@@ -1,0 +1,498 @@
+<title>The As-Built Gap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+  :root{
+    --ground:#EAEDEF; --panel:#F7F8F9; --panel-2:#E2E7EA;
+    --ink:#13191D; --ink-soft:#3A464E; --muted:#657179;
+    --rule:#C3CCD2; --rule-soft:#D6DDE1;
+    --blue:#16457C; --blue-soft:#2C63A4;
+    --hivis:#B8590A; --hivis-soft:#D2700F;
+    --good:#1F6B4A;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0D1317; --panel:#141C22; --panel-2:#1B252C;
+      --ink:#DFE6EA; --ink-soft:#B3BFC7; --muted:#87949C;
+      --rule:#28343C; --rule-soft:#1E2930;
+      --blue:#8CBBEE; --blue-soft:#6FA3DC;
+      --hivis:#F09340; --hivis-soft:#D97F2C;
+      --good:#5FBF92;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0D1317; --panel:#141C22; --panel-2:#1B252C;
+    --ink:#DFE6EA; --ink-soft:#B3BFC7; --muted:#87949C;
+    --rule:#28343C; --rule-soft:#1E2930;
+    --blue:#8CBBEE; --blue-soft:#6FA3DC;
+    --hivis:#F09340; --hivis-soft:#D97F2C;
+    --good:#5FBF92;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Source Serif 4",Georgia,serif;
+    font-size:17px; line-height:1.65;
+    margin:0; padding:0 20px 96px;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:0;min-width:0}
+  .wrap>*,section>*{min-width:0;max-width:100%}
+
+  /* ---- masthead ---- */
+  header.mast{padding:56px 0 0;display:flex;flex-direction:column;gap:18px}
+  .eyebrow{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);margin:0;
+  }
+  h1{
+    font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+    font-weight:800;letter-spacing:-.03em;line-height:1.02;
+    font-size:clamp(38px,9vw,64px);margin:0;text-wrap:balance;color:var(--ink);
+  }
+  .standfirst{
+    font-size:clamp(18px,3.4vw,21px);line-height:1.5;color:var(--ink-soft);
+    margin:0;max-width:34em;
+  }
+  .meta{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+    color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 18px;margin:0;
+  }
+
+  /* ---- dimension-line divider: a measured span, not decoration ---- */
+  .dim{display:flex;align-items:center;gap:0;margin:52px 0 0;height:12px}
+  .dim i{display:block;width:1px;height:11px;background:var(--rule);flex:0 0 auto}
+  .dim span{display:block;height:1px;background:var(--rule);flex:1 1 auto}
+
+  section{display:flex;flex-direction:column;gap:16px;padding-top:20px}
+  h2{
+    font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+    font-weight:800;letter-spacing:-.02em;line-height:1.12;
+    font-size:clamp(24px,5vw,32px);margin:0;text-wrap:balance;
+  }
+  h2 .num{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:500;
+    font-size:.55em;color:var(--hivis);letter-spacing:0;
+    display:inline-block;margin-right:.7em;vertical-align:.18em;
+  }
+  h3{
+    font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+    font-weight:600;font-size:17px;letter-spacing:.01em;margin:14px 0 0;color:var(--ink);
+  }
+  p{margin:0;max-width:66ch;overflow-wrap:break-word}
+  strong{font-weight:600;color:var(--ink)}
+  a{color:var(--blue);text-underline-offset:2px}
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--hivis);outline-offset:3px;border-radius:2px}
+
+  ul,ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:9px;max-width:66ch}
+  li::marker{color:var(--muted)}
+  ol.gap{padding-left:0;list-style:none;counter-reset:g}
+  ol.gap li{
+    counter-increment:g;position:relative;padding-left:38px;
+  }
+  ol.gap li::before{
+    content:counter(g,decimal-leading-zero);
+    position:absolute;left:0;top:.28em;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;font-weight:500;
+    color:var(--hivis);letter-spacing:.04em;
+  }
+
+  /* ---- provenance chips ---- */
+  .tag{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    padding:2px 6px;border:1px solid var(--rule);border-radius:2px;
+    color:var(--muted);white-space:nowrap;display:inline-block;
+    vertical-align:1px;line-height:1.5;
+  }
+  .tag.v{color:var(--blue);border-color:var(--blue-soft)}
+  .tag.d{color:var(--good);border-color:var(--good)}
+
+  /* ---- tables ---- */
+  .scroll{overflow-x:auto;max-width:100%;border:1px solid var(--rule);border-radius:3px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;min-width:560px;
+    font-family:Archivo,"Helvetica Neue",Arial,sans-serif;font-size:14px;line-height:1.45}
+  caption{
+    caption-side:top;text-align:left;padding:12px 14px 0;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  }
+  th,td{padding:11px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule-soft)}
+  thead th{
+    font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);border-bottom:1px solid var(--rule);background:var(--panel-2);
+    position:sticky;top:0;
+  }
+  tbody tr:last-child td{border-bottom:0}
+  td.num,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:13px}
+  td .name{font-weight:600;color:var(--ink)}
+
+  /* ---- callout ---- */
+  .call{
+    background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--hivis);
+    border-radius:3px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;
+  }
+  .call .lbl{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--hivis);
+  }
+  .call p{font-size:18px;line-height:1.55}
+
+  blockquote{
+    margin:0;padding:0 0 0 20px;border-left:2px solid var(--blue);
+    font-size:19px;line-height:1.5;color:var(--ink);max-width:60ch;
+  }
+
+  .verdict{
+    background:var(--panel);border:1px solid var(--rule);border-radius:3px;
+    padding:20px;display:flex;flex-direction:column;gap:12px;
+  }
+  .verdict ol{padding-left:1.2em}
+
+  footer{margin-top:8px;padding-top:20px;border-top:1px solid var(--rule);
+    font-size:13px;color:var(--muted);line-height:1.6}
+  footer p{max-width:none}
+  details{font-size:13px;color:var(--muted)}
+  summary{cursor:pointer;font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue)}
+  details .srcs{margin-top:12px;line-height:1.9;word-break:break-word}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Field research · 19 August 2026</p>
+  <h1>The As-Built Gap</h1>
+  <p class="standfirst">Every scanning app on the market sells you a scan. None of them sells a
+  measured building that a human has signed off on. That is the whole opening.</p>
+  <p class="meta"><span>Interior reality capture</span><span>·</span><span>Remodelers &amp; general contractors</span><span>·</span><span>iOS LiDAR</span></p>
+</header>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">01</span>Photos alone will not measure a room</h2>
+  <p>The ask was “take pictures and get measurements out of them.” The measuring half is the
+  hard half, and the capture technology decides whether it is possible at all.</p>
+
+  <div class="scroll">
+    <table>
+      <caption>Accuracy on interior walls — published figures, none measured here</caption>
+      <thead><tr><th>Method</th><th>Accuracy</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td class="name">iPhone LiDAR, drift-corrected</td><td class="num">≈ ½ in, rooms to 40 ft</td><td><span class="tag">review</span></td></tr>
+        <tr><td class="name">iPhone LiDAR, raw Apple frameworks</td><td class="num">± 2–4 in across 20 ft</td><td><span class="tag">review</span></td></tr>
+        <tr><td class="name">Apple RoomPlan output</td><td class="num">± 5 cm drift per wall</td><td><span class="tag">review</span></td></tr>
+        <tr><td class="name">Photogrammetry — photos only</td><td class="num">± 5–15 cm per wall</td><td><span class="tag">review</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Photogrammetry fails indoors for a reason that cannot be engineered away: <strong>plain
+  painted drywall has no texture for the solver to match against.</strong> It wins on small
+  objects and organic shapes. It loses on flat interior surfaces — which is the entire subject
+  of a floor plan.</p>
+
+  <div class="call">
+    <span class="lbl">The product, in one line</span>
+    <p>Depth capture <em>measures</em>. The human’s typed number <em>overrides</em>. Photos are
+    the visual record and the evidence — never the ruler.</p>
+  </div>
+</section>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">02</span>This cannot be a website</h2>
+  <p>WebXR handheld AR is <strong>still unsupported in Safari on iPhone and iPad in 2026</strong>.
+  Depth sensing, plane detection and mesh detection have limited or no support, and there is no
+  browser path to LiDAR at all. The Depth Sensing Module remains a W3C Working Draft.</p>
+  <p>Workarounds exist — 8th Wall runs its own SLAM on the camera feed inside stock Safari,
+  Variant Launch injects a real WebXR API through App Clips — but none of them reach LiDAR, and
+  LiDAR is where the accuracy lives.</p>
+  <p><strong>So: a native iOS scanner, and the web for everything else.</strong> Projects, the
+  2D and 3D viewer, the builder, accounts, sharing and PDF output all run fine in a browser on
+  any tablet or desktop.</p>
+</section>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">03</span>Apple gives a free head start. Android does not.</h2>
+  <p>Apple’s <strong>RoomPlan</strong> returns a <em>parametric</em> room — walls, doors,
+  windows, openings — not just a point cloud <span class="tag d">docs</span>. Android’s
+  <strong>ARCore Depth API</strong> reaches over 87% of active devices and needs no
+  time-of-flight sensor, but returns raw depth only. <strong>There is no RoomPlan equivalent on
+  Android</strong>; the open feature request on Google’s SDK has no ship date.</p>
+  <p>Android is therefore not “the same app on another platform.” It is: build wall-plane
+  fitting, corner solving and opening detection from scratch. Defer it — and design the data
+  format so it can arrive later without a rewrite.</p>
+
+  <h3>RoomPlan’s real limits — engineer around these, not away from them</h3>
+  <ul>
+    <li>Walls are modelled at a <strong>uniform ~16 cm thickness</strong> regardless of reality;
+    anything over ~50 cm splits into two thin walls. Handling improved in iOS 18.</li>
+    <li>Only a fixed set of common household objects is recognised.</li>
+    <li>Double doors and door/window combinations <strong>merge incorrectly</strong>.</li>
+    <li>Max scan area ~<strong>9 × 9 m (30 × 30 ft)</strong>; longer sessions drift, overheat and
+    degrade tracking. A session should not exceed <strong>five minutes</strong>.</li>
+    <li>Each room arrives <strong>in its own coordinate system</strong>, and Apple’s own merge is
+    limited to <strong>one floor, one horizontal plane</strong> <span class="tag d">docs</span>.</li>
+    <li>Merging simplifies geometry — it optimises how the model <em>looks</em> at the expense of
+    how accurate it <em>is</em>.</li>
+  </ul>
+
+  <div class="call">
+    <span class="lbl">Read that last cluster again</span>
+    <p>Multi-room and multi-storey stitching is exactly where every consumer scanner visibly
+    falls apart — and exactly what “multiple rooms, houses, buildings” demands. Houses have
+    stairs. Apple’s merge stops at one floor.</p>
+  </div>
+</section>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">04</span>The field</h2>
+  <div class="scroll">
+    <table>
+      <caption>What already exists · prices as published or as reported</caption>
+      <thead><tr><th>Product</th><th>Capture</th><th>Price</th><th>Exports</th><th>Best at</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="name">magicplan</td><td>iPhone LiDAR + sketch</td>
+          <td class="num">~$33.33/mo <span class="tag">review</span><br>free: 2 projects</td>
+          <td>PDF, DXF, IFC, <strong>ESX → Xactimate</strong> <span class="tag v">vendor</span></td>
+          <td>Restoration &amp; insurance claims</td>
+        </tr>
+        <tr>
+          <td class="name">Polycam</td><td>LiDAR + photogrammetry</td>
+          <td class="num">~$150/yr Basic<br>$36/mo Business</td>
+          <td>15+ formats — but the full set is gated to Business/Enterprise <span class="tag v">vendor</span></td>
+          <td>General 3D capture, export breadth</td>
+        </tr>
+        <tr>
+          <td class="name">CubiCasa</td><td>phone walk-through</td>
+          <td class="num">$22.99–$29.99/scan<br>up to $460–600/scan</td>
+          <td>floor plans; developer API <span class="tag v">vendor</span></td>
+          <td>Real-estate volume</td>
+        </tr>
+        <tr>
+          <td class="name">Canvas / Twindo</td><td>iPad Pro LiDAR</td>
+          <td class="num">~$29/mo</td>
+          <td>CAD — via <strong>humans</strong>, 1–2 day turnaround</td>
+          <td>Scan-to-CAD accuracy</td>
+        </tr>
+        <tr>
+          <td class="name">Matterport</td><td>Pro3 camera ~$6,000, or phone</td>
+          <td class="num">$65–$309/mo<br>$350–1,000 per pro scan</td>
+          <td>hosted tour + embed link</td>
+          <td>Marketing tours</td>
+        </tr>
+        <tr>
+          <td class="name">Hover</td><td>smartphone <strong>photos</strong></td>
+          <td class="num">$99/mo <em>plus</em><br>$29–$139 per project</td>
+          <td>50+ integrations incl. Xactimate</td>
+          <td><strong>Exteriors</strong> — roofing, siding</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <blockquote>Matterport’s own positioning says its AI floor plans are “not CAD-accurate
+  drawings and should not be used for construction or renovation planning.”</blockquote>
+  <p>The biggest name in the category explicitly disclaims the exact job your friend needs done.</p>
+
+  <h3>Two structural facts</h3>
+  <ul>
+    <li><strong>Nobody owns interiors + accuracy + estimating together.</strong> Hover owns
+    exteriors. magicplan owns insurance restoration. Polycam owns raw 3D. Canvas owns CAD by
+    paying humans. CubiCasa owns real-estate volume. <em>The remodeler doing interior as-builts
+    to price a job is served by pieces of all of them and the whole of none.</em></li>
+    <li><strong>Almost everyone meters per scan.</strong> Reviews are blunt that this “punishes
+    low-volume contractors” — under ten jobs a month the math stops working. A flat seat price
+    is a real weapon here.</li>
+  </ul>
+</section>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">05</span>What users complain about</h2>
+  <p>Collected from app-store review aggregators and review sites. Reported complaints, not my
+  testing.</p>
+
+  <h3>Polycam</h3>
+  <ul>
+    <li>Pricing structure, “perceived misleading free trials”, unexpected charges.</li>
+    <li><strong>Dimensions and floor-plan detail locked behind higher tiers</strong> — users call
+    these “essential to using the application.”</li>
+    <li>Crashes and processing failures; scans stopping mid-capture; the app closing without
+    producing a plan.</li>
+    <li><strong>Users reported losing hundreds of scans after upgrading</strong>, with no remedy.</li>
+  </ul>
+
+  <h3>magicplan</h3>
+  <ul>
+    <li>Subscription cost called prohibitive for independents; unclear ROI for infrequent users.</li>
+    <li>Mixed accuracy — some report solid results and reliable door/window detection, others
+    report discrepancies that propagate into layout errors.</li>
+  </ul>
+
+  <h3>Floor-plan tools generally</h3>
+  <ul>
+    <li><strong>“The biggest frustration is export limitations, not design features.”</strong>
+    The tool looks great until you need to hand something to a client.</li>
+    <li>Missing roles and permissions, version control, and communication tools.</li>
+    <li><strong>Seat limits push teams into sharing credentials</strong> — a security problem and
+    a growth blocker.</li>
+  </ul>
+
+  <h3>And the workflow itself</h3>
+  <ul>
+    <li>Professionals spend <strong>8 to 24 hours</strong> measuring one residential space.</li>
+    <li>Miss one measurement and it is another trip to site.</li>
+    <li>Teams trust decades-old CAD files that are “artifacts, not reality” — no undocumented
+    renovations, no structural sag.</li>
+    <li>Errors stay hidden until framing or equipment placement, then get paid for through RFIs,
+    redesign, rework and coordination churn.</li>
+  </ul>
+</section>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">06</span>What they wish they had</h2>
+  <p>Each line below is a feature we can build, derived from the complaints above and the
+  technical limits in §03.</p>
+  <ol class="gap">
+    <li><strong>A correction layer that re-solves.</strong> Type the real number for one wall and
+    every connected room, corner, opening and quantity updates around it. Existing apps let you
+    edit a value; they do not propagate it. Highest-value differentiator by a distance.</li>
+    <li><strong>Multi-room and multi-storey stitching that survives.</strong> Corner-anchored
+    capture plus loop closure — the known SLAM answer to accumulated drift.</li>
+    <li><strong>Dimensions never paywalled.</strong> The thing Polycam users are angriest about.</li>
+    <li><strong>Exports that keep their dimensions.</strong> magicplan’s own help page states DXF
+    export to SketchUp/AutoCAD <em>does not include dimensions</em>. Small engineering job,
+    large sales line.</li>
+    <li><strong>Real roles and permissions</strong>, and enough seats that nobody shares a password.</li>
+    <li><strong>Version history on a plan</strong> — which measurement changed, who changed it,
+    when, and what it was before. Nobody offers it; every remodeler needs it the day a client
+    disputes a number.</li>
+    <li><strong>Flat pricing.</strong> No per-scan meter.</li>
+    <li><strong>Offline capture in a basement</strong>, syncing when signal returns.</li>
+    <li><strong>Wall thickness that is real</strong> — not a uniform 16 cm — with a fast way to
+    say “these are 2×4, these are 2×6, that one is masonry.”</li>
+    <li><strong>Confidence shown honestly.</strong> Mark every dimension as scanned (±) or
+    human-verified (exact). Someone ordering cabinets needs to know which is which. No competitor
+    does this and it is nearly free to build.</li>
+  </ol>
+</section>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">07</span>Ideas past the edge of the field</h2>
+  <ul>
+    <li><strong>Scan → scope → price.</strong> Areas, wall runs, opening counts and ceiling
+    heights fall out of the model free. Turn them into quantities: drywall SF, paint SF less
+    openings, flooring SF plus waste, baseboard LF. This is the bridge to Plumbline and the
+    reason the thing pays for itself. Prices come from the company’s own accepted-estimate
+    history — never invented.</li>
+    <li><strong>A verification punch list.</strong> After a scan, the app names the six dimensions
+    it is least sure about and asks for a tape check on those. Turns 8–24 hours of measuring
+    into a 20-minute walk plus six checks.</li>
+    <li><strong>Before/after overlay.</strong> Re-scan mid-job and diff against the as-built.
+    Shows the client what changed; catches framing that went in wrong.</li>
+    <li><strong>Anchors that survive.</strong> Drop a persistent marker at a corner so next
+    week’s re-scan lands in the same coordinate system instead of drifting into a new one.</li>
+    <li><strong>Photo pins in 3D.</strong> Every photo attaches to the point it was taken from,
+    so “the outlet behind the fridge” is findable six weeks later.</li>
+    <li><strong>Hidden conditions marked in space</strong> — joist runs, the stack, the
+    knob-and-tube they found — pinned in the model, not buried in a note.</li>
+    <li><strong>A client link with a 3D walkthrough and no login.</strong> Matterport’s entire
+    business is this one feature.</li>
+    <li><strong>Xactimate ESX export</strong>, if he touches insurance restoration at all. It is
+    magicplan’s strongest moat and the reason restoration contractors pay $33 a month.</li>
+    <li><strong>Exteriors later.</strong> Hover proves photos-only works outside, where brick,
+    siding and shingles give the solver the texture drywall never will.</li>
+    <li><strong>AI writes words, never numbers.</strong> A drafted scope of work off the model —
+    every figure in it from geometry or SQL, never from the model’s imagination.</li>
+  </ul>
+</section>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">08</span>Where this wins</h2>
+  <div class="verdict">
+    <blockquote>Everyone else sells a scan. This sells a <strong>measured building a human has
+    signed off on</strong> — one that gets more accurate every time somebody checks a number,
+    and that turns into a priced scope.</blockquote>
+    <p style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">The wedge, most defensible first</p>
+    <ol>
+      <li>The <strong>correction layer</strong> — typed exact measurements that re-solve the model.</li>
+      <li><strong>Stitching that holds</strong> across rooms and floors, where Apple’s own merge gives up.</li>
+      <li><strong>Confidence marking</strong> — scanned vs. verified, visible on every dimension.</li>
+      <li><strong>Flat seat pricing</strong> against a market that meters per scan.</li>
+      <li><strong>Scan → priced scope</strong>, through the seam to Plumbline.</li>
+    </ol>
+  </div>
+</section>
+
+<div class="dim"><i></i><span></span><i></i></div>
+
+<section>
+  <h2><span class="num">09</span>What could not be researched from here</h2>
+  <ul>
+    <li>CubiCasa’s API pricing is not published — it requires contacting them.</li>
+    <li>Measure Square’s pricing was not found.</li>
+    <li>Canvas/Twindo and PLNAR feature detail beyond the summary above was not found.</li>
+    <li><strong>There is no LiDAR device in this environment. No accuracy figure in this document
+    was measured by me.</strong> All are cited from published sources and must be re-validated
+    against the actual device and actual rooms before any of them is ever repeated to a customer.</li>
+  </ul>
+</section>
+
+<footer>
+  <details>
+    <summary>Sources</summary>
+    <div class="srcs">
+      developer.apple.com/documentation/RoomPlan/merging-multiple-scans-into-a-single-structure ·
+      it-jim.com/blog/roomplan-framework-by-apple ·
+      developers.google.com/ar/develop/java/depth/developer-guide ·
+      github.com/google-ar/arcore-android-sdk/issues/1772 ·
+      xrdoctors.pro/blog/webxr-on-ios-what-actually-works ·
+      testmuai.com/learning-hub/webxr-compatible-browsers ·
+      w3.org/TR/2025/WD-webxr-depth-sensing-1-20250521 ·
+      scanmanifold.com/blog-posts/lidar-on-iphone-how-accurate-is-it-plus-the-biggest-errors-that-manifold-corrects ·
+      amrax.ai/blog/lidar-vs-photogrammetry ·
+      help.magicplan.app/export-formats · help.magicplan.app/ifc-and-bim ·
+      magicplan.app/integrations/xactimate · help.magicplan.app/xactimate-integration ·
+      softwareworld.co/software/magicplan-reviews · bizwarely.com/articles/magicplan-app-review-floor-plans ·
+      learn.poly.cam/hc/en-us/articles/27756102599572-What-File-Types-Can-Polycam-Export ·
+      appsupports.co/1532482376/polycam-lidar-3d-scanner/negative-reviews ·
+      cubi.casa/pricing · cubi.casa/developers · capterra.com/p/193054/CubiCasa ·
+      contractortoolstack.com/software/hover · roofingsoftwareguide.com/guides/hover-pricing ·
+      thefuture3d.com/learn/matterport-cost-guide · scanmanifold.com/blog-posts/matterport-pricing-2026-contractors ·
+      existingconditions.com/service/as-built-drawings ·
+      iscano.com/laser-scanning-lidar-best-practices/as-built-documentation-best-practices ·
+      bimheroes.com/building-remodeling ·
+      oxmaint.com/blog/post/best-3d-mapping-robots-facility-maintenance-lidar-2026 ·
+      poly.cam/blog/how-to-scan-a-building-interior-exterior-and-multi-story-workflows ·
+      apps.apple.com/us/app/ar-plan-measure-room-scanner/id1459846158 ·
+      apps.apple.com/ca/app/roomscan-classic/id673673795
+    </div>
+  </details>
+  <p style="margin-top:18px">Research compiled 19 August 2026. <span class="tag v">vendor</span> read
+  off the company’s own page · <span class="tag">review</span> reported by a third party, not
+  independently confirmed · <span class="tag d">docs</span> platform developer documentation.</p>
+</footer>
+
+</div>
