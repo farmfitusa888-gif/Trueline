@@ -1,0 +1,15 @@
+{
+  "name": "@trueline/core",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Exact lengths and measurement provenance. No floats, no guessing.",
+  "scripts": {
+    "test": "node --experimental-strip-types --test src/test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

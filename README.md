@@ -51,4 +51,19 @@ is proven.
 
 ## Status
 
-Research and decisions complete. No application code yet.
+| | |
+|---|---|
+| Tests | **31 passing, 0 failing** (`npm test`) |
+| Typecheck | clean (`npm run typecheck`) |
+| Verified against | Node 22.22 |
+
+Built so far: `core/` — the measurement layer. Exact lengths in bigint nanometres,
+feet-inches-fractions parsing and formatting, metric, and the provenance model that marks
+every number scanned, verified or derived and refuses to let a sensor's guess read like a fact.
+
+Not built yet: the iOS scanner, the geometry solver, the web viewer, the API, anything with
+a screen.
+
+```bash
+cd trueline && npm install && npm test && npm run typecheck
+```
