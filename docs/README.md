@@ -2,17 +2,40 @@
 
 | File | What it is |
 |---|---|
-| `scanning-field-card.pdf` | Two-page field card for scanning a room. Print it, take it on site, fill in the tape log. |
-| `scanning-field-card.html` | The source the PDF is built from. Edit this, never the PDF. |
+| `scanning-field-card.pdf` | Three-page illustrated field card. Print it, take it on site, write on page 3. |
+| `scanning-field-card.html` | Generated. Do not hand-edit — it is overwritten on every build. |
+| `build/diagrams.py` | The four SVG diagrams. Edit here. |
+| `build/build_card.py` | Composes the card and finds a layout that fits. Edit here. |
 | `market-research.html` | What the field already does, and where the gap is. |
 
-## Rebuilding the field card
+## Rebuilding the card
 
 ```bash
+cd docs/build && python3 build_card.py          # writes guide.html, prints the page count
 chromium --headless --no-pdf-header-footer \
-  --print-to-pdf=docs/scanning-field-card.pdf docs/scanning-field-card.html
+  --print-to-pdf=../scanning-field-card.pdf guide.html
 ```
 
-It must come out at **exactly two US Letter pages**. If it grows to three, content was
-added — trim it rather than letting it spill, because a field card that runs onto a
-near-empty third page stops getting printed.
+`build_card.py` walks a ladder of type sizes and tape-log row counts and stops at the
+first combination that lands on **three pages**, so adding content does not silently push
+the card to four — it re-fits, or the ladder runs out and says so.
+
+## Two rules for editing it
+
+**Never shrink the type to make something fit.** It is read at arm's length on a job site.
+Cut words, or let the card grow a page. The ladder starts at 9.2pt and will not go below
+what was set when it was last verified.
+
+**Look at the rendered pages before committing.** Every layout change here has broken
+something that only showed up in the render — labels running off an SVG artboard, a caption
+landing under a sofa, a masthead clipped at the margin, footers stranded on their own page.
+Rasterise and look:
+
+```python
+import pypdfium2 as pdfium
+pdf = pdfium.PdfDocument("scanning-field-card.pdf")
+[pdf[i].render(scale=1.5).to_pil().save(f"p{i+1}.png") for i in range(len(pdf))]
+```
+
+Check greyscale too — the card gets photocopied. The diagrams carry meaning in line weight
+and dash pattern as well as colour, and that has to stay true.
