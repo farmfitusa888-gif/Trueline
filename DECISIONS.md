@@ -53,6 +53,24 @@ Interiors first. Then, all confirmed on the roadmap:
    page admits theirs lack.
 4. **Insurance restoration** — Xactimate ESX export.
 
+## Occlusion-aware confidence
+
+Raised by Sam while planning the first capture, and it is a feature rather than a caveat.
+
+RoomPlan returns detected objects — 16 categories: storage, sofa, table, chair, bed,
+refrigerator, oven, stove, dishwasher, washer/dryer, fireplace, sink, bathtub, toilet, stairs,
+TV — as records separate from the walls. Their positions are therefore known.
+
+So the app can work out **which walls it could not actually see**, mark those lower confidence
+without being told, and push them to the top of the verification punch list: *"these three walls
+had furniture against them — put a tape on these first."* No competitor does this, and the data
+needed for it is already in every scan.
+
+Background: Apple names furniture occlusion as a known RoomPlan limitation. On iOS 17 walls
+could encroach into the room where furniture sat flush against them, improved in iOS 18. Sam's
+test device runs iOS 26.6, far downstream of both, and no findings specific to RoomPlan on iOS 26
+were located — his capture is the evidence, not the published complaints.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.

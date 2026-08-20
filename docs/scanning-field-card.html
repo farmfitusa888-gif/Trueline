@@ -54,7 +54,7 @@
   .fill td.blank { background:#FCFCFD; }
 
   footer { break-inside:avoid; margin-top:8pt; padding-top:5pt; border-top:0.7pt solid #B9C1C6;
-           font-size:7.8pt; color:#5B656B; line-height:1.45; }
+           font-size:7.2pt; color:#5B656B; line-height:1.4; }
   .pagebreak { break-before:page; }
 </style></head><body>
 
@@ -83,17 +83,14 @@ afterwards — it has to be walked again.</p>
     </div>
   </div>
   <p><b>Why 4–6 ft:</b> the whole wall run has to be in frame, including where it meets the floor.
-  Hug the wall and the sensor only ever sees a patch — no long straight edge to fit a plane to. Stand
-  too far back in a big room and the far wall is past range. Minimum working distance is ~8–10 in.</p>
+  Hug it and the sensor sees only a patch, with no long straight edge to fit a plane to. Minimum working distance ~8–10 in.</p>
 </section>
 
 <section>
   <h2><span class="n">02</span>How to hold it</h2>
   <table>
     <tr><td class="k">Height</td><td><b>Chest height</b>, tilted slightly down.</td></tr>
-    <tr><td class="k">Aim</td><td>So the camera sees <b>where the wall meets the floor</b>. That joint is the
-      strongest signal the scanner has for finding the room's outline. Pointing level at blank
-      drywall gives it almost nothing to work with.</td></tr>
+    <tr><td class="k">Aim</td><td>So the camera sees <b>where the wall meets the floor</b> — the strongest signal the scanner has. Held level at blank drywall it gets almost nothing.</td></tr>
     <tr><td class="k">Grip</td><td>Two hands. Elbows in. Smooth beats fast.</td></tr>
   </table>
 </section>
@@ -116,6 +113,7 @@ afterwards — it has to be walked again.</p>
     <tr><td class="k">Under 30 × 30 ft</td><td>Apple's recommended maximum scan area. Bigger spaces get split into separate scans.</td></tr>
     <tr><td class="k">One room per scan</td><td>Do not try to walk the house in one go. Each room is its own capture.</td></tr>
     <tr><td class="k">Glass &amp; mirrors</td><td>Reflective surfaces cut reliability. Note where they are rather than trusting them.</td></tr>
+    <tr><td class="k">Furniture</td><td>Leave it — a furnished room is the real job. Pick up loose floor clutter, note which walls are blocked, and <b>tape only walls that are clear</b>.</td></tr>
   </table>
   <div class="warn">
     <span class="lbl">If the app tells you something, it wins</span>
@@ -141,10 +139,11 @@ afterwards — it has to be walked again.</p>
 <section>
   <h2><span class="n">05</span>The tape log — the most valuable thing you do</h2>
   <p class="lede">A scan on its own has no ground truth. Tape three or four walls per room and write the
-  numbers here — it turns "accurate within a published range" into "accurate within a figure we measured."</p>
+  numbers here — it turns "accurate within a published range" into "accurate within a figure we measured."
+  <b>Tape walls clear of furniture</b>, or sensor error and occlusion get confounded and the reading is wasted.</p>
 
   <table class="fill">
-    <thead><tr><th style="width:22%">Room</th><th style="width:24%">Which wall</th><th style="width:20%">Tape says</th><th style="width:20%">Scan says</th><th>Notes</th></tr></thead>
+    <thead><tr><th style="width:22%">Room</th><th style="width:24%">Which wall</th><th style="width:20%">Tape says</th><th style="width:20%">Scan says</th><th>Notes &mdash; mark &ldquo;B&rdquo; if blocked</th></tr></thead>
     <tbody>
       <tr><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
       <tr><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
@@ -164,8 +163,7 @@ afterwards — it has to be walked again.</p>
   <h2><span class="n">06</span>Also worth writing down</h2>
   <p><b>Scan time per room</b> — bumping five minutes on a normal room explains a lot of drift on its own.
   <b>Which device</b>, and whether more than one was used on the same room.
-  <b>What it got visibly wrong</b> — a double door read as one, a closet swallowed, a wall split in two,
-  an angled wall squared off. Those are the failure modes worth catching now rather than in six months.</p>
+  <b>What it got visibly wrong</b> — a double door read as one, a closet swallowed, a wall split in two. Those are the failure modes worth catching now.</p>
 </section>
 
 <section>
