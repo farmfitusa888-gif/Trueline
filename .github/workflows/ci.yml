@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core:
+    name: Core — tests and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm test
+      - run: npm run typecheck
+
+  cad:
+    name: Does the DXF draw in real CAD?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # A parser is not a renderer and a renderer library is not CAD. Two
+      # confident wrong findings came from forgetting that, so this job runs a
+      # real CAD engine and fails if the drawing does not draw.
+      - name: Install LibreCAD
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends librecad xvfb
+
+      - name: Install verification tools
+        run: pip install --quiet ezdxf pypdfium2 pillow
+
+      - name: Render the DXF through LibreCAD
+        run: ./core/tools/verify-in-cad.sh

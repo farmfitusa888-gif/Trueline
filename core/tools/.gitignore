@@ -1,0 +1,7 @@
+node_modules/
+package.json
+package-lock.json
+proof.dxf
+proof.pdf
+*.png
+!librecad-render.png

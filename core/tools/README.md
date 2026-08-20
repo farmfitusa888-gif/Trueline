@@ -42,7 +42,18 @@ from the definition points, which is what AutoCAD does too. LibreCAD drew all th
 The lesson is in the tooling, not the library: **a parser is not a renderer, and a renderer
 library is not CAD.** Verify against the thing the customer opens.
 
-## The defect that is real: units
+## The units defect — found, and fixed at the source
+
+`proof.dxf` originally carried **`$INSUNITS = 0`**, meaning unitless, and LibreCAD printed a
+blank sheet until the header was forced. With no declared unit a CAD application guesses, and
+for a contractor that is a plan that prints at the wrong size — worse than one that will not
+print, because it looks correct.
+
+**This was mine, not the library's.** `@tarikjabiri/dxf` exposes `setUnits()` and
+`setVariable()`; the generator simply never called them. It does now, and
+`verify-in-cad.sh` **fails** rather than warns if `$INSUNITS` is ever 0 again.
+
+## Superseded: the defect that was real
 
 `proof.dxf` carries **`$INSUNITS = 0`**, meaning unitless. `@tarikjabiri/dxf` does not write
 it. LibreCAD printed the file as a blank sheet until the header was forced to millimetres —
@@ -53,6 +64,12 @@ does not print at all, because it looks fine.
 
 **Trueline must set `$INSUNITS` explicitly on every export.** It is one header value and it
 is not optional.
+
+## sample-plan.dxf
+
+A committed copy of the generated output, so it can be downloaded and opened in a CAD
+application without running anything. It declares inches (`$INSUNITS=1`) and contains three
+dimensions on the confidence layers.
 
 ## Running the check
 

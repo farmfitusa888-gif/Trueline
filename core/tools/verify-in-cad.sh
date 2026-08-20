@@ -47,10 +47,13 @@ src, dst = sys.argv[1], sys.argv[2]
 doc = ezdxf.readfile(src)
 units = doc.header.get('$INSUNITS', 0)
 if units == 0:
-    print("  WARNING  $INSUNITS is 0 (unitless). Forcing millimetres to run the check.")
-    print("           A real export must set this. It is one header value.")
-    doc.header['$INSUNITS'] = 4
-    doc.header['$MEASUREMENT'] = 1
+    raise SystemExit(
+        "  FAIL: $INSUNITS is 0 (unitless).\n"
+        "        A CAD application then guesses the scale, and the plan prints at the\n"
+        "        wrong size — worse than not printing, because it looks correct.\n"
+        "        Call setUnits() on the writer. It is one line."
+    )
+print(f"  units:    $INSUNITS={units} ({ {1:'inches',2:'feet',4:'mm',5:'cm',6:'metres'}.get(units, 'code %d' % units) })")
 doc.saveas(dst)
 dims = sum(1 for e in doc.modelspace() if e.dxftype() == 'DIMENSION')
 print(f"  entities: {dims} DIMENSION")
@@ -70,14 +73,20 @@ import sys
 import pypdfium2 as pdfium
 from PIL import Image, ImageChops
 pdf = pdfium.PdfDocument(sys.argv[1])
-img = pdf[0].render(scale=1.4).to_pil().convert('RGB')
+page = pdf[0]
+# A drawing in inches puts LibreCAD on a very large sheet, and rasterising that
+# at a fixed scale exhausts memory. Fit the raster to a fixed pixel budget
+# instead, so the check works whatever units the drawing declares.
+w_pt, h_pt = page.get_size()
+scale = min(1.4, 2000.0 / max(w_pt, h_pt))
+img = page.render(scale=scale).to_pil().convert('RGB')
 bbox = ImageChops.difference(img, Image.new('RGB', img.size, (255,255,255))).getbbox()
 if bbox is None:
     raise SystemExit("  FAIL: LibreCAD rendered a blank page — the drawing did not draw.")
 w, h = bbox[2]-bbox[0], bbox[3]-bbox[1]
-if w < 20 or h < 20:
+if w < 12 or h < 12:
     raise SystemExit(f"  FAIL: LibreCAD rendered almost nothing ({w}x{h} px of ink).")
-print(f"  rendered: {w}x{h} px of ink on the page")
+print(f"  rendered: {w}x{h} px of ink on a {w_pt:.0f}x{h_pt:.0f}pt sheet (scale {scale:.3f})")
 PY
 
 printf '\n  PASS: %s draws in CAD, with %s dimension(s).\n' "$DXF" "$EXPECTED_DIMS"

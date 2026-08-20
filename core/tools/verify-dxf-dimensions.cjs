@@ -1,6 +1,12 @@
-const { DxfWriter, point3d, Colors } = require('@tarikjabiri/dxf');
+const { DxfWriter, point3d, Colors, Units } = require('@tarikjabiri/dxf');
 
 const w = new DxfWriter();
+
+// Declare the unit. A DXF without $INSUNITS is unitless, and a CAD application
+// then guesses the scale — which is a plan that prints at the wrong size, and
+// that is worse than one that will not print, because it looks correct.
+// Everything below is in inches.
+w.setUnits(Units.Inches);
 
 // Confidence as layers — the thing that survives DXF's floating point boundary.
 w.addLayer('TRUELINE-WALLS', Colors.White);
