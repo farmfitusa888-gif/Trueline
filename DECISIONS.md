@@ -238,6 +238,78 @@ works out which walls something was standing against and how much of each that h
 - A verified wall never appears, whatever stands in front of it. What the sensor could see
   stopped mattering the moment a person signed for the number.
 
+## What to take from them, and what it costs
+
+### The DXF recommendation was wrong, and here is the correction
+
+I recommended lifting their DXF exporter as "weeks saved". Checking it: their DXF export
+uses the **`dxf-writer`** npm package — MIT, version 1.18.4, last published about four years
+ago — which supports line, polyline, 3DFace, arc, circle and text. **It has no DIMENSION
+entity.**
+
+So their DXF cannot carry live dimensions either. There is nothing valuable to lift, and the
+differentiator needs a writer that emits real `DIMENSION` entities. `@tarikjabiri/dxf`
+(`dxfjs/writer`) surfaced as a TypeScript DXF generator and is the candidate — **its
+dimension support and its licence have not been verified** and must be before it is promised
+to anyone.
+
+### What MIT actually obliges
+
+One thing: ship their copyright notice and permission notice with any copy or substantial
+portion. In practice a `NOTICES` file in the repository and an acknowledgements screen in the
+app.
+
+It does **not** restrict keeping Trueline closed source, selling it, modifying their code,
+declining to contribute anything back, or combining it with proprietary code.
+
+Two costs that are real but not legal:
+
+- **No warranty.** Their bugs become our bugs, and our customers blame us, not them.
+- **MIT is silent on patents**, where Apache 2.0 grants them explicitly. Negligible here, but true.
+
+### It cannot jeopardise the photo work — they do not touch
+
+Their code is TypeScript running in a browser. Photo and pose capture is Swift and ARKit
+running on the phone. Different language, different device, different process. The single
+contact point is that at export time geometry is handed to an exporter, and DXF cannot carry
+a photo pose regardless — it is a 2D vector drawing format.
+
+Worth stating once: **at the DXF boundary, provenance and exactness are lost.** DXF stores
+floating-point drawing units. That is the format, not their code. What can survive is
+confidence as **layers** — verified dimensions on one layer, scanned on another — which
+nobody currently does.
+
+### Decided: take the Three.js rendering, nothing else
+
+| | Take renderer only | Take everything including the model |
+|---|---|---|
+| **Saves** | Months on the 3D scene, camera and wall interaction — the expensive, framework-agnostic part | All of that plus the exporters and editor, immediately |
+| **Costs** | An adapter from our model to their render shapes. One boundary to maintain. | Every differentiator |
+| **Model** | Ours. Nanometre integers, per-dimension provenance, zones. | Theirs |
+
+Why the split is right rather than merely cautious: **floats are correct for rendering.**
+Nothing needs exact arithmetic to draw a wall on a screen. Three.js is float throughout, and
+that is fine — it is the same principle as metres becoming nanometres at the device boundary.
+Exact model, float renderer, quantise once between them.
+
+The pitfall of the other path is not aesthetic. Per-dimension provenance is what the
+confidence badges, the punch list, the obstruction proof and mixed-mode capture are all built
+on. A model without it cannot have them bolted on — retrofitting a model touches every place
+a number flows, where an adapter touches one boundary. And commercially, adopting their model
+makes Trueline "OpenPlan3D but paid", which is not a product.
+
+**Not verified:** their source has not been read. The stack is confirmed as SvelteKit,
+Three.js, Tailwind, TypeScript, jsPDF, `dxf-writer` and optional Firebase sync, with test
+files named `test-orthogonal.ts`, `test-room-polygons.ts` and `test-furniture-rotation.ts`.
+Whether their storage model is separate from their render model is unknown, and someone
+should read it before the adapter is designed.
+
+### Web framework
+
+**React 19 + Vite + Tailwind**, matching Plumbline exactly. One framework across both
+products, so the seam to Plumbline stays cheap. Their Three.js code ports into React; only
+the SvelteKit shell is discarded, and that is the least valuable part of it.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
