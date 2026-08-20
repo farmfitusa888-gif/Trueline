@@ -2,7 +2,7 @@
 
 | File | What it is |
 |---|---|
-| `scanning-field-card.pdf` | Three-page illustrated field card. Print it, take it on site, write on page 3. |
+| `scanning-field-card.pdf` | Four-page illustrated field card. Print it double-sided, take it on site, write on page 4. |
 | `scanning-field-card.html` | Generated. Do not hand-edit — it is overwritten on every build. |
 | `build/diagrams.py` | The four SVG diagrams. Edit here. |
 | `build/build_card.py` | Composes the card and finds a layout that fits. Edit here. |

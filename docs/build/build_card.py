@@ -1,6 +1,6 @@
 import re, subprocess, os, sys
 import pypdfium2 as pdfium
-from diagrams import STAND, HOLD, WALK, FURNITURE
+from diagrams import STAND, HOLD, WALK, FURNITURE, OPENPLAN
 
 CH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 ROW = '      <tr><td class="b"></td><td class="b"></td><td class="b"></td><td class="b"></td><td class="b"></td></tr>\n'
@@ -91,7 +91,7 @@ def html(body_pt=9.2, lead=1.34, rows=7):
 <footer>{FOOT1}</footer>
 
 <div class="pb"></div>
-{mast("Field card &mdash; page 2<br>The walk, furniture &amp; fixes")}
+{mast("Field card &mdash; page 2<br>The walk &amp; furniture")}
 
 <section>
   <h2><span class="n">04</span>How to walk it</h2>
@@ -112,8 +112,28 @@ def html(body_pt=9.2, lead=1.34, rows=7):
   walls are blocked.</p>
 </section>
 
+<footer>A furnished room is the real job. Pick up loose floor clutter, note which walls are
+blocked, and tape only walls that are clear.</footer>
+
+<div class="pb"></div>
+{mast("Field card &mdash; page 3<br>Open plans &amp; when it goes wrong")}
+
 <section>
-  <h2><span class="n">06</span>When it goes wrong</h2>
+  <h2><span class="n">06</span>Open plans &mdash; one scan, then split</h2>
+  <figure>{OPENPLAN}</figure>
+  <p>A kitchen running into a dining area running into a living room is <b>one capture</b>. Do not
+  scan the areas separately: there is no wall between them to anchor on, so two captures of one
+  continuous floor invent a seam the building does not have.</p>
+  <p><b>The exception.</b> Over about 30 &times; 30 ft or five minutes it has to be split anyway
+  &mdash; and this is the hardest case in the whole job. Overlap the two walks generously and make
+  sure one shared feature appears in <b>both</b>: a column, a fireplace, a full corner.</p>
+  <p><b>Write down two things.</b> Where <em>you</em> would draw the line between the areas, and
+  whether the ceiling changes height across the space &mdash; a vaulted living room off a flat-ceiling
+  kitchen is not the same ceiling, and the quantities have to know that.</p>
+</section>
+
+<section>
+  <h2><span class="n">07</span>When it goes wrong</h2>
   <table>
     <tr><td class="k">Will not close</td><td>Walk it again <b>in the opposite direction</b> before giving up.</td></tr>
     <tr><td class="k">Wall missing</td><td>Too close, or held level. Re-walk at 4&ndash;6 ft, angled at the floor joint.</td></tr>
@@ -127,10 +147,10 @@ def html(body_pt=9.2, lead=1.34, rows=7):
 done properly beats twenty done badly.</footer>
 
 <div class="pb"></div>
-{mast("Field card &mdash; page 3<br>Tape log &mdash; print and write on this")}
+{mast("Field card &mdash; page 4<br>Tape log &mdash; print and write on this")}
 
 <section>
-  <h2><span class="n">07</span>The tape log &mdash; the most valuable thing you do</h2>
+  <h2><span class="n">08</span>The tape log &mdash; the most valuable thing you do</h2>
   <p>A scan on its own has no ground truth. Tape three or four <b>clear</b> walls per room and write the
   numbers here. <b>Measure one wall twice</b>, at the start and end of the scan &mdash; if the two differ,
   that is drift, a different problem from sensor error.</p>
@@ -139,8 +159,8 @@ done properly beats twenty done badly.</footer>
     <tbody>
 @@ROWS@@    </tbody>
   </table>
-  <p style="margin-top:4pt"><b>Also note:</b> scan time per room, which device, and anything it got visibly
-  wrong &mdash; a double door read as one, a closet swallowed, a wall split in two.</p>
+  <p style="margin-top:4pt"><b>Also note:</b> scan time per room, which device, any change of ceiling height, and anything
+  it got visibly wrong &mdash; a double door read as one, a closet swallowed, a wall split in two.</p>
 </section>
 
 <footer>{FOOT3}</footer>
@@ -155,12 +175,12 @@ def pages(doc, path='try'):
     return len(pdfium.PdfDocument(f'{path}.pdf'))
 
 if __name__ == '__main__':
-    ladder = [(9.2,1.34,r) for r in (24,23,22,21,20,19,18,17,16,15,14)]
+    ladder = [(9.2,1.34,r) for r in (24,22,20,18,16,14,12,10)]
     for pt,lead,rows in ladder:
         doc = html(pt,lead).replace('@@ROWS@@', ROW*rows)
         n = pages(doc)
         print(f"body {pt}pt / lead {lead} / {rows} rows -> {n} pages")
-        if n == 3:
+        if n in (3, 4):
             open('guide.html','w').write(doc)
             print(f"=> LOCKED IN at {pt}pt, {rows} log rows")
             sys.exit(0)

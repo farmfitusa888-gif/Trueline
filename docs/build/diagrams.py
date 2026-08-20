@@ -134,3 +134,26 @@ FURNITURE = f'''<svg viewBox="0 0 620 158" xmlns="http://www.w3.org/2000/svg" ro
   <text x="40" y="132" font-size="11" fill="#14181B">So: <tspan font-weight="bold">put the tape on walls that are clear</tspan>, and mark the blocked ones &#8220;B&#8221; on the log.</text>
   <text x="40" y="150" font-size="10.5" fill="#4A5459">A tape reading on a blocked wall mixes sensor error with occlusion error, and calibrates nothing.</text>
 </svg>'''
+
+# ------------------------------------------------------------------ 5. open plan
+OPENPLAN = f'''<svg viewBox="0 0 620 168" xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-label="One capture of an open plan versus two separate captures">{DEFS}
+
+  <!-- right way -->
+  <text x="0" y="12" font-size="11.5" font-weight="bold" fill="#B8590A">ONE SCAN &#10003;</text>
+  <rect x="0" y="24" width="284" height="96" fill="#F4F6F7" stroke="#14181B" stroke-width="4"/>
+  <line x1="98" y1="24" x2="98" y2="120" stroke="#B8590A" stroke-width="2.4" stroke-dasharray="8 5"/>
+  <line x1="190" y1="24" x2="190" y2="120" stroke="#B8590A" stroke-width="2.4" stroke-dasharray="8 5"/>
+  <text x="49"  y="76" font-size="10.5" text-anchor="middle" fill="#4A5459" font-weight="bold">KITCHEN</text>
+  <text x="144" y="76" font-size="10.5" text-anchor="middle" fill="#4A5459" font-weight="bold">DINING</text>
+  <text x="237" y="76" font-size="10.5" text-anchor="middle" fill="#4A5459" font-weight="bold">LIVING</text>
+  <text x="142" y="140" font-size="10.5" text-anchor="middle" fill="#14181B">One floor, one capture. The dashed lines get</text>
+  <text x="142" y="155" font-size="10.5" text-anchor="middle" fill="#14181B">drawn in the app &#8212; they are not walls.</text>
+
+  <!-- wrong way -->
+  <text x="336" y="12" font-size="11.5" font-weight="bold" fill="#6B757B">TWO SCANS &#10007;</text>
+  <rect x="336" y="24" width="140" height="90" fill="#fff" stroke="#6B757B" stroke-width="3"/>
+  <rect x="466" y="40" width="140" height="90" fill="#fff" stroke="#6B757B" stroke-width="3" stroke-dasharray="7 4"/>
+  <text x="471" y="140" font-size="10.5" text-anchor="middle" fill="#14181B">Each capture starts its own coordinate system.</text>
+  <text x="471" y="155" font-size="10.5" text-anchor="middle" fill="#14181B" font-weight="bold">They do not line up.</text>
+</svg>'''
