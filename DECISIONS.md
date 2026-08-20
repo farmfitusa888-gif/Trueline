@@ -325,6 +325,20 @@ the same geometry, which does set the angle and does read back 150.
 **Rule: always `addLinearDim` with an explicit angle; never `addAlignedDim`.** Zero or ninety
 for a rectilinear room, `atan2(dy, dx)` for anything angled.
 
+### Correction: verified as parseable is not verified as visible
+
+The claim above was checked further and is only half true. Rendered through `ezdxf`'s
+renderer, the file `@tarikjabiri/dxf` writes **crashes it** — every dimension is missing
+`text_midpoint` (group 11), and none carries a generated geometry block (`*D1`, `*D2`), which
+is what many viewers actually draw. The same dimensions written by `ezdxf` carry both and
+render.
+
+So the entities are structurally correct, measure correctly, and are **visually absent** in a
+spec-following renderer. AutoCAD regenerates dimension graphics itself and may show them;
+simpler viewers will not. A DXF whose dimensions do not draw is exactly the failure being
+sold against, so **the library cannot be used as-is for the feature it was chosen for**, and
+the upstream fix is not a few lines — it is implementing dimension geometry generation.
+
 Re-runnable proof lives at `core/tools/verify-dxf-dimensions.js`. **Not verified:** the file
 has not been opened in AutoCAD, Revit or SketchUp, and must be before the claim is made to a
 customer.

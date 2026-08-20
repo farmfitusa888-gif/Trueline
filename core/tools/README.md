@@ -40,6 +40,33 @@ verified correct above.
 This is exactly the defect that produces "the DXF dropped its dimensions" complaints, and it
 is why this script exists rather than a sentence in a document.
 
+### The finding that matters more: the dimensions do not render
+
+Parsing is not drawing. Pushed through `ezdxf`'s renderer — an independent implementation of
+the DXF spec — the file written by `@tarikjabiri/dxf` **crashes it**:
+
+```
+AttributeError: 'NoneType' object has no attribute 'z'
+  ezdxf/entities/dimension.py: dim_elevation = self.dxf.text_midpoint.z
+```
+
+Three attributes are missing from every dimension it writes:
+
+| Missing | Group code | Consequence |
+|---|---|---|
+| `text_midpoint` | 11 | A spec renderer cannot place the text and fails outright |
+| geometry block (`*D1`, `*D2`, ...) | 2 | Viewers that draw the stored block show **nothing** |
+| `angle` on aligned dimensions | 50 | Measures the horizontal component, not the true length |
+
+The same two dimensions written by `ezdxf`, which calls `.render()` to generate the block,
+carry `text_midpoint`, reference blocks `*D1` and `*D2`, and draw correctly. That render is
+kept beside this file as `dimension-render-control.png`.
+
+**So the entities are structurally right and visually absent.** AutoCAD regenerates dimension
+graphics itself and may well show them; anything simpler will not. A DXF whose dimensions do
+not draw is precisely the failure this feature exists to beat, so the library cannot be used
+as-is for the one thing it was chosen for.
+
 ### Not verified
 
 The file has not been opened in AutoCAD, Revit or SketchUp. `ezdxf` parsing cleanly with no
