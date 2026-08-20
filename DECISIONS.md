@@ -111,6 +111,71 @@ invent a seam that is not in the building. Above ~30 x 30 ft it has to be split 
 that is the hardest case in the product — there are no walls to align on, so the captures
 must overlap generously and share a feature (a column, a fireplace, a full corner).
 
+## Capture modes — all four, in this order
+
+OpenPlan3D is the reference. What was verified of it: RoomPlan LiDAR capture with walls,
+doors, windows and furniture detected; a 3D dollhouse and a 2D plan for review; an editor
+that drags walls with live dimensions, splits walls and labels rooms; export to PNG, SVG,
+DXF, PDF and USDZ; free, open source, no account; App Store listing says LiDAR required.
+**Its licence has not been read and must be before anything structural is borrowed.**
+
+All four modes are committed. The order below is sequencing, not scope — every mode below
+ships, and each step is usable before the next begins.
+
+| # | Mode | Why here | Ships |
+|---|---|---|---|
+| 1 | **Manual draw / type** | Needs no camera, no LiDAR, no hardware in CI. Exercises the solver end to end and forces the data model, the 2D/3D viewer and the PDF to exist. | A complete product on any device: sketch a room, type the tape numbers, get a dimensioned plan. |
+| 2 | **LiDAR scan** | Capture now has somewhere to land. Feeds the same `Room` the manual mode produces. | The headline feature, on a model already proven. |
+| 3 | **AR measure, no LiDAR** | Same capture pipeline, different sensor, wider tolerance. Mostly reuse by this point. | Every ARKit iPhone, which matters for crews on mixed devices. |
+| 4 | **Trace an existing plan** | A different input, but the model and the editor already exist. | The drawer full of old blueprints nobody else can digitise. |
+
+**The reason the order is not LiDAR first:** capture built before there is a model to put it
+in gets built twice. Manual mode is the cheapest complete path through the whole system.
+
+### What makes this better than three separate modes
+
+Every mode produces **the same `Room` of the same `Measurement`s**. Only the provenance
+differs:
+
+| Mode | Provenance | Tolerance |
+|---|---|---|
+| LiDAR | `scanned` | tight, from the measured device figure |
+| AR without LiDAR | `scanned` | wider |
+| Typed from a tape | `verified` | none — a person signed it |
+| Traced from an old drawing | `estimated` | from the drawing's scale |
+
+So **the modes mix inside one room**: scan what you can walk, AR-measure the alcove behind
+the furnace, type what the 1998 blueprint says about the wall behind the built-ins. Every
+number says where it came from and the punch list ranks what to go verify. None of the apps
+researched can do this, because none of them carry confidence per dimension.
+
+`estimated` is a fourth provenance kind and is not built yet.
+
+### Manual mode interaction
+
+All three, user picks — typed-first as the launch default, because hitting an exact fraction
+by dragging with gloves on is miserable:
+
+- **Typed-first** (default) — tap a wall, type `12' 4 1/2"`, the room re-solves and closes.
+- **Drag with live dimensions** — familiar from every floor plan editor.
+- **Sketch then interview** — draw a rough outline, then the app asks for each wall in turn.
+
+### Exports — all five
+
+1. **PDF**, dimensioned — v1, the output bar already chosen.
+2. **DXF with dimensions intact** — the differentiator. magicplan's own help page admits
+   theirs drops dimensions.
+3. **USDZ** — opens on any iPhone with no app installed, which makes it the best way to send
+   a client a walkthrough.
+4. **PNG / SVG** — cheap once the plan renders.
+
+### Positioning
+
+Sell on the correction layer and the confidence first; the scan-to-priced-scope seam through
+Plumbline is why the subscription renews. Free tools capture — Trueline gets the number right
+and proves who stands behind it, which cannot be copied without rebuilding the data model
+underneath it.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
