@@ -51,10 +51,35 @@ const SIGN: Record<Heading, 1n | -1n> = {
   east: 1n, north: 1n, west: -1n, south: -1n,
 };
 
+/**
+ * A hole in a wall. Doors and cased openings interrupt the baseboard; windows do
+ * not. All three interrupt the wall face that gets drywall and paint.
+ *
+ * `offsetFromStart` is measured from the wall's first corner, walking the room
+ * in order. It is what makes an opening attributable to a zone when a wall is
+ * split between two of them — without it, a door in an open plan belongs to
+ * whichever zone the code happened to check first, which is not an answer.
+ */
+export interface Opening {
+  readonly id: string;
+  readonly kind: 'door' | 'window' | 'cased';
+  readonly width: Measurement;
+  readonly height: Measurement;
+  readonly offsetFromStart: Measurement;
+}
+
 export interface Wall {
   readonly id: string;
   readonly heading: Heading;
   readonly length: Measurement;
+  /**
+   * Set only when this wall is not full height — a pony wall, a breakfast bar,
+   * the half wall round a stair. It is genuinely built, so it carries drywall,
+   * paint and a cap, and it divides the space. Left unset, the room's ceiling
+   * height applies.
+   */
+  readonly height?: Measurement;
+  readonly openings?: readonly Opening[];
 }
 
 export interface Room {

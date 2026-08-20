@@ -71,6 +71,46 @@ could encroach into the room where furniture sat flush against them, improved in
 test device runs iOS 26.6, far downstream of both, and no findings specific to RoomPlan on iOS 26
 were located — his capture is the evidence, not the published complaints.
 
+## Open plans — zones and virtual boundaries
+
+A kitchen running into a dining area running into a living room is one continuous space
+that has to be priced as three rooms. The advice the field currently gives is to lay
+painter's tape on the customer's floor so the scanner sees a corner.
+
+**A divider is never a wall.** Split an open plan with a wall and the estimate carries
+drywall, paint and baseboard for a surface nobody will build. So there are two kinds of edge:
+
+| Edge | Carries |
+|---|---|
+| **built** — a real wall | drywall, paint, baseboard, cost |
+| **virtual** — a line somebody drew | floor and ceiling area only. Nothing else. |
+
+Decided with Sam:
+
+- **Pony walls, breakfast bars and half walls are built**, at their own height rather than
+  the room's, because they genuinely get finished and genuinely cost money. `Wall.height`
+  is set only when a wall is not full height.
+- **Zones are suggested, never imposed.** RoomPlan already detects a stove, refrigerator,
+  dishwasher, sofa and table, so the app proposes "kitchen here, living there" and the user
+  accepts, drags or deletes. Fast on the common case, never in charge.
+- **Zones and the whole are always reported together**, and the total is always exactly the
+  sum. Nobody has to add up a list of rooms to find out whether it reconciles — `report()`
+  refuses to produce one that does not.
+- **Boundaries snap to what is already there** — the jamb of a cased opening, a column, the
+  end of an island, a change of flooring. That is the answer to the painter's tape: you tap
+  the thing that exists rather than marking the floor.
+- **A boundary is a decision, not a measurement.** It records who declared it and when, and
+  carries no tolerance, because nobody measured anything.
+- **An opening straddling a boundary is credited to each side by how much of it is on that
+  side**, by clipping the opening's span to the zone's stretch of wall. Attributing it whole
+  to one side would put a door in a room it is only half in.
+
+Scanning an open plan: **one capture, then split in the app.** Scanning the kitchen and the
+living room separately would create two coordinate systems for one continuous floor and
+invent a seam that is not in the building. Above ~30 x 30 ft it has to be split anyway, and
+that is the hardest case in the product — there are no walls to align on, so the captures
+must overlap generously and share a feature (a column, a fireplace, a full corner).
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.

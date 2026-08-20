@@ -53,16 +53,19 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **31 passing, 0 failing** (`npm test`) |
+| Tests | **63 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
-Built so far: `core/` — the measurement layer. Exact lengths in bigint nanometres,
+Built so far: `core/` — the measurement layer and the geometry on top of it. Exact lengths in bigint nanometres,
 feet-inches-fractions parsing and formatting, metric, and the provenance model that marks
 every number scanned, verified or derived and refuses to let a sensor's guess read like a fact.
 
-Not built yet: the iOS scanner, the geometry solver, the web viewer, the API, anything with
-a screen.
+Also built: the rectilinear solver that re-closes a room around a typed measurement, and the
+zone model that splits an open plan into named areas without pretending there is a wall
+between them.
+
+Not built yet: the iOS scanner, the web viewer, the API, anything with a screen.
 
 ```bash
 cd trueline && npm install && npm test && npm run typecheck
