@@ -176,6 +176,68 @@ Plumbline is why the subscription renews. Free tools capture — Trueline gets t
 and proves who stands behind it, which cannot be copied without rebuilding the data model
 underneath it.
 
+## OpenPlan3D's licence — MIT, read not assumed
+
+`LICENSE` at `laanlabs/openPlan3D`, read directly rather than taken from a summary:
+**MIT, copyright 2026 theLodgeStudio.**
+
+Use, copy, modify, merge, publish, distribute, sublicense and sell are all permitted,
+including inside a closed-source commercial product. The single condition is that the
+copyright notice and permission notice travel with any copy or substantial portion.
+
+**So their code can be used.** No copyleft, nothing that touches Trueline's licensing or
+its sale. The cost is a `NOTICES` file in the repository and an acknowledgement in the app.
+
+An earlier note in this file warned that a GPL licence would force Trueline open source.
+That warning was disproportionate in a second way as well: copying *features* never carries
+a licence obligation at all — functionality and UI ideas are not protected by copyright.
+Only copied source would have attached one.
+
+Their editor is SvelteKit and Three.js. The renderer, the interaction and the exporters are
+the expensive, model-agnostic parts and are worth taking. Their data model is not: every
+differentiator in Trueline — nanometre integers, per-dimension provenance, zones with virtual
+boundaries — lives in the model, and adopting theirs would give all of it away.
+
+## Photos during capture
+
+Verified: `RoomCaptureSession` exposes its underlying `ARSession`, and from iOS 17 RoomPlan
+accepts a custom `ARSession` with an `ARWorldTrackingConfiguration`. Every `ARFrame` carries
+the camera transform and intrinsics, and `arFrameReferenceOriginTransform` (returned in
+`didEndWith`) puts them in the finished room's coordinate space.
+
+- **Stills with poses**, not video. A photo you can tap is worth more on site than footage
+  to scrub, and a still pins to a wall while a video does not.
+- **Automatic on a new viewpoint, plus a shutter button.** Capture when the camera has moved
+  or turned enough to see something genuinely new, rather than on a timer — a timer produces
+  duplicates down a slow wall and misses a fast corner.
+- **In manual draw mode too, as an option the user turns on.** Somebody typing a room off a
+  tape still wants the wall photographed. There is no ARKit pose to hang it on, so those
+  photos attach to the wall the user was editing rather than to a camera position.
+- **Attached to the wall they see, browsable as a project roll, and exportable into the client
+  PDF.** They stay on the device until a deliberate sync, and behave as ordinary project data
+  under normal roles after that.
+- **Never retain `ARFrame` objects** — the ARSession delegate holding frames is a known memory
+  problem. Copy the pixel buffer and the transform, then release.
+- A high-resolution still capture during an active session was **not** verified. Frames from
+  the AR session are video resolution until somebody checks otherwise.
+
+## Obstruction — proving why a wall is uncertain
+
+Built. RoomPlan returns detected objects separately from walls, with positions, so the app
+works out which walls something was standing against and how much of each that hides.
+
+- Footprints arrive as axis-aligned boxes computed on the device. An object at an angle gets
+  a box larger than itself and therefore over-reports how much it blocks. That is the safe
+  direction: it sends somebody to check a wall that turned out fine, rather than leaving a
+  bad dimension unflagged.
+- **Reach defaults to six inches** — roughly where furniture stops leaving the wall-floor
+  joint visible. It is a default, not a fact, and it is a parameter so real captures can
+  replace it.
+- The punch list ranks by floor area at stake multiplied by the share of the wall that was
+  blocked, so a long uncertain wall nobody could see outranks a short one merely guessed at.
+- A verified wall never appears, whatever stands in front of it. What the sensor could see
+  stopped mattering the moment a person signed for the number.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
