@@ -1,0 +1,203 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Trueline Field Card</title>
+<style>
+  @page { size: letter; margin: 12mm 12mm 10mm; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    font-family: "Liberation Sans", Arial, sans-serif;
+    color:#14181B; font-size:9.1pt; line-height:1.33;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .mono { font-family:"DejaVu Sans Mono", monospace; }
+
+  header.mast { border-bottom:2.5pt solid #14181B; padding-bottom:6pt; margin-bottom:11pt;
+                display:flex; justify-content:space-between; align-items:flex-end; gap:12pt; }
+  .brand { font-size:19pt; font-weight:bold; letter-spacing:-0.5pt; line-height:1; }
+  .brand span { color:#B8590A; }
+  .sub { font-size:8.5pt; color:#4A5459; letter-spacing:.6pt; text-transform:uppercase;
+         font-family:"DejaVu Sans Mono", monospace; text-align:right; line-height:1.5; }
+
+  h2 { font-size:11.5pt; margin:0 0 5pt; letter-spacing:-0.2pt;
+       border-bottom:1pt solid #B9C1C6; padding-bottom:3pt; }
+  h2 .n { font-family:"DejaVu Sans Mono", monospace; color:#B8590A; font-size:9.5pt; margin-right:7pt; }
+  section { margin-bottom:9.5pt; break-inside:avoid; }
+  p { margin:0 0 5pt; }
+  .lede { font-size:10.2pt; color:#2C3439; margin-bottom:8pt; }
+
+  .row { display:flex; gap:11pt; }
+  .col { flex:1; }
+
+  .big { border:1.2pt solid #14181B; padding:7pt 9pt; margin-bottom:7pt; background:#F4F6F7; }
+  .big .num { font-size:21pt; font-weight:bold; line-height:1; letter-spacing:-1pt; }
+  .big .num small { font-size:12pt; font-weight:normal; }
+  .big .cap { font-size:8.5pt; text-transform:uppercase; letter-spacing:.7pt; color:#4A5459;
+              font-family:"DejaVu Sans Mono", monospace; margin-top:3pt; }
+
+  table { border-collapse:collapse; width:100%; font-size:9pt; }
+  th, td { border:0.7pt solid #9AA4AA; padding:3.6pt 5.5pt; text-align:left; vertical-align:top; }
+  th { background:#E4E9EB; font-size:8pt; text-transform:uppercase; letter-spacing:.6pt; }
+  td.k { white-space:nowrap; font-family:"DejaVu Sans Mono", monospace; }
+
+  ol.rules { margin:0; padding:0; list-style:none; counter-reset:r; }
+  ol.rules li { counter-increment:r; position:relative; padding-left:24pt; margin-bottom:5.5pt; }
+  ol.rules li::before { content:counter(r); position:absolute; left:0; top:0;
+    width:15pt; height:15pt; border-radius:50%; background:#14181B; color:#fff;
+    font-family:"DejaVu Sans Mono", monospace; font-size:9pt; font-weight:bold;
+    display:flex; align-items:center; justify-content:center; }
+  ol.rules b { display:block; }
+
+  .warn { border-left:3pt solid #B8590A; background:#FBF3EA; padding:6pt 9pt; margin:7pt 0; }
+  .warn .lbl { font-family:"DejaVu Sans Mono", monospace; font-size:8pt; text-transform:uppercase;
+               letter-spacing:.9pt; color:#B8590A; display:block; margin-bottom:2pt; }
+
+  .fill td { height:20pt; }
+  .fill td.blank { background:#FCFCFD; }
+
+  footer { break-inside:avoid; margin-top:8pt; padding-top:5pt; border-top:0.7pt solid #B9C1C6;
+           font-size:7.8pt; color:#5B656B; line-height:1.45; }
+  .pagebreak { break-before:page; }
+</style></head><body>
+
+<header class="mast">
+  <div class="brand">True<span>line</span></div>
+  <div class="sub">Field card — scanning a room<br>Rev 1 · for iPhone / iPad LiDAR</div>
+</header>
+
+<p class="lede">A scan is only worth what the walk was worth. A room walked wrong cannot be fixed
+afterwards — it has to be walked again.</p>
+
+<section>
+  <h2><span class="n">01</span>Where to stand</h2>
+  <div class="row">
+    <div class="col big">
+      <div class="num">4–6 <small>ft</small></div>
+      <div class="cap">Off the wall — aim here</div>
+    </div>
+    <div class="col big">
+      <div class="num">3–15 <small>ft</small></div>
+      <div class="cap">Usable band. Edges drift</div>
+    </div>
+    <div class="col big">
+      <div class="num">16 <small>ft</small></div>
+      <div class="cap">Range ceiling &middot; 5 m</div>
+    </div>
+  </div>
+  <p><b>Why 4–6 ft:</b> the whole wall run has to be in frame, including where it meets the floor.
+  Hug the wall and the sensor only ever sees a patch — no long straight edge to fit a plane to. Stand
+  too far back in a big room and the far wall is past range. Minimum working distance is ~8–10 in.</p>
+</section>
+
+<section>
+  <h2><span class="n">02</span>How to hold it</h2>
+  <table>
+    <tr><td class="k">Height</td><td><b>Chest height</b>, tilted slightly down.</td></tr>
+    <tr><td class="k">Aim</td><td>So the camera sees <b>where the wall meets the floor</b>. That joint is the
+      strongest signal the scanner has for finding the room's outline. Pointing level at blank
+      drywall gives it almost nothing to work with.</td></tr>
+    <tr><td class="k">Grip</td><td>Two hands. Elbows in. Smooth beats fast.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="n">03</span>How to walk it</h2>
+  <ol class="rules">
+    <li><b>Start in a corner, never mid-wall.</b> Starting mid-wall slows the tracker's orientation and increases drift from the first second.</li>
+    <li><b>Move your body, not your arms.</b> Walk the perimeter at a slow walking pace, sweeping gently side to side, camera angled inward toward the middle of the room. Standing still and panning is what produces drift.</li>
+    <li><b>Pause a beat at every corner.</b> Corners are where the geometry gets pinned down. Rushing them is the most common cause of a room that will not close.</li>
+    <li><b>Finish where you started.</b> Returning to known ground is what lets the tracker correct everything it accumulated on the way round. This is the single biggest quality lever on the card.</li>
+    <li><b>Turn the lights on.</b> LiDAR does not care about darkness. The camera tracking that stitches it all together does.</li>
+  </ol>
+</section>
+
+<section>
+  <h2><span class="n">04</span>The limits — these are where it breaks</h2>
+  <table>
+    <tr><td class="k">Under 5 min</td><td>Per room. Longer sessions drift, the device heats up, and tracking degrades.</td></tr>
+    <tr><td class="k">Under 30 × 30 ft</td><td>Apple's recommended maximum scan area. Bigger spaces get split into separate scans.</td></tr>
+    <tr><td class="k">One room per scan</td><td>Do not try to walk the house in one go. Each room is its own capture.</td></tr>
+    <tr><td class="k">Glass &amp; mirrors</td><td>Reflective surfaces cut reliability. Note where they are rather than trusting them.</td></tr>
+  </table>
+  <div class="warn">
+    <span class="lbl">If the app tells you something, it wins</span>
+    RoomPlan gives live feedback — "Move farther away", "Slow down", "More light". It is reading your
+    actual session; this card is not. Follow the screen over this page, every time.
+  </div>
+</section>
+
+<footer>
+  Figures are published manufacturer and industry values, not measurements taken by Trueline.
+  Range ~5 m / 16 ft; minimum working distance ~8–10 in; recommended max scan area ~9 × 9 m.
+  Validate against your own device before quoting any of them to a customer.
+</footer>
+
+<!-- ===================== PAGE 2 ===================== -->
+<div class="pagebreak"></div>
+
+<header class="mast">
+  <div class="brand">True<span>line</span></div>
+  <div class="sub">Field card — page 2<br>Tape log &amp; troubleshooting</div>
+</header>
+
+<section>
+  <h2><span class="n">05</span>The tape log — the most valuable thing you do</h2>
+  <p class="lede">A scan on its own has no ground truth. Tape three or four walls per room and write the
+  numbers here — it turns "accurate within a published range" into "accurate within a figure we measured."</p>
+
+  <table class="fill">
+    <thead><tr><th style="width:22%">Room</th><th style="width:24%">Which wall</th><th style="width:20%">Tape says</th><th style="width:20%">Scan says</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+      <tr><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+      <tr><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+      <tr><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+      <tr><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>
+    </tbody>
+  </table>
+  <div class="warn">
+    <span class="lbl">Measure the same wall twice</span>
+    Once at the start of the scan and once at the end. If the two readings differ, that is
+    <b>drift</b> — a different problem from sensor error, and it gets fixed differently.
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">06</span>Also worth writing down</h2>
+  <p><b>Scan time per room</b> — bumping five minutes on a normal room explains a lot of drift on its own.
+  <b>Which device</b>, and whether more than one was used on the same room.
+  <b>What it got visibly wrong</b> — a double door read as one, a closet swallowed, a wall split in two,
+  an angled wall squared off. Those are the failure modes worth catching now rather than in six months.</p>
+</section>
+
+<section>
+  <h2><span class="n">07</span>When it goes wrong</h2>
+  <table>
+    <thead><tr><th style="width:34%">What happened</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>The room will not close</td><td>Walk it again <b>in the opposite direction</b> before giving up. Known ground from a new angle lets the tracker correct itself.</td></tr>
+      <tr><td>A wall is missing entirely</td><td>Too close, or held level rather than tilted down. Re-walk it at 4–6 ft, camera angled at the floor joint.</td></tr>
+      <tr><td>Tracking jumped or reset</td><td>Stop and start the room again. A scan that lost tracking is not worth correcting afterwards.</td></tr>
+      <tr><td>Device got hot</td><td>Scan was too long. Split the space up and let the device cool.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2><span class="n">08</span>Scan the simple room first</h2>
+  <p>Not a preference — it is the control case. Without it a bad result cannot be diagnosed at all.</p>
+  <table>
+    <thead><tr><th style="width:22%">Simple room</th><th style="width:22%">Awkward room</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td>Accurate</td><td>Accurate</td><td>Technique and device are sound. Build on it.</td></tr>
+      <tr><td>Accurate</td><td>Wrong</td><td><b>Geometry complexity</b> — that is the solver's job, not yours.</td></tr>
+      <tr><td>Wrong</td><td>Wrong</td><td>Technique or the device itself. Fix this before anything else matters.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  <b>What to send back:</b> one export file per room, scanned separately — not merged. Two rooms that
+  share a wall are worth far more than two rooms at opposite ends of the house. JSON above all other
+  formats; DXF and PDF too if the app offers them. Plus this page, filled in.
+</footer>
+
+</body></html>
