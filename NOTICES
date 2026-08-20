@@ -1,0 +1,75 @@
+Trueline — third-party notices
+==============================
+
+Everything below is MIT unless stated otherwise. MIT asks one thing: that the
+copyright notice and permission notice travel with any copy or substantial
+portion. That is what this file is for, and it is the entire obligation.
+
+Licences were read from each package's own LICENSE file or manifest, not from a
+summary.
+
+
+-------------------------------------------------------------------------------
+SHIPPED WITH TRUELINE
+-------------------------------------------------------------------------------
+
+@tarikjabiri/dxf — DXF writing, including DIMENSION entities
+https://github.com/dxfjs/writer
+
+    MIT License
+    Copyright (c) 2021-present EL JABIRI Tarik
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+
+OpenPlan3D — Three.js rendering, when that work lands
+https://github.com/laanlabs/openPlan3D
+
+    MIT License
+    Copyright (c) 2026 theLodgeStudio
+
+    (Full text as above.)
+
+    Nothing from this project is in Trueline yet. The decision on record is to
+    take its Three.js rendering and none of its data model, and this notice is
+    written in advance so that it cannot be forgotten when the code arrives.
+
+
+-------------------------------------------------------------------------------
+DEVELOPMENT AND VERIFICATION ONLY — NOT SHIPPED
+-------------------------------------------------------------------------------
+
+ezdxf — reads Trueline's DXF output back in the test suite
+    MIT. Copyright (c) Manfred Moitzi.
+    A development dependency. No part of it is distributed with Trueline.
+
+LibreCAD — renders Trueline's DXF output to prove it draws in real CAD
+https://www.librecad.org/
+
+    GPL-2. Upstream contact: Ries van Twisk.
+
+    **This one is not MIT, and the distinction matters.** LibreCAD is used as a
+    build tool: `core/tools/verify-in-cad.sh` invokes the `librecad` binary as a
+    separate program and reads the PDF it writes. Nothing from LibreCAD is
+    linked into Trueline, copied into it, or distributed with it. Using a GPL
+    program as a tool places no licence obligation on the work it inspects — in
+    the same way that compiling with GCC does not make a program GPL.
+
+    If any LibreCAD *code* is ever copied into Trueline, that changes
+    completely, and this file must be revisited before it happens.

@@ -1,11 +1,11 @@
 # tools
 
-## verify-dxf-dimensions.js
+## verify-dxf-dimensions.cjs
 
 Proves the claim the product is sold on: **a DXF that keeps its dimensions.**
 
 ```bash
-npm i @tarikjabiri/dxf && node verify-dxf-dimensions.js     # writes proof.dxf
+npm i @tarikjabiri/dxf && node verify-dxf-dimensions.cjs     # writes proof.dxf
 ```
 
 ## What real CAD does with it
@@ -53,6 +53,20 @@ does not print at all, because it looks fine.
 
 **Trueline must set `$INSUNITS` explicitly on every export.** It is one header value and it
 is not optional.
+
+## Running the check
+
+```bash
+./verify-in-cad.sh              # generates proof.dxf and checks it
+./verify-in-cad.sh some.dxf     # checks a file you already have
+```
+
+It fails if the drawing renders blank, renders almost nothing, or contains no
+dimensions at all, and it warns when `$INSUNITS` is unset. Cheap enough to run on
+every build, and today proved it is the only check that tells the truth.
+
+LibreCAD is GPL-2 and is invoked here as a separate program, never linked or
+shipped. See `NOTICES` at the repository root.
 
 ## Still not verified
 
