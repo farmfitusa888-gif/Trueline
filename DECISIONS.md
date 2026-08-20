@@ -322,26 +322,35 @@ measures by projecting along it reads the horizontal component rather than the t
 120 where it should be 150. Confirmed against `ezdxf` writing its own aligned dimension over
 the same geometry, which does set the angle and does read back 150.
 
-**Rule: always `addLinearDim` with an explicit angle; never `addAlignedDim`.** Zero or ninety
-for a rectilinear room, `atan2(dy, dx)` for anything angled.
+**Verified in real CAD.** LibreCAD, rendering through its own engine, draws all three
+dimensions correctly: 148.50 on the verified layer in green, and 150.00 for the aligned
+diagonal on the scanned layer in yellow. The render is kept at `core/tools/librecad-render.png`.
 
-### Correction: verified as parseable is not verified as visible
+### Two earlier alarms in this file were wrong
 
-The claim above was checked further and is only half true. Rendered through `ezdxf`'s
-renderer, the file `@tarikjabiri/dxf` writes **crashes it** — every dimension is missing
-`text_midpoint` (group 11), and none carries a generated geometry block (`*D1`, `*D2`), which
-is what many viewers actually draw. The same dimensions written by `ezdxf` carry both and
-render.
+Both came from treating `ezdxf` helpers as though they were CAD.
 
-So the entities are structurally correct, measure correctly, and are **visually absent** in a
-spec-following renderer. AutoCAD regenerates dimension graphics itself and may show them;
-simpler viewers will not. A DXF whose dimensions do not draw is exactly the failure being
-sold against, so **the library cannot be used as-is for the feature it was chosen for**, and
-the upstream fix is not a few lines — it is implementing dimension geometry generation.
+- *"Aligned dimensions measure 120 instead of 150."* `ezdxf`'s `get_measurement()` projects
+  along an `angle` attribute the writer omits. Real CAD measures from the definition points
+  and shows 150.00. **`addAlignedDim` is fine.**
+- *"The dimensions do not render."* `ezdxf`'s renderer needs a stored geometry block. Real
+  CAD regenerates the graphics from the definition points, as AutoCAD does. **They render.**
 
-Re-runnable proof lives at `core/tools/verify-dxf-dimensions.js`. **Not verified:** the file
-has not been opened in AutoCAD, Revit or SketchUp, and must be before the claim is made to a
-customer.
+A parser is not a renderer, and a renderer library is not CAD. Verify against what the
+customer opens.
+
+### The defect that is real: `$INSUNITS`
+
+`@tarikjabiri/dxf` writes **`$INSUNITS = 0`** — unitless. LibreCAD printed a blank sheet until
+the header was forced to millimetres, because with no declared unit a CAD application guesses
+the scale.
+
+For a contractor that is a plan that prints at the wrong size, which is worse than one that
+does not print, because it looks correct. **Trueline sets `$INSUNITS` explicitly on every
+export.** One header value, not optional.
+
+Nothing needs writing to generate dimension geometry, and no Python export service is needed.
+Both were proposed on the strength of the two wrong findings above and are withdrawn.
 
 ## Confidence as DXF layers — on the roadmap
 

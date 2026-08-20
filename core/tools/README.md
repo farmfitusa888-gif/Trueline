@@ -5,70 +5,56 @@
 Proves the claim the product is sold on: **a DXF that keeps its dimensions.**
 
 ```bash
-npm i @tarikjabiri/dxf && node verify-dxf-dimensions.js
-pip install ezdxf && python3 -c "
-import ezdxf
-doc = ezdxf.readfile('proof.dxf')
-for d in [e for e in doc.modelspace() if e.dxftype()=='DIMENSION']:
-    print(d.dxf.layer, d.get_measurement())
-print('audit errors:', len(doc.audit().errors))"
+npm i @tarikjabiri/dxf && node verify-dxf-dimensions.js     # writes proof.dxf
 ```
 
-### What it established, on 2026-08-20
+## What real CAD does with it
 
-`@tarikjabiri/dxf` v2.8.9, **MIT**, does emit genuine `DIMENSION` entities. Read back by
-`ezdxf` — an independent parser, not the one that wrote the file — the output contains three
-DIMENSION entities on named layers, and **zero audit errors**.
+`librecad-render.png` beside this file is **LibreCAD** — an actual CAD application, not a
+parser — rendering `proof.dxf` through its own `dxf2pdf` engine:
 
-| Dimension | Wrote | ezdxf read back |
-|---|---|---|
-| Horizontal, `angle: 0` | 148.5 (12' 4 1/2") | **148.5000** |
-| Vertical, `angle: 90` | 96 (8') | **96.0000** |
-| `addAlignedDim` on a 120 x 90 diagonal | 150 expected | **120.0000** |
+- the dimension on `DIM-VERIFIED` draws in green and reads **148.50**, with extension lines,
+  dimension line and arrowheads
+- the aligned dimension on `DIM-SCANNED` draws in yellow and reads **150.00** — the true
+  diagonal of a 120 x 90 triangle
+- the layer colours come through, so **confidence as layers works in CAD**
 
-### The trap, and the rule that avoids it
+Reproduce:
 
-`addAlignedDim` **does not write the `angle` (group code 50)**. Any consumer that measures by
-projecting along that angle therefore reads the horizontal component instead of the true
-length — 120 where it should be 150. Confirmed by making `ezdxf` write its own aligned
-dimension over identical geometry: it sets `angle` to 36.87 degrees and reads back 150.
-
-**So: always use `addLinearDim` with an explicit angle. Never `addAlignedDim`.**
-Zero or ninety degrees for a rectilinear room, `atan2(dy, dx)` for anything angled. Both
-verified correct above.
-
-This is exactly the defect that produces "the DXF dropped its dimensions" complaints, and it
-is why this script exists rather than a sentence in a document.
-
-### The finding that matters more: the dimensions do not render
-
-Parsing is not drawing. Pushed through `ezdxf`'s renderer — an independent implementation of
-the DXF spec — the file written by `@tarikjabiri/dxf` **crashes it**:
-
-```
-AttributeError: 'NoneType' object has no attribute 'z'
-  ezdxf/entities/dimension.py: dim_elevation = self.dxf.text_midpoint.z
+```bash
+apt-get install -y librecad xvfb
+Xvfb :99 & DISPLAY=:99 librecad dxf2pdf proof.dxf
 ```
 
-Three attributes are missing from every dimension it writes:
+## Two earlier findings that were wrong, and why
 
-| Missing | Group code | Consequence |
-|---|---|---|
-| `text_midpoint` | 11 | A spec renderer cannot place the text and fails outright |
-| geometry block (`*D1`, `*D2`, ...) | 2 | Viewers that draw the stored block show **nothing** |
-| `angle` on aligned dimensions | 50 | Measures the horizontal component, not the true length |
+Both came from trusting `ezdxf` helpers as though they were CAD. They are not.
 
-The same two dimensions written by `ezdxf`, which calls `.render()` to generate the block,
-carry `text_midpoint`, reference blocks `*D1` and `*D2`, and draw correctly. That render is
-kept beside this file as `dimension-render-control.png`.
+**"The aligned dimension measures 120 instead of 150."** `ezdxf`'s `get_measurement()`
+projects along the `angle` attribute, which `@tarikjabiri/dxf` omits, so it read the
+horizontal component. Real CAD computes the measurement from the definition points and shows
+150.00. The file was always right.
 
-**So the entities are structurally right and visually absent.** AutoCAD regenerates dimension
-graphics itself and may well show them; anything simpler will not. A DXF whose dimensions do
-not draw is precisely the failure this feature exists to beat, so the library cannot be used
-as-is for the one thing it was chosen for.
+**"The dimensions do not render."** `ezdxf`'s renderer draws a dimension from its stored
+geometry block and crashes without `text_midpoint`. Real CAD *regenerates* dimension graphics
+from the definition points, which is what AutoCAD does too. LibreCAD drew all three.
 
-### Not verified
+The lesson is in the tooling, not the library: **a parser is not a renderer, and a renderer
+library is not CAD.** Verify against the thing the customer opens.
 
-The file has not been opened in AutoCAD, Revit or SketchUp. `ezdxf` parsing cleanly with no
-audit errors is strong evidence and is not the same thing. Open one in real CAD before the
-claim is made to a customer.
+## The defect that is real: units
+
+`proof.dxf` carries **`$INSUNITS = 0`**, meaning unitless. `@tarikjabiri/dxf` does not write
+it. LibreCAD printed the file as a blank sheet until the header was forced to millimetres —
+because with no declared unit, a CAD application guesses.
+
+For a contractor that is a plan that prints at the wrong scale, which is worse than one that
+does not print at all, because it looks fine.
+
+**Trueline must set `$INSUNITS` explicitly on every export.** It is one header value and it
+is not optional.
+
+## Still not verified
+
+Not opened in AutoCAD, Revit or SketchUp. LibreCAD rendering it correctly through its own
+engine is strong evidence and is not the same thing.
