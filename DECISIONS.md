@@ -352,6 +352,54 @@ export.** One header value, not optional.
 Nothing needs writing to generate dimension geometry, and no Python export service is needed.
 Both were proposed on the strength of the two wrong findings above and are withdrawn.
 
+## Autodesk Viewer — the authoritative test, and what it showed
+
+Sam opened `sample-plan.dxf` in Autodesk's own free viewer. It drew the dimension
+**geometry** — extension lines, dimension lines, and the layer colours, so confidence as
+layers is confirmed in Autodesk's engine — and **no text whatsoever**. No 148.50, no 150.00.
+
+The cause is group code 11, the text midpoint. Without it Autodesk draws the lines and omits
+the number, so a plan looks finished and carries no figures. **LibreCAD regenerates the text
+and hides the problem**, which is how it survived a CAD check that passed.
+
+That makes the earlier correction in this file wrong in turn. The order of findings went:
+`ezdxf` says the dimensions are broken → LibreCAD says they are fine and `ezdxf` was wrong →
+Autodesk says `ezdxf` was right after all. **The lesson is not "verify in CAD", it is "verify
+in the CAD the customer uses."**
+
+Two distinct mechanisms, not to be conflated again:
+
+| Consumer | Draws dimensions from | Needs |
+|---|---|---|
+| Autodesk Viewer, AutoCAD | regenerates the lines itself | `middlePoint` (group 11) for the text |
+| LibreCAD | regenerates lines and text | neither — which is why it hid this |
+| `ezdxf` renderer | the stored geometry block only | a generated block (still absent) |
+
+**Fixed at the source.** The library exposes `middlePoint`, `blockName` and
+`ActualMeasurement`; the generator never set them. It sets `middlePoint` now, and
+`verify-in-cad.sh` asserts group 11 on every dimension directly rather than inferring it from
+a render that might regenerate.
+
+The missing geometry block remains, and matters only for consumers that draw from the block
+rather than regenerating. It is recorded as known and unfixed rather than quietly ignored.
+
+## Autodesk Viewer — the UX reference for Trueline's web viewer
+
+Sam's reaction to it was strong and specific, so it is written down rather than remembered.
+What it does that Trueline should take:
+
+- **Drag and drop, no install, no account** to see a drawing. The client-facing share link
+  should work exactly like this — a homeowner should never make an account to look at a plan.
+- **A layer panel that toggles.** Trueline's confidence layers are already this: let a client
+  or an architect switch verified dimensions on and off.
+- **Fit, Pan, Zoom, Measure, Markup as a persistent bottom bar**, plain-worded and always
+  reachable, rather than buried in menus.
+- **Measure as a first-class tool on the model**, not a mode you have to find.
+- **Screenshot and Share as top-level actions.** Sending a client a view of their own house
+  is the thing Matterport built a business on.
+- **Properties beside the drawing**, so selecting something tells you what it is.
+- Progressive load rather than a spinner: the drawing appears as it arrives.
+
 ## Confidence as DXF layers — on the roadmap
 
 Provenance and exactness die at the DXF boundary, because DXF stores floating-point drawing

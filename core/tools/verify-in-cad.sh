@@ -54,6 +54,21 @@ if units == 0:
         "        Call setUnits() on the writer. It is one line."
     )
 print(f"  units:    $INSUNITS={units} ({ {1:'inches',2:'feet',4:'mm',5:'cm',6:'metres'}.get(units, 'code %d' % units) })")
+
+# Group code 11 is where the measurement text sits. Without it Autodesk Viewer
+# draws the dimension lines and arrowheads and no number at all — the drawing
+# looks finished and carries no figures. LibreCAD regenerates the text and hides
+# it, which is how it went unnoticed until the file was opened in Autodesk's own
+# viewer. So this is asserted directly rather than inferred from a render.
+missing = [d.dxf.layer for d in doc.modelspace()
+           if d.dxftype() == 'DIMENSION' and d.dxf.get('text_midpoint', None) is None]
+if missing:
+    raise SystemExit(
+        "  FAIL: %d dimension(s) have no text_midpoint (group 11): %s\n"
+        "        Autodesk Viewer will draw the lines and omit the numbers.\n"
+        "        Pass middlePoint when adding the dimension." % (len(missing), ', '.join(missing))
+    )
+print("  text:     all dimensions carry a text midpoint (group 11)")
 doc.saveas(dst)
 dims = sum(1 for e in doc.modelspace() if e.dxftype() == 'DIMENSION')
 print(f"  entities: {dims} DIMENSION")

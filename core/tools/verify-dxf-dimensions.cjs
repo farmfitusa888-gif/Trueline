@@ -19,16 +19,32 @@ w.setCurrentLayerName('TRUELINE-WALLS');
 w.addLine(point3d(0, 0), point3d(L, 0));
 
 // A dimension a person put a tape on.
+//
+// middlePoint is group code 11, where the measurement text sits. Without it,
+// Autodesk Viewer draws the dimension lines and no number at all — the arrows
+// appear, the figure does not. LibreCAD happens to regenerate the text and hides
+// the problem, which is exactly how it went unnoticed.
 w.setCurrentLayerName('DIM-VERIFIED');
-w.addLinearDim(point3d(0, 0), point3d(L, 0), { offset: 24 });
+w.addLinearDim(point3d(0, 0), point3d(L, 0), {
+  offset: 24,
+  middlePoint: point3d(L / 2, 24),
+});
 
 // A dimension the sensor produced.
 w.setCurrentLayerName('DIM-SCANNED');
 // A vertical run needs its angle stated, or a linear dim measures the horizontal
 // component of it and reports zero. Aligned dims measure along the segment itself.
-w.addLinearDim(point3d(0, 0), point3d(0, 96), { offset: -24, angle: 90 });
+w.addLinearDim(point3d(0, 0), point3d(0, 96), {
+  offset: -24,
+  angle: 90,
+  middlePoint: point3d(-24, 48),
+});
 w.setCurrentLayerName('DIM-SCANNED');
-w.addAlignedDim(point3d(0, 0), point3d(120, 90), { offset: 12 });
+// Midpoint of the segment, pushed out along its perpendicular by the offset.
+w.addAlignedDim(point3d(0, 0), point3d(120, 90), {
+  offset: 12,
+  middlePoint: point3d(60 - 7.2, 45 + 9.6),
+});
 
 const out = w.stringify();
 require('fs').writeFileSync('proof.dxf', out);
