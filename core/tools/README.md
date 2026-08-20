@@ -10,44 +10,55 @@ npm i @tarikjabiri/dxf && node verify-dxf-dimensions.cjs     # writes proof.dxf
 
 ## Where this actually stands, as of 2026-08-20
 
-**The check was lying, and it has been fixed to stop.** It copied the file through `ezdxf`
-before rendering, and `ezdxf` repairs a file on save. So every green light was a repaired
-copy that no customer would ever receive. It now hands LibreCAD the original bytes, and on
-those it **fails**.
+### Verified in Autodesk Viewer, by hand
 
-What is established, by observation rather than inference:
+Autodesk Viewer is the customer's tool, and these were confirmed there by manually driving
+the Measure tool and the Layers panel. **This is the only verification that counts, and it
+cannot be automated from here — it must be done by hand, in the viewer, every time the claim
+matters.**
 
-| Consumer | Our raw file | Notes |
-|---|---|---|
-| Autodesk Viewer | **draws the geometry**, correct layer colours, **no dimension text** | Autodesk regenerates the lines. Screenshots from Sam. |
-| LibreCAD | **draws nothing at all** — blank page | Even a file containing only four plain `LINE` entities comes back blank. |
-| LibreCAD, after an `ezdxf` round trip | draws everything including text | Which is what produced the earlier false confidence. |
-| `ezdxf` renderer | draws only the plain lines | It needs a stored geometry block, which is still absent. |
+| Claim | Result |
+|---|---|
+| Geometry is exact | **VERIFIED.** Measure returned **150.000"** on the aligned diagonal and **96.000"** on the vertical — dead on. |
+| Confidence as layers | **VERIFIED.** Toggling `DIM-VERIFIED` off removed the green and left the yellow. |
+| Dimension text renders | **NOT VERIFIED.** No numbers appear. Three attempts have failed. |
 
-**So the file is not fundamentally invalid** — Autodesk reads it and draws it. LibreCAD is
-stricter about something `ezdxf` supplies on save, and the exact cause has not been isolated.
-Ruled out so far: it is not dimension-specific (plain lines are blank too), and it is not
-`$INSUNITS`, `$EXTMIN`/`$EXTMAX` or `$LIMMIN`/`$LIMMAX`, all of which are now set explicitly
-and none of which changed the result. The remaining suspect is the `OBJECTS` section —
-`ezdxf` writes far more there, including layout and plot settings, which is what LibreCAD's
-PDF printer reads.
+Readings of 148.565" and 23.937" in the same session are unsnapped cursor clicks, not file
+error — a wrong coordinate would not land exactly on 150.000 and 96.000 and miss only where
+the cursor was placed by eye.
 
-### Fixed at the source along the way
+### The claim to make, and the claim not to make
 
-All of these were mine rather than the library's. It exposes every one of them and the
-generator called none:
+**"DXF that keeps its dimensions" is unproven and must not be said to a customer.** It has
+been reported working twice from automated checks and was wrong both times.
 
-- `setUnits()` — the file was unitless, so a CAD application guessed the scale
-- `middlePoint` — group 11, without which Autodesk draws the lines and omits the number
-- `styleName` + a `DIMTXT` of 4 — with no text height, text is drawn at zero size
-- `text: '<>'` — the DXF token meaning "draw the measured value here"
-- `$EXTMIN` / `$EXTMAX` / `$LIMMIN` / `$LIMMAX` — where the drawing is
+What can be said, because it was watched happening: the geometry is exact in Autodesk Viewer,
+and the confidence layers work there.
 
-### The next test that decides it
+### LibreCAD blank page — cause isolated
 
-Autodesk Viewer, on the current `sample-plan.dxf`, which now carries the text height and the
-style. If the numbers appear there, the product claim holds and the LibreCAD failure is a
-printing-setup problem to fix separately. If they do not, the geometry block is next.
+Our file contains **zero `LAYOUT` objects**; a repaired copy has two. LibreCAD's `dxf2pdf`
+prints *from* a layout, which is where paper size and plot settings live, so with none it has
+no page and emits a blank sheet.
+
+Also absent, all of which `ezdxf` writes: `MLINESTYLE`, `MATERIAL`, `MLEADERSTYLE`,
+`DICTIONARYVAR`, `ACDBPLACEHOLDER`, `ACDBDICTIONARYWDFLT`.
+
+**`@tarikjabiri/dxf` cannot write layouts.** It exposes `addPaperSpace()`, which creates a
+paper-space *block*, and no API for the `LAYOUT` objects themselves. So the library cannot
+produce a file LibreCAD will print — which is a printing limitation, not a drawing-validity
+one, and is exactly consistent with Autodesk viewing it correctly.
+
+### Still unexplained: the missing dimension text
+
+Ruled out, all now set and none of which changed the result: `$INSUNITS`, `middlePoint`
+(group 11), a `DIMTXT` text height of 4, a named `dimstyle`, the `<>` token, and
+`$EXTMIN`/`$EXTMAX`/`$LIMMIN`/`$LIMMAX`.
+
+Next hypothesis, untested: the generated **geometry block**. Autodesk Viewer draws dimension
+*lines* but no text, which fits a viewer that partially regenerates geometry and reads text
+from the stored block. `ezdxf`'s renderer needed that block too. It is the last thing both
+failing consumers have in common.
 
 ## What real CAD does with it
 

@@ -400,7 +400,28 @@ What it does that Trueline should take:
 - **Properties beside the drawing**, so selecting something tells you what it is.
 - Progressive load rather than a spinner: the drawing appears as it arrives.
 
-## Confidence as DXF layers — on the roadmap
+## DXF status — what is proven and what is not
+
+**Verified by hand in Autodesk Viewer**, which is the customer's tool and the only
+verification that counts here:
+
+- **Geometry is exact.** Measure returned 150.000" on the aligned diagonal and 96.000" on the
+  vertical.
+- **Confidence as layers works.** Toggling `DIM-VERIFIED` off removed the green and left the
+  yellow.
+
+**Not verified: dimension text does not render.** Three attempts have failed, and the claim
+"a DXF that keeps its dimensions" **must not be made to a customer** until numbers are seen
+in the viewer. It was reported working twice off automated checks and was wrong both times.
+
+**Verification of this claim is manual and cannot be automated from here.** Upload to
+Autodesk Viewer, drive the Measure tool, toggle the layers, look.
+
+The LibreCAD blank page is isolated: our file has no `LAYOUT` objects, which is where paper
+size and plot settings live, and `@tarikjabiri/dxf` has no API to write them. That is a
+printing limitation rather than a drawing-validity one.
+
+## Confidence as DXF layers — verified in Autodesk
 
 Provenance and exactness die at the DXF boundary, because DXF stores floating-point drawing
 units. What survives is **which layer a dimension sits on**, and that is enough:
