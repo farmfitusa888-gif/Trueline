@@ -310,6 +310,67 @@ should read it before the adapter is designed.
 products, so the seam to Plumbline stays cheap. Their Three.js code ports into React; only
 the SvelteKit shell is discarded, and that is the least valuable part of it.
 
+## DXF with dimensions — verified, with the trap named
+
+`@tarikjabiri/dxf` v2.8.9, **MIT licence**, read from its own package manifest. It emits real
+`DIMENSION` entities. Proven by writing a file and reading it back with `ezdxf`, a different
+parser: three DIMENSION entities on named layers, zero audit errors, and the horizontal and
+vertical dimensions measuring exactly 148.5 and 96 as written.
+
+**The trap:** `addAlignedDim` does not write the angle (group code 50), so a consumer that
+measures by projecting along it reads the horizontal component rather than the true length —
+120 where it should be 150. Confirmed against `ezdxf` writing its own aligned dimension over
+the same geometry, which does set the angle and does read back 150.
+
+**Rule: always `addLinearDim` with an explicit angle; never `addAlignedDim`.** Zero or ninety
+for a rectilinear room, `atan2(dy, dx)` for anything angled.
+
+Re-runnable proof lives at `core/tools/verify-dxf-dimensions.js`. **Not verified:** the file
+has not been opened in AutoCAD, Revit or SketchUp, and must be before the claim is made to a
+customer.
+
+## Confidence as DXF layers — on the roadmap
+
+Provenance and exactness die at the DXF boundary, because DXF stores floating-point drawing
+units. What survives is **which layer a dimension sits on**, and that is enough:
+
+| Layer | Holds |
+|---|---|
+| `TRUELINE-WALLS` | the geometry |
+| `DIM-VERIFIED` | dimensions a person put a tape on |
+| `DIM-SCANNED` | dimensions a sensor produced |
+| `DIM-ESTIMATED` | dimensions read off an older drawing |
+
+An architect opening the file sees, per dimension, whether somebody stood behind the number —
+by toggling a layer. No competitor does this, and it costs nothing once layers are being
+emitted anyway. Verified working in the proof above: the entities came back on
+`DIM-VERIFIED` and `DIM-SCANNED` as written.
+
+## Their model layer — read, and it settles the adapter question
+
+`src/lib/models/types.ts`, quoted:
+
+```ts
+export interface Point { x: number; y: number; }
+export interface Measurement { id: string; x1: number; y1: number; x2: number; y2: number; }
+export interface Room { id: string; name: string; walls: string[]; area: number;
+                        floorTexture: string; /* ... */ }
+```
+
+- Coordinates and lengths are JavaScript `number` — floating point throughout.
+- Units are inconsistent: "world units" for coordinates, centimetres for furniture.
+- `Wall` carries `color`, `texture`, `interiorColor`, `exteriorTexture` — presentation, not measurement.
+- `Room.area` is **stored**, not derived, so it can drift from the walls it claims to describe.
+- **No provenance, no confidence, no tolerance, no zones or virtual boundaries.**
+
+Their `Measurement` is not a measurement. It is an annotation line with no value and no units.
+
+This is a rendering model, which is exactly what it should be for what it does — and it
+confirms taking the renderer and not the model. It also answers the cost question:
+**the adapter is an afternoon, not a fortnight.** It runs one way only, ours to theirs, for
+drawing; their shape is simpler than ours; and `corners()` already produces the start and end
+points their `Wall` wants.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
