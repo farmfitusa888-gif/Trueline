@@ -8,6 +8,32 @@ const w = new DxfWriter();
 // Everything below is in inches.
 w.setUnits(Units.Inches);
 
+// Declare where the drawing is.
+//
+// Without $EXTMIN/$EXTMAX and $LIMMIN/$LIMMAX, LibreCAD prints on a default
+// letter sheet at 1:1 and a 148-inch drawing falls entirely off the page —
+// which is why every render came back blank until the file was accidentally
+// repaired by a round trip through another library. The geometry below spans
+// roughly -30..160 by -30..100 inches; a real export computes this from the
+// model rather than hard-coding it.
+w.setVariable('$EXTMIN', { 10: -30, 20: -30, 30: 0 });
+w.setVariable('$EXTMAX', { 10: 165, 20: 105, 30: 0 });
+w.setVariable('$LIMMIN', { 10: -30, 20: -30 });
+w.setVariable('$LIMMAX', { 10: 165, 20: 105 });
+
+// A dimension style that actually has a text height.
+//
+// With DIMTXT unset the text is drawn at zero size, which is why Autodesk Viewer
+// showed the extension lines and arrowheads and no number. The drawing is about
+// 150 inches across, so four-inch text reads when the whole plan fits a page.
+const style = w.tables.addDimStyle('TRUELINE');
+style.DIMTXT = 4;      // text height
+style.DIMASZ = 3;      // arrowhead size
+style.DIMEXE = 1.5;    // extension line beyond the dimension line
+style.DIMEXO = 1;      // gap between the object and the extension line
+style.DIMGAP = 1;      // gap around the text
+style.DIMDEC = 2;      // decimal places
+
 // Confidence as layers — the thing that survives DXF's floating point boundary.
 w.addLayer('TRUELINE-WALLS', Colors.White);
 w.addLayer('DIM-VERIFIED', Colors.Green);
@@ -28,6 +54,8 @@ w.setCurrentLayerName('DIM-VERIFIED');
 w.addLinearDim(point3d(0, 0), point3d(L, 0), {
   offset: 24,
   middlePoint: point3d(L / 2, 24),
+  styleName: 'TRUELINE',
+  text: '<>',
 });
 
 // A dimension the sensor produced.
@@ -38,12 +66,16 @@ w.addLinearDim(point3d(0, 0), point3d(0, 96), {
   offset: -24,
   angle: 90,
   middlePoint: point3d(-24, 48),
+  styleName: 'TRUELINE',
+  text: '<>',
 });
 w.setCurrentLayerName('DIM-SCANNED');
 // Midpoint of the segment, pushed out along its perpendicular by the offset.
 w.addAlignedDim(point3d(0, 0), point3d(120, 90), {
   offset: 12,
   middlePoint: point3d(60 - 7.2, 45 + 9.6),
+  styleName: 'TRUELINE',
+  text: '<>',
 });
 
 const out = w.stringify();

@@ -69,7 +69,13 @@ if missing:
         "        Pass middlePoint when adding the dimension." % (len(missing), ', '.join(missing))
     )
 print("  text:     all dimensions carry a text midpoint (group 11)")
-doc.saveas(dst)
+
+# Deliberately NOT re-saved through ezdxf. Doing that repairs the file on the way
+# past, and the check then passes on a copy the customer will never receive —
+# which is exactly how this check gave a false green while Autodesk Viewer showed
+# a drawing with no numbers on it. CAD must be handed the original bytes.
+import shutil
+shutil.copyfile(src, dst)
 dims = sum(1 for e in doc.modelspace() if e.dxftype() == 'DIMENSION')
 print(f"  entities: {dims} DIMENSION")
 open('/tmp/_dimcount', 'w').write(str(dims))
