@@ -5,6 +5,8 @@ import { importRoomPlan } from '../../core/src/import-roomplan.ts';
 import type { Footprint } from '../../core/src/obstruction.ts';
 import { makeCased, makeOpen, makeWall, verifyWall } from '../../core/src/edit.ts';
 import { loadProject, saveProject } from '../../core/src/persist.ts';
+import { type PhotoManifest, type RoomFrame, importPhotos } from '../../core/src/capture.ts';
+import type { Photo } from '../../core/src/photo.ts';
 
 /**
  * All the state this screen has, and every way it can change.
@@ -34,6 +36,14 @@ export interface Loaded {
   readonly room: Room;
   readonly report: ImportReport;
   readonly footprints: readonly Footprint[];
+  /**
+   * Photographs taken during the scan, each one knowing which walls it shows.
+   * Empty for a scan opened from a file; full when the scanner in this app
+   * handed the room over.
+   */
+  readonly photos: readonly Photo[];
+  /** The coordinate frame the room came in on, so more photos can be placed later. */
+  readonly frame: RoomFrame;
   /** Rooms as they were before each edit, most recent last. */
   readonly undo: readonly Room[];
   /** What the last edit did, for the line under the plan. */
@@ -51,7 +61,7 @@ export interface State {
 export const EMPTY: State = { loaded: null, error: null, selected: null };
 
 export type Action =
-  | { type: 'open'; json: unknown; fileName: string; at: string }
+  | { type: 'open'; json: unknown; fileName: string; at: string; photos?: unknown }
   | { type: 'restore' }
   | { type: 'select'; wallId: string | null }
   | { type: 'make'; wallId: string; as: 'wall' | 'open' | 'cased' }
@@ -83,11 +93,42 @@ export function reduce(state: State, action: Action): State {
   switch (action.type) {
     case 'open': {
       try {
-        const { room, report, footprints } = importRoomPlan(action.json as never, { at: action.at });
+        const { room, report, footprints, frame } = importRoomPlan(action.json as never, {
+          at: action.at,
+        });
+
+        // Photographs are optional: a scan dropped in from a file has none, and
+        // one handed over by the scanner in this app has hundreds. Either way a
+        // photo that will not place is named rather than dropped.
+        let photos: readonly Photo[] = [];
+        let photoTrouble: string | null = null;
+        if (action.photos) {
+          try {
+            const imported = importPhotos(action.photos as PhotoManifest, frame);
+            photos = imported.photos;
+            if (imported.rejected.length > 0) {
+              photoTrouble =
+                `${imported.rejected.length} photo${imported.rejected.length === 1 ? '' : 's'} ` +
+                `could not be placed against the room: ${imported.rejected[0]!.reason}`;
+            }
+          } catch (error) {
+            photoTrouble = message(error);
+          }
+        }
+
         return {
           selected: null,
-          error: null,
-          loaded: { room, report, footprints, undo: [], lastEdit: null, fileName: action.fileName },
+          error: photoTrouble,
+          loaded: {
+            room,
+            report,
+            footprints,
+            photos,
+            frame,
+            undo: [],
+            lastEdit: null,
+            fileName: action.fileName,
+          },
         };
       } catch (error) {
         return { ...state, error: message(error) };
@@ -106,7 +147,12 @@ export function reduce(state: State, action: Action): State {
       if (text === null) return state;
       try {
         const saved = loadProject(text);
-        const extras = saved.extras as { report?: ImportReport; footprints?: readonly Footprint[] };
+        const extras = saved.extras as {
+          report?: ImportReport;
+          footprints?: readonly Footprint[];
+          photos?: readonly Photo[];
+          frame?: RoomFrame;
+        };
         if (!extras.report) throw new Error('That saved room has no import report with it.');
         return {
           selected: null,
@@ -115,6 +161,8 @@ export function reduce(state: State, action: Action): State {
             room: saved.room,
             report: extras.report,
             footprints: extras.footprints ?? [],
+            photos: extras.photos ?? [],
+            frame: extras.frame ?? { datum: { x: 1, y: 0 }, referenceOriginTransform: null },
             undo: [],
             lastEdit: `Picked up where you left off — saved ${when(saved.savedAt)}.`,
             fileName: saved.fileName,
@@ -236,7 +284,12 @@ export function persist(loaded: Loaded, at: string): string | null {
         savedAt: at,
         fileName: loaded.fileName,
         room: loaded.room,
-        extras: { report: loaded.report, footprints: loaded.footprints },
+        extras: {
+          report: loaded.report,
+          footprints: loaded.footprints,
+          photos: loaded.photos,
+          frame: loaded.frame,
+        },
       })
     );
     return null;

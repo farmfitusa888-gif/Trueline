@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **253 passing, 0 failing** (`npm test`) |
+| Tests | **267 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -107,9 +107,14 @@ It keeps your corrections in the browser between visits, and it produces **a lis
 the four walls worth a tape, ranked, as plain text you can send to a phone or print. `netlify.toml`
 deploys the whole thing as a static site with no backend.
 
-Not built yet: **the scanner**. Trueline does not capture — it reads a scan another app made.
-Capture is a native iOS job (WebXR cannot reach LiDAR in Safari) and it is the next phase. Also
-not built: the API, accounts, exports.
+**The scanner is written** — `ios/`, a SwiftUI app on Apple's RoomPlan. It shows wall lengths
+live while you walk, photographs the room every two seconds and on a shutter press with the
+camera's exact pose attached to each shot, and hands the finished scan straight to the
+correction screens running in a web view inside the same app. One measurement engine, not two.
+**It has not been compiled** — this repository is developed on Linux, where there is no Xcode —
+so it needs a first build on a Mac. `ios/README.md` has the steps.
+
+Not built yet: AR measure without LiDAR, manual draw's screen, the API, accounts, exports.
 
 ```bash
 cd trueline && npm install && npm test && npm run typecheck

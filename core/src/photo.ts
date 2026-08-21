@@ -1,4 +1,4 @@
-import { type Nanometres } from './length.ts';
+import { type Nanometres, hypotenuse } from './length.ts';
 import { type Point, type Room, RoomError, corners, validate } from './room.ts';
 
 /**
@@ -111,13 +111,19 @@ function along(from: Point, to: Point, f: { numerator: bigint; denominator: bigi
   };
 }
 
+/**
+ * How much of a wall a clipped span covers.
+ *
+ * Square segments are exact subtraction. One that runs at an angle takes the
+ * integer square root, the same rounding the wall it lies on already carries.
+ * This used to refuse angled walls outright, and 292 real camera poses walked
+ * into a kitchen with a 203 mm chamfer in it and found out.
+ */
 function segmentLength(a: Point, b: Point): Nanometres {
   const dx = a.x > b.x ? a.x - b.x : b.x - a.x;
   const dy = a.y > b.y ? a.y - b.y : b.y - a.y;
-  if (dx !== 0n && dy !== 0n) {
-    throw new PhotoError('Walls run square in this model; that segment runs diagonally.');
-  }
-  return dx + dy;
+  if (dx === 0n || dy === 0n) return dx + dy;
+  return hypotenuse(dx, dy);
 }
 
 /* ------------------------------------------------------------------ in frame */
@@ -164,11 +170,33 @@ export function wallsInFrame(photo: Photo, room: Room): WallInFrame[] {
 
     if (!aIn || !bIn) {
       // Clip against whichever frustum edges the wall crosses.
-      const hits = [photo.pose.leftEdge, photo.pose.rightEdge]
-        .map((edge) => crossingFraction(a, b, photo.pose.at, edge))
-        .filter((f): f is { numerator: bigint; denominator: bigint } => f !== null)
-        .map((f) => along(a, b, f))
-        .filter((p) => insideWedge(photo.pose, p));
+      //
+      // A point produced by clipping against one edge lies *on* that edge, so
+      // checking it against that same edge asks whether a rounded number is
+      // exactly zero — and it is not. The crossing is rounded to the nearest
+      // nanometre, which lands it a fraction of a nanometre to one side, and
+      // that fraction used to throw the whole wall away. Found by pointing a
+      // camera at a wall it plainly could see and getting nothing back. Each hit
+      // is therefore tested against the *other* edge only.
+      const clipped = (edge: Vec2, keep: (v: Vec2) => boolean): Point | null => {
+        const f = crossingFraction(a, b, photo.pose.at, edge);
+        if (f === null) return null;
+        const p = along(a, b, f);
+        return keep(minus(p, photo.pose.at)) ? p : null;
+      };
+      const hits = [
+        clipped(photo.pose.leftEdge, (v) => cross(photo.pose.rightEdge, v) >= 0n),
+        clipped(photo.pose.rightEdge, (v) => cross(photo.pose.leftEdge, v) <= 0n),
+      ]
+        .filter((p): p is Point => p !== null)
+        // In the order they appear walking the wall, so `from` and `to` mean
+        // what they say and the length is measured across the right stretch.
+        .sort((p, q) => {
+          const along = (r: Point) => (r.x - a.x) * (b.x - a.x) + (r.y - a.y) * (b.y - a.y);
+          const dp = along(p);
+          const dq = along(q);
+          return dp === dq ? 0 : dp < dq ? -1 : 1;
+        });
 
       if (aIn && hits[0]) { from = a; to = hits[0]; }
       else if (bIn && hits[0]) { from = hits[0]; to = b; }

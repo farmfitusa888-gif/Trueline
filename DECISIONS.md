@@ -1017,6 +1017,102 @@ reading it. Whatever is written has to be built and run by Sam on a Mac, and the
 be verified here — the capture file format, the live-measurement arithmetic, the photo-to-wall
 composition — stay in `core` where they are tested.
 
+## The scanner — decided, and written
+
+Sam's four answers, and what each one means:
+
+| | Decision |
+|---|---|
+| Building it | Mac with Xcode, ready. Swift is written here and built there. |
+| Architecture | **Native capture, the web screens embedded.** One measurement engine. |
+| Photos | **Automatic every two seconds, plus a shutter.** |
+| Storage | **On the phone, with a share button.** No account, no server, no bill. |
+
+### One measurement engine, and why that settled the architecture
+
+Writing the model twice — nanometre integers, provenance, the solver, zones,
+obstruction, the issue guard — in Swift *and* TypeScript would mean two models in
+two languages, kept in step forever, every bug fixed twice. Small products die of
+that. So capture is native because capture has to be, and everything after the
+scan is `web/` running in a `WKWebView` inside the same app, with no network
+access at all. The app hands the scan across as an argument through
+`window.trueline.open(room, photos, name)`; nothing is fetched and nothing is
+uploaded.
+
+The one number the native side formats is the live wall length during a scan, and
+`Formatting.swift` says in its own comment that it is a glance and not a figure:
+it rounds to the half inch, nothing it produces is written anywhere, and the
+moment the scan is saved every number a person sees comes from `core` with a band
+on it.
+
+### The app writes RoomPlan's own format, on purpose
+
+`CaptureWriter` encodes `CapturedRoom` straight through `JSONEncoder`, producing
+exactly the shape the two real exports have. The importer was written against
+those exports and is tested against them — nine edges out of the kitchen, six out
+of the garage, both landing on the area of the outline they came from. Writing a
+different format here would throw all of that verification away and start again.
+
+That retires `CaptureExport.swift` from the `ios-scanner` branch, which invented a
+format of its own before there was any real data to check it against.
+
+### Not stealing the ARSession delegate
+
+`ARSession` has exactly one delegate and RoomPlan is using it. Taking it would
+break the thing being photographed. So frames come from
+`arSession.currentFrame`, polled on a timer — photographs are evidence, not
+tracking, and a few a second is more than enough.
+
+### Intrinsics go across row-major, and the transform column-major
+
+Not a mistake, and not a guess: checked against the two real exports.
+`cameraPoseARFrame` is column-major (its last four entries are the translation,
+and frame 0 of the kitchen scan has them at the origin, which is what a session
+start looks like). `intrinsics` in the same files are
+`[fx, 0, cx, 0, fy, cy, 0, 0, 1]`, which is the other way round. So
+`PhotoRecorder` flattens the transform and *names* the four intrinsics that
+matter rather than flattening a matrix and hoping. Getting it wrong is every
+photograph claiming the wrong field of view.
+
+## A bug that only real data could find: sub-nanometre rounding was deleting walls
+
+`capture.ts` was run against the 292 real camera poses in the kitchen scan and the
+314 in the garage. Every one of them placed, and every one landed between 2'7"
+and 6'7" above the floor — a person holding a phone. The composition works.
+
+Then a synthetic test pointed a camera straight at a wall it could plainly see and
+got **nothing back**.
+
+The cause: when a wall is wider than the frame, both ends are outside it and the
+visible stretch is found by clipping against the two edges of the view. A clipped
+point lies *on* an edge by construction — so testing it against that same edge
+asks whether a rounded number is exactly zero. It is not. The crossing is rounded
+to the nearest nanometre, which lands it a fraction of a nanometre to one side,
+and that fraction threw the whole wall away.
+
+Sub-nanometre. Four-billionths of a metre, deleting a twelve-foot wall.
+
+Each clipped point is now tested against the *other* edge only. On the real
+kitchen scan the effect was not marginal:
+
+| | Before | After |
+|---|---|---|
+| Walls found per photo, mean | 0.3 | **1.1** |
+| Photos found of the longest wall | 24 | **96** |
+| Photos found of the counter wall | 6 | **42** |
+
+Nearly four times the coverage was being discarded, and the failure was silent —
+`unphotographedWalls()` would have sent somebody back to photograph a wall it
+already had fifty pictures of. Exactly the plausible-but-wrong output this
+codebase is built to refuse.
+
+## What is not built, stated plainly
+
+The Swift has **not been compiled**. This container is Linux with no Swift
+toolchain and no Xcode. It has been checked by reading, its two file formats are
+read by code that is tested against real data, and it will not be called working
+until it runs on a phone.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.

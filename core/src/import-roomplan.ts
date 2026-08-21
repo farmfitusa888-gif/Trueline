@@ -1,6 +1,7 @@
 import { type Nanometres, NM_PER_METRE, abs, formatFeetInches, formatMetric, hypotenuse } from './length.ts';
 import { type Measurement, scanned } from './measurement.ts';
 import { type Footprint } from './obstruction.ts';
+import { type RoomFrame } from './capture.ts';
 import {
   type Direction,
   type Heading,
@@ -68,6 +69,8 @@ export interface RoomPlanSurface {
 
 export interface RoomPlanExport {
   readonly version?: number;
+  /** Maps the room's own coordinates into the ARKit world the photos were taken in. */
+  readonly referenceOriginTransform?: readonly number[];
   readonly walls: readonly RoomPlanSurface[];
   readonly doors?: readonly RoomPlanSurface[];
   readonly windows?: readonly RoomPlanSurface[];
@@ -287,6 +290,16 @@ export interface ImportResult {
   readonly report: ImportReport;
   /** Detected objects as axis-aligned boxes, for `obstruction.ts`. */
   readonly footprints: readonly Footprint[];
+  /**
+   * The coordinate frame this room ended up in.
+   *
+   * Photographs taken during the same scan have to land in the same one, and the
+   * datum is a choice this importer made — the longest wall — not something that
+   * can be recovered from the room afterwards. So it comes out with the room
+   * rather than being worked out a second time. Two independent derivations of
+   * one datum is two chances to disagree.
+   */
+  readonly frame: RoomFrame;
 }
 
 /* ------------------------------------------------------------------ import */
@@ -447,6 +460,11 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
       notes,
     },
     footprints: readObjects(scan, datum),
+    frame: {
+      datum,
+      referenceOriginTransform: (scan as { referenceOriginTransform?: readonly number[] })
+        .referenceOriginTransform ?? null,
+    },
   };
 }
 

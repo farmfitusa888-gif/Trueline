@@ -4,6 +4,7 @@ import { area, formatSquareFeet, isDiagonal, runLength } from '../../core/src/ro
 import { readiness } from '../../core/src/issue.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
 import { EMPTY, persist, reduce } from './state.ts';
+import { installBridge } from './bridge.ts';
 import { LEGEND, Plan } from './Plan.tsx';
 import { Corrections } from './Corrections.tsx';
 import { FieldSheet } from './FieldSheet.tsx';
@@ -107,8 +108,21 @@ export function App() {
   const [saveTrouble, setSaveTrouble] = useState<string | null>(null);
   const loaded = state.loaded;
 
-  // Pick up whatever was being corrected last time, before anything is drawn.
+  // Let the scanner in — and pick up whatever was being corrected last time.
+  // A capture handed over at start-up wins: somebody who has just finished
+  // walking a room wants that room, not the one they were looking at yesterday.
   useEffect(() => {
+    const waiting = installBridge(dispatch);
+    if (waiting) {
+      dispatch({
+        type: 'open',
+        json: waiting.room,
+        photos: waiting.photos,
+        fileName: waiting.fileName ?? 'scan from this device',
+        at: new Date().toISOString(),
+      });
+      return;
+    }
     dispatch({ type: 'restore' });
   }, []);
 
