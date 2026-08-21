@@ -203,6 +203,20 @@ export interface Wall {
    */
   readonly height?: Measurement;
   readonly openings?: readonly Opening[];
+  /**
+   * True when this side of the room has no wall across it.
+   *
+   * A garage door opening. A span into the next room too wide for a scanner to
+   * call a door. It is part of the room's outline — it bounds the floor and the
+   * ceiling and it closes the polygon — but it carries no drywall, no paint and
+   * no baseboard, and nothing hangs in it.
+   *
+   * Both of Sam's scans have one: 4.8144 m across the front of the garage, and
+   * 3.5243 m round a corner out of the kitchen. In each case the wall-less floor
+   * edges account for the gap between two dangling wall ends exactly, which is
+   * how the importer knows it is an opening rather than a hole in the data.
+   */
+  readonly open?: true;
 }
 
 export interface Room {
@@ -269,6 +283,12 @@ export function validate(room: Room): void {
     if (wall.length.value <= 0n) {
       throw new RoomError(`Wall "${wall.id}" has a length of ${wall.length.value}nm. Walls run positive.`);
     }
+    if (wall.open && (wall.openings?.length ?? 0) > 0) {
+      throw new RoomError(
+        `"${wall.id}" is an open span with ${wall.openings!.length} opening(s) in it. ` +
+          `There is no wall there to put a door or a window in.`
+      );
+    }
   }
   for (const wall of room.walls) {
     if (!isDiagonal(wall.heading)) continue;
@@ -292,11 +312,16 @@ export function validate(room: Room): void {
   for (let i = 0; i < room.walls.length; i += 1) {
     const here = room.walls[i]!;
     const next = room.walls[(i + 1) % room.walls.length]!;
-    // A diagonal may sit beside anything — that is what it is for. Two square
+    // A diagonal may sit beside anything — that is what it is for. Two built
     // walls in a row on the same axis are still a mistake: they are one wall
     // written twice, and the solver would move both to fix one error.
+    //
+    // An open span in line with the wall next to it is not a mistake, and Sam's
+    // garage is the proof: a 4.8 m garage door with a 0.57 m stub of wall either
+    // side of it, all three dead in line down the east side of the building.
+    // Three collinear segments there is what the building is.
     const hereAxis = axisOf(here);
-    if (hereAxis !== null && hereAxis === axisOf(next)) {
+    if (hereAxis !== null && hereAxis === axisOf(next) && !here.open && !next.open) {
       throw new RoomError(
         `Walls "${here.id}" and "${next.id}" both run ${hereAxis === 'x' ? 'east-west' : 'north-south'}. ` +
           `In a rectilinear room every wall turns a corner into the next one. If there is a real ` +
@@ -489,10 +514,31 @@ export function perimeter(room: Room): Measurement {
   );
 }
 
-export const NM2_PER_SQ_FOOT: bigint = NM_PER_FOOT * NM_PER_FOOT;
+/**
+ * Areas here are held in **half square nanometres**, and this is the unit.
+ *
+ * The shoelace formula produces twice the area. For a rectilinear room that
+ * doubled figure is always even, so halving it is exact and the unit never had
+ * to be thought about. A room with an angled wall breaks that: a triangle can
+ * genuinely enclose a half of a square nanometre, and the doubled figure comes
+ * out odd. Sam's kitchen is one — the 203 mm chamfer does it.
+ *
+ * Halving anyway would be a rounding, and a rounded area does not reconcile:
+ * split a room into zones, round each, and the parts stop adding up to the
+ * whole. `zone.ts` refuses a split that loses a square nanometre, and it is
+ * right to. So the doubled figure is what is stored, everywhere, and the only
+ * place it is ever halved is where it becomes square feet for a person to read.
+ *
+ * Half a square nanometre is 5 x 10^-19 square metres. Nobody will ever see it.
+ * It is carried because carrying it costs nothing and dropping it costs the one
+ * guarantee that makes a take-off trustworthy.
+ */
+export type HalfSquareNanometres = bigint;
+
+export const HALF_NM2_PER_SQ_FOOT: HalfSquareNanometres = 2n * NM_PER_FOOT * NM_PER_FOOT;
 
 /**
- * Floor area, in square nanometres, by the shoelace formula over the corners.
+ * Floor area by the shoelace formula over the corners, in half square nanometres.
  *
  * The tolerance is a real bound rather than a gesture: moving a wall outward by
  * its tolerance adds at most its own length times that tolerance to the area, so
@@ -509,23 +555,18 @@ export function area(room: Room): Measurement {
     twiceArea += a.x * b.y - b.x * a.y;
   }
   const magnitude = twiceArea < 0n ? -twiceArea : twiceArea;
-  if (magnitude % 2n !== 0n) {
-    throw new RoomError(`"${room.name}" has an area that is not a whole number of square nanometres.`);
-  }
 
-  const tolerance = add(
-    ...room.walls.map((w) => w.length.value * toleranceOf(w.length))
-  );
+  const tolerance = 2n * add(...room.walls.map((w) => runLength(w) * toleranceOf(w.length)));
   return {
-    value: magnitude / 2n,
+    value: magnitude,
     provenance: { kind: 'derived', tolerance, from: room.walls.map((w) => w.id) },
   };
 }
 
-/** Renders square nanometres as square feet, rounded for reading only. */
-export function formatSquareFeet(nm2: bigint, decimals = 1): string {
+/** Renders half square nanometres as square feet, rounded for reading only. */
+export function formatSquareFeet(halfNm2: HalfSquareNanometres, decimals = 1): string {
   const scale = 10n ** BigInt(decimals);
-  const scaled = (nm2 * scale + NM2_PER_SQ_FOOT / 2n) / NM2_PER_SQ_FOOT;
+  const scaled = (halfNm2 * scale + HALF_NM2_PER_SQ_FOOT / 2n) / HALF_NM2_PER_SQ_FOOT;
   const whole = scaled / scale;
   const frac = (scaled % scale).toString().padStart(decimals, '0');
   return decimals === 0 ? `${whole} sq ft` : `${whole}.${frac} sq ft`;
@@ -543,7 +584,7 @@ export function verificationPunchList(room: Room, limit = 5): { wallId: string; 
   validate(room);
   return room.walls
     .filter((w) => !isVerified(w.length))
-    .map((w) => ({ wallId: w.id, areaAtStake: runLength(w) * toleranceOf(w.length) }))
+    .map((w) => ({ wallId: w.id, areaAtStake: 2n * runLength(w) * toleranceOf(w.length) }))
     .filter((w) => w.areaAtStake > 0n)
     .sort((a, b) => (a.areaAtStake === b.areaAtStake ? 0 : a.areaAtStake > b.areaAtStake ? -1 : 1))
     .slice(0, limit);

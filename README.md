@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **183 passing, 0 failing** (`npm test`) |
+| Tests | **207 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -85,6 +85,13 @@ every wall end meeting its neighbour to within a thousandth of a millimetre — 
 proves nothing about an imported one. A room whose walls were all scanned cannot be issued as a
 dimensioned drawing until a person has put a tape on one wall per axis, and the error the
 closure check is hiding is reported as a number rather than a shrug.
+
+Also built: **the RoomPlan importer**. The floor polygon says what the outline is; the walls say
+where it is. An edge with no wall across it becomes an open span rather than a hole in the data;
+a wall on no edge of the outline is left out and listed; a real angle survives and sensor noise
+is straightened. Run against Sam's kitchen and garage it produces 175.3 and 418.0 sq ft — the
+areas of the outlines they came from — and both rooms are refused as drawings until somebody
+measures them.
 
 Checked against real scans: `core/tools/inspect-roomplan.py` reads a RoomPlan export and prints
 what it actually contains. Run against Sam's kitchen and garage it found two of the room model's

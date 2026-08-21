@@ -1,6 +1,15 @@
 import { type Nanometres, add, hypotenuse } from './length.ts';
 import { type Measurement, toleranceOf } from './measurement.ts';
-import { type Point, type Room, type Wall, RoomError, area, corners, validate } from './room.ts';
+import {
+  type HalfSquareNanometres,
+  type Point,
+  type Room,
+  type Wall,
+  RoomError,
+  area,
+  corners,
+  validate,
+} from './room.ts';
 
 /**
  * Open plans, and the reason every competitor's numbers go wrong on them.
@@ -53,7 +62,25 @@ export interface VirtualEdge {
   readonly to: Point;
 }
 
-export type ZoneEdge = BuiltEdge | VirtualEdge;
+/**
+ * A side of the room with no wall across it — a garage door opening, a wide span
+ * into the next room.
+ *
+ * Different from both of the others, and worth its own kind. A built edge takes
+ * drywall, paint and baseboard. A virtual edge is a line somebody drew and
+ * nothing was ever built along it. An open edge is a real, physical gap: it is
+ * on the room's outline, it was measured, and there is nothing there.
+ */
+export interface OpenEdge {
+  readonly kind: 'open';
+  readonly wallId: string;
+  readonly from: Point;
+  readonly to: Point;
+  readonly spanStart: Nanometres;
+  readonly spanEnd: Nanometres;
+}
+
+export type ZoneEdge = BuiltEdge | VirtualEdge | OpenEdge;
 
 export interface Zone {
   readonly id: string;
@@ -126,15 +153,9 @@ function edgeIndexFor(p: Point, edges: Outline[], what: string): number {
   return i;
 }
 
-function built(e: Outline, from: Point, to: Point): BuiltEdge {
-  return {
-    kind: 'built',
-    wallId: e.wall.id,
-    from,
-    to,
-    spanStart: len(e.from, from),
-    spanEnd: len(e.from, to),
-  };
+function built(e: Outline, from: Point, to: Point): BuiltEdge | OpenEdge {
+  const span = { wallId: e.wall.id, from, to, spanStart: len(e.from, from), spanEnd: len(e.from, to) };
+  return e.wall.open ? { kind: 'open', ...span } : { kind: 'built', ...span };
 }
 
 /* -------------------------------------------------------------------- split */
@@ -215,7 +236,8 @@ export function splitByBoundary(
 
 /* ---------------------------------------------------------------- questions */
 
-export function zoneArea(zone: Zone): bigint {
+/** In half square nanometres, the same unit `area()` uses. See `room.ts`. */
+export function zoneArea(zone: Zone): HalfSquareNanometres {
   let twice = 0n;
   const pts = zone.edges.map((e) => e.from);
   for (let i = 0; i < pts.length; i += 1) {
@@ -223,7 +245,7 @@ export function zoneArea(zone: Zone): bigint {
     const q = pts[(i + 1) % pts.length]!;
     twice += p.x * q.y - q.x * p.y;
   }
-  return (twice < 0n ? -twice : twice) / 2n;
+  return twice < 0n ? -twice : twice;
 }
 
 /** The part of the zone's outline that is actually built. Baseboard runs here. */
@@ -236,18 +258,29 @@ export function virtualPerimeter(zone: Zone): Nanometres {
   return add(...zone.edges.filter((e) => e.kind === 'virtual').map((e) => len(e.from, e.to)));
 }
 
+/** The part that is a real gap: a garage door opening, a wide span to the next room. */
+export function openPerimeter(zone: Zone): Nanometres {
+  return add(...zone.edges.filter((e) => e.kind === 'open').map((e) => len(e.from, e.to)));
+}
+
 /* --------------------------------------------------------------- quantities */
 
 export interface Quantities {
   /** Floor and ceiling both follow the zone outline, virtual edges included. */
-  readonly floorArea: bigint;
-  readonly ceilingArea: bigint;
+  readonly floorArea: HalfSquareNanometres;
+  readonly ceilingArea: HalfSquareNanometres;
   /** Baseboard follows built edges only, less doors and cased openings. */
   readonly baseboardRun: Nanometres;
-  /** Drywall and paint follow built edges only, less every opening. */
+  /** Drywall and paint follow built edges only, less every opening. In square nanometres. */
   readonly wallFaceArea: bigint;
   /** How much of the zone's outline is a line somebody drew rather than a wall. */
   readonly virtualRun: Nanometres;
+  /**
+   * How much of it is a real gap with nothing built across it. Separate from
+   * `virtualRun` because this one was measured and that one was declared, and
+   * because a garage door opening is a thing somebody may want to price.
+   */
+  readonly openRun: Nanometres;
 }
 
 /** How much of an opening falls inside this stretch of wall. Zero if none of it does. */
@@ -298,6 +331,7 @@ export function quantities(zone: Zone, room: Room): Quantities {
     baseboardRun: baseboard,
     wallFaceArea: face,
     virtualRun: virtualPerimeter(zone),
+    openRun: openPerimeter(zone),
   };
 }
 
@@ -320,6 +354,7 @@ export function report(room: Room, zones: readonly Zone[]): ZoneReport {
     baseboardRun: add(...rows.map((r) => r.quantities.baseboardRun)),
     wallFaceArea: rows.reduce((t, r) => t + r.quantities.wallFaceArea, 0n),
     virtualRun: add(...rows.map((r) => r.quantities.virtualRun)),
+    openRun: add(...rows.map((r) => r.quantities.openRun)),
   };
 
   const whole = area(room).value;

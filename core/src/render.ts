@@ -61,6 +61,12 @@ export interface RenderWall {
   readonly height: number;
   /** Ours, and the reason this adapter exists rather than a straight port. */
   readonly confidence: 'scanned' | 'verified' | 'derived';
+  /**
+   * True when there is no wall here — a garage door opening, a wide span to the
+   * next room. The edge is on the outline and it was measured; the renderer
+   * draws the floor and ceiling across it and nothing standing up.
+   */
+  readonly open: boolean;
   /** Half-width of the band this wall's length lives in, in the same unit. Zero once verified. */
   readonly tolerance: number;
 }
@@ -70,8 +76,11 @@ export interface RenderZone {
   readonly name: string;
   /** Closed ring, first point not repeated at the end. */
   readonly outline: readonly RenderPoint[];
-  /** Which edges are real walls and which are lines somebody drew, in outline order. */
-  readonly edgeKinds: readonly ('built' | 'virtual')[];
+  /**
+   * What each edge is, in outline order: a wall, a real gap with nothing built
+   * across it, or a line somebody drew.
+   */
+  readonly edgeKinds: readonly ('built' | 'open' | 'virtual')[];
 }
 
 export interface RenderModel {
@@ -133,6 +142,7 @@ export function toRenderModel(
     height: toUnit(wallHeight(wall, room).value, unit),
     confidence: confidenceLabel(wall.length),
     tolerance: toUnit(toleranceOf(wall.length), unit),
+    open: wall.open === true,
   }));
 
   const renderZones: RenderZone[] = zones.map((zone) => ({

@@ -173,7 +173,8 @@ export function punchList(
     .filter((w) => !isVerified(w.length))
     .map((wall) => {
       const o = blocking.get(wall.id);
-      const areaAtStake = wall.length.value * toleranceOf(wall.length);
+      // Half square nanometres, matching `area()`, so the two rank on one scale.
+      const areaAtStake = 2n * wall.length.value * toleranceOf(wall.length);
       const blockedPerMille = o?.blockedPerMille ?? 0n;
       return {
         wallId: wall.id,

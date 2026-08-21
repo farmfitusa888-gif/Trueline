@@ -702,6 +702,90 @@ the drawing, but they do not stop it going out. That is a deliberately narrower 
 wall gate, because Sam's instruction was one tape per axis and widening a gate quietly is its own
 kind of dishonesty.
 
+## Four decisions on importing a scan, and the importer that acts on them
+
+Sam decided all four. The importer is `core/src/import-roomplan.ts`, 24 tests, and it has been
+run against both real exports.
+
+### 1. Off-grid walls: hybrid
+
+Square walls keep a compass heading; a wall at a genuine angle carries an exact run. Built and
+locked — see "Angled walls" in the commit history and `room.ts`. The kitchen's 203 mm chamfer
+comes through as a diagonal of 8 inches at its measured angle, and it is held fixed while the
+square walls absorb the room's error.
+
+### 2. Which source is the truth: the walls, with the outline straightened onto them
+
+**The floor polygon says what the outline is. The walls say where it is.** The polygon is the
+only source with every edge, including the ones with no wall across them. But RoomPlan snaps
+its walls to a right-angle grid and does not snap the polygon, so the two disagree, and where
+they do the wall wins.
+
+The test for square is a **ratio, not an angle** — a run counts as square when its smaller
+component is at most a hundredth of its larger one, which is 0.573°. That is exact integer
+arithmetic with no trigonometry, and it is chosen against the three things it has to separate:
+
+| | Off square | Verdict |
+|---|---|---|
+| RoomPlan's own square walls | 0.001° | square, 500x inside the line |
+| The garage's unsnapped floor edge | 0.335° | square — straightened, 28 mm |
+| The kitchen's chamfer | 19.6° | a real angle, kept |
+
+Straightening leaves a residual, and it is not hidden: the room fails to close by exactly what
+was straightened away, `solve()` shares that out across the scanned walls in proportion to their
+tolerances, and the report says how much moved. On the garage that is 28 mm on a 6.5 m room —
+one part in three hundred, and every dimension still carries a 50 mm band until somebody
+measures one.
+
+### 3. A wall on no edge of the outline is left out, and listed
+
+The kitchen's 1.3167 m fragment of the room next door is dropped, and the report says
+*"Left out a 4' 3 13/16" wall … no edge of the floor outline runs between this wall's two ends."*
+Visible and arguable, never silent.
+
+### 4. A wall-less edge becomes an open span
+
+Not a cased opening — a garage door is not a cased opening and calling it one would put a header
+and jambs on a take-off that has none. `Wall.open` marks a side of the room with no wall across
+it: on the outline, bounding floor and ceiling, carrying no drywall, paint or baseboard. `zone.ts`
+gains a third edge kind for it, next to built and virtual, because the three are genuinely
+different: one takes finishes, one is a line somebody drew, one is a measured hole.
+
+### What the importer does to the two real scans
+
+| | Kitchen | Garage |
+|---|---|---|
+| Edges out | 9 | 6 |
+| Walls | 6 | 5 |
+| Open spans | 2, totalling 11' 6 13/16" | 1, at 15' 9 9/16" |
+| Diagonals | 1, the 8" chamfer | none |
+| Dropped | 1 wall, 4' 3 13/16" | none |
+| Largest straightening | 0.0003 mm | 28.1 mm |
+| Area | **175.3 sq ft** | **418.0 sq ft** |
+| Raw floor polygon area | 175.28 sq ft | 418.01 sq ft |
+| Issuable | no | no |
+
+Both areas land on the polygon they came from. Both rooms close. Both are refused as drawings,
+which is the guard doing its job.
+
+### Two things the real scans forced
+
+**A garage door is in line with the wall stubs either side of it.** `validate()` refused three
+collinear segments in a row. The rule was right for its reason — two built walls on the same
+axis are one wall written twice, and the solver would move both to fix one error — but an open
+span in line with the wall beside it is a building, not a mistake. The rule now applies only
+when both segments are built.
+
+**Areas are held in half square nanometres.** The shoelace formula gives twice the area, and for
+a rectilinear room that is always even, so halving it was exact and the unit never had to be
+thought about. A room with an angled wall breaks it: a triangle can enclose a genuine half of a
+square nanometre, and the kitchen's chamfer does. Halving anyway is a rounding, and a rounded
+area does not reconcile — split a room into zones, round each, and the parts stop adding up to
+the whole, which `zone.ts` refuses and is right to refuse. So the doubled figure is what is
+stored, and the only place it is halved is where it becomes square feet on a screen. Half a
+square nanometre is 5 x 10^-19 m². It is carried because carrying it costs nothing and dropping
+it costs the guarantee that makes a take-off trustworthy.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
@@ -728,19 +812,13 @@ before any money goes into branding.
 
 ## Still open
 
-Opened by the first real scan, and not yet closed:
-
-- **Off-grid walls.** `room.ts` refuses two same-axis walls in a row and has no general
-  solver. A 203 mm chamfer at 70° is ordinary, not exotic, so the importer needs a path for
-  short off-grid segments before a scan can round-trip.
-- **Which exported walls belong to the room.** Two scans in, the rule looks mechanical — match
-  wall lengths against floor-edge lengths, and what is left over is not on the outline — but it
-  is still a decision the importer makes on somebody's behalf, so it has to be visible and
-  correctable rather than silent.
-- **Whether the walls or the floor polygon is the truth**, given that RoomPlan snaps one to the
-  grid and not the other. 0.335° over 4.8 m in the garage.
 - **The batch photo delete spec** — checkboxes, select-all, and the warning when the photo
   being deleted is the only one showing a wall. Decided (gap 3 above), not written.
+- **Correcting an import by hand.** The importer names every decision it made — dropped walls,
+  open spans, straightened edges — but nothing yet turns "that open span is really a wall" back
+  into a change. That is a screen, and it belongs with the web shell.
+- **Stitching rooms.** Both scans are one room. The dropped fragment of the space next door is
+  evidence of where the next room starts, and it is thrown away today.
 
 Everything else: build proceeds.
 
