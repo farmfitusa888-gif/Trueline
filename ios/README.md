@@ -44,6 +44,35 @@ Two things Xcode will not do for you, both one-time:
 A free Apple ID also expires the build after seven days. Press Run again and it
 comes back; nothing on the phone is lost, because captures live in Documents.
 
+## Putting it on more than one phone
+
+Three routes, and which one you want depends on whether the other phone is in
+the room with you.
+
+**Free Apple ID, cable.** Plug each phone into the Mac and press Run. No cost,
+and the limits are real: **3 devices**, 3 apps installed per device, 10 App IDs,
+and everything — profiles, devices, App IDs — **expires 7 days from issue**, so
+the app stops opening after a week until you plug in and Run again. Fine for you
+and one other person standing next to you. Not fine for a tester across town.
+(These figures are Apple's, from a Developer Forums answer rather than the
+formal help pages.)
+
+**Apple Developer Program, $99/year, TestFlight.** The real answer for Gilbert.
+You upload a build once and he installs it from a link on his own phone with no
+cable and no Mac: **up to 100 internal testers** (people on your team) and **up
+to 10,000 external testers**, each able to test on up to 30 devices. Builds
+expire and get replaced by uploading a new one.
+
+**Apple Developer Program, ad hoc.** Same $99, no TestFlight: you collect each
+phone's identifier and sign a build for it. **100 devices per product family per
+membership year**, and the count only resets when the membership renews —
+disabling a device during the year does not give the slot back.
+
+Sources: [TestFlight](https://developer.apple.com/testflight/),
+[Devices overview](https://developer.apple.com/help/account/devices/devices-overview/).
+Nothing here has been paid for or signed up to yet — that is a decision, not a
+build step.
+
 ## The two ways to capture a room
 
 | | Scan | Measure |
