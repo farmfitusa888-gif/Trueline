@@ -411,7 +411,7 @@ function allocate(total: Nanometres, weights: readonly Nanometres[]): Nanometres
   }
 
   const shares = effective.map((w) => (magnitude * w) / sum);
-  const remainders = effective.map((w, i) => (magnitude * w) % sum);
+  const remainders = effective.map((w) => (magnitude * w) % sum);
   let leftover = magnitude - add(...shares);
 
   const order = remainders

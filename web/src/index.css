@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* A phone in a half-built kitchen, held in one hand. Nothing here assumes a mouse. */
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+  /* Never smaller than 16px on an input: iOS zooms the page if it is. */
+  input, select, button, textarea {
+    font-size: max(16px, 1rem);
+  }
+}

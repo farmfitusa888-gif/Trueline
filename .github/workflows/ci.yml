@@ -18,6 +18,20 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
+  web:
+    name: Web — typecheck and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      # The web app imports core straight from source, so a change to a
+      # measurement type that breaks a screen fails here rather than in a browser.
+      - run: npm run typecheck -w web
+      - run: npm run build -w web
+
   # LibreCAD's printer will not draw our file even with layouts, while Autodesk
   # draws the same bytes correctly. That makes it a harness limitation rather
   # than a product defect, so this job reports and does not gate.

@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **207 passing, 0 failing** (`npm test`) |
+| Tests | **229 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -98,8 +98,14 @@ what it actually contains. Run against Sam's kitchen and garage it found two of 
 assumptions wrong, one field missing, and the closure trap above; all of it is written up in
 `DECISIONS.md`.
 
-Not built yet: the iOS scanner, the web viewer, the API, anything with a screen.
+**There is a screen.** `web/` is the web shell, and its first page is the import-correction
+screen: drop a RoomPlan `room.json` on it and you get the plan, every dimension marked scanned
+or measured, what the scanner could not see and why, and a box to type the real number into —
+after which the whole room re-solves around what you said. No server, nothing uploaded.
+
+Not built yet: the iOS scanner, the API, accounts, exports.
 
 ```bash
 cd trueline && npm install && npm test && npm run typecheck
+npm run dev          # then drop a room.json on the page
 ```

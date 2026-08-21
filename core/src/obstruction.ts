@@ -1,5 +1,5 @@
-import { type Nanometres, NM_PER_INCH, add } from './length.ts';
-import { type Point, type Room, RoomError, corners, validate } from './room.ts';
+import { type Nanometres, NM_PER_INCH, add, roundDiv } from './length.ts';
+import { type Point, type Room, RoomError, corners, runLength, validate } from './room.ts';
 import { isVerified, toleranceOf } from './measurement.ts';
 
 /**
@@ -84,9 +84,11 @@ export interface WallObstruction {
 /**
  * What is standing against each wall, and how much of it that hides.
  *
- * A wall runs along one axis, so an object blocks it when its box comes within
- * `reach` of the wall's line and overlaps the wall's run. Both tests are exact
- * integer comparisons — nothing here estimates.
+ * An object blocks a wall when its box comes within `reach` of the wall's line
+ * and overlaps the wall's run. Both tests are exact integer comparisons —
+ * nothing here estimates — and both work for a wall at an angle as well as one
+ * running square, because they are cross and dot products against the wall's own
+ * run rather than a comparison against an axis.
  */
 export function obstructions(
   room: Room,
@@ -100,27 +102,43 @@ export function obstructions(
   return room.walls.map((wall, i) => {
     const a = points[i]!;
     const b = points[(i + 1) % points.length]!;
-    const horizontal = a.y === b.y;
-
-    // The wall's line, and its run along the axis it occupies.
-    const line = horizontal ? a.y : a.x;
-    const lo = horizontal ? (a.x < b.x ? a.x : b.x) : (a.y < b.y ? a.y : b.y);
-    const hi = horizontal ? (a.x < b.x ? b.x : a.x) : (a.y < b.y ? b.y : a.y);
+    const run = { x: b.x - a.x, y: b.y - a.y };
+    const span = runLength(wall);
 
     const spans: Span[] = [];
     const by: string[] = [];
 
     for (const f of footprints) {
-      // Distance from the wall's line to the nearest face of the box.
-      const near = horizontal ? f.min.y : f.min.x;
-      const far = horizontal ? f.max.y : f.max.x;
-      const gap = line < near ? near - line : line > far ? line - far : 0n;
-      if (gap > reach) continue;
+      const box: Point[] = [
+        { x: f.min.x, y: f.min.y },
+        { x: f.max.x, y: f.min.y },
+        { x: f.max.x, y: f.max.y },
+        { x: f.min.x, y: f.max.y },
+      ];
 
-      const across = horizontal
-        ? { from: f.min.x, to: f.max.x }
-        : { from: f.min.y, to: f.max.y };
-      const shared = overlapSpan(across, { from: lo, to: hi });
+      // Cross product against the wall's own run: positive on one side, negative
+      // on the other, zero on the line. Its magnitude is the perpendicular
+      // distance times the wall's length, so comparing it against `reach * span`
+      // tests the distance without ever dividing — which is what keeps this
+      // exact for a wall running at an angle as well as one running square.
+      const crosses = box.map((p) => run.x * (p.y - a.y) - run.y * (p.x - a.x));
+      const straddles = crosses.some((c) => c >= 0n) && crosses.some((c) => c <= 0n);
+      if (!straddles) {
+        const nearest = crosses.reduce((least, c) => {
+          const magnitude = c < 0n ? -c : c;
+          return magnitude < least ? magnitude : least;
+        }, crosses[0]! < 0n ? -crosses[0]! : crosses[0]!);
+        if (nearest > reach * span) continue;
+      }
+
+      // How far along the wall the box reaches, by projection. For a wall that
+      // runs square this division is exact; for one at an angle it is the same
+      // nanometre rounding its own length already carries.
+      const dots = box.map((p) => run.x * (p.x - a.x) + run.y * (p.y - a.y));
+      const from = roundDiv(dots.reduce((least, d) => (d < least ? d : least)), span);
+      const to = roundDiv(dots.reduce((most, d) => (d > most ? d : most)), span);
+
+      const shared = overlapSpan({ from, to }, { from: 0n, to: span });
       if (!shared) continue;
 
       spans.push(shared);
@@ -129,12 +147,11 @@ export function obstructions(
 
     const blocked = merge(spans);
     const blockedLength = add(...blocked.map((s) => s.to - s.from));
-    const whole = wall.length.value;
     return {
       wallId: wall.id,
       blocked,
       blockedLength,
-      blockedPerMille: whole === 0n ? 0n : (blockedLength * 1000n) / whole,
+      blockedPerMille: span === 0n ? 0n : (blockedLength * 1000n) / span,
       by,
     };
   });
@@ -174,7 +191,7 @@ export function punchList(
     .map((wall) => {
       const o = blocking.get(wall.id);
       // Half square nanometres, matching `area()`, so the two rank on one scale.
-      const areaAtStake = 2n * wall.length.value * toleranceOf(wall.length);
+      const areaAtStake = 2n * runLength(wall) * toleranceOf(wall.length);
       const blockedPerMille = o?.blockedPerMille ?? 0n;
       return {
         wallId: wall.id,

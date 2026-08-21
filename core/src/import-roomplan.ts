@@ -272,6 +272,12 @@ export interface ImportReport {
   readonly openings: readonly { readonly id: string; readonly wallId: string; readonly kind: string }[];
   /** Windows whose sill height was recovered rather than read; the file never states one. */
   readonly recoveredSills: readonly string[];
+  /**
+   * Which RoomPlan identifier each readable id came from. Nothing on screen says
+   * `373288F9-2F3C-4E65-AB0D-FD2EE8C3727E`, and nothing is lost either — a
+   * re-scan of the same room can still be matched against this one.
+   */
+  readonly sourceIds: readonly { readonly id: string; readonly sourceIdentifier: string }[];
   /** Everything above, as lines to put in front of a person. */
   readonly notes: readonly string[];
 }
@@ -323,6 +329,13 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
   const openSpans: { wallId: string; length: Nanometres }[] = [];
   const snapped: SnappedEdge[] = [];
   const diagonals: string[] = [];
+  const sourceIds: { id: string; sourceIdentifier: string }[] = [];
+  // Ids a person can read. RoomPlan's own are UUIDs, and a refusal that says
+  // "no north-south dimension has been measured: 373288F9-2F3C-4E65-AB0D-..."
+  // is not something to put in front of somebody standing in a kitchen. The
+  // UUIDs are not lost — they go in the report, so a re-scan can still be
+  // matched against this one.
+  let wallCount = 0;
   let openCount = 0;
 
   for (let i = 0; i < outline.length; i += 1) {
@@ -353,7 +366,8 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
     }
 
     const { direction, length } = classify(run);
-    const id = matched ?? `open-${(openCount += 1)}`;
+    const id = matched ? `wall-${(wallCount += 1)}` : `opening-${(openCount += 1)}`;
+    if (matched) sourceIds.push({ id, sourceIdentifier: matched });
 
     if (typeof direction === 'string') {
       // Anything the straightening moved is worth naming, however small.
@@ -395,7 +409,8 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
   if (tallest <= 0) throw new ImportError('No wall in the scan has a height, so the room has no ceiling.');
 
   const name = options.name ?? scan.sections?.[0]?.label ?? 'Room';
-  const withOpenings = attachOpenings(scan, walls, outline, datum, weld, measured, options.at, tolerance);
+  const idOf = new Map(sourceIds.map((s) => [s.sourceIdentifier, s.id]));
+  const withOpenings = attachOpenings(scan, walls, outline, datum, weld, measured, options.at, tolerance, idOf);
 
   const draft: Room = {
     id: `roomplan:${floor.identifier}`,
@@ -428,6 +443,7 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
       closureBeforeSolving: before,
       openings: withOpenings.openings,
       recoveredSills: withOpenings.recoveredSills,
+      sourceIds,
       notes,
     },
     footprints: readObjects(scan, datum),
@@ -444,7 +460,8 @@ function attachOpenings(
   weld: Nanometres,
   measured: (v: Nanometres) => Measurement,
   at_: string,
-  tolerance: Nanometres
+  tolerance: Nanometres,
+  idOf: ReadonlyMap<string, string>
 ): {
   walls: Wall[];
   openings: { id: string; wallId: string; kind: string }[];
@@ -461,12 +478,14 @@ function attachOpenings(
     [scan.openings ?? [], 'cased'],
   ];
 
+  const counts: Record<string, number> = { door: 0, window: 0, cased: 0 };
+
   for (const [surfaces, kind] of kinds) {
     for (const surface of surfaces) {
-      const parent = surface.parentIdentifier;
-      if (!parent) continue;
+      const parent = surface.parentIdentifier ? idOf.get(surface.parentIdentifier) : undefined;
+      if (!parent) continue; // Its wall was dropped, so the opening goes with it.
       const wallIndex = walls.findIndex((w) => w.id === parent);
-      if (wallIndex === -1) continue; // Its wall was dropped, so the opening goes with it.
+      if (wallIndex === -1) continue;
 
       const start = outline[wallIndex]!;
       const end = outline[(wallIndex + 1) % outline.length]!;
@@ -485,8 +504,9 @@ function attachOpenings(
 
       const sillMetres = at(surface.transform, 3, 1) - (surface.dimensions[1] ?? 0) / 2 - level;
       const sill = nm(sillMetres);
+      const id = `${kind}-${(counts[kind] = (counts[kind] ?? 0) + 1)}`;
       const opening: Opening = {
-        id: surface.identifier,
+        id,
         kind,
         width: measured(width),
         height: measured(height),
@@ -497,10 +517,10 @@ function attachOpenings(
         // so it carries the same provenance as everything else.
         ...(kind === 'window' ? { sillHeight: scanned(sill, tolerance, at_, 'roomplan') } : {}),
       };
-      if (kind === 'window') recoveredSills.push(surface.identifier);
+      if (kind === 'window') recoveredSills.push(id);
 
       byWall.set(parent, [...(byWall.get(parent) ?? []), opening]);
-      listed.push({ id: surface.identifier, wallId: parent, kind });
+      listed.push({ id, wallId: parent, kind });
     }
   }
 

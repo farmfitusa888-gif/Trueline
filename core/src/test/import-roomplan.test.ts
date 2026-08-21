@@ -5,12 +5,14 @@ import { isVerified, verify } from '../measurement.ts';
 import { area, closes, formatSquareFeet, isDiagonal, runLength } from '../room.ts';
 import { assertIssuable, readiness } from '../issue.ts';
 import {
+  type ImportReport,
   type RoomPlanExport,
   type RoomPlanSurface,
   ImportError,
   SQUARE_RATIO,
   importRoomPlan,
 } from '../import-roomplan.ts';
+import { DEFAULT_REACH, describe, obstructions, punchList } from '../obstruction.ts';
 
 const AT = '2026-08-20T17:12:09Z';
 
@@ -144,16 +146,33 @@ function scan(overrides: Partial<RoomPlanExport> = {}): RoomPlanExport {
   };
 }
 
+/**
+ * The importer gives walls readable ids — `wall-1`, `opening-1` — because a
+ * refusal that names `373288F9-2F3C-4E65-AB0D-FD2EE8C3727E` is not something to
+ * put in front of somebody standing in a kitchen. The RoomPlan identifier is
+ * kept in the report, and this is how the tests get back to it.
+ */
+function idFor(report: ImportReport, sourceIdentifier: string): string {
+  const row = report.sourceIds.find((x) => x.sourceIdentifier === sourceIdentifier);
+  assert.ok(row, `no imported wall came from "${sourceIdentifier}"`);
+  return row.id;
+}
+
 /* ------------------------------------------------------------------ shape */
 
 test('the outline comes from the floor polygon, in its order', () => {
-  const { room } = importRoomPlan(scan(), { at: AT });
+  const { room, report } = importRoomPlan(scan(), { at: AT });
   assert.equal(room.name, 'workshop');
   assert.equal(room.walls.length, 7, 'six walls and the opening between two of them');
   assert.deepEqual(
     room.walls.map((w) => w.id),
-    ['south', 'east-lower', 'open-1', 'east-upper', 'chamfer', 'north', 'west']
+    ['wall-1', 'wall-2', 'opening-1', 'wall-3', 'wall-4', 'wall-5', 'wall-6']
   );
+  // Numbered in outline order, and each one still traceable to what it came from.
+  assert.equal(idFor(report, 'south'), 'wall-1');
+  assert.equal(idFor(report, 'east-upper'), 'wall-3');
+  assert.equal(idFor(report, 'west'), 'wall-6');
+  assert.ok(!report.sourceIds.some((x) => x.sourceIdentifier === 'next-door'), 'dropped walls get no id');
 });
 
 test('the imported room closes', () => {
@@ -162,31 +181,31 @@ test('the imported room closes', () => {
 });
 
 test('the datum is the longest wall, whichever way the scan happened to be pointing', () => {
-  const { room } = importRoomPlan(scan(), { at: AT });
+  const { room, report } = importRoomPlan(scan(), { at: AT });
   // The 11 m west wall is the longest, so it is the one that runs true.
-  const west = room.walls.find((w) => w.id === 'west')!;
+  const west = room.walls.find((w) => w.id === idFor(report, 'west'))!;
   assert.equal(west.heading, 'east');
   assert.equal(runLength(west), 11n * NM_PER_METRE);
 });
 
 test('lengths survive the trip, to the nanometre', () => {
-  const { room } = importRoomPlan(scan(), { at: AT });
+  const { room, report } = importRoomPlan(scan(), { at: AT });
   const byId = new Map(room.walls.map((w) => [w.id, runLength(w)]));
   // The east-west walls are untouched: nothing had to move on that axis.
-  assert.equal(byId.get('east-lower'), 3n * NM_PER_METRE);
-  assert.equal(byId.get('east-upper'), 2n * NM_PER_METRE);
-  assert.equal(byId.get('west'), 11n * NM_PER_METRE);
+  assert.equal(byId.get(idFor(report, 'east-lower')), 3n * NM_PER_METRE);
+  assert.equal(byId.get(idFor(report, 'east-upper')), 2n * NM_PER_METRE);
+  assert.equal(byId.get(idFor(report, 'west')), 11n * NM_PER_METRE);
 
   // The two north-south walls did move, by half the 20 mm the straightening left
   // behind, because their tolerances are equal. One runs north and one runs
   // south, so closing the gap means one grows and the other shrinks. That is the
   // solver working, not the import failing, and the report says how much.
-  assert.equal(byId.get('south'), 8n * NM_PER_METRE + 10n * NM_PER_METRE / 1000n);
-  assert.equal(byId.get('north'), 6n * NM_PER_METRE - 10n * NM_PER_METRE / 1000n);
+  assert.equal(byId.get(idFor(report, 'south')), 8n * NM_PER_METRE + 10n * NM_PER_METRE / 1000n);
+  assert.equal(byId.get(idFor(report, 'north')), 6n * NM_PER_METRE - 10n * NM_PER_METRE / 1000n);
 });
 
 test('the area matches the outline it came from', () => {
-  const { room } = importRoomPlan(scan(), { at: AT });
+  const { room, report } = importRoomPlan(scan(), { at: AT });
   // 8 x 11 less the 2 x 2 triangle the chamfer cuts off is 86.0 square metres,
   // or 925.7 sq ft. The room comes in a foot over that because straightening the
   // opening lengthened the room by 20 mm, which the solver then shared out. That
@@ -200,10 +219,10 @@ test('the area matches the outline it came from', () => {
 test('an edge with no wall across it comes in as an open span, not a wall', () => {
   const { room, report } = importRoomPlan(scan(), { at: AT });
   const open = room.walls.find((w) => w.open)!;
-  assert.equal(open.id, 'open-1');
+  assert.equal(open.id, 'opening-1');
   assert.equal(runLength(open), 4n * NM_PER_METRE, 'straightened onto the grid');
-  assert.deepEqual(report.openSpans.map((s) => s.wallId), ['open-1']);
-  assert.ok(report.notes.some((n) => /has no wall across it \("open-1"\)/.test(n)));
+  assert.deepEqual(report.openSpans.map((s) => s.wallId), ['opening-1']);
+  assert.ok(report.notes.some((n) => /has no wall across it \("opening-1"\)/.test(n)));
   assert.ok(report.notes.some((n) => /takes no drywall, paint or baseboard/.test(n)));
 });
 
@@ -227,15 +246,15 @@ test('a wall on no edge of the outline is left out, and named', () => {
 
 test('the walls win: a wall runs true even where the polygon beside it does not', () => {
   const { room, report } = importRoomPlan(scan(), { at: AT });
-  const wall = room.walls.find((w) => w.id === 'east-upper')!;
+  const wall = room.walls.find((w) => w.id === idFor(report, 'east-upper'))!;
   assert.equal(wall.heading, 'west');
   assert.equal(runLength(wall), 2n * NM_PER_METRE, 'exactly 2 m, not 2 m and a bit');
-  assert.ok(!report.snapped.some((s) => s.wallId === 'east-upper'), 'nothing to straighten');
+  assert.ok(!report.snapped.some((s) => s.wallId === idFor(report, 'east-upper')), 'nothing to straighten');
 });
 
 test('the polygon is straightened where it is the only source, and by how much is reported', () => {
   const { report } = importRoomPlan(scan(), { at: AT });
-  const snap = report.snapped.find((s) => s.wallId === 'open-1')!;
+  const snap = report.snapped.find((s) => s.wallId === 'opening-1')!;
   assert.equal(snap.by, 20n * NM_PER_METRE / 1000n, '20 mm, which is what the polygon was out by');
   assert.ok(report.notes.some((n) => /Straightened 1 edge onto the grid; the largest moved 20 mm/.test(n)));
   assert.ok(report.notes.some((n) => /squares up its walls and not its floor outline/.test(n)));
@@ -251,41 +270,41 @@ test('straightening leaves a residual, and the solver absorbs it rather than hid
 test('the squareness test is a ratio, so it separates noise from a real angle', () => {
   assert.equal(SQUARE_RATIO, 100n, '0.573 degrees');
   const { room, report } = importRoomPlan(scan(), { at: AT });
-  const chamfer = room.walls.find((w) => w.id === 'chamfer')!;
+  const chamfer = room.walls.find((w) => w.id === idFor(report, 'chamfer'))!;
   assert.ok(isDiagonal(chamfer.heading), 'a 45 degree wall is not noise');
-  assert.deepEqual(report.diagonals, ['chamfer']);
+  assert.deepEqual(report.diagonals, [idFor(report, 'chamfer')]);
   assert.ok(report.notes.some((n) => /came in at a genuine angle rather than being straightened/.test(n)));
 });
 
 /* -------------------------------------------------------------- openings */
 
 test('openings land on their wall, at the right offset', () => {
-  const { room } = importRoomPlan(scan(), { at: AT });
-  const south = room.walls.find((w) => w.id === 'south')!;
+  const { room, report } = importRoomPlan(scan(), { at: AT });
+  const south = room.walls.find((w) => w.id === idFor(report, 'south'))!;
   assert.equal(south.openings?.length, 2);
 
   const [door, window_] = south.openings!;
-  assert.equal(door!.id, 'front-door');
+  assert.equal(door!.id, 'door-1', 'numbered by kind, in the order the scan listed them');
   assert.equal(door!.kind, 'door');
   // Centred 2 m along an 8 m wall, 0.9 m wide, so it starts at 1.55 m.
   assert.equal(door!.offsetFromStart.value, 1550n * NM_PER_METRE / 1000n);
   assert.equal(door!.width.value, 900n * NM_PER_METRE / 1000n);
 
-  assert.equal(window_!.id, 'kitchen-window');
+  assert.equal(window_!.id, 'window-1');
   assert.equal(window_!.offsetFromStart.value, 4400n * NM_PER_METRE / 1000n);
 });
 
 test('a window sill is recovered, not read, and says so', () => {
   const { room, report } = importRoomPlan(scan(), { at: AT });
-  const window_ = room.walls.find((w) => w.id === 'south')!.openings!.find((o) => o.id === 'kitchen-window')!;
+  const window_ = room.walls.find((w) => w.id === idFor(report, 'south'))!.openings!.find((o) => o.id === 'window-1')!;
   assert.equal(window_.sillHeight?.value, 900n * NM_PER_METRE / 1000n);
-  assert.deepEqual(report.recoveredSills, ['kitchen-window']);
+  assert.deepEqual(report.recoveredSills, ['window-1']);
   assert.ok(report.notes.some((n) => /worked out from the scan rather than read from it/.test(n)));
 });
 
 test('a door needs no sill, because a door starts at the floor', () => {
-  const { room } = importRoomPlan(scan(), { at: AT });
-  const door = room.walls.find((w) => w.id === 'south')!.openings!.find((o) => o.id === 'front-door')!;
+  const { room, report } = importRoomPlan(scan(), { at: AT });
+  const door = room.walls.find((w) => w.id === idFor(report, 'south'))!.openings!.find((o) => o.id === 'door-1')!;
   assert.equal(door.sillHeight, undefined);
 });
 
@@ -299,16 +318,17 @@ test('an opening whose wall was dropped goes with it', () => {
     ],
   };
   const { room, report } = importRoomPlan(withOrphan, { at: AT });
-  assert.ok(!report.openings.some((o) => o.id === 'orphan'));
-  assert.ok(!room.walls.some((w) => w.openings?.some((o) => o.id === 'orphan')));
+  // Two doors were listed; only the one whose wall survived came through.
+  assert.deepEqual(report.openings.map((o) => o.kind), ['door', 'window']);
+  assert.equal(room.walls.flatMap((w) => w.openings ?? []).length, 2);
 });
 
 /* --------------------------------------------------------------- heights */
 
 test('the ceiling is the tallest wall, so a low one is a soffit and not the room', () => {
-  const { room } = importRoomPlan(scan(), { at: AT });
+  const { room, report } = importRoomPlan(scan(), { at: AT });
   assert.equal(room.ceilingHeight.value, 2400n * NM_PER_METRE / 1000n);
-  const low = room.walls.find((w) => w.id === 'east-upper')!;
+  const low = room.walls.find((w) => w.id === idFor(report, 'east-upper'))!;
   assert.equal(low.height?.value, 2100n * NM_PER_METRE / 1000n);
 });
 
@@ -346,11 +366,11 @@ test('the room closes and is still refused as a drawing, which is the whole poin
 });
 
 test('two tapes, one per axis, and the same room may be issued', () => {
-  const { room } = importRoomPlan(scan(), { at: AT });
+  const { room, report } = importRoomPlan(scan(), { at: AT });
   const checked = {
     ...room,
     walls: room.walls.map((w) => {
-      if (w.id !== 'south' && w.id !== 'west') return w;
+      if (w.id !== idFor(report, 'south') && w.id !== idFor(report, 'west')) return w;
       return { ...w, length: verify(w.length, runLength(w), 'sam', '2026-08-21T09:00:00Z', 'laser') };
     }),
   };
@@ -381,4 +401,119 @@ test('a scan with no floor outline is refused, with the reason', () => {
 
 test('a scan with no walls is refused', () => {
   assert.throws(() => importRoomPlan(scan({ walls: [] }), { at: AT }), ImportError);
+});
+
+/* ------------------------------------------------- through to obstruction */
+
+/**
+ * The kitchen scan is the reason this section exists. It has six detected
+ * objects — two runs of storage, a stove, an oven, a sink and a chair — and run
+ * end to end it says the counter wall is 995/1000 hidden and the corner chamfer
+ * is 1000/1000 hidden. Those numbers are in `DECISIONS.md`; the fixture below
+ * reproduces the same shapes so the path stays tested without the house in it.
+ */
+function withCounter(): RoomPlanExport {
+  const base = scan();
+  return {
+    ...base,
+    objects: [
+      ...(base.objects ?? []),
+      {
+        // A run of base cabinets the full length of the north wall.
+        identifier: 'cabinets',
+        category: { storage: {} },
+        confidence: { low: {} },
+        dimensions: [6, 0.9, 0.6],
+        transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, FLOOR_Y + 0.45, 10.7, 1],
+      },
+      {
+        // A fridge tucked into the cut corner, against the chamfer.
+        identifier: 'fridge',
+        category: { refrigerator: {} },
+        confidence: { medium: {} },
+        dimensions: [0.8, 1.8, 0.7],
+        transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 6.9, FLOOR_Y + 0.9, 9.9, 1],
+      },
+    ],
+  };
+}
+
+test('objects from the import land against the walls they are actually against', () => {
+  const { room, report, footprints } = importRoomPlan(withCounter(), { at: AT });
+  const blocked = new Map(obstructions(room, footprints).map((o) => [o.wallId, o]));
+
+  // The bench is 2 m of the south wall, which the solver stretched to 8.01 m
+  // when it absorbed the straightening — so 249 thousandths, not a round quarter.
+  // The blocked share is measured against the wall as it now stands, not as the
+  // scanner first reported it.
+  assert.equal(blocked.get(idFor(report, 'south'))!.blockedLength, 2n * NM_PER_METRE);
+  assert.equal(blocked.get(idFor(report, 'south'))!.blockedPerMille, 249n);
+  assert.deepEqual(blocked.get(idFor(report, 'south'))!.by, ['bench']);
+
+  // The cabinets run the whole 6 m north wall.
+  assert.equal(blocked.get(idFor(report, 'north'))!.blockedPerMille, 1000n);
+  assert.equal(describe(blocked.get(idFor(report, 'north'))!), 'Almost all of this wall was behind cabinets — the scan could not see it properly.');
+
+  // The cabinet run reaches the corner, so it butts into the west wall too and
+  // hides its last 600 mm. That is not a false positive: the scanner could not
+  // see that stretch of the west wall either.
+  assert.equal(blocked.get(idFor(report, 'west'))!.blockedLength, 600n * NM_PER_METRE / 1000n);
+  assert.deepEqual(blocked.get(idFor(report, 'west'))!.by, ['cabinets']);
+
+  // Nothing is near the lower east stub.
+  assert.equal(blocked.get(idFor(report, 'east-lower'))!.blockedLength, 0n);
+  assert.equal(describe(blocked.get(idFor(report, 'east-lower'))!), 'Nothing against this wall.');
+});
+
+test('a wall at an angle is checked the same way as one running square', () => {
+  const { room, report, footprints } = importRoomPlan(withCounter(), { at: AT });
+  const chamfer = obstructions(room, footprints).find((o) => o.wallId === idFor(report, 'chamfer'))!;
+  assert.ok(chamfer.blockedPerMille > 0n, 'the fridge is in the cut corner');
+  assert.ok(chamfer.by.includes('fridge'));
+});
+
+test('the punch list ranks by what is at stake, and says what was in the way', () => {
+  const { room, report, footprints } = importRoomPlan(withCounter(), { at: AT });
+  const list = punchList(room, footprints, DEFAULT_REACH, 10);
+
+  assert.equal(list.length, room.walls.length, 'nothing is verified yet, so every edge is on it');
+  // Sorted by weight, and every weight is positive because every wall carries a band.
+  for (let i = 1; i < list.length; i += 1) {
+    assert.ok(list[i - 1]!.weight >= list[i]!.weight, 'out of order');
+  }
+  const north = list.find((x) => x.wallId === idFor(report, 'north'))!;
+  assert.deepEqual(north.blockedBy, ['cabinets']);
+  assert.equal(north.blockedPerMille, 1000n);
+});
+
+test('a taped wall leaves the punch list however much is piled against it', () => {
+  const { room, report, footprints } = importRoomPlan(withCounter(), { at: AT });
+  const taped = {
+    ...room,
+    walls: room.walls.map((w) =>
+      w.id === idFor(report, 'north') ? { ...w, length: verify(w.length, runLength(w), 'sam', '2026-08-21T09:00:00Z', 'laser') } : w
+    ),
+  };
+  assert.ok(!punchList(taped, footprints, DEFAULT_REACH, 10).some((x) => x.wallId === idFor(report, 'north')));
+});
+
+test('an open span is checked too: something can stand in a garage door opening', () => {
+  const base = withCounter();
+  const inTheOpening: RoomPlanExport = {
+    ...base,
+    objects: [
+      ...(base.objects ?? []),
+      {
+        identifier: 'pallet',
+        category: { storage: {} },
+        confidence: { low: {} },
+        dimensions: [1.2, 0.5, 1.2],
+        transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 7.9, FLOOR_Y + 0.25, 5, 1],
+      },
+    ],
+  };
+  const { room, report, footprints } = importRoomPlan(inTheOpening, { at: AT });
+  const open = obstructions(room, footprints).find((o) => o.wallId === 'opening-1')!;
+  assert.ok(open.by.includes('pallet'));
+  assert.ok(open.blockedPerMille > 0n);
 });

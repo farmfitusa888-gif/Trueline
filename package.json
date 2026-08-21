@@ -2,11 +2,18 @@
   "name": "trueline",
   "private": true,
   "version": "0.1.0",
-  "description": "Trueline — scan a building, correct it by hand, get a blueprint.",
-  "workspaces": ["core"],
-  "engines": { "node": ">=22.6.0" },
+  "description": "Trueline \u2014 scan a building, correct it by hand, get a blueprint.",
+  "workspaces": [
+    "core",
+    "web"
+  ],
+  "engines": {
+    "node": ">=22.6.0"
+  },
   "scripts": {
     "test": "npm run test -w core",
-    "typecheck": "npm run typecheck -w core"
+    "typecheck": "npm run typecheck -w core && npm run typecheck -w web",
+    "dev": "npm run dev -w web",
+    "build": "npm run build -w web"
   }
 }

@@ -786,6 +786,107 @@ stored, and the only place it is halved is where it becomes square feet on a scr
 square nanometre is 5 x 10^-19 m². It is carried because carrying it costs nothing and dropping
 it costs the guarantee that makes a take-off trustworthy.
 
+## Obstruction, fed from the import and checked against the kitchen
+
+`obstruction.ts` was the only module in core with no real-data validation. The importer already
+produced footprints, and the kitchen is the scan with things lying around, so the two were
+joined up and run.
+
+**What it found in Sam's kitchen**, six detected objects — two runs of storage, a stove, an
+oven, a sink and a chair:
+
+| Wall | Length | Blocked | By |
+|---|---|---|---|
+| the counter run | 7' 8 5/8" | **995/1000** | storage x2, stove, oven, sink |
+| the chamfer | 8" | **1000/1000** | storage x2 |
+| beside the counter | 5' 1" | 434/1000 | storage x2 |
+| the opening to the next room | 3' 1 13/16" | 11/1000 | storage |
+| everything else | — | 0 | — |
+
+Four of the nine edges are behind something. The counter wall — the one a kitchen is priced
+off — is a dimension the scanner essentially guessed at, and nothing in the scan says so. The
+garage, with one object nowhere near a wall, comes back clean, which is the control.
+
+Two things this forced:
+
+**The blocked test had to work for a wall at an angle.** It compared against an axis, so a
+diagonal was silently treated as vertical. It is now a cross product against the wall's own run
+— `|cross| <= reach * length` tests the perpendicular distance without ever dividing — and a
+dot product for the extent along it. Exact for both kinds, and the axis case falls out of the
+general one.
+
+**The temptation to widen the tolerance on a blocked wall was refused.** It is obviously true
+that a wall behind cabinets is measured worse than one in clear air, and it would be easy to
+multiply its band. There is no published figure for it. Apple documents ±5 cm; nobody documents
+±5 cm behind a fridge. So every wall keeps the vendor's number and the blocked share is
+reported *beside* it, which is the honest split: one is measured, the other is ours.
+
+Note what this does **not** do to the ranking. Area at stake still dominates: a long clear wall
+outranks a short blocked one, because area at stake is what costs money. Blocking is a
+multiplier, not an override.
+
+## The import-correction screen — the web shell starts here
+
+`web/`, React 19 + Vite + Tailwind, one screen. Sam's call, and the right one: the importer
+named every decision it made and none of those notes went anywhere. *"If that is really a wall,
+change it here"* is a confession with no remedy unless "here" exists.
+
+It is also the right **first** screen. A scan closes perfectly whether it is right or wrong, so
+the moment that decides whether any of this is worth building is the one where a person
+disagrees with a number and types the real one. Projects, accounts and exports are scaffolding
+around that moment.
+
+### What it does
+
+- Draws the plan from `toRenderModel`, with every dimension marked scanned or measured — amber
+  for the scanner's number, ink for one somebody stood behind, dashed for an edge with no wall,
+  red hatching for a wall something was standing against, and faint boxes for what was standing
+  there.
+- **Type a real measurement on any wall.** The room re-solves, and it says how many other walls
+  moved and how many moved further than the scanner's own tolerance.
+- **Fix the import's guesses**: open span → wall, or → cased opening.
+- Says what is blocking the drawing from being issued, and which wall to measure first.
+- Undo, which is exact rather than reconstructed: every edit keeps the room it started from.
+
+### What it deliberately does not do
+
+There is **no server**. A scan is a `room.json` dropped on the page — the file the reference app
+already exports — read in the browser and never uploaded. That makes it usable today, on a
+phone, on a real scan, before an API exists, and it means the first version cannot leak anybody's
+house.
+
+And there is no button for the dropped wall. A wall that is not on this room's outline cannot be
+one of its walls, so the card says there is nothing to do about it here and why — rather than
+offering an action that pretends.
+
+### `core/src/edit.ts`, and one thing it forced
+
+The screen's operations belong in the model, not in a component: `makeWall`, `makeOpen`,
+`makeCased`, `verifyWall`. All four return a new room and leave the old one alone.
+
+`makeWall` turned out not to be a flag flip. A garage door sits **in line** with the stub of wall
+either side of it, so closing that opening leaves three collinear segments, which the model
+refuses — and rightly, because two built walls on one axis are one wall written twice and the
+solver would move both to fix one error. So closing an opening **merges** it with any wall in
+line with it: the lengths add, the tolerances add (a merged wall is no surer than its pieces),
+and the openings keep their positions along the merged wall. The merge is lossy — the swallowed
+segments are gone — which is why undo is the room you were holding, not an inverse operation.
+
+### Readable ids
+
+RoomPlan's identifiers are UUIDs, and the first run of this screen put
+*"No north-south dimension has been measured: 373288F9-2F3C-4E65-AB0D-FD2EE8C3727E,
+7D348F29-B1AB-4253-8CB2-AA67C796B63C…"* in front of a contractor. The importer now assigns
+`wall-1`, `opening-1`, `door-1` in outline order, and keeps the UUIDs in `report.sourceIds` so a
+re-scan of the same room can still be matched against this one.
+
+### Verified by driving it
+
+Not by reading the code. The dev server was driven headless at iPad size against both real
+scans: import, tap the top punch-list item, type `12' 3 1/2"`, watch three walls move and the
+area go from 175.3 to 184.8 sq ft, close an open span into a wall, undo it. No console errors.
+Screenshots are not checked in — they are of Sam's house.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
@@ -814,9 +915,6 @@ before any money goes into branding.
 
 - **The batch photo delete spec** — checkboxes, select-all, and the warning when the photo
   being deleted is the only one showing a wall. Decided (gap 3 above), not written.
-- **Correcting an import by hand.** The importer names every decision it made — dropped walls,
-  open spans, straightened edges — but nothing yet turns "that open span is really a wall" back
-  into a change. That is a screen, and it belongs with the web shell.
 - **Stitching rooms.** Both scans are one room. The dropped fragment of the space next door is
   evidence of where the next room starts, and it is thrown away today.
 
