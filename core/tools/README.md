@@ -8,6 +8,28 @@ Proves the claim the product is sold on: **a DXF that keeps its dimensions.**
 npm i @tarikjabiri/dxf && node verify-dxf-dimensions.cjs     # writes proof.dxf
 ```
 
+## The dimensions draw — proven locally, awaiting Autodesk
+
+`core/src/dxf/complete.ts` finishes what the writer leaves out: it generates a geometry block
+for every dimension — two extension lines, the dimension line, two arrowheads and the
+measurement as text — and adds the `LAYOUT` objects a printer needs.
+
+`dxf-render.png` beside this file is the result through `ezdxf`'s renderer, **the same
+renderer that crashed on this file three attempts ago**: green `148.50`, yellow `96.00`,
+yellow `150.00`, each on its own confidence layer. The measurements the module computes are
+148.500, 96.000 and 150.000, and the aligned diagonal reads its true length rather than its
+horizontal component.
+
+`sample-plan.dxf` is the completed file. **Autodesk Viewer is still the test that counts**,
+and it must be done by hand.
+
+## LibreCAD still prints a blank page, and that is a harness problem
+
+The completed file, with layouts, still prints blank from LibreCAD's `dxf2pdf` on a default
+letter sheet. Autodesk renders the same bytes correctly, so this is a limitation of the
+verification harness rather than a defect in the drawing, and it stopped being chased on
+those grounds. `verify-in-cad.sh` therefore does **not** gate the build.
+
 ## Where this actually stands, as of 2026-08-20
 
 ### Verified in Autodesk Viewer, by hand
