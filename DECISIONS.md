@@ -463,6 +463,50 @@ confirms taking the renderer and not the model. It also answers the cost questio
 drawing; their shape is simpler than ours; and `corners()` already produces the start and end
 points their `Wall` wants.
 
+## Three gaps Sam found by using the reference app
+
+Found by scanning real rooms rather than reading a feature list, which is why they are worth
+more than anything on a comparison table.
+
+### 1. It shows no measurements. We already compute them.
+
+Sam scanned four rooms and saw no dimensions or areas anywhere. Trueline computes area
+exactly from the closed polygon — `area()` returns square nanometres by the shoelace formula
+and `formatSquareFeet()` renders it — and it carries a tolerance derived from the walls it
+came from, so a scanned room shows a band and a typed room shows none.
+
+That is not a feature to add. It is built, tested, and it is the whole point: **a floor plan
+without numbers on it is a picture.**
+
+### 2. The ceiling hides the room from above
+
+Scanning part of the ceiling leaves a partial roof on the model, and from a top view it
+blocks everything underneath. The model is right; the view is wrong.
+
+**The viewer hides the ceiling when the camera is above it.** Not a setting somebody has to
+find — looking down at a room means wanting to see into it, and there is no case where a
+person is looking straight down and wants an obstruction. On top of that:
+
+- a **cut-plane slider** to take a horizontal section at any height, which is how a floor plan
+  is defined anyway
+- a **dollhouse view** — walls at full height, no ceiling, seen from above at an angle. This
+  is the single view Matterport built a business on, and it costs us nothing because the
+  geometry is already there.
+
+Note also that this is not a scanning mistake to correct on the field card. Ceiling height is
+wanted, and RoomPlan needs the wall to be seen up to it. The fix belongs in the viewer.
+
+### 3. Photos need batch delete — and one thing better than that
+
+Today, in the reference app, photos are deleted one at a time. Trueline gets checkboxes,
+select-all-in-room, and a single delete with a confirmation and an undo window.
+
+**What the checkbox version cannot do, and ours can:** every Trueline photo knows which walls
+it sees. So deleting can warn — *"this is the only photo showing the north wall"* — before the
+evidence for a dimension disappears. `unphotographedWalls()` already computes exactly that.
+Nobody can offer this without per-photo poses, which is the same reason nobody can offer
+per-dimension confidence.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
