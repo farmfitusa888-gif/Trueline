@@ -2,9 +2,9 @@
 
 | File | What it is |
 |---|---|
-| `scanning-field-card.pdf` | Four-page illustrated field card. Print it double-sided, take it on site, write on page 4. |
+| `scanning-field-card.pdf` | Five-page illustrated field card. Print it double-sided, take it on site, write on page 4. |
 | `scanning-field-card.html` | Generated. Do not hand-edit — it is overwritten on every build. |
-| `build/diagrams.py` | The four SVG diagrams. Edit here. |
+| `build/diagrams.py` | The six SVG diagrams. Edit here. |
 | `build/build_card.py` | Composes the card and finds a layout that fits. Edit here. |
 | `market-research.html` | What the field already does, and where the gap is. |
 
@@ -17,8 +17,14 @@ chromium --headless --no-pdf-header-footer \
 ```
 
 `build_card.py` walks a ladder of type sizes and tape-log row counts and stops at the
-first combination that lands on **three pages**, so adding content does not silently push
-the card to four — it re-fits, or the ladder runs out and says so.
+first combination that lands on exactly `TARGET_PAGES`, so adding content does not silently
+push the card to an extra sheet — it re-fits by shortening the tape log, or the ladder runs
+out and the build fails rather than shipping the wrong page count.
+
+**When the app changes, this changes.** Page 5 describes what the screen does with a scan.
+If the colours on the plan, the wording of a refusal, or what the importer decides for you
+changes, the card is wrong until it is rebuilt — and a wrong field card is worse than none,
+because somebody is holding it in a room believing it.
 
 ## Two rules for editing it
 

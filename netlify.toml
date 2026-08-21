@@ -1,0 +1,35 @@
+# Deploying the web shell.
+#
+# It is a static build with no backend: a scan is a file the browser reads, and
+# corrections are kept in that browser's own storage. So there is nothing to
+# provision, nothing to pay for, and no way for one person's house to reach
+# another's.
+[build]
+  base = "."
+  command = "npm install && npm run build"
+  publish = "web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# One page, no router. Anything else resolves to it rather than 404ing, so a
+# link somebody shares works whatever path it carries.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Nothing here loads from anywhere else, so nothing here may. The one
+    # exception this page needs is reading a file the person chose themselves,
+    # which is not a network request at all.
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

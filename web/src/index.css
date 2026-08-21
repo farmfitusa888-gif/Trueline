@@ -18,3 +18,17 @@
     font-size: max(16px, 1rem);
   }
 }
+
+@layer utilities {
+  /* Printing is for one thing: the list of walls to go and measure. Everything
+     else on the page is a screen and prints as noise. */
+  @media print {
+    body {
+      background: white;
+    }
+    main {
+      max-width: none;
+      padding: 0;
+    }
+  }
+}

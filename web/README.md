@@ -44,3 +44,19 @@ a wall, change it here"* is a confession with no remedy unless "here" exists.
   the measurement code, and the browser runs the same files the tests do.
 - Every touch target is at least 44 px and no input is under 16 px, because iOS
   zooms the page if it is. This gets used on a phone in a half-built kitchen.
+
+## Putting it somewhere people can open it
+
+`netlify.toml` at the repository root configures it: build from the root with
+`npm install && npm run build`, publish `web/dist`, Node 22. Point Netlify at the
+repo and it needs nothing else — there is no backend to provision and no secret
+to set.
+
+The headers there are not decoration. The page loads nothing from anywhere else,
+so the content-security policy says it may not, and `frame-ancestors 'none'`
+keeps it out of somebody else's iframe. A scan is read from a file the person
+chose; it never becomes a network request.
+
+**What this is not.** Corrections live in one browser on one device. That is
+enough for a first real user test and it is not a backup — say so to whoever you
+give the link to, because the screen says so too.

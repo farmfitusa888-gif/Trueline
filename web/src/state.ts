@@ -4,6 +4,7 @@ import type { ImportReport } from '../../core/src/import-roomplan.ts';
 import { importRoomPlan } from '../../core/src/import-roomplan.ts';
 import type { Footprint } from '../../core/src/obstruction.ts';
 import { makeCased, makeOpen, makeWall, verifyWall } from '../../core/src/edit.ts';
+import { loadProject, saveProject } from '../../core/src/persist.ts';
 
 /**
  * All the state this screen has, and every way it can change.
@@ -18,7 +19,16 @@ import { makeCased, makeOpen, makeWall, verifyWall } from '../../core/src/edit.t
  * says. That is the same rule the ledger has in Plumbline, for the same reason —
  * a number that gets recomputed in a component is a number that will disagree
  * with the one on the export.
+ *
+ * One thing does outlive the tab: the corrected room is written to
+ * `localStorage` after every change, exactly, through `persist.ts`. Ten minutes
+ * of correcting a scan on a tablet in a half-built kitchen must not be lost
+ * because the phone rang. It is still not a backup — one browser, one device,
+ * and clearing site data clears it — and the screen says so rather than implying
+ * otherwise.
  */
+
+export const STORAGE_KEY = 'trueline.room.v1';
 
 export interface Loaded {
   readonly room: Room;
@@ -42,6 +52,7 @@ export const EMPTY: State = { loaded: null, error: null, selected: null };
 
 export type Action =
   | { type: 'open'; json: unknown; fileName: string; at: string }
+  | { type: 'restore' }
   | { type: 'select'; wallId: string | null }
   | { type: 'make'; wallId: string; as: 'wall' | 'open' | 'cased' }
   | { type: 'verify'; wallId: string; text: string; by: string; at: string }
@@ -51,6 +62,12 @@ export type Action =
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** A saved-at stamp as a person reads it, or nothing rather than a raw one. */
+function when(iso: string): string {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime()) ? 'earlier' : at.toLocaleString();
 }
 
 /** Applies an edit, keeping the room it started from so undo is exact. */
@@ -73,6 +90,44 @@ export function reduce(state: State, action: Action): State {
           loaded: { room, report, footprints, undo: [], lastEdit: null, fileName: action.fileName },
         };
       } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'restore': {
+      // Storage can be unavailable outright — a private window, a browser with
+      // site data switched off — so reading it is as fallible as parsing it.
+      let text: string | null = null;
+      try {
+        text = window.localStorage.getItem(STORAGE_KEY);
+      } catch {
+        return state;
+      }
+      if (text === null) return state;
+      try {
+        const saved = loadProject(text);
+        const extras = saved.extras as { report?: ImportReport; footprints?: readonly Footprint[] };
+        if (!extras.report) throw new Error('That saved room has no import report with it.');
+        return {
+          selected: null,
+          error: null,
+          loaded: {
+            room: saved.room,
+            report: extras.report,
+            footprints: extras.footprints ?? [],
+            undo: [],
+            lastEdit: `Picked up where you left off — saved ${when(saved.savedAt)}.`,
+            fileName: saved.fileName,
+          },
+        };
+      } catch (error) {
+        // A saved room that will not load is cleared rather than left to fail on
+        // every visit, and the reason is shown once.
+        try {
+          window.localStorage.removeItem(STORAGE_KEY);
+        } catch {
+          // Nothing more to do; the message below is still worth showing.
+        }
         return { ...state, error: message(error) };
       }
     }
@@ -155,7 +210,40 @@ export function reduce(state: State, action: Action): State {
     case 'dismissError':
       return { ...state, error: null };
 
-    case 'close':
+    case 'close': {
+      try {
+        window.localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // If it cannot be cleared it was never written; closing still works.
+      }
       return EMPTY;
+    }
+  }
+}
+
+/**
+ * Writes the room to storage, or says why it could not.
+ *
+ * Returns a message rather than throwing, because a full disk must not take the
+ * screen down — but it must not be silent either. Somebody who thinks their work
+ * is saved and finds it gone has been lied to.
+ */
+export function persist(loaded: Loaded, at: string): string | null {
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      saveProject({
+        savedAt: at,
+        fileName: loaded.fileName,
+        room: loaded.room,
+        extras: { report: loaded.report, footprints: loaded.footprints },
+      })
+    );
+    return null;
+  } catch (error) {
+    return (
+      `This room could not be saved in the browser, so it will be gone if you close the tab: ` +
+      `${message(error)}`
+    );
   }
 }

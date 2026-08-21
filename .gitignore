@@ -3,3 +3,7 @@ dist/
 .DS_Store
 web/dist/
 *.local
+__pycache__/
+docs/build/try.*
+docs/build/guide.html
+*.tsbuildinfo

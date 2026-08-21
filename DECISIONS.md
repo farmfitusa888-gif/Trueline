@@ -887,6 +887,78 @@ scans: import, tap the top punch-list item, type `12' 3 1/2"`, watch three walls
 area go from 175.3 to 184.8 sq ft, close an open span into a wall, undo it. No console errors.
 Screenshots are not checked in — they are of Sam's house.
 
+## What the web app is and is not — asked directly, answered directly
+
+Sam asked whether it is functional with all the scanning features of OpenPlan3D before hosting it.
+**No, and it never will be from a browser.** The distinction matters enough to write down:
+
+| | OpenPlan3D | Trueline web, today |
+|---|---|---|
+| LiDAR capture | yes | **no — impossible in a browser** |
+| AR measure without LiDAR | yes | no |
+| Draw a plan manually | yes | no (built in `core`, no screen yet) |
+| Read a finished scan | — | **yes** |
+| Every dimension marked scanned or measured | no | **yes** |
+| Type a real measurement and re-solve the room | no | **yes** |
+| Say which wall the scanner could not see | no | **yes** |
+| Refuse to issue a drawing nobody checked | no | **yes** |
+
+WebXR is unsupported in Safari on iOS, so there is no browser path to the LiDAR sensor at all —
+this was settled in Phase 0 and it is why the scanner is a native iOS app. What is hosted is the
+half of the product that is ours: the correction layer. The workflow it supports today is
+**scan in OpenPlan3D, correct in Trueline** — export the scan, drop the `room.json` on the page.
+
+That is the right thing to put in front of a first user anyway, because it is the half nobody
+else has. Handing somebody a worse scanner teaches nothing.
+
+## The field list — the punch list, off the screen
+
+`core/src/fieldlist.ts`. "Measure these first" was living on a page somebody would have to keep
+open while holding a tape, which nobody does. It is now plain text: four lines, what the scanner
+said for each, why it is on the list, and a blank to write in.
+
+Deliberately plain — no table that reflows, no character a messaging app mangles, every line
+under 72 columns so it prints and reads on a narrow screen. On iOS the Send button reaches
+Messages through the Web Share API, which is how it actually gets to whoever is holding the tape.
+
+It carries **what the scanner said** on every line, so the disagreement shows up in the room
+rather than back at a desk. And it is generated in `core`, not in a component — a list built in
+the UI is a list that will disagree with the screen.
+
+Four lines by default. Ten is a chore nobody finishes.
+
+## Saving the work — exact, and honest about what it is
+
+`core/src/persist.ts`. Somebody spends ten minutes correcting a scan on a tablet in a half-built
+kitchen, the phone rings, the tab is dropped. That is not acceptable.
+
+The hard part is the only part: **every length in this model is a bigint and `JSON.stringify`
+throws on one.** Converting to `Number` would make the whole thing quietly approximate. So a
+bigint is written as `{"$nm":"3657600000"}` — a tagged decimal string, exact both ways and
+readable by anybody who opens the file.
+
+The codec is general rather than a hand-written mapper per type, on purpose: a hand-written one
+silently drops the field somebody forgot to add. This one cannot lose a field, and `loadProject`
+runs the room through `validate()` before returning it, so a corrupt or older payload is refused
+loudly rather than half-loaded. A file from a different `SAVE_FORMAT` is refused outright — a
+half-understood room is worse than no room, because a person would trust it.
+
+**It is not a backup, and the screen says so.** One browser, one device; clearing site data
+clears it. Verified by driving it: correct a scan, reload the page cold, and the dimension list
+comes back byte-identical — the measured wall still exactly `12' 3 1/2"` with no band on it.
+
+Why a length still fits a double and an area does not, since it comes up: 100 m is 1e11 nm and a
+double is exact to 9e15. A 20 x 12 room is 4.4e19 half-square-nanometres, four orders past that.
+The codec exists for the second number.
+
+## Hosting
+
+`netlify.toml`: build from the root, publish `web/dist`, Node 22. No backend to provision, no
+secret to set. The content-security policy is `default-src 'self'` with `frame-ancestors 'none'`
+— the page loads nothing from anywhere else and must not, and a scan is a file the person chose
+rather than a network request. Nobody's house can reach anybody else's, because nothing leaves
+the device.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
@@ -915,6 +987,11 @@ before any money goes into branding.
 
 - **The batch photo delete spec** — checkboxes, select-all, and the warning when the photo
   being deleted is the only one showing a wall. Decided (gap 3 above), not written.
+- **A capture path of our own.** The hosted page reads scans; it does not make them. Until the
+  iOS scanner exists the workflow depends on a competitor's app, which is fine for a first user
+  test and not fine for a product.
+- **Manual draw has no screen.** `draft.ts` builds a room wall by wall and computes the closing
+  wall, and there is no way to reach it. That is the offline fallback for a room with no scan.
 - **Stitching rooms.** Both scans are one room. The dropped fragment of the space next door is
   evidence of where the next room starts, and it is thrown away today.
 

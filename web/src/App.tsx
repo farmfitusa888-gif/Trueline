@@ -1,11 +1,12 @@
-import { useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import { formatFeetInches } from '../../core/src/length.ts';
 import { area, formatSquareFeet, isDiagonal, runLength } from '../../core/src/room.ts';
 import { readiness } from '../../core/src/issue.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
-import { EMPTY, reduce } from './state.ts';
+import { EMPTY, persist, reduce } from './state.ts';
 import { LEGEND, Plan } from './Plan.tsx';
 import { Corrections } from './Corrections.tsx';
+import { FieldSheet } from './FieldSheet.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -103,7 +104,20 @@ function Opener({ onOpen }: { onOpen: (json: unknown, fileName: string) => void 
 
 export function App() {
   const [state, dispatch] = useReducer(reduce, EMPTY);
+  const [saveTrouble, setSaveTrouble] = useState<string | null>(null);
   const loaded = state.loaded;
+
+  // Pick up whatever was being corrected last time, before anything is drawn.
+  useEffect(() => {
+    dispatch({ type: 'restore' });
+  }, []);
+
+  // And write it back after every change. Ten minutes of correcting a scan on a
+  // tablet must not be lost because the phone rang.
+  useEffect(() => {
+    if (!loaded) return;
+    setSaveTrouble(persist(loaded, new Date().toISOString()));
+  }, [loaded]);
 
   const derived = useMemo(() => {
     if (!loaded) return null;
@@ -132,6 +146,12 @@ export function App() {
           </button>
         )}
       </header>
+
+      {saveTrouble && (
+        <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          {saveTrouble}
+        </div>
+      )}
 
       {state.error && (
         <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
@@ -238,6 +258,8 @@ export function App() {
               </div>
             )}
 
+            <FieldSheet room={loaded.room} footprints={loaded.footprints} />
+
             <Corrections
               room={loaded.room}
               report={loaded.report}
@@ -249,9 +271,9 @@ export function App() {
               onMake={(wallId, as) => dispatch({ type: 'make', wallId, as })}
             />
 
-            <p className="px-1 text-xs text-slate-400">
+            <p className="px-1 text-xs text-slate-400 print:hidden">
               {loaded.fileName} · imported from RoomPlan v{loaded.report.sourceVersion ?? '?'} ·
-              nothing here left this device
+              nothing here left this device · kept in this browser only, so it is not a backup
             </p>
           </div>
         )

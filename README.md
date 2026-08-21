@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **229 passing, 0 failing** (`npm test`) |
+| Tests | **253 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -103,7 +103,13 @@ screen: drop a RoomPlan `room.json` on it and you get the plan, every dimension 
 or measured, what the scanner could not see and why, and a box to type the real number into —
 after which the whole room re-solves around what you said. No server, nothing uploaded.
 
-Not built yet: the iOS scanner, the API, accounts, exports.
+It keeps your corrections in the browser between visits, and it produces **a list to carry** —
+the four walls worth a tape, ranked, as plain text you can send to a phone or print. `netlify.toml`
+deploys the whole thing as a static site with no backend.
+
+Not built yet: **the scanner**. Trueline does not capture — it reads a scan another app made.
+Capture is a native iOS job (WebXR cannot reach LiDAR in Safari) and it is the next phase. Also
+not built: the API, accounts, exports.
 
 ```bash
 cd trueline && npm install && npm test && npm run typecheck
