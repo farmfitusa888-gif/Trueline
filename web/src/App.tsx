@@ -8,6 +8,7 @@ import { installBridge } from './bridge.ts';
 import { LEGEND, Plan } from './Plan.tsx';
 import { Corrections } from './Corrections.tsx';
 import { FieldSheet } from './FieldSheet.tsx';
+import { Mark } from './Mark.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -158,7 +159,12 @@ export function App() {
   return (
     <main className="mx-auto max-w-3xl px-4 pb-24 pt-6">
       <header className="mb-5 flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Trueline</h1>
+        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900">
+          <Mark className="h-7 w-auto text-slate-900" />
+          <span>
+            True<span className="text-[#B8590A]">line</span>
+          </span>
+        </h1>
         {loaded && (
           <button
             type="button"

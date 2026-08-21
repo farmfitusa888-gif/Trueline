@@ -1232,6 +1232,49 @@ The two walls worth a tape in that kitchen, if it can be revisited: **wall-2, 12
 (running east–west) and **wall-1, 11&prime; 7 13/16&Prime;** (running north–south). One each way, because
 the two directions are separate sums and measuring one says nothing about the other.
 
+## The mark
+
+Two lines: a dimension line with end ticks across the top, a plumb line with the
+bob hanging from the middle. They read as a T. It says what the product is —
+a true length and a true vertical — in the two oldest instruments in the trade,
+and it survives being 40 px on a home screen, which a word does not.
+
+Ink `#14181B` and amber `#B8590A`, the same two colours the plan and the field
+card already use, where amber has always meant *this was measured*. The bob is
+the only amber in the mark.
+
+Drawn as SVG and rasterised, not generated: an icon is geometry, and geometry
+that is typed out can be changed later without redrawing it. `assets/logo/`
+holds the sources and says which file goes where. Nothing was paid for.
+
+## A white screen that had not happened yet
+
+Reading the app back before handing over build instructions turned up a fault
+that would have cost the whole first run: the correction screens would have
+opened blank.
+
+Two causes, both certain enough to fix without a device:
+
+1. **Vite emitted absolute asset paths.** `/assets/index-xxxx.js` resolves to the
+   root of the device's filesystem inside the app, where there is nothing.
+   `base: './'` fixes it and changes nothing for a hosted copy.
+2. **`loadFileURL` cannot load ES modules.** A `file://` page has an opaque
+   origin; a module script is fetched under CORS; an opaque origin fails that
+   check. The module never runs and nothing is logged. This is not a bug in the
+   bundle — it is what the platform does.
+
+So the bundle is now served, not opened: `WebBundle.swift` is a
+`WKURLSchemeHandler` answering `trueline://app/…` out of the app bundle, with
+path traversal refused and a content security policy on every response. A real
+origin also means `localStorage` belongs to the page, so the data store went from
+`.nonPersistent()` to the default one — ten minutes of typing tape readings in a
+half-built kitchen now survives the app being closed, which was the whole point
+of writing them down.
+
+None of this is compiled yet either. What can be said is that the two failures
+are understood rather than guessed at, and that both fixes are the documented
+way round them.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.

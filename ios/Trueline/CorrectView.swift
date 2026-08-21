@@ -29,22 +29,30 @@ struct CorrectView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        // Nothing on the page needs to reach the network, so nothing on the page
-        // is given a way to. A scan is somebody's house.
-        configuration.websiteDataStore = .nonPersistent()
+        // The bundle is served under its own scheme rather than from `file://`.
+        // See `WebBundle` for why: modules do not load from an opaque origin,
+        // and the failure looks exactly like a hang.
+        configuration.setURLSchemeHandler(context.coordinator.bundle, forURLScheme: WebBundle.scheme)
+        // The default, persistent data store, deliberately: the correction
+        // screens write the room to `localStorage` after every edit, and ten
+        // minutes of typing tape readings in a half-built kitchen must survive
+        // the app being closed. Nothing reaches the network — the handler above
+        // serves the only origin the page has, under a content security policy
+        // that allows nothing else.
+        configuration.websiteDataStore = .default()
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.scrollView.contentInsetAdjustmentBehavior = .always
         webView.isOpaque = false
 
-        guard let index = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Web") else {
+        guard context.coordinator.bundle.isPresent else {
             // A build with no web bundle in it is a broken build, and saying so
             // beats a blank white screen that looks like a hang.
             webView.loadHTMLString(missingBundleMessage, baseURL: nil)
             return webView
         }
-        webView.loadFileURL(index, allowingReadAccessTo: index.deletingLastPathComponent())
+        webView.load(URLRequest(url: WebBundle.start))
         return webView
     }
 
@@ -65,6 +73,8 @@ struct CorrectView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         var parent: CorrectView
+        /// Held here because the configuration does not retain it.
+        let bundle = WebBundle()
 
         init(_ parent: CorrectView) {
             self.parent = parent

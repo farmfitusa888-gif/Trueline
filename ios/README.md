@@ -80,6 +80,13 @@ door, a door height the scan probably got wrong, a wall no photograph shows.
 Those checks used to be a Python script somebody had to run in a terminal. They
 are in the app now, because the app put the file there.
 
+## The icon
+
+`Trueline/Assets.xcassets/AppIcon.appiconset/icon-1024.png`, rendered from
+`assets/logo/trueline-mark.svg`. It is opaque RGB with no alpha channel, which
+is what the App Store requires and what Xcode will otherwise reject at upload
+time. To change it, edit the SVG and rasterise — never touch the PNG by hand.
+
 ## Why the correction screens are a web view
 
 One measurement engine. Nanometre integers, the provenance rules, the solver,
@@ -87,6 +94,25 @@ zones, obstruction, the issue guard — writing all of that a second time in Swi
 would mean two models in two languages and every bug fixed twice. So capture is
 native, because capture has to be, and everything after it is `web/`, running
 locally inside the app with no network access at all.
+
+## The web view is served, not opened
+
+`loadFileURL` is the obvious way to show a local page and it does not work for
+this bundle. A page loaded from `file://` has an opaque origin, and an ES module
+script — which is what a Vite build is — gets fetched under CORS rules that an
+opaque origin cannot satisfy. The module never runs, and what you see is a white
+screen with nothing in the log to explain it.
+
+So `WebBundle.swift` serves the bundle under a scheme of its own,
+`trueline://app/index.html`. A custom scheme has a real origin: modules load,
+relative paths resolve the way they do on a web server, and `localStorage`
+belongs to that origin so corrections survive the app being closed. The handler
+only ever reads files inside the app, and every response carries a content
+security policy that allows nothing off-device.
+
+`web/vite.config.ts` sets `base: './'` for the same reason. An absolute
+`/assets/index.js` resolves to the root of the device's filesystem, where there
+is nothing.
 
 ## What a capture looks like on disk
 

@@ -1,4 +1,4 @@
-# Trueline
+<img src="./assets/logo/trueline-wordmark.svg" alt="Trueline" width="380">
 
 Scan a building, correct it by hand, get a blueprint.
 

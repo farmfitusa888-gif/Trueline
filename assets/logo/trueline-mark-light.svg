@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"
+     role="img" aria-label="Trueline">
+  <!-- The same mark for light ground: ink where the icon is paper-white. No
+       background, so it can sit on anything. -->
+  <g transform="translate(512,512) scale(1.16) translate(-512,-512)">
+    <g stroke="#14181B" stroke-linecap="butt">
+      <line x1="224" y1="300" x2="800" y2="300" stroke-width="46"/>
+      <line x1="234" y1="234" x2="234" y2="366" stroke-width="24"/>
+      <line x1="790" y1="234" x2="790" y2="366" stroke-width="24"/>
+      <line x1="512" y1="300" x2="512" y2="596" stroke-width="46"/>
+    </g>
+    <polygon points="512,584 578,646 578,690 512,800 446,690 446,646" fill="#B8590A"/>
+  </g>
+</svg>
