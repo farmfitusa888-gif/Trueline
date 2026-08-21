@@ -2,6 +2,7 @@ import { type Nanometres, NM_PER_FOOT, NM_PER_INCH, NM_PER_METRE, NM_PER_MM } fr
 import { type Measurement, confidenceLabel, toleranceOf } from './measurement.ts';
 import { type Point, type Room, corners, validate } from './room.ts';
 import { type SectionView } from './section.ts';
+import { type Trust, readiness } from './issue.ts';
 import { type Zone } from './zone.ts';
 
 /**
@@ -78,6 +79,15 @@ export interface RenderModel {
   readonly walls: readonly RenderWall[];
   readonly zones: readonly RenderZone[];
   readonly ceilingHeight: number;
+  /**
+   * Whether anybody has stood behind these numbers, so the badge is on the
+   * screen and not only on the export. A scan closes perfectly whether it is
+   * right or wrong, so this is the only thing on the drawing that distinguishes
+   * the two. See `issue.ts`.
+   */
+  readonly trust: Trust;
+  /** True when this room may go out as a dimensioned drawing. */
+  readonly issuable: boolean;
 }
 
 export interface RenderOptions {
@@ -132,11 +142,14 @@ export function toRenderModel(
     edgeKinds: zone.edges.map((e) => e.kind),
   }));
 
+  const state = readiness(room);
   return {
     unit,
     walls,
     zones: renderZones,
     ceilingHeight: toUnit(room.ceilingHeight.value, unit),
+    trust: state.trust,
+    issuable: state.blocking.length === 0,
   };
 }
 

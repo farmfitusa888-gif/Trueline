@@ -612,6 +612,96 @@ to test.
 the same one place everything else crosses it. A wall clipped to 4'0" for a drawing is still
 an 8'0" wall on the take-off.
 
+## A second scan — the garage, and what two scans settle
+
+308 KB of JSON off the same phone: 5 walls, 314 frames, 4 minutes, section label `unidentified`.
+Not an empty room — one `storage` object, and a large opening. It confirms three findings and
+adds two.
+
+**Confirmed: the scan always closes.** Every wall end meets its neighbour at 0.000 mm, with one
+at 0.001 mm. Two scans, two closed polygons. This is the normal state, not a coincidence, and
+the 0.001 mm says the importer must compare with a tolerance rather than for equality.
+
+**Confirmed: wall heights vary inside one room.** Three of them here — 2.13 m, 1.95 m, 1.62 m —
+in a single garage.
+
+**Confirmed: thickness is never exported.** All zeros again.
+
+### New: dangling wall ends are two different things
+
+Both scans have wall ends that meet nothing. They are not the same problem:
+
+| | Garage | Kitchen |
+|---|---|---|
+| Dangling ends | wall 3B, wall 4A | wall 2A, wall 4B, **and both ends of wall 6** |
+| Gap between them | 4.8144 m, one straight run | 2.7383 m direct, 3.5243 m round two edges |
+| Floor edges with no wall | one, 4.8144 m | two, 2.5646 m + 0.9597 m |
+| What it is | the garage door opening | the opening into the next room, turning a corner |
+
+In both cases the wall-less floor edges account for the gap **exactly**: 4.8144 m in the garage,
+and in the kitchen an L of 2.5646 + 0.9597 whose diagonal is 2.7383 m — the direct distance
+between the two dangling ends, to four decimal places.
+
+So a dangling end is usually not garbage. It is **the flank of an opening too wide for RoomPlan
+to call a door**, and the gap between two of them is a virtual edge in the sense `zone.ts`
+already means: it bounds floor and ceiling and carries no drywall, paint or baseboard.
+
+The exception is real and separable: the kitchen's wall 6 (1.3167 m) has **both** ends dangling
+and no matching floor edge at all. It is a fragment of the room next door, caught through the
+doorway. Matching wall lengths against floor-edge lengths separates the two cases cleanly —
+every garage wall is on the outline, and in the kitchen exactly one is not.
+
+### New: RoomPlan snaps the walls but not the floor polygon
+
+Every garage wall is square to within 0.001°. Its floor polygon is not: one edge sits at
+**-89.665°**, which over 4.8144 m is 28 mm of drift. So the two sources disagree about whether
+the room is rectilinear, and picking one is a decision rather than a detail.
+
+### New: scanned opening sizes are not usable
+
+| | Scanned height | A real door |
+|---|---|---|
+| Kitchen door 1 | 2.0868 m (6'10") | 2.032 m (6'8") |
+| Kitchen door 2 | 2.0985 m (6'11") | 2.032 m |
+| Garage door | 1.7011 m (5'7") | — |
+
+Out by more than a foot, in both directions, on two scans. An opening size off a scan may
+appear on a drawing, but it must be marked, and nothing may be ordered against it. This is now
+a warning in `issue.ts`.
+
+## The import guard — built
+
+Sam's call, and the most important thing in the codebase: **a room whose walls were all scanned
+may not go out as a dimensioned drawing.** `core/src/issue.ts`, 14 tests.
+
+The reason is the closure finding. On an imported scan `closure()` returns zero, `solve()`
+reports no adjustment and no wall beyond tolerance, and a person reads that as *the measurements
+agree*. They have never been compared. The reassurance a closed room normally gives is, on a
+scan, worth nothing.
+
+- `closedWithoutBeingChecked()` names the trap exactly: every wall scanned, every one carrying a
+  tolerance, and the room closes anyway. A hand-drawn room also closes exactly, and that **does**
+  mean something, so the test requires that nothing in it be verified.
+- **One tape per axis** is the gate. Not one tape — one per axis, because the model closes on two
+  independent equations and a measurement along one constrains nothing along the other. Verify
+  the north wall of a rectangle and every east-west dimension is still a guess.
+- `unseenError(room, axis)` reports the number the closure check is hiding: the sum of the
+  unverified tolerances on that axis. It goes in the blocking message, so the screen says
+  *"these could be out by 4 inches"* rather than *"unverified"*.
+- `assertIssuable()` throws rather than returning a flag. An export that forgets to check a
+  boolean is precisely the failure this file exists to prevent; a thrown error cannot be
+  forgotten. Every dimensioned output calls it.
+- On-screen views are **not** gated. Looking at a scan is how somebody decides where to put the
+  tape. It is issuing that requires a checked drawing.
+- `trustLabel()` is blunt on purpose: *Scanned — not checked* / *Partly measured — scanned
+  dimensions marked* / *Measured — every dimension checked*. `toRenderModel()` carries it, so the
+  badge is on the screen and not only on the export.
+
+Opening sizes and an unverified ceiling height are **warnings**, not gates — they must appear on
+the drawing, but they do not stop it going out. That is a deliberately narrower rule than the
+wall gate, because Sam's instruction was one tape per axis and widening a gate quietly is its own
+kind of dishonesty.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
@@ -643,9 +733,12 @@ Opened by the first real scan, and not yet closed:
 - **Off-grid walls.** `room.ts` refuses two same-axis walls in a row and has no general
   solver. A 203 mm chamfer at 70° is ordinary, not exotic, so the importer needs a path for
   short off-grid segments before a scan can round-trip.
-- **Which exported walls belong to the room.** One wall in the kitchen scan is a fragment of
-  the space next door. Picking the closed outline out of the wall list is a decision the
-  importer has to make, and it has to be visible and correctable rather than silent.
+- **Which exported walls belong to the room.** Two scans in, the rule looks mechanical — match
+  wall lengths against floor-edge lengths, and what is left over is not on the outline — but it
+  is still a decision the importer makes on somebody's behalf, so it has to be visible and
+  correctable rather than silent.
+- **Whether the walls or the floor polygon is the truth**, given that RoomPlan snaps one to the
+  grid and not the other. 0.335° over 4.8 m in the garage.
 - **The batch photo delete spec** — checkboxes, select-all, and the warning when the photo
   being deleted is the only one showing a wall. Decided (gap 3 above), not written.
 

@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **147 passing, 0 failing** (`npm test`) |
+| Tests | **162 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -73,9 +73,16 @@ Also built: **section and dollhouse views** — the ceiling comes off when you l
 room, a cut plane slides to any height, and the walls between you and the room come down for an
 oblique view. Exact integer geometry, so a viewpoint gives the same answer on every device.
 
-Checked against a real scan: `core/tools/inspect-roomplan.py` reads a RoomPlan export and
-prints what it actually contains. Run against Sam's kitchen it found two of the room model's
-assumptions wrong and one field missing; all three are written up in `DECISIONS.md`.
+Also built: **the import guard**. A RoomPlan scan always closes perfectly — two real exports,
+every wall end meeting its neighbour to within a thousandth of a millimetre — so a closed room
+proves nothing about an imported one. A room whose walls were all scanned cannot be issued as a
+dimensioned drawing until a person has put a tape on one wall per axis, and the error the
+closure check is hiding is reported as a number rather than a shrug.
+
+Checked against real scans: `core/tools/inspect-roomplan.py` reads a RoomPlan export and prints
+what it actually contains. Run against Sam's kitchen and garage it found two of the room model's
+assumptions wrong, one field missing, and the closure trap above; all of it is written up in
+`DECISIONS.md`.
 
 Not built yet: the iOS scanner, the web viewer, the API, anything with a screen.
 
