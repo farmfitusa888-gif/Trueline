@@ -209,3 +209,54 @@ PLANKEY = f'''<svg viewBox="0 0 620 196" xmlns="http://www.w3.org/2000/svg" role
     <text x="364" y="183" font-size="10" fill="#4A5459">an opening. No drywall, no paint, no baseboard.</text>
   </g>
 </svg>'''
+
+# ------------------------------------------- 7. walking a room with AR, no LiDAR
+# The same room, captured by a person instead of a sensor. The point of the
+# drawing is the last tap: it is not another corner, it is the measurement of
+# how well the walk went, and it is where every tolerance in the room comes
+# from. Drawn big and in amber for that reason.
+WALKTAP = f'''<svg viewBox="0 0 620 176" xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-label="Plan view of tapping each corner of a room with AR, and re-tapping the first corner to close">{DEFS}
+  <text x="0" y="10" font-size="11" font-weight="bold" fill="#14181B">TAP EACH CORNER, THEN TAP THE FIRST ONE AGAIN</text>
+
+  <rect x="30" y="24" width="330" height="134" fill="#F4F6F7" stroke="#14181B" stroke-width="4"/>
+
+  <!-- the walk between taps -->
+  <path d="M70,50 L320,50"  stroke="#B8590A" stroke-width="2.6" marker-end="url(#arA)" fill="none"/>
+  <path d="M320,50 L320,132" stroke="#B8590A" stroke-width="2.6" marker-end="url(#arA)" fill="none"/>
+  <path d="M320,132 L70,132" stroke="#B8590A" stroke-width="2.6" marker-end="url(#arA)" fill="none"/>
+  <path d="M70,132 L70,58"   stroke="#B8590A" stroke-width="2.6" marker-end="url(#arA)" fill="none"/>
+
+  <!-- the taps -->
+  <g fill="#fff" stroke="#B8590A" stroke-width="2.6">
+    <circle cx="58" cy="38" r="9.5"/><circle cx="332" cy="38" r="9.5"/>
+    <circle cx="332" cy="144" r="9.5"/><circle cx="58" cy="144" r="9.5"/>
+  </g>
+  <g font-size="11" font-weight="bold" fill="#B8590A" text-anchor="middle">
+    <text x="58" y="42">1</text><text x="332" y="42">2</text>
+    <text x="332" y="148">3</text><text x="58" y="148">4</text>
+  </g>
+
+  <text x="195" y="86" font-size="11" text-anchor="middle" fill="#4A5459">aim at the foot of the corner &#8212; where</text>
+  <text x="195" y="100" font-size="11" text-anchor="middle" fill="#4A5459">the two walls meet the floor</text>
+  <text x="195" y="172" font-size="11" text-anchor="middle" fill="#14181B">one direction round, phone up the whole way</text>
+
+  <!-- the closing tap, enlarged -->
+  <text x="400" y="10" font-size="11" font-weight="bold" fill="#B8590A">TAP 5 &#8212; BACK ON CORNER 1</text>
+  <rect x="400" y="24" width="220" height="134" fill="#FBF3EA" stroke="#B8590A" stroke-width="1.6"/>
+
+  <circle cx="466" cy="60" r="7" fill="#fff" stroke="#B8590A" stroke-width="2.6"/>
+  <circle cx="546" cy="60" r="7" fill="#B8590A"/>
+  <text x="466" y="46" font-size="10" text-anchor="middle" fill="#4A5459">tap 1</text>
+  <text x="546" y="46" font-size="10" text-anchor="middle" fill="#B8590A" font-weight="bold">tap 5</text>
+
+  <line x1="473" y1="80" x2="539" y2="80" stroke="#14181B" stroke-width="1.5"
+        marker-start="url(#ar)" marker-end="url(#ar)"/>
+  <line x1="466" y1="67" x2="466" y2="84" stroke="#14181B" stroke-width="1"/>
+  <line x1="546" y1="67" x2="546" y2="84" stroke="#14181B" stroke-width="1"/>
+
+  <text x="510" y="102" font-size="11" text-anchor="middle" fill="#14181B" font-weight="bold">THE GAP IS THE ANSWER</text>
+  <text x="510" y="120" font-size="10.5" text-anchor="middle" fill="#4A5459">how far the walk drifted, measured</text>
+  <text x="510" y="133" font-size="10.5" text-anchor="middle" fill="#4A5459">by you, on this room, today &#8212; and it</text>
+  <text x="510" y="146" font-size="10.5" text-anchor="middle" fill="#4A5459">becomes the band on every wall.</text>
+</svg>'''

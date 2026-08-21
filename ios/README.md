@@ -28,6 +28,22 @@ whatever was copied last time rather than failing the build.
 
 **Device only.** ARKit does not run in the simulator.
 
+### First time on that phone only
+
+Two things Xcode will not do for you, both one-time:
+
+1. **Developer Mode.** iOS 16 and later refuse to run a build from Xcode until
+   it is on. Plug the phone in and press Run once; the phone puts
+   **Settings → Privacy & Security → Developer Mode** there. Turn it on and let
+   it restart.
+2. **Trust the certificate.** A free Apple ID signs the app but the phone does
+   not trust it yet: **Settings → General → VPN & Device Management** → your
+   Apple ID → **Trust**. Without this the icon installs and the app closes the
+   moment it opens.
+
+A free Apple ID also expires the build after seven days. Press Run again and it
+comes back; nothing on the phone is lost, because captures live in Documents.
+
 ## The two ways to capture a room
 
 | | Scan | Measure |

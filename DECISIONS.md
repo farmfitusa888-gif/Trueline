@@ -1203,6 +1203,35 @@ that normally makes a checked-in `.pbxproj` unbearable.
 `Info.plist` parses as a plist and the scheme parses as XML — all checked here. That is not the
 same as Xcode opening it, and it will not be called working until it does.
 
+## The field card grew a sixth page, and where 175.3 sq ft came from
+
+Rev 4 of `docs/scanning-field-card.pdf` adds page 6: walking a room on a phone with no depth
+sensor. Six numbered steps, the two-panel diagram of the walk and the closing tap, and a table
+of what a walked room does *not* come with — no doors or windows found for you, no measured
+ceiling height (8&prime; &plusmn;6&Prime;, marked assumed), no furniture, no photographs. The page exists
+because the closing tap is the one thing a person can get wrong that nothing downstream can
+repair: it is not a corner, it is the tolerance on every wall in the room, and somebody who does
+not know that will skip it.
+
+The masthead changed with it — "how to scan a room / iPhone / iPad LiDAR" became "how to measure
+a room / with LiDAR or without". The card is no longer about one sensor.
+
+`ios/README.md` gained the two first-run steps Xcode does not do for you: Developer Mode
+(Settings → Privacy & Security, iOS 16+) and trusting the signing certificate (Settings →
+General → VPN & Device Management). Both are one-time, both look like the app is broken when
+they are missed — the icon installs and the app closes on launch.
+
+**Where the 175.3 sq ft came from.** It is ours, not OpenPlan3D's. The reference app displays no
+measurements anywhere in its interface — that is product gap 1 above, and it is why this project
+exists. The number is the shoelace area of `floors[0].polygonCorners` in the kitchen `room.json`,
+those corners placed by the floor's own transform: **16.2840 m² = 175.279 sq ft**, which the
+importer carries through to **175.3 sq ft** on screen. Re-derived from the raw file, twice, by two
+independent paths.
+
+The two walls worth a tape in that kitchen, if it can be revisited: **wall-2, 12&prime; 9 7/8&Prime;**
+(running east–west) and **wall-1, 11&prime; 7 13/16&Prime;** (running north–south). One each way, because
+the two directions are separate sums and measuring one says nothing about the other.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
@@ -1231,9 +1260,10 @@ before any money goes into branding.
 
 - **The batch photo delete spec** — checkboxes, select-all, and the warning when the photo
   being deleted is the only one showing a wall. Decided (gap 3 above), not written.
-- **A capture path of our own.** The hosted page reads scans; it does not make them. Until the
-  iOS scanner exists the workflow depends on a competitor's app, which is fine for a first user
-  test and not fine for a product.
+- **The scanner has never been compiled.** It is written — RoomPlan capture, photographs with
+  poses, AR measure, the correction screens in a web view — and this container is Linux with no
+  Swift toolchain, so not one line of it has been through a compiler. Until it builds on a Mac
+  the hosted page is still the only thing that runs, and it reads scans rather than making them.
 - **Manual draw has no screen.** `draft.ts` builds a room wall by wall and computes the closing
   wall, and there is no way to reach it. That is the offline fallback for a room with no scan.
 - **Stitching rooms.** Both scans are one room. The dropped fragment of the space next door is

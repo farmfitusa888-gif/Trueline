@@ -1,6 +1,6 @@
 import re, subprocess, os, sys
 import pypdfium2 as pdfium
-from diagrams import STAND, HOLD, WALK, FURNITURE, OPENPLAN, PLANKEY
+from diagrams import STAND, HOLD, WALK, FURNITURE, OPENPLAN, PLANKEY, WALKTAP
 
 CH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 ROW = '      <tr><td class="b"></td><td class="b"></td><td class="b"></td><td class="b"></td><td class="b"></td></tr>\n'
@@ -59,7 +59,7 @@ def html(body_pt=9.2, lead=1.34, rows=7):
     return f'''<!doctype html><html><head><meta charset="utf-8"><title>Trueline Field Card</title>
 <style>{css(body_pt, lead)}</style></head><body>
 
-{mast("Field card &mdash; how to scan a room<br>Rev 3 &middot; iPhone / iPad LiDAR")}
+{mast("Field card &mdash; how to measure a room<br>Rev 4 &middot; iPhone / iPad &mdash; with LiDAR or without")}
 
 <section>
   <h2><span class="n">01</span>Where to stand</h2>
@@ -210,6 +210,50 @@ done properly beats twenty done badly.</footer>
 <footer>Nothing on the drawing is a measurement until somebody has stood behind it. That is the
 whole point of the tape log on the previous page &mdash; and of the amber lines on this one.</footer>
 
+<div class="pb"></div>
+{mast("Field card &mdash; page 6<br>No LiDAR? Walk the room instead")}
+
+<section>
+  <h2><span class="n">12</span>Which one this phone does</h2>
+  <p>The first screen offers two ways in. <b>Scan</b> sweeps the room with the depth sensor and comes
+  back with walls, doors and windows already found. <b>Measure</b> uses the camera only: you walk the
+  room and tap the corners yourself. You do not have to know which phone is which &mdash; if
+  <b>Scan</b> is greyed out, this device has no depth sensor, so <b>Measure</b> is the way in.</p>
+</section>
+
+<section>
+  <h2><span class="n">13</span>Walking a room with the camera</h2>
+  <figure>{WALKTAP}</figure>
+  <table>
+    <tr><td class="k">1. Find the floor</td><td>Move the phone slowly across the floor until the app says it has one. Nothing can be tapped before that &mdash; it says so rather than guess.</td></tr>
+    <tr><td class="k">2. Stand back</td><td>As for a scan: 4&ndash;6 ft off the corner, chest height, tilted down.</td></tr>
+    <tr><td class="k">3. Tap corner one</td><td>Dot on the floor at the foot of the corner. Tap.</td></tr>
+    <tr><td class="k">4. Walk, tap, repeat</td><td>One direction round. Phone up and moving the whole way &mdash; lose tracking and every corner already placed is wrong.</td></tr>
+    <tr><td class="k">5. Close it</td><td>Back at corner one, aim at that same spot, tap again. It shows how close you are as you come back.</td></tr>
+    <tr><td class="k">6. Correct it</td><td>Same screen as a scan: plan, area, punch list, tape box.</td></tr>
+  </table>
+  <div class="warn"><span class="lbl">The closing tap is not a corner &mdash; it is the accuracy</span>
+  Nobody publishes how precisely a person places a point in AR by eye, and Trueline will not invent a
+  figure. The gap between tap 1 and tap 5 <b>is</b> the tolerance. Skip it and the app has to ask you
+  to type one in, because it has nothing else to go on.</div>
+</section>
+
+<section>
+  <h2><span class="n">14</span>What a walked room does not come with</h2>
+  <table>
+    <tr><td class="k">Doors &amp; windows</td><td>Not found for you &mdash; add them on the plan afterwards.</td></tr>
+    <tr><td class="k">Ceiling height</td><td>Nothing measures it. The app starts at 8&#8242; &plusmn;6&#8243; and marks it assumed. Tape it.</td></tr>
+    <tr><td class="k">Blocked walls</td><td>No furniture is detected, so the punch list cannot rank by what is in the way. Write &ldquo;B&rdquo; on the log yourself.</td></tr>
+    <tr><td class="k">Photographs</td><td>A scan pins each one to the walls it shows. A walked room has none.</td></tr>
+  </table>
+  <p style="margin-top:4pt">None of that stops the room being priced &mdash; it means <b>the tape log on page 4 matters
+  more</b>, not less.</p>
+</section>
+
+<footer>A walked room and a scanned room are the same room from the last tap onwards &mdash; same plan,
+same solver, same refusal to be issued until a tape has been on it. All that differs is how much the
+phone did for you first.</footer>
+
 </body></html>'''
 
 def pages(doc, path='try'):
@@ -219,10 +263,11 @@ def pages(doc, path='try'):
         capture_output=True)
     return len(pdfium.PdfDocument(f'{path}.pdf'))
 
-# Five sheets: scan, walk, open plans, tape log, and what to do with it afterwards.
+# Six sheets: scan, walk, open plans, tape log, what to do with it afterwards, and
+# the same room walked by hand on a phone with no depth sensor.
 # The ladder shortens the tape log rather than shrinking the type, because the
 # card is read at arm's length on a job site.
-TARGET_PAGES = 5
+TARGET_PAGES = 6
 
 if __name__ == '__main__':
     ladder = [(9.2,1.34,r) for r in (24,22,20,18,16,14,12,10)]

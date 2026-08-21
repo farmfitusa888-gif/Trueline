@@ -2,9 +2,9 @@
 
 | File | What it is |
 |---|---|
-| `scanning-field-card.pdf` | Five-page illustrated field card. Print it double-sided, take it on site, write on page 4. |
+| `scanning-field-card.pdf` | Six-page illustrated field card. Print it double-sided, take it on site, write on page 4. |
 | `scanning-field-card.html` | Generated. Do not hand-edit — it is overwritten on every build. |
-| `build/diagrams.py` | The six SVG diagrams. Edit here. |
+| `build/diagrams.py` | The seven SVG diagrams. Edit here. |
 | `build/build_card.py` | Composes the card and finds a layout that fits. Edit here. |
 | `market-research.html` | What the field already does, and where the gap is. |
 
@@ -21,7 +21,8 @@ first combination that lands on exactly `TARGET_PAGES`, so adding content does n
 push the card to an extra sheet — it re-fits by shortening the tape log, or the ladder runs
 out and the build fails rather than shipping the wrong page count.
 
-**When the app changes, this changes.** Page 5 describes what the screen does with a scan.
+**When the app changes, this changes.** Pages 5 and 6 describe what the screen does with a scan
+and what walking a room without LiDAR involves.
 If the colours on the plan, the wording of a refusal, or what the importer decides for you
 changes, the card is wrong until it is rebuilt — and a wrong field card is worse than none,
 because somebody is holding it in a room believing it.
