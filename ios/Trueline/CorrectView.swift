@@ -21,6 +21,8 @@ struct CorrectView: UIViewRepresentable {
     /// The scan to hand over: RoomPlan's own JSON, and the photo manifest.
     let roomJSON: Data
     let photosJSON: Data
+    /// The corners somebody tapped, when the room was walked rather than scanned.
+    let traceJSON: Data
     let title: String
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -79,6 +81,28 @@ struct CorrectView: UIViewRepresentable {
         /// the classic way this breaks, on the first room somebody names with an
         /// apostrophe in it.
         private func hand(over webView: WKWebView) {
+            // A walked room and a scanned room go across the same hook and come
+            // out the same on the other side. Which one this is, is the only
+            // difference, and it stops here.
+            if !parent.traceJSON.isEmpty {
+                guard let trace = String(data: parent.traceJSON, encoding: .utf8) else { return }
+                run(
+                    on: webView,
+                    """
+                    (function () {
+                      var trace = JSON.parse(\(quoted(trace)));
+                      var name = \(quoted(parent.title));
+                      if (window.trueline && window.trueline.openTrace) {
+                        window.trueline.openTrace(trace, name);
+                      } else {
+                        window.truelinePayload = { trace: trace, fileName: name };
+                      }
+                    })();
+                    """
+                )
+                return
+            }
+
             guard
                 let room = String(data: parent.roomJSON, encoding: .utf8),
                 let photos = String(data: parent.photosJSON, encoding: .utf8)
@@ -96,11 +120,15 @@ struct CorrectView: UIViewRepresentable {
               }
             })();
             """
+            run(on: webView, script)
+        }
+
+        private func run(on webView: WKWebView, _ script: String) {
             webView.evaluateJavaScript(script) { _, error in
                 if let error {
-                    // Worth a line in the console: a scan that does not arrive
-                    // looks exactly like a scan that produced nothing.
-                    print("Trueline: the scan did not reach the web view — \(error)")
+                    // Worth a line in the console: a capture that does not
+                    // arrive looks exactly like one that produced nothing.
+                    print("Trueline: the capture did not reach the web view — \(error)")
                 }
             }
         }

@@ -26,6 +26,11 @@ export interface TruelineBridge {
    * manifest from `capture.ts`, or omitted when a scan carries none.
    */
   open(room: unknown, photos?: unknown, fileName?: string): void;
+  /**
+   * Called when the room was walked with AR or traced off a drawing rather than
+   * scanned. Different capture, same everything afterwards.
+   */
+  openTrace(trace: unknown, fileName?: string): void;
   /** Version of this contract, so a mismatched app build can say so. */
   readonly version: 1;
 }
@@ -37,7 +42,12 @@ declare global {
      * Set by the native app before the page loads, for a capture that is ready
      * at start-up rather than arriving later. Read once and then forgotten.
      */
-    truelinePayload?: { room: unknown; photos?: unknown; fileName?: string };
+    truelinePayload?: {
+      room?: unknown;
+      photos?: unknown;
+      trace?: unknown;
+      fileName?: string;
+    };
   }
 }
 
@@ -61,7 +71,16 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     });
   };
 
-  window.trueline = { open, version: BRIDGE_VERSION };
+  const openTrace = (trace: unknown, fileName?: string) => {
+    dispatch({
+      type: 'openTrace',
+      trace,
+      fileName: fileName ?? 'room walked on this device',
+      at: new Date().toISOString(),
+    });
+  };
+
+  window.trueline = { open, openTrace, version: BRIDGE_VERSION };
 
   const waiting = window.truelinePayload;
   delete window.truelinePayload;

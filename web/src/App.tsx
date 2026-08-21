@@ -113,7 +113,16 @@ export function App() {
   // walking a room wants that room, not the one they were looking at yesterday.
   useEffect(() => {
     const waiting = installBridge(dispatch);
-    if (waiting) {
+    if (waiting?.trace) {
+      dispatch({
+        type: 'openTrace',
+        trace: waiting.trace,
+        fileName: waiting.fileName ?? 'room walked on this device',
+        at: new Date().toISOString(),
+      });
+      return;
+    }
+    if (waiting?.room) {
       dispatch({
         type: 'open',
         json: waiting.room,
@@ -280,6 +289,7 @@ export function App() {
               readiness={derived.state}
               obstructions={derived.obstructions}
               punchList={derived.punchList}
+              photos={loaded.photos}
               selected={state.selected}
               onSelect={(wallId) => dispatch({ type: 'select', wallId })}
               onMake={(wallId, as) => dispatch({ type: 'make', wallId, as })}

@@ -1,78 +1,87 @@
-# ios — the scanner
+# ios — the app
 
-The native half of Trueline: capture a room, photograph it while you walk, and
-hand the result straight to the correction screens without leaving the app.
+Trueline on a phone. It scans, it measures, it photographs, and it corrects —
+all of it in one app, with nothing to export and nothing to upload.
 
-> **None of this Swift has been compiled.** It was written on Linux, where there
-> is no Xcode and no Swift toolchain, so it has been checked by reading and not
-> by building. Expect compile errors on the first run and send them back — that
-> is the fastest way through. Every part that *could* be verified was: the photo
-> manifest it writes and the room JSON it writes are both read by `core`, which
-> is tested against two real RoomPlan exports.
+> **None of this Swift has been compiled.** This repository is developed on
+> Linux, where there is no Xcode and no Swift toolchain, so it has been checked
+> by reading and not by building. Expect compile errors on the first run and
+> send the whole list back at once — that is one turn instead of forty. Every
+> part that *could* be checked was: both file formats it writes are read by
+> `core`, which is tested against two real scans.
 
 ## Building it
 
 ```bash
-brew install xcodegen        # once
-cd ios && xcodegen           # writes Trueline.xcodeproj
-open Trueline.xcodeproj
+open ios/Trueline.xcodeproj
 ```
 
-Then in Xcode: select the **Trueline** target → **Signing & Capabilities** →
-set **Team** to your Apple Developer account. Plug in the phone, pick it as the
-run destination, and press Run.
+That is the whole setup. No Homebrew, no XcodeGen, no command line. In Xcode:
+select the **Trueline** target → **Signing & Capabilities** → set **Team** to
+your Apple Developer account. Plug in the phone, choose it as the destination,
+press **Run**.
 
-The project's pre-build step runs `npm install && npm run build` at the top of
-the repository and copies `web/dist` into `Trueline/Web`, so the correction
-screens in the app are always the ones in this commit. If `npm` is not on
-Xcode's `PATH` it says so and uses whatever was copied last time rather than
-failing the build.
+The project's first build phase runs `npm install && npm run build` at the top
+of the repository and copies `web/dist` into the app, so the screens in the app
+are always the ones in this commit. If it cannot find `npm` it says so and uses
+whatever was copied last time rather than failing the build.
 
-**Device only.** RoomPlan needs a LiDAR sensor, so this will not run in the
-simulator. iPhone 12 Pro or later, iPad Pro 2020 or later.
+**Device only.** ARKit does not run in the simulator.
 
-## What it does
+## The two ways to capture a room
 
-| Screen | What happens |
-|---|---|
-| Projects | The scans on this phone. They live in Documents, so they are visible in the Files app and can be copied off without any server existing. |
-| Scan | RoomPlan's own capture view, **wall lengths live on screen as they settle**, a photo every two seconds while you walk, a shutter for anything you want on the record, and a box to name the room before you forget which one it was. |
-| Review | The web app, in a web view, fed the scan directly. The plan, every dimension marked scanned or measured, what the scanner could not see, and a box to type a real measurement into. Share sends the whole folder. |
+| | Scan | Measure |
+|---|---|---|
+| Needs | LiDAR — iPhone 12 Pro or later, iPad Pro 2020 or later | any ARKit phone |
+| How | Walk the room; the phone finds the walls | Tap each corner, walk to the next |
+| Photos | Every two seconds, plus a shutter, each with its exact pose | — |
+| Where the band comes from | Apple's published ±50 mm | **your own closing tap** |
+
+The app hides Scan on a phone that cannot do it rather than letting somebody
+find out halfway through a room.
+
+### The closing tap
+
+Measuring without LiDAR ends by walking back to the corner you started at and
+tapping it again. That tap is not part of the room — it is the measurement of
+how well the pointing went, and it is where the band on every wall comes from.
+Nobody publishes how accurately a person can place a point in AR by eye, so
+rather than invent a figure, the app asks you to produce one. Tap within a foot
+of where you started and every wall carries that foot; tap within an inch and
+every wall carries an inch.
+
+## What happens after either one
+
+The same thing. The plan, every dimension marked scanned or measured, what the
+scanner could not see, and a box to type a real measurement into — the same
+screens, the same solver, the same refusal to be issued until a tape has been on
+one wall running each way. **How a room was captured changes nothing about how
+it is corrected.**
+
+The app also checks the capture itself and says what it found: a room that
+closes too perfectly to mean anything, a wall that belongs to the room next
+door, a door height the scan probably got wrong, a wall no photograph shows.
+Those checks used to be a Python script somebody had to run in a terminal. They
+are in the app now, because the app put the file there.
 
 ## Why the correction screens are a web view
 
-There is one measurement engine and it is the one with tests against it.
-Nanometre integers, the provenance rules, the solver, zones, obstruction, the
-issue guard — writing all of that a second time in Swift would mean maintaining
-two models in two languages and fixing every bug twice. Small products die of
-that. So capture is native, because capture has to be, and everything after it
-is `web/`, running locally inside the app with no network access at all.
+One measurement engine. Nanometre integers, the provenance rules, the solver,
+zones, obstruction, the issue guard — writing all of that a second time in Swift
+would mean two models in two languages and every bug fixed twice. So capture is
+native, because capture has to be, and everything after it is `web/`, running
+locally inside the app with no network access at all.
 
-## What a scan looks like on disk
+## What a capture looks like on disk
 
 ```
 Documents/Scans/Kitchen 2026-08-21 1412/
-  room.json      Apple's CapturedRoom, exactly as RoomPlan encodes it
-  photos.json    one line per photograph: the pose, the lens, the trigger
-  photos/        photo_00001.jpg …
-  room.usdz      Apple's 3D model, for Quick Look
+  room.json      Apple's CapturedRoom, exactly as RoomPlan encodes it   (scan)
+  photos.json    one line per photograph: the pose, the lens, the trigger (scan)
+  photos/        photo_00001.jpg …                                       (scan)
+  room.usdz      Apple's 3D model, for Quick Look                        (scan)
+  trace.json     the corners you tapped                               (measure)
 ```
 
-`room.json` is deliberately RoomPlan's own format rather than one of ours. The
-importer in `core` was written against two real RoomPlan exports and is tested
-against them, so writing anything else here would throw that verification away
-and start it again.
-
-## The one thing worth checking first
-
-When the first scan comes off the phone, run it through the same tool the
-reference scans went through:
-
-```bash
-python3 core/tools/inspect-roomplan.py "path/to/Kitchen 2026-08-21 1412"
-```
-
-It prints what the file actually contains — squareness, closure, thicknesses,
-opening sills, and whether the camera poses land inside the room. If our own
-capture disagrees with the two exports the model was built against, that is
-where it will show.
+Documents, so they appear in the Files app: a capture can be copied off, backed
+up, or sent to a client without Trueline running any server at all.

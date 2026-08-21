@@ -15,9 +15,12 @@ final class ProjectStore: ObservableObject {
         let folder: URL
         let name: String
         let modified: Date
-        /// True when the folder holds a room. A folder without one is a scan
-        /// that failed, and it is listed as that rather than hidden.
+        /// True when the folder holds something openable — a scanned room or a
+        /// walked trace. A folder with neither is a capture that failed, and it
+        /// is listed as that rather than hidden.
         let hasRoom: Bool
+        /// Which way it was captured, for the line under its name.
+        let kind: String
 
         var id: URL { folder }
     }
@@ -52,7 +55,12 @@ final class ProjectStore: ObservableObject {
                         .contentModificationDate) ?? .distantPast,
                     hasRoom: FileManager.default.fileExists(
                         atPath: folder.appendingPathComponent("room.json").path
-                    )
+                    ) || FileManager.default.fileExists(
+                        atPath: folder.appendingPathComponent("trace.json").path
+                    ),
+                    kind: FileManager.default.fileExists(
+                        atPath: folder.appendingPathComponent("room.json").path
+                    ) ? "scanned" : "walked"
                 )
             }
             .sorted { $0.modified > $1.modified }
@@ -63,13 +71,19 @@ final class ProjectStore: ObservableObject {
         refresh()
     }
 
-    /// Reads a scan back off disk. Returns nil rather than a half-scan.
+    /// Reads a capture back off disk. Returns nil rather than half of one.
     func load(_ entry: Entry) -> SavedScan? {
-        guard
-            let room = try? Data(contentsOf: entry.folder.appendingPathComponent("room.json"))
-        else { return nil }
+        let room = (try? Data(contentsOf: entry.folder.appendingPathComponent("room.json"))) ?? Data()
+        let trace = (try? Data(contentsOf: entry.folder.appendingPathComponent("trace.json"))) ?? Data()
+        guard !room.isEmpty || !trace.isEmpty else { return nil }
         let photos = (try? Data(contentsOf: entry.folder.appendingPathComponent("photos.json")))
             ?? Data(#"{"schema":"trueline.photos.v1","capturedAt":"","device":"","photos":[]}"#.utf8)
-        return SavedScan(folder: entry.folder, title: entry.name, roomJSON: room, photosJSON: photos)
+        return SavedScan(
+            folder: entry.folder,
+            title: entry.name,
+            roomJSON: room,
+            photosJSON: photos,
+            traceJSON: trace
+        )
     }
 }

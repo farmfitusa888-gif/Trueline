@@ -4,6 +4,8 @@ import { type Room, isDiagonal, runLength } from '../../core/src/room.ts';
 import type { ImportReport } from '../../core/src/import-roomplan.ts';
 import { type Readiness, trustLabel } from '../../core/src/issue.ts';
 import { type PunchListItem, type WallObstruction, describe } from '../../core/src/obstruction.ts';
+import { checkCapture } from '../../core/src/health.ts';
+import type { Photo } from '../../core/src/photo.ts';
 
 /**
  * What the import decided, and what to do about each one.
@@ -21,10 +23,12 @@ export interface CorrectionsProps {
   readonly readiness: Readiness;
   readonly obstructions: readonly WallObstruction[];
   readonly punchList: readonly PunchListItem[];
+  readonly photos: readonly Photo[];
   readonly selected: string | null;
   readonly onSelect: (wallId: string) => void;
   readonly onMake: (wallId: string, as: 'wall' | 'open' | 'cased') => void;
 }
+
 
 function Card({ tone, title, children }: { tone: 'do' | 'note' | 'stop'; title: string; children: React.ReactNode }) {
   const border =
@@ -56,11 +60,15 @@ export function Corrections({
   readiness,
   obstructions,
   punchList,
+  photos,
   selected,
   onSelect,
   onMake,
 }: CorrectionsProps) {
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
+  // The same checks the command-line tool ran, on screen, because the app put
+  // the file here and should be the one to say whether it is any good.
+  const findings = checkCapture({ room, report, photos });
   const openSpans = room.walls.filter((w) => w.open);
   const inTheWay = obstructions.filter((o) => o.blockedLength > 0n);
 
@@ -84,6 +92,33 @@ export function Corrections({
           </ul>
         )}
       </Card>
+
+      {findings.length > 0 && (
+        <Card
+          tone={findings.some((f) => f.severity === 'stop') ? 'stop' : 'do'}
+          title={`What this capture looks like — ${findings.length} thing${findings.length === 1 ? '' : 's'} to know`}
+        >
+          <ul className="space-y-3">
+            {findings.map((finding) => (
+              <li key={finding.what}>
+                <span
+                  className={`mr-2 rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+                    finding.severity === 'stop'
+                      ? 'bg-red-100 text-red-800'
+                      : finding.severity === 'check'
+                        ? 'bg-amber-100 text-amber-900'
+                        : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {finding.severity}
+                </span>
+                <span className="font-medium text-slate-900">{finding.what}</span>
+                <span className="block text-slate-600">{finding.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {punchList.length > 0 && (
         <Card tone="do" title="Measure these first">

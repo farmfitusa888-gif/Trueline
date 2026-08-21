@@ -86,12 +86,30 @@ final class ScanModel: ObservableObject {
     }
 }
 
-/// A scan that is on disk, and therefore safe to look at.
+/// A capture that is on disk, and therefore safe to look at.
+///
+/// One type for all the capture modes on purpose. A LiDAR scan carries a room
+/// and photographs; an AR measure carries a trace. What happens next — the plan,
+/// the corrections, the tape — is identical, so nothing downstream has to ask
+/// which it was.
 struct SavedScan: Identifiable, Hashable {
     let folder: URL
     let title: String
+    /// RoomPlan's CapturedRoom. Empty for a walked room.
     let roomJSON: Data
+    /// The photo manifest. Empty for a walked room.
     let photosJSON: Data
+    /// The corners somebody tapped. Empty for a LiDAR scan.
+    let traceJSON: Data
+
+    init(folder: URL, title: String, roomJSON: Data, photosJSON: Data, traceJSON: Data = Data()) {
+        self.folder = folder
+        self.title = title
+        self.roomJSON = roomJSON
+        self.photosJSON = photosJSON
+        self.traceJSON = traceJSON
+    }
 
     var id: URL { folder }
+    var isTrace: Bool { !traceJSON.isEmpty }
 }

@@ -1,4 +1,6 @@
-import { parseLength } from '../../core/src/length.ts';
+import { fromJSON, parseLength } from '../../core/src/length.ts';
+import { scanned } from '../../core/src/measurement.ts';
+import { type TracedCorner, roomFromCorners } from '../../core/src/trace.ts';
 import type { Room } from '../../core/src/room.ts';
 import type { ImportReport } from '../../core/src/import-roomplan.ts';
 import { importRoomPlan } from '../../core/src/import-roomplan.ts';
@@ -63,6 +65,7 @@ export const EMPTY: State = { loaded: null, error: null, selected: null };
 export type Action =
   | { type: 'open'; json: unknown; fileName: string; at: string; photos?: unknown }
   | { type: 'restore' }
+  | { type: 'openTrace'; trace: unknown; fileName: string; at: string }
   | { type: 'select'; wallId: string | null }
   | { type: 'make'; wallId: string; as: 'wall' | 'open' | 'cased' }
   | { type: 'verify'; wallId: string; text: string; by: string; at: string }
@@ -125,6 +128,62 @@ export function reduce(state: State, action: Action): State {
             footprints,
             photos,
             frame,
+            undo: [],
+            lastEdit: null,
+            fileName: action.fileName,
+          },
+        };
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    // A room somebody walked with AR, or traced off a drawing. Different hands,
+    // different sensors, same room from here on: the same plan, the same solver,
+    // the same refusal to be issued until a tape has been on it.
+    case 'openTrace': {
+      try {
+        const payload = action.trace as {
+          corners?: readonly TracedCorner[];
+          closingRetap?: boolean;
+          source?: 'ar' | 'plan';
+          tolerance?: string;
+        };
+        if (!payload?.corners) throw new Error('That trace has no corners in it.');
+
+        const { room, report } = roomFromCorners(payload.corners, {
+          name: action.fileName,
+          at: action.at,
+          source: payload.source ?? 'ar',
+          ceilingHeight: scanned(parseLength(`8'`), parseLength(`6"`), action.at, 'assumed'),
+          ...(payload.closingRetap ? { closingRetap: true } : {}),
+          ...(payload.tolerance ? { tolerance: fromJSON(payload.tolerance) } : {}),
+        });
+
+        return {
+          selected: null,
+          error: null,
+          loaded: {
+            room,
+            // A walked room has no importer report, so it carries an empty one
+            // rather than a fabricated one: nothing was dropped, nothing was
+            // straightened off a polygon, because there was no polygon.
+            report: {
+              sourceVersion: undefined,
+              walls: room.walls.map((w) => w.id),
+              openSpans: [],
+              dropped: [],
+              snapped: [],
+              diagonals: report.diagonals,
+              closureBeforeSolving: report.closureBeforeSolving,
+              openings: [],
+              recoveredSills: [],
+              sourceIds: [],
+              notes: report.notes,
+            },
+            footprints: [],
+            photos: [],
+            frame: { datum: { x: 1, y: 0 }, referenceOriginTransform: null },
             undo: [],
             lastEdit: null,
             fileName: action.fileName,

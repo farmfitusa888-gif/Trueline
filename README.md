@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **267 passing, 0 failing** (`npm test`) |
+| Tests | **283 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -114,7 +114,18 @@ correction screens running in a web view inside the same app. One measurement en
 **It has not been compiled** — this repository is developed on Linux, where there is no Xcode —
 so it needs a first build on a Mac. `ios/README.md` has the steps.
 
-Not built yet: AR measure without LiDAR, manual draw's screen, the API, accounts, exports.
+**AR measure is built too** — for a phone with no LiDAR: tap each corner, walk to the next, and
+finish by tapping the first corner again. That closing tap is not part of the room; it is the
+measurement of how well the pointing went, and it is where the band on every wall comes from.
+Nobody publishes how accurately a person can place a point in AR by eye, so rather than invent a
+figure, the app asks you to produce one.
+
+Either way the room is corrected identically — same plan, same solver, same words. **How a room
+was captured changes nothing about how it is corrected.**
+
+`ios/Trueline.xcodeproj` is checked in: open it, set your signing team, press Run.
+
+Not built yet: manual draw's screen, the API, accounts, exports.
 
 ```bash
 cd trueline && npm install && npm test && npm run typecheck

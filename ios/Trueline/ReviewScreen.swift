@@ -10,7 +10,12 @@ struct ReviewScreen: View {
     @State private var sharing = false
 
     var body: some View {
-        CorrectView(roomJSON: scan.roomJSON, photosJSON: scan.photosJSON, title: scan.title)
+        CorrectView(
+            roomJSON: scan.roomJSON,
+            photosJSON: scan.photosJSON,
+            traceJSON: scan.traceJSON,
+            title: scan.title
+        )
             .ignoresSafeArea(.container, edges: .bottom)
             .navigationTitle(scan.title)
             .navigationBarTitleDisplayMode(.inline)

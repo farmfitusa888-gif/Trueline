@@ -1113,6 +1113,96 @@ toolchain and no Xcode. It has been checked by reading, its two file formats are
 read by code that is tested against real data, and it will not be called working
 until it runs on a phone.
 
+## One app, two ways in, one way to correct
+
+Sam asked whether typing a tape measurement is the process in the new app, and whether it is the
+same however the room was captured. **Yes, and it is the most important promise the product
+makes.** Written down so it stays true:
+
+> **How a room was captured changes nothing about how it is corrected.**
+
+A LiDAR scan, an AR walk, a traced drawing and a hand-drawn plan all become the same `Room`.
+From there it is one plan, one solver, one `verifyWall`, one punch list, one issue guard, one set
+of words. Tap a wall, type what your tape says, and every other unverified wall moves in
+proportion to how unsure its source was — while the one you measured never moves again.
+
+The only thing that differs is **where the band comes from before anybody measures**, and that is
+a fact about the sensor rather than about the room:
+
+| Capture | Band on an unmeasured wall | Where that number comes from |
+|---|---|---|
+| LiDAR scan | 50 mm | Apple's published figure for RoomPlan |
+| AR measure | whatever your closing tap missed by | **your own session** |
+| Traced plan | supplied by the caller | the drawing's own scale, or a stated assumption |
+| Hand-drawn | none — typed is verified | the person typing it |
+
+## AR measure — built, and where its tolerance comes from
+
+`core/src/trace.ts`, 16 tests. Without a depth sensor there is no scanning; there is a tracked
+camera and a floor plane. So the room is **walked**: aim the reticle at the foot of a corner,
+tap, walk to the next, tap.
+
+The hard question was the tolerance. Nobody publishes how accurately a person can place a point
+in AR by eye, and this codebase does not invent numbers. So the app asks the person to produce
+one: **walk back to the corner you started at and tap it again.** The gap between the first tap
+and the last is a measurement of how badly the pointing went, taken with the same hand, the same
+phone and the same room.
+
+That gap becomes the band on every wall — the **whole** gap, not a share of it, because any one
+corner could account for all of it. A bound rather than an average, which is how tolerances
+already add everywhere else here. Tap within an inch and every wall carries an inch; tap within a
+foot and every wall carries a foot, and the punch list says so.
+
+A trace with no closing tap has no such evidence, and then the caller must supply the tolerance.
+There is no default, because a default would be a number nobody measured.
+
+**The squareness test is deliberately looser than the importer's.** RoomPlan snaps its walls to a
+grid before anyone sees them, so a scanned wall arrives square to a thousandth of a degree. A
+person aiming a phone at a skirting board does not. `TRACE_SQUARE_RATIO` is 20 — 2.86 degrees,
+or seven inches of sideways error across a twelve foot wall — because calling a wobbly aim an
+angled wall would fill a plan with corners nobody built. A real 3-4-5 chamfer is 36.9 degrees
+off, thirteen times outside the line, and survives.
+
+Taps that land mid-wall are folded in rather than becoming a corner that is not there.
+
+## The scan check moved into the app
+
+There was a Python script for reading a capture and saying what it actually contained. It earned
+its place — it found two of the room model's assumptions wrong and a missing field. But Sam is
+right that asking somebody who has just walked a room with a phone to go and run a Python script
+is asking the wrong person to do the wrong thing. **The app put the file there, so the app says
+whether it is any good.**
+
+`core/src/health.ts` holds the checks, so the app and the tool both reach the same ones and they
+are tested. Run against the two real scans it produces, with no terminal involved:
+
+- *kitchen* — **stop**: closes perfectly and that means nothing yet. **check**: one wall left out
+  of this room; two edges with no wall across. **note**: one wall at a real angle; one sill
+  worked out rather than read; thickness is not in the file at all.
+- *garage* — **stop**: the same closure warning. **check**: one edge with no wall across; **one
+  door height the scan probably got wrong (5'7")**. **note**: an edge straightened by 28 mm.
+
+The door finding is the one to point at. Nothing told it that 5'7" was wrong — it knows a door is
+nearly always 6'8", and it knows that scanned door heights came back out by more than a foot in
+both directions on two real scans, so it says so before anybody orders one.
+
+Severities are `stop`, `check` and `note`, and there is no score out of ten. "87%" tells a
+contractor nothing; "the counter wall is the one to tape" tells him what to do next.
+
+## The Xcode project is checked in
+
+It was going to be `brew install xcodegen && xcodegen`, and Sam is right that that is two steps
+too many when the thing he wants is to put the app on his phone. `ios/Trueline.xcodeproj` is in
+the repository. Open it, set the signing team, press Run.
+
+The object ids in it are derived from file names by hash rather than being random, so
+regenerating the file produces the same ids and a diff stays readable — which is the one thing
+that normally makes a checked-in `.pbxproj` unbearable.
+
+**It has not been opened by Xcode.** Braces and parentheses balance, every id is distinct, the
+`Info.plist` parses as a plist and the scheme parses as XML — all checked here. That is not the
+same as Xcode opening it, and it will not be called working until it does.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.

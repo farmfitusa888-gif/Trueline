@@ -1,4 +1,4 @@
-Trueline.xcodeproj/
 Trueline/Web/
 *.xcuserdatad
+xcuserdata/
 DerivedData/

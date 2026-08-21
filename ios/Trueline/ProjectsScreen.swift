@@ -17,8 +17,28 @@ struct ProjectsScreen: View {
         List {
             Section {
                 NavigationLink(value: Route.newScan) {
-                    Label("Scan a room", systemImage: "camera.viewfinder")
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Scan a room", systemImage: "camera.viewfinder")
+                            .font(.headline)
+                        Text(
+                            ARMeasureSession.hasLiDAR
+                            ? "Walk it and the phone finds the walls"
+                            : "Needs LiDAR — this phone does not have it"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(!ARMeasureSession.hasLiDAR)
+
+                NavigationLink(value: Route.newMeasure) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Measure a room", systemImage: "ruler")
+                            .font(.headline)
+                        Text("Tap each corner. Works on any phone.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -33,8 +53,12 @@ struct ProjectsScreen: View {
                         NavigationLink(value: Route.open(entry)) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(entry.name)
-                                if !entry.hasRoom {
-                                    Text("No room in this one — the scan did not finish")
+                                if entry.hasRoom {
+                                    Text(entry.kind)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Text("Nothing in this one — the capture did not finish")
                                         .font(.caption)
                                         .foregroundStyle(.orange)
                                 }
@@ -61,11 +85,13 @@ struct ProjectsScreen: View {
             switch route {
             case .newScan:
                 ScanScreen(store: store)
+            case .newMeasure:
+                ARMeasureScreen(store: store)
             case .open(let entry):
                 if let scan = store.load(entry) {
                     ReviewScreen(scan: scan)
                 } else {
-                    Text("That scan could not be read. Its room.json is missing or damaged.")
+                    Text("That capture could not be read. Its room.json or trace.json is missing.")
                         .padding()
                 }
             }
@@ -75,6 +101,7 @@ struct ProjectsScreen: View {
 
     enum Route: Hashable {
         case newScan
+        case newMeasure
         case open(ProjectStore.Entry)
     }
 }

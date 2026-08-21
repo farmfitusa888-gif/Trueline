@@ -1,0 +1,320 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3D10EAA50BB9071F0948FA /* TruelineApp.swift */; };
+		D11C22FC215A4E923A59B0BC /* ProjectsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C95EB9D0408516F5196654B /* ProjectsScreen.swift */; };
+		1C5A53064896C146AD8102A9 /* ScanScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 526EEAB90E3FE1E06A054578 /* ScanScreen.swift */; };
+		E708DD26ECD9A8F5CD07693C /* ScanSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09949C9144142DEB51D75388 /* ScanSession.swift */; };
+		75EB0CFACCF12A685E27AAF6 /* ScanModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37FE98214E5BB1F976B7DE3D /* ScanModel.swift */; };
+		1A900FE60EC51B678AB94A8D /* PhotoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFB7BC726C809BD4D681F543 /* PhotoRecorder.swift */; };
+		12C2D6E24A9059EF024B0FA5 /* CaptureWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB063A9A08F05B2DDAA4654 /* CaptureWriter.swift */; };
+		AA260F0E93691C4A3C9C1EC9 /* CorrectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460D40E495FCE69129EABC93 /* CorrectView.swift */; };
+		77B17BD5DF3DB71DB30B2051 /* ReviewScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D61DD1CFB8FB286B4B069B49 /* ReviewScreen.swift */; };
+		EA71B27A7ABBC5636C814E76 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EEF929913A019B6EF3676D8 /* ProjectStore.swift */; };
+		8415AFC98E5A8D7F6B451EA2 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B034E399CFA50DECE5A534F /* Formatting.swift */; };
+		2B2C86015441414F9BB466BA /* ARMeasureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5C4BF998E1E466D06BC498 /* ARMeasureSession.swift */; };
+		B46E3F93D22737C0C82E1FE9 /* ARMeasureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223C314C178BBF05B8D8EC70 /* ARMeasureScreen.swift */; };
+		EB11C2DB17EE95B2B3345113 /* ARMeasureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE28D0C5C19BF5AD12E5F77E /* ARMeasureModel.swift */; };
+		037B80EBAC15037FEE5F7325 /* Web in Resources */ = {isa = PBXBuildFile; fileRef = DA1B9D64EFC2ED4C64672F34 /* Web */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		FD3D10EAA50BB9071F0948FA /* TruelineApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TruelineApp.swift; sourceTree = "<group>"; };
+		4C95EB9D0408516F5196654B /* ProjectsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsScreen.swift; sourceTree = "<group>"; };
+		526EEAB90E3FE1E06A054578 /* ScanScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanScreen.swift; sourceTree = "<group>"; };
+		09949C9144142DEB51D75388 /* ScanSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSession.swift; sourceTree = "<group>"; };
+		37FE98214E5BB1F976B7DE3D /* ScanModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanModel.swift; sourceTree = "<group>"; };
+		CFB7BC726C809BD4D681F543 /* PhotoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoRecorder.swift; sourceTree = "<group>"; };
+		AFB063A9A08F05B2DDAA4654 /* CaptureWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureWriter.swift; sourceTree = "<group>"; };
+		460D40E495FCE69129EABC93 /* CorrectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrectView.swift; sourceTree = "<group>"; };
+		D61DD1CFB8FB286B4B069B49 /* ReviewScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewScreen.swift; sourceTree = "<group>"; };
+		5EEF929913A019B6EF3676D8 /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
+		5B034E399CFA50DECE5A534F /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
+		0F5C4BF998E1E466D06BC498 /* ARMeasureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeasureSession.swift; sourceTree = "<group>"; };
+		223C314C178BBF05B8D8EC70 /* ARMeasureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeasureScreen.swift; sourceTree = "<group>"; };
+		AE28D0C5C19BF5AD12E5F77E /* ARMeasureModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeasureModel.swift; sourceTree = "<group>"; };
+		E4E6D7EFB44C842A7A9609C6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		DA1B9D64EFC2ED4C64672F34 /* Web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Web; sourceTree = "<group>"; };
+		38A007151ABE87CC01A5B6E9 /* Trueline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Trueline.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		69BE8A4D8E4D9DA4E7DB3928 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		E50290A24C49A459B43487C5 = {
+			isa = PBXGroup;
+			children = (
+				69893B3804EF5FDC735E0813 /* Trueline */,
+				328EC33DF3954DC9B83FA285 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		69893B3804EF5FDC735E0813 /* Trueline */ = {
+			isa = PBXGroup;
+			children = (
+				FD3D10EAA50BB9071F0948FA /* TruelineApp.swift */,
+				4C95EB9D0408516F5196654B /* ProjectsScreen.swift */,
+				526EEAB90E3FE1E06A054578 /* ScanScreen.swift */,
+				09949C9144142DEB51D75388 /* ScanSession.swift */,
+				37FE98214E5BB1F976B7DE3D /* ScanModel.swift */,
+				CFB7BC726C809BD4D681F543 /* PhotoRecorder.swift */,
+				AFB063A9A08F05B2DDAA4654 /* CaptureWriter.swift */,
+				460D40E495FCE69129EABC93 /* CorrectView.swift */,
+				D61DD1CFB8FB286B4B069B49 /* ReviewScreen.swift */,
+				5EEF929913A019B6EF3676D8 /* ProjectStore.swift */,
+				5B034E399CFA50DECE5A534F /* Formatting.swift */,
+				0F5C4BF998E1E466D06BC498 /* ARMeasureSession.swift */,
+				223C314C178BBF05B8D8EC70 /* ARMeasureScreen.swift */,
+				AE28D0C5C19BF5AD12E5F77E /* ARMeasureModel.swift */,
+				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
+				DA1B9D64EFC2ED4C64672F34 /* Web */,
+			);
+			path = Trueline;
+			sourceTree = "<group>";
+		};
+		328EC33DF3954DC9B83FA285 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				38A007151ABE87CC01A5B6E9 /* Trueline.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0E8A3AD980EC179856012B7E /* Trueline */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A4C54DBBEE4CD1F0693131A9 /* Build configuration list for PBXNativeTarget "Trueline" */;
+			buildPhases = (
+				1831018E9342F843855DC422 /* Build the web app */,
+				4E57AE888889001C06A4F7E8 /* Sources */,
+				69BE8A4D8E4D9DA4E7DB3928 /* Frameworks */,
+				D6C9E8A172005E68A1DD674F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Trueline;
+			productName = Trueline;
+			productReference = 38A007151ABE87CC01A5B6E9 /* Trueline.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		98F54143AB4E86B28C3AFEE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					0E8A3AD980EC179856012B7E = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = D3AFF16135CE7066D577B464 /* Build configuration list for PBXProject "Trueline" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = E50290A24C49A459B43487C5;
+			productRefGroup = 328EC33DF3954DC9B83FA285 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0E8A3AD980EC179856012B7E /* Trueline */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D6C9E8A172005E68A1DD674F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				037B80EBAC15037FEE5F7325 /* Web in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1831018E9342F843855DC422 /* Build the web app */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build the web app";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n# Xcode's PATH has neither Homebrew nor nvm on it, so look where a login\n# shell would rather than assuming.\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH\"\nROOT=\"$SRCROOT/..\"\nif ! command -v npm >/dev/null 2>&1; then\n  echo \"warning: npm not found - using whatever is already in Trueline/Web\"\n  exit 0\nfi\n( cd \"$ROOT\" && npm install --silent && npm run build --silent )\nrm -rf \"$SRCROOT/Trueline/Web\"\nmkdir -p \"$SRCROOT/Trueline/Web\"\ncp -R \"$ROOT/web/dist/.\" \"$SRCROOT/Trueline/Web/\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4E57AE888889001C06A4F7E8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */,
+				D11C22FC215A4E923A59B0BC /* ProjectsScreen.swift in Sources */,
+				1C5A53064896C146AD8102A9 /* ScanScreen.swift in Sources */,
+				E708DD26ECD9A8F5CD07693C /* ScanSession.swift in Sources */,
+				75EB0CFACCF12A685E27AAF6 /* ScanModel.swift in Sources */,
+				1A900FE60EC51B678AB94A8D /* PhotoRecorder.swift in Sources */,
+				12C2D6E24A9059EF024B0FA5 /* CaptureWriter.swift in Sources */,
+				AA260F0E93691C4A3C9C1EC9 /* CorrectView.swift in Sources */,
+				77B17BD5DF3DB71DB30B2051 /* ReviewScreen.swift in Sources */,
+				EA71B27A7ABBC5636C814E76 /* ProjectStore.swift in Sources */,
+				8415AFC98E5A8D7F6B451EA2 /* Formatting.swift in Sources */,
+				2B2C86015441414F9BB466BA /* ARMeasureSession.swift in Sources */,
+				B46E3F93D22737C0C82E1FE9 /* ARMeasureScreen.swift in Sources */,
+				EB11C2DB17EE95B2B3345113 /* ARMeasureModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		32FAAECAC742100F7753F0C1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		01F561AC4AB15D6A23A57976 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		7082CC0B6FC1282FCEABD07A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Trueline/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.trueline.Trueline;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		639A7CA24D39909E713B47F7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Trueline/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.trueline.Trueline;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D3AFF16135CE7066D577B464 /* Build configuration list for PBXProject "Trueline" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				32FAAECAC742100F7753F0C1 /* Debug */,
+				01F561AC4AB15D6A23A57976 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A4C54DBBEE4CD1F0693131A9 /* Build configuration list for PBXNativeTarget "Trueline" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7082CC0B6FC1282FCEABD07A /* Debug */,
+				639A7CA24D39909E713B47F7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+}
