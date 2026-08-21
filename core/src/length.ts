@@ -327,3 +327,46 @@ export function fromJSON(value: string): Nanometres {
   }
   return BigInt(value);
 }
+
+/**
+ * Integer square root, rounded to the nearest nanometre.
+ *
+ * Needed because a wall that runs at an angle has a length that is almost never
+ * a whole number of anything. Its run — the exact offsets that make the room
+ * close — stays exact integers; the *length* printed on the drawing is this.
+ *
+ * Newton's method on bigints, so there is no float anywhere in it and the answer
+ * is the same on every machine. The result is within half a nanometre of the
+ * true root, which is 5 x 10^-10 metres, about one twenty-millionth of an inch.
+ */
+export function isqrt(value: bigint): bigint {
+  if (value < 0n) throw new LengthError(`No square root of ${value}: lengths do not go negative.`);
+  if (value < 2n) return value;
+
+  // Start from a power of two at least as large as the root, so the iteration
+  // only ever descends and cannot loop.
+  let guess = 1n << (BigInt(value.toString(2).length) / 2n + 1n);
+  let next = (guess + value / guess) / 2n;
+  while (next < guess) {
+    guess = next;
+    next = (guess + value / guess) / 2n;
+  }
+  // `guess` is now floor(sqrt(value)). Round to nearest: go up when the halfway
+  // point is behind us, compared without ever forming a fraction.
+  return (guess * guess + guess) < value ? guess + 1n : guess;
+}
+
+/** The straight-line distance between two exact offsets, to the nearest nanometre. */
+export function hypotenuse(x: Nanometres, y: Nanometres): Nanometres {
+  return isqrt(x * x + y * y);
+}
+
+/** Division rounded to the nearest integer, halves away from zero, no floats. */
+export function roundDiv(numerator: bigint, denominator: bigint): bigint {
+  if (denominator === 0n) throw new LengthError('Division by zero.');
+  const negative = numerator < 0n !== denominator < 0n;
+  const a = numerator < 0n ? -numerator : numerator;
+  const b = denominator < 0n ? -denominator : denominator;
+  const q = (2n * a + b) / (2n * b);
+  return negative ? -q : q;
+}

@@ -1,4 +1,4 @@
-import { type Nanometres, add } from './length.ts';
+import { type Nanometres, add, hypotenuse } from './length.ts';
 import { type Measurement, toleranceOf } from './measurement.ts';
 import { type Point, type Room, type Wall, RoomError, area, corners, validate } from './room.ts';
 
@@ -65,32 +65,38 @@ export class ZoneError extends RoomError {}
 
 /* ------------------------------------------------------------------ helpers */
 
+/**
+ * How long a segment is.
+ *
+ * Axis-aligned segments — nearly all of them — are exact subtraction. A segment
+ * that runs at an angle takes the integer square root, which is the same
+ * rounding the wall it lies on already carries.
+ */
 function len(a: Point, b: Point): Nanometres {
   const dx = a.x > b.x ? a.x - b.x : b.x - a.x;
   const dy = a.y > b.y ? a.y - b.y : b.y - a.y;
-  if (dx !== 0n && dy !== 0n) {
-    throw new ZoneError('This model only handles rectilinear edges; that segment runs diagonally.');
-  }
-  return dx + dy;
+  if (dx === 0n || dy === 0n) return dx + dy;
+  return hypotenuse(dx, dy);
 }
 
 function same(a: Point, b: Point): boolean {
   return a.x === b.x && a.y === b.y;
 }
 
-/** Exact, because both the outline and the boundary are axis-aligned integers. */
+/**
+ * Is the point on the segment?
+ *
+ * Exact, and exact for angled segments too: the cross product is zero only when
+ * the three points are truly collinear, and the bounding-box test then decides
+ * whether the point is between the ends rather than out along the line. No
+ * division, so no rounding, so a corner is never "nearly" on a wall.
+ */
 function onSegment(p: Point, a: Point, b: Point): boolean {
-  if (a.x === b.x && p.x === a.x) {
-    const lo = a.y < b.y ? a.y : b.y;
-    const hi = a.y < b.y ? b.y : a.y;
-    return p.y >= lo && p.y <= hi;
-  }
-  if (a.y === b.y && p.y === a.y) {
-    const lo = a.x < b.x ? a.x : b.x;
-    const hi = a.x < b.x ? b.x : a.x;
-    return p.x >= lo && p.x <= hi;
-  }
-  return false;
+  const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+  if (cross !== 0n) return false;
+  const withinX = p.x >= (a.x < b.x ? a.x : b.x) && p.x <= (a.x < b.x ? b.x : a.x);
+  const withinY = p.y >= (a.y < b.y ? a.y : b.y) && p.y <= (a.y < b.y ? b.y : a.y);
+  return withinX && withinY;
 }
 
 interface Outline {

@@ -5,6 +5,8 @@ import {
   abs,
   add,
   formatFeetInches,
+  hypotenuse,
+  isqrt,
 } from './length.ts';
 import {
   type Measurement,
@@ -24,11 +26,20 @@ import {
  * fact that walking them must return you to where you started, and a correction
  * is a change to that system rather than to one field.
  *
- * This solver handles rectilinear rooms — every wall running square to the ones
- * either side of it. That is the overwhelming majority of interior rooms, and
- * the constraint reduces to two exact equations rather than a numerical fit:
- * the east-west runs must cancel, and so must the north-south ones. Angled and
- * curved walls need a different solver and do not pretend to work here.
+ * Rooms here are rectilinear with named exceptions. Almost every wall runs square
+ * to the ones either side of it, which reduces closure to two exact equations
+ * rather than a numerical fit: the east-west runs must cancel, and so must the
+ * north-south ones. That is not a simplification — it is what a real scan looks
+ * like. Seven of the eight walls in Sam's kitchen are square to within a
+ * thousandth of a degree, and all five of the garage's are.
+ *
+ * The eighth is a 203 mm corner chamfer at 70.4 degrees, and it is ordinary
+ * rather than exotic, so a wall may also be a `Diagonal`: an exact run in x and
+ * y, held fixed while the square walls absorb the room's error. That keeps both
+ * halves honest. The square walls stay exactly solvable, and the chamfer stays a
+ * chamfer instead of being quietly absorbed into its neighbours.
+ *
+ * Curved walls still need a different solver and do not pretend to work here.
  *
  * Who absorbs the error is the whole point:
  *
@@ -50,6 +61,103 @@ const AXIS: Record<Heading, 'x' | 'y'> = {
 const SIGN: Record<Heading, 1n | -1n> = {
   east: 1n, north: 1n, west: -1n, south: -1n,
 };
+
+/**
+ * A wall that does not run along an axis.
+ *
+ * The run is the truth. A direction like 70.441 degrees has no exact
+ * representation in any number of decimal places, so storing an angle and a
+ * length would mean the room's corners depended on a rounding. Storing the run —
+ * the exact whole-nanometre offset from this wall's first corner to its second —
+ * means the closure sum stays exact integers, which is the one property the
+ * whole model rests on.
+ *
+ * The length on the drawing is then derived from the run, to the nearest
+ * nanometre. That is a rounding, and it is the honest place to put one: a number
+ * shown to a person, at a precision five thousand times finer than the best tape.
+ */
+export interface Diagonal {
+  readonly kind: 'diagonal';
+  readonly run: { readonly x: Nanometres; readonly y: Nanometres };
+}
+
+export type Direction = Heading | Diagonal;
+
+export function isDiagonal(direction: Direction): direction is Diagonal {
+  return typeof direction !== 'string';
+}
+
+/**
+ * How far a run's length may sit from the `length` recorded against it.
+ *
+ * Building a diagonal from a length and a direction rounds twice — once turning
+ * the direction into whole nanometres, once taking the square root — so the two
+ * can disagree by a few nanometres. Four nanometres is four billionths of a
+ * metre, about one six-millionth of an inch. Anything larger is a real
+ * disagreement and `validate()` refuses it.
+ */
+export const DIAGONAL_SLACK: Nanometres = 4n;
+
+/**
+ * A diagonal of a given length pointing a given way.
+ *
+ * `towards` is a direction, not a distance: any two integers with the right
+ * ratio will do, and the length decides how far it actually goes. That is what
+ * lets a person tape a chamfer, type 8 inches, and keep the angle the scan
+ * measured.
+ *
+ * The arithmetic stays in integers throughout. Each component is
+ * `sqrt(length^2 * towards^2 / (towards.x^2 + towards.y^2))`, taken with the
+ * integer root, which is the same on every machine and never drifts.
+ */
+export function diagonal(length: Nanometres, towards: { x: bigint; y: bigint }): Diagonal {
+  if (length <= 0n) {
+    throw new RoomError(`A diagonal wall of ${formatFeetInches(length)} runs nowhere.`);
+  }
+  if (towards.x === 0n && towards.y === 0n) {
+    throw new RoomError('A diagonal wall needs a direction; (0, 0) is not one.');
+  }
+  if (towards.x === 0n || towards.y === 0n) {
+    throw new RoomError(
+      `That direction runs straight ${towards.x === 0n ? 'north-south' : 'east-west'}, so it is a ` +
+        `plain wall with a heading, not a diagonal. Use the heading — it stays exact.`
+    );
+  }
+  const squared = towards.x * towards.x + towards.y * towards.y;
+  const component = (towards_: bigint): Nanometres => {
+    const magnitude = isqrt((length * length * towards_ * towards_) / squared);
+    return towards_ < 0n ? -magnitude : magnitude;
+  };
+  return { kind: 'diagonal', run: { x: component(towards.x), y: component(towards.y) } };
+}
+
+/** A diagonal straight from two known corners — what an importer has. */
+export function diagonalFromRun(x: Nanometres, y: Nanometres): Diagonal {
+  if (x === 0n || y === 0n) {
+    throw new RoomError(
+      `A run of (${x}, ${y}) is axis-aligned, so it is a plain wall with a heading, not a diagonal.`
+    );
+  }
+  return { kind: 'diagonal', run: { x, y } };
+}
+
+/** The exact offset a wall adds to the walk, whichever kind it is. */
+export function runOf(wall: Wall): Point {
+  if (isDiagonal(wall.heading)) return wall.heading.run;
+  const step = SIGN[wall.heading] * wall.length.value;
+  return AXIS[wall.heading] === 'x' ? { x: step, y: 0n } : { x: 0n, y: step };
+}
+
+/** The axis a wall runs along, or null when it runs along neither. */
+export function axisOf(wall: Wall): 'x' | 'y' | null {
+  return isDiagonal(wall.heading) ? null : AXIS[wall.heading];
+}
+
+/** How long a wall's run actually is, to the nearest nanometre. */
+export function runLength(wall: Wall): Nanometres {
+  const run = runOf(wall);
+  return isDiagonal(wall.heading) ? hypotenuse(run.x, run.y) : wall.length.value;
+}
 
 /**
  * A hole in a wall. Doors and cased openings interrupt the baseboard; windows do
@@ -84,7 +192,8 @@ export interface Opening {
 
 export interface Wall {
   readonly id: string;
-  readonly heading: Heading;
+  /** A compass heading for a square wall, or an exact run for one that is not. */
+  readonly heading: Direction;
   readonly length: Measurement;
   /**
    * Set only when this wall is not full height — a pony wall, a breakfast bar,
@@ -119,17 +228,31 @@ export class ClosureConflict extends RoomError {
   readonly axis: 'x' | 'y';
   readonly residual: Nanometres;
   readonly wallIds: readonly string[];
+  /** Diagonal walls the solver refused to stretch, if any were in the way. */
+  readonly heldDiagonals: readonly string[];
 
-  constructor(axis: 'x' | 'y', residual: Nanometres, wallIds: readonly string[]) {
+  constructor(
+    axis: 'x' | 'y',
+    residual: Nanometres,
+    wallIds: readonly string[],
+    heldDiagonals: readonly string[] = []
+  ) {
     super(
       `The ${axis === 'x' ? 'east-west' : 'north-south'} walls do not add up: they are out by ` +
         `${formatFeetInches(abs(residual))} and every one of them (${wallIds.join(', ')}) has been ` +
         `verified by a person. Two of these measurements disagree — re-check them rather than ` +
-        `letting the room close on a number nobody stands behind.`
+        `letting the room close on a number nobody stands behind.` +
+        (heldDiagonals.length > 0
+          ? ` The angled wall${heldDiagonals.length === 1 ? '' : 's'} ` +
+            `(${heldDiagonals.join(', ')}) ${heldDiagonals.length === 1 ? 'was' : 'were'} held ` +
+            `rather than stretched, because stretching one changes its angle. If the disagreement ` +
+            `is there, re-measure it.`
+          : '')
     );
     this.axis = axis;
     this.residual = residual;
     this.wallIds = wallIds;
+    this.heldDiagonals = heldDiagonals;
   }
 }
 
@@ -147,14 +270,37 @@ export function validate(room: Room): void {
       throw new RoomError(`Wall "${wall.id}" has a length of ${wall.length.value}nm. Walls run positive.`);
     }
   }
+  for (const wall of room.walls) {
+    if (!isDiagonal(wall.heading)) continue;
+    const { x, y } = wall.heading.run;
+    if (x === 0n || y === 0n) {
+      throw new RoomError(
+        `Wall "${wall.id}" is marked diagonal but runs (${x}, ${y}), which is along an axis. ` +
+          `Give it a heading instead; a heading stays exact.`
+      );
+    }
+    const actual = hypotenuse(x, y);
+    const stated = wall.length.value;
+    if (abs(actual - stated) > DIAGONAL_SLACK) {
+      throw new RoomError(
+        `Wall "${wall.id}" says it is ${formatFeetInches(stated)} long, but its run is ` +
+          `${formatFeetInches(actual)}. A diagonal's run and its length have to agree; ` +
+          `re-make it with diagonal() rather than editing one of the two.`
+      );
+    }
+  }
   for (let i = 0; i < room.walls.length; i += 1) {
     const here = room.walls[i]!;
     const next = room.walls[(i + 1) % room.walls.length]!;
-    if (AXIS[here.heading] === AXIS[next.heading]) {
+    // A diagonal may sit beside anything — that is what it is for. Two square
+    // walls in a row on the same axis are still a mistake: they are one wall
+    // written twice, and the solver would move both to fix one error.
+    const hereAxis = axisOf(here);
+    if (hereAxis !== null && hereAxis === axisOf(next)) {
       throw new RoomError(
-        `Walls "${here.id}" and "${next.id}" both run ${AXIS[here.heading] === 'x' ? 'east-west' : 'north-south'}. ` +
-          `In a rectilinear room every wall turns a corner into the next one. If this room has an ` +
-          `angled wall, it needs the general solver, which does not exist yet.`
+        `Walls "${here.id}" and "${next.id}" both run ${hereAxis === 'x' ? 'east-west' : 'north-south'}. ` +
+          `In a rectilinear room every wall turns a corner into the next one. If there is a real ` +
+          `angle between them, the wall carrying it is a diagonal — build it with diagonal().`
       );
     }
   }
@@ -170,9 +316,9 @@ export function corners(room: Room): Point[] {
   let y = 0n;
   for (const wall of room.walls) {
     points.push({ x, y });
-    const step = SIGN[wall.heading] * wall.length.value;
-    if (AXIS[wall.heading] === 'x') x += step;
-    else y += step;
+    const step = runOf(wall);
+    x += step.x;
+    y += step.y;
   }
   return points;
 }
@@ -186,9 +332,9 @@ export function closure(room: Room): { x: Nanometres; y: Nanometres } {
   let x = 0n;
   let y = 0n;
   for (const wall of room.walls) {
-    const step = SIGN[wall.heading] * wall.length.value;
-    if (AXIS[wall.heading] === 'x') x += step;
-    else y += step;
+    const step = runOf(wall);
+    x += step.x;
+    y += step.y;
   }
   return { x, y };
 }
@@ -259,11 +405,17 @@ function allocate(total: Nanometres, weights: readonly Nanometres[]): Nanometres
 function solveAxis(room: Room, axis: 'x' | 'y', residual: Nanometres): Adjustment[] {
   if (residual === 0n) return [];
 
-  const onAxis = room.walls.filter((w) => AXIS[w.heading] === axis);
+  // Diagonals are held. Stretching one along a single axis would change its
+  // angle, and the angle is a measurement too — a 70-degree chamfer that quietly
+  // becomes a 68-degree one to make the arithmetic work is exactly the silent
+  // drift this module exists to stop. A diagonal changes only when a person
+  // re-measures it.
+  const onAxis = room.walls.filter((w) => axisOf(w) === axis);
   const movable = onAxis.filter((w) => !isVerified(w.length));
 
   if (movable.length === 0) {
-    throw new ClosureConflict(axis, residual, onAxis.map((w) => w.id));
+    const held = room.walls.filter((w) => isDiagonal(w.heading)).map((w) => w.id);
+    throw new ClosureConflict(axis, residual, onAxis.map((w) => w.id), held);
   }
 
   // Each movable wall takes a share of the correction, weighted by how unsure
@@ -276,7 +428,7 @@ function solveAxis(room: Room, axis: 'x' | 'y', residual: Nanometres): Adjustmen
     // Lengthening an east wall pushes the walk east; lengthening a west wall
     // pushes it west. The share is a correction to the walk, so it turns into a
     // change of length through the wall's own sign.
-    const by = SIGN[wall.heading] * shares[i]!;
+    const by = SIGN[wall.heading as Heading] * shares[i]!;
     return {
       wallId: wall.id,
       by,
@@ -333,7 +485,7 @@ export function perimeter(room: Room): Measurement {
   validate(room);
   return derive(
     room.walls.map((w) => ({ name: w.id, measurement: w.length })),
-    add(...room.walls.map((w) => w.length.value))
+    add(...room.walls.map((w) => runLength(w)))
   );
 }
 
@@ -391,7 +543,7 @@ export function verificationPunchList(room: Room, limit = 5): { wallId: string; 
   validate(room);
   return room.walls
     .filter((w) => !isVerified(w.length))
-    .map((w) => ({ wallId: w.id, areaAtStake: w.length.value * toleranceOf(w.length) }))
+    .map((w) => ({ wallId: w.id, areaAtStake: runLength(w) * toleranceOf(w.length) }))
     .filter((w) => w.areaAtStake > 0n)
     .sort((a, b) => (a.areaAtStake === b.areaAtStake ? 0 : a.areaAtStake > b.areaAtStake ? -1 : 1))
     .slice(0, limit);

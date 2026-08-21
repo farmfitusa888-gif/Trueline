@@ -2,9 +2,10 @@ import { type Nanometres, formatFeetInches } from './length.ts';
 import { isVerified, toleranceOf } from './measurement.ts';
 import {
   type Room,
-  type Wall,
   RoomError,
+  axisOf,
   closes,
+  isDiagonal,
   validate,
   verificationPunchList,
 } from './room.ts';
@@ -48,13 +49,6 @@ export type Trust =
   | 'verified';
 
 export type Axis = 'x' | 'y';
-
-const AXIS_OF: Record<Wall['heading'], Axis> = {
-  east: 'x',
-  west: 'x',
-  north: 'y',
-  south: 'y',
-};
 
 const AXIS_NAME: Record<Axis, string> = {
   x: 'east-west',
@@ -112,7 +106,7 @@ export class NotIssuable extends RoomError {
 export function axisReadiness(room: Room): AxisReadiness[] {
   validate(room);
   return (['x', 'y'] as const).map((axis) => {
-    const onAxis = room.walls.filter((w) => AXIS_OF[w.heading] === axis);
+    const onAxis = room.walls.filter((w) => axisOf(w) === axis);
     return {
       axis,
       verified: onAxis.filter((w) => isVerified(w.length)).map((w) => w.id),
@@ -146,8 +140,11 @@ export function closedWithoutBeingChecked(room: Room): boolean {
  */
 export function unseenError(room: Room, axis: Axis): Nanometres {
   validate(room);
+  // A diagonal is counted against both axes. It runs in both, so an unverified
+  // one puts both dimensions in doubt — and counting it twice is the honest way
+  // round, since this number is an upper bound on what nobody has checked.
   return room.walls
-    .filter((w) => AXIS_OF[w.heading] === axis && !isVerified(w.length))
+    .filter((w) => !isVerified(w.length) && (axisOf(w) === axis || isDiagonal(w.heading)))
     .reduce((total, w) => total + toleranceOf(w.length), 0n);
 }
 

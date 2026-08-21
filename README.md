@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **162 passing, 0 failing** (`npm test`) |
+| Tests | **183 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -68,6 +68,13 @@ between them.
 Also built: **manual draw mode** — a room typed in wall by wall, with the closing wall worked
 out rather than asked for, and the DXF completion that gives every dimension the geometry a
 viewer needs to draw it.
+
+Also built: **angled walls**. Almost every wall in a real scan is square to within a
+thousandth of a degree — but not all of them, and a 203 mm corner chamfer at 70° is ordinary
+rather than exotic. A wall may now carry an exact run in x and y instead of a compass heading.
+The run is the truth and the length is derived from it, so the room still closes on exact
+integers; the angled wall is held fixed while the square ones absorb the error, because
+stretching a chamfer to make the arithmetic work would quietly change its angle.
 
 Also built: **section and dollhouse views** — the ceiling comes off when you look down at the
 room, a cut plane slides to any height, and the walls between you and the room come down for an

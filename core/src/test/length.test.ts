@@ -11,9 +11,12 @@ import {
   formatFeetInches,
   formatMetric,
   fromJSON,
+  hypotenuse,
   isExactAt,
+  isqrt,
   of,
   parseLength,
+  roundDiv,
   scale,
   subtract,
   toJSON,
@@ -160,4 +163,43 @@ test('a hundred-metre building is nowhere near any limit', () => {
   const building = of(100, 'm');
   assert.equal(building, 100_000_000_000n);
   assert.ok(building < BigInt(Number.MAX_SAFE_INTEGER));
+});
+
+test('integer square root is exact where it can be and rounded where it cannot', () => {
+  assert.equal(isqrt(0n), 0n);
+  assert.equal(isqrt(1n), 1n);
+  assert.equal(isqrt(4n), 2n);
+  assert.equal(isqrt(1_000_000n), 1000n);
+  // 2 is not a square. floor is 1, and 1.41... rounds to 1.
+  assert.equal(isqrt(2n), 1n);
+  assert.equal(isqrt(3n), 2n, '1.73 rounds up');
+  assert.equal(isqrt(6n), 2n, '2.449 rounds down');
+  assert.equal(isqrt(7n), 3n, '2.646 rounds up');
+  assert.throws(() => isqrt(-1n), LengthError);
+});
+
+test('the root of a building-sized number is right to the nanometre', () => {
+  // A 3-4-5 triangle at 100 metre scale: exactly 500 m, no rounding at all.
+  const a = 300n * NM_PER_METRE;
+  const b = 400n * NM_PER_METRE;
+  assert.equal(hypotenuse(a, b), 500n * NM_PER_METRE);
+
+  // Every square from 1 to 5000 nanometres round-trips exactly, and every value
+  // in between is the nearest whole root rather than a drift in one direction.
+  for (let n = 1n; n <= 5000n; n += 1n) {
+    assert.equal(isqrt(n * n), n);
+    const root = isqrt(n);
+    assert.ok(root * root <= n + root, `isqrt(${n}) = ${root} overshoots`);
+    assert.ok((root + 1n) * (root + 1n) > n, `isqrt(${n}) = ${root} undershoots`);
+  }
+});
+
+test('rounding a division never drifts, in either direction', () => {
+  assert.equal(roundDiv(10n, 4n), 3n, '2.5 goes away from zero');
+  assert.equal(roundDiv(-10n, 4n), -3n);
+  assert.equal(roundDiv(9n, 4n), 2n);
+  assert.equal(roundDiv(-9n, 4n), -2n);
+  assert.equal(roundDiv(11n, 4n), 3n);
+  assert.equal(roundDiv(8n, 4n), 2n);
+  assert.throws(() => roundDiv(1n, 0n), LengthError);
 });
