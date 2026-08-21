@@ -1,6 +1,7 @@
 import { type Nanometres, NM_PER_FOOT, NM_PER_INCH, NM_PER_METRE, NM_PER_MM } from './length.ts';
 import { type Measurement, confidenceLabel, toleranceOf } from './measurement.ts';
 import { type Point, type Room, corners, validate } from './room.ts';
+import { type SectionView } from './section.ts';
 import { type Zone } from './zone.ts';
 
 /**
@@ -146,3 +147,50 @@ export function toRenderModel(
  * wrong, not the tolerance.
  */
 export const RENDER_EPSILON = 1e-9;
+
+/* ---------------------------------------------------------------- section */
+
+export interface RenderWallSection {
+  readonly id: string;
+  readonly visible: boolean;
+  /** Bottom and top of the band to draw, above the floor, in the render unit. */
+  readonly drawnFrom: number;
+  readonly drawnTo: number;
+  /** True when the plane passes through this wall, so the renderer can poché the cut face. */
+  readonly cut: boolean;
+  readonly openingsCut: readonly string[];
+}
+
+export interface RenderSection {
+  readonly unit: RenderUnit;
+  readonly ceilingVisible: boolean;
+  readonly floorVisible: boolean;
+  readonly cutHeight: number;
+  readonly walls: readonly RenderWallSection[];
+}
+
+/**
+ * Carries a section view across the same boundary the rest of this file guards.
+ *
+ * `section.ts` decides what is visible in exact nanometres, because the decision
+ * has to be the same on every device. This turns that decision into the floats a
+ * renderer needs, and like everything else here the numbers it produces are for
+ * drawing — a wall clipped to 4'0" for a section is still an 8'0" wall on the
+ * take-off.
+ */
+export function toRenderSection(view: SectionView, unit: RenderUnit = 'm'): RenderSection {
+  return {
+    unit,
+    ceilingVisible: view.ceilingVisible,
+    floorVisible: view.floorVisible,
+    cutHeight: toUnit(view.cutHeight, unit),
+    walls: view.walls.map((w) => ({
+      id: w.wallId,
+      visible: w.visible,
+      drawnFrom: toUnit(w.drawnFrom, unit),
+      drawnTo: toUnit(w.drawnTo, unit),
+      cut: w.cut,
+      openingsCut: w.openingsCut,
+    })),
+  };
+}

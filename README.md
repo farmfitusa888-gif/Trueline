@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **125 passing, 0 failing** (`npm test`) |
+| Tests | **147 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -68,6 +68,14 @@ between them.
 Also built: **manual draw mode** — a room typed in wall by wall, with the closing wall worked
 out rather than asked for, and the DXF completion that gives every dimension the geometry a
 viewer needs to draw it.
+
+Also built: **section and dollhouse views** — the ceiling comes off when you look down at the
+room, a cut plane slides to any height, and the walls between you and the room come down for an
+oblique view. Exact integer geometry, so a viewpoint gives the same answer on every device.
+
+Checked against a real scan: `core/tools/inspect-roomplan.py` reads a RoomPlan export and
+prints what it actually contains. Run against Sam's kitchen it found two of the room model's
+assumptions wrong and one field missing; all three are written up in `DECISIONS.md`.
 
 Not built yet: the iOS scanner, the web viewer, the API, anything with a screen.
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatFeetInches, parseLength } from '../length.ts';
-import { history, isVerified } from '../measurement.ts';
+import { history, isVerified, toleranceOf } from '../measurement.ts';
 import { area, closes, formatSquareFeet } from '../room.ts';
 import {
   DraftError,
@@ -176,7 +176,9 @@ test('a typed room has no uncertainty anywhere in it', () => {
   d = addWall(d, 'd', 'south', `10'`, T0);
   const room = finish(d);
   // Nothing was scanned, so the area carries no band at all.
-  assert.equal(area(room).provenance.kind === 'derived' ? area(room).provenance.tolerance : -1n, 0n);
+  const measured = area(room);
+  assert.equal(measured.provenance.kind, 'derived');
+  assert.equal(toleranceOf(measured), 0n);
 });
 
 test('bare numbers mean feet here, because that is what the field says', () => {

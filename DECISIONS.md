@@ -507,6 +507,111 @@ evidence for a dimension disappears. `unphotographedWalls()` already computes ex
 Nobody can offer this without per-photo poses, which is the same reason nobody can offer
 per-dimension confidence.
 
+## What a real RoomPlan export actually contains
+
+Everything above about RoomPlan came from Apple's documentation. This section came from
+Sam's own kitchen: an iPhone 14 Pro, iOS 26.6, RoomPlan export version 2, 292 frames over
+2 minutes 27 seconds, of a kitchen with furniture and appliances in it. Reproduce any line
+below with `core/tools/inspect-roomplan.py <scan>/JSON`.
+
+Six assumptions the room model was built on were checked. Four held, two were wrong, and one
+turned up a field the model was missing.
+
+### Held
+
+**Wall thickness is not exported at all.** Every wall, door, window and floor comes back with
+`dimensions[2] == 0`. This is stronger than the assumption in `render.ts`, which treated
+RoomPlan's uniform ~160 mm as a rough figure to be improved on. There is no figure. Any
+thickness Trueline draws is one Trueline chose, `ROOMPLAN_ASSUMED_THICKNESS` is the only
+source of it, and the drawing has to say so rather than imply a measurement.
+
+**Openings sit exactly on their wall and inside it.** All three openings in the scan project
+onto their parent wall with an off-plane error under 0.005 mm and a span that fits within the
+wall's length. `Opening.offsetFromStart` is directly computable from the export; no fitting,
+no clamping.
+
+**Object categories are a single-key object, not a string.** `{"storage": {}}`, and the same
+encoding for confidence. Anything reading this format with a plain string comparison gets
+nothing. Categories seen in one kitchen: `chair`, `oven`, `sink`, `storage`, `stove`. Object
+confidence was `low` on five of six — which is the point of `obstruction.ts`: these are hints
+about what blocked the scan, never facts about the room.
+
+**Camera poses compose with the room model.** Inverting `referenceOriginTransform` and
+applying it to each frame's `cameraPoseARFrame` puts all 292 cameras between 1.293 m and
+2.012 m above the floor plane, inside the footprint. That is a phone held at chest and eye
+height, which is what happened. The composition `photo.ts` depends on is correct.
+
+### Wrong
+
+**Closure error is not something the solver will see.** Expected some millimetres of drift to
+distribute. Found zero: every wall end that meets another meets it at a gap of 0.000 mm.
+RoomPlan hands back an already-closed, already-rectified polygon. The ±5 cm per wall Apple
+documents is still in there — it is just systematic, and invisible to a closure check.
+
+The consequence matters. **A scan that closes perfectly is not a scan that is right.** On
+import, `solve()` will report no adjustment and no wall beyond tolerance, and that must never
+be presented as agreement between measurements. The value of verification is entirely in what
+happens next: a person types one exact number, that contradicts the pre-closed polygon, and
+the other walls have to move. The verification punch list is not a fallback for when a scan
+fails to close — it is the whole mechanism.
+
+**Not every wall is square, and not every wall is on the outline.** Seven of the eight walls
+are square to each other to within 0.001° — RoomPlan snaps to a right-angle grid. The eighth
+is a 203 mm stub at 70.441°, a real corner chamfer, and it is in the floor polygon too. So the
+rectilinear solver in `room.ts` cannot be the only path: short off-grid stubs are ordinary.
+
+Worse for a naive importer: the floor outline is 20.0873 m round and the walls add up to
+17.8797 m. One wall (1.3167 m) has both ends meeting nothing — a fragment of the space next
+door, caught through a doorway. Two floor edges totalling 3.5243 m have no wall at all.
+
+That last part is the open-plan problem showing up in the very first real scan, and it is what
+`zone.ts` was built for: **an outline legitimately contains edges that are not built walls.**
+A virtual edge bounds floor and ceiling and carries no drywall, paint or baseboard. Sam asked
+for this before there was any evidence it was needed; there is now.
+
+### The field the model was missing
+
+`Opening` had width, height and offset along the wall, and no sill height. Doors do not need
+one — both doors in the scan sit within 0.1 mm of the floor, because that is what a door is.
+A window does. This one works out at 927 mm above the floor, a normal kitchen sill, and
+**nothing in the export says so**: it is recovered by subtracting half the window's height
+from its centre and comparing against the floor plane.
+
+`Opening.sillHeight` is now an optional `Measurement` — recovered, so it carries provenance
+like anything else. A window without one cannot be sectioned honestly, and `section.ts` names
+it and asks rather than picking a number.
+
+### Two smaller facts worth keeping
+
+- **Wall heights vary inside one room.** Seven walls at 2.4257 m, one at 2.13 m. `Wall.height`
+  being optional and per-wall is not an edge case for pony walls; it is the first scan.
+- **Coverage is not automatic.** The camera never entered the far half of the room: it spans
+  2.8 m of a room 5.8 m deep. Tracking stayed `normal` for 290 of 292 frames and motion
+  quality averaged 0.91, so nothing warned about it. A scan can be clean and still leave walls
+  with no photograph on them, which is exactly what `unphotographedWalls()` is for.
+
+## Seeing inside the model — built
+
+Decision 2 above is now `core/src/section.ts`, 24 tests. All of it is exact integer geometry,
+so the same viewpoint gives the same answer on every device, and none of it needs a renderer
+to test.
+
+- `aboveCeiling()` — level with the ceiling counts as above.
+- `cutAt()` — a horizontal plane at any height. Walls shorter than the plane are drawn whole
+  and reported as not cut, so the renderer poché's only the faces the plane really passes
+  through. That case is the 2.13 m wall from Sam's kitchen, not a hypothetical.
+- `dollhouse()` — no ceiling, and the walls the viewer is standing outside of come down.
+  Outward normals are read off the polygon's winding rather than assumed, so it works whichever
+  way the room was walked. A camera exactly flush with a wall does not delete it.
+- `sectionFor()` — the auto rule: inside is a walkthrough, straight overhead is a plan,
+  oblique overhead is the dollhouse. A dragged slider always wins over the rule.
+- `cutStops()` — the slider's stops are the room's own features: the conventional 4'0"
+  section, the top of every part-height wall, and every known sill and head.
+
+`toRenderSection()` in `render.ts` carries the result across the exact-to-float boundary, in
+the same one place everything else crosses it. A wall clipped to 4'0" for a drawing is still
+an 8'0" wall on the take-off.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
@@ -533,7 +638,18 @@ before any money goes into branding.
 
 ## Still open
 
-- Nothing. Build proceeds.
+Opened by the first real scan, and not yet closed:
+
+- **Off-grid walls.** `room.ts` refuses two same-axis walls in a row and has no general
+  solver. A 203 mm chamfer at 70° is ordinary, not exotic, so the importer needs a path for
+  short off-grid segments before a scan can round-trip.
+- **Which exported walls belong to the room.** One wall in the kitchen scan is a fragment of
+  the space next door. Picking the closed outline out of the wall list is a decision the
+  importer has to make, and it has to be visible and correctable rather than silent.
+- **The batch photo delete spec** — checkboxes, select-all, and the warning when the photo
+  being deleted is the only one showing a wall. Decided (gap 3 above), not written.
+
+Everything else: build proceeds.
 
 ## Standing constraints carried from Plumbline
 

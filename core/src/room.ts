@@ -66,6 +66,20 @@ export interface Opening {
   readonly width: Measurement;
   readonly height: Measurement;
   readonly offsetFromStart: Measurement;
+  /**
+   * How far the bottom of the opening sits above the finished floor.
+   *
+   * Doors and cased openings start at the floor, so they leave this unset. A
+   * window does not, and RoomPlan does not tell you: its export gives a window a
+   * centre and a height in the room's own frame and nothing that names a sill.
+   * The number is recoverable — Sam's kitchen window works out at 927 mm, a
+   * normal sill — but it is recovered, not read, so it carries provenance like
+   * any other measurement rather than arriving as a bare number.
+   *
+   * A window without one cannot be cut by a section plane honestly, so the
+   * section view names it and asks rather than guessing. See `section.ts`.
+   */
+  readonly sillHeight?: Measurement;
 }
 
 export interface Wall {
