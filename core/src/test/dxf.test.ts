@@ -51,8 +51,16 @@ test('the aligned dimension measures along itself, not across', () => {
   assert.ok(!near(120), 'measured the horizontal component, not the length');
 });
 
-test('layouts are added, so a printer has a page to print onto', () => {
-  const { dxf, report } = completeDxf(load());
+test('layouts are off by default, because they invalidated the file', () => {
+  // Emitting them produced AutoCAD-InvalidFile in Autodesk's translator, and the
+  // only consumer that wanted them never drew the file anyway.
+  const { report } = completeDxf(load());
+  assert.equal(report.layoutsAdded, 0);
+  assert.equal(report.dimensionsGivenGeometry, 3, 'the dimensions still get their geometry');
+});
+
+test('layouts can still be asked for, and are clearly unverified', () => {
+  const { dxf, report } = completeDxf(load(), { emitLayouts: true });
   assert.equal(report.layoutsAdded, 2);
   const tags = parseTags(dxf);
   const layouts = tags.filter((t) => t.code === 0 && t.value === 'LAYOUT');
@@ -62,7 +70,7 @@ test('layouts are added, so a printer has a page to print onto', () => {
 });
 
 test('the paper size is stated rather than left to a guess', () => {
-  const { dxf } = completeDxf(load(), { paper: { width: 297, height: 210 } });
+  const { dxf } = completeDxf(load(), { emitLayouts: true, paper: { width: 297, height: 210 } });
   assert.ok(dxf.includes('297'));
   assert.ok(dxf.includes('210'));
 });

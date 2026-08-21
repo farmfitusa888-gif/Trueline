@@ -8,20 +8,24 @@ Proves the claim the product is sold on: **a DXF that keeps its dimensions.**
 npm i @tarikjabiri/dxf && node verify-dxf-dimensions.cjs     # writes proof.dxf
 ```
 
-## The dimensions draw — proven locally, awaiting Autodesk
+## Dimension geometry: generated. Layouts: withdrawn.
 
-`core/src/dxf/complete.ts` finishes what the writer leaves out: it generates a geometry block
-for every dimension — two extension lines, the dimension line, two arrowheads and the
-measurement as text — and adds the `LAYOUT` objects a printer needs.
+`core/src/dxf/complete.ts` generates a geometry block for every dimension — two extension
+lines, the dimension line, two arrowheads, and the measurement as text. The strings `148.50`,
+`150.00` and `96.00` are in the file, and `dxf-render.png` shows them drawn.
 
-`dxf-render.png` beside this file is the result through `ezdxf`'s renderer, **the same
-renderer that crashed on this file three attempts ago**: green `148.50`, yellow `96.00`,
-yellow `150.00`, each on its own confidence layer. The measurements the module computes are
-148.500, 96.000 and 150.000, and the aligned diagonal reads its true length rather than its
-horizontal component.
+**Emitting `LAYOUT` objects broke the file and has been turned off.** Autodesk's translator
+rejected the whole drawing — `AutoCAD-InvalidFile`, *"Design is empty"* — where the previous
+version at least drew its geometry. The cause was mine: group 330 is an owner **handle** and a
+block-record **name** was written there.
 
-`sample-plan.dxf` is the completed file. **Autodesk Viewer is still the test that counts**,
-and it must be done by hand.
+The fix was not to guess at the handle. Layouts only ever served LibreCAD's printer, which is
+a harness rather than a customer, and which did not draw the file even with them present. A
+construct that helps nobody and can invalidate the drawing does not belong in the default
+path. It is `emitLayouts`, off unless asked for, and unverified.
+
+**Status of the current `sample-plan.dxf`: blocks present, layouts absent, untested in
+Autodesk.** Nothing about it should be claimed until it has been opened there.
 
 ## LibreCAD still prints a blank page, and that is a harness problem
 

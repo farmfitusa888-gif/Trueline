@@ -37,7 +37,21 @@ export interface CompleteOptions {
   readonly extensionBeyond?: number;
   /** Decimal places on the generated measurement text. */
   readonly decimals?: number;
-  /** Paper size for the generated layout, in millimetres. */
+  /**
+   * Emit `LAYOUT` objects. **Off by default, and off for a reason.**
+   *
+   * Layouts exist to give a printer a page. The only consumer that needed them
+   * was LibreCAD's `dxf2pdf`, which is a verification harness rather than a
+   * customer, and it did not draw the file even once they were present.
+   * Meanwhile Autodesk's translator rejected the whole drawing as invalid when
+   * they were emitted — `AutoCAD-InvalidFile`, "Design is empty" — because group
+   * 330 is an owner *handle* and a block-record *name* was written there.
+   *
+   * A construct that helps nobody and can invalidate the file does not belong in
+   * the default path. It stays available, unverified, and clearly labelled.
+   */
+  readonly emitLayouts?: boolean;
+  /** Paper size for the generated layout, in millimetres. Only used with `emitLayouts`. */
   readonly paper?: { readonly width: number; readonly height: number };
 }
 
@@ -326,9 +340,10 @@ export function completeDxf(
     }
   }
 
-  // Layouts, so a printer has a page to print onto.
+  // Layouts, so a printer has a page to print onto. See emitLayouts above for
+  // why this is off unless asked for.
   let layoutsAdded = 0;
-  const objectsStart = findSection(out, 'OBJECTS');
+  const objectsStart = options.emitLayouts === true ? findSection(out, 'OBJECTS') : -1;
   if (objectsStart !== -1) {
     const objectsEnd = findEndOfSection(out, objectsStart);
     const layouts = [
