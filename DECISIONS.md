@@ -959,6 +959,64 @@ secret to set. The content-security policy is `default-src 'self'` with `frame-a
 rather than a network request. Nobody's house can reach anybody else's, because nothing leaves
 the device.
 
+## Correction: the two-app workflow is rejected, and it was never asked for
+
+I recommended hosting the web shell and having Sam's friend scan in OpenPlan3D and correct in
+Trueline. **That was wrong and Sam rejected it.** Recorded because the reasoning behind the
+rejection is a product decision, not a preference:
+
+- Two apps is not a product. Nobody exports a file from one app to load into another on a job
+  site, and asking somebody to is asking them to do the integration work.
+- **The scanning is the feature the customer wants.** Sam showed his friend the capture, and that
+  is what he responded to. A correction layer with no capture in front of it has nothing to
+  correct until somebody else's app has run.
+- The stated requirement from the start was one app that scans, measures and photographs at the
+  same time. Nothing about that changed; the recommendation drifted.
+
+**Nothing is put in front of a user until Trueline scans.**
+
+## What can and cannot be taken from OpenPlan3D — checked, not assumed
+
+`laanlabs/openPlan3D` was read again, at the repository level rather than the licence file. What
+is actually in it:
+
+`src/`, `static/`, `svelte.config.js`, `vite.config.ts`, `firebase.json`, `test-roomplan.json`.
+SvelteKit, Three.js, TypeScript, Firebase. **No `.swift` file, no Xcode project, no ARKit or
+RoomPlan source anywhere in it.** Its own README describes a *companion iOS app* that scans and
+hands data to this web editor over Firebase Storage.
+
+So the MIT grant covers **the web editor only**. The scanner — the thing Sam actually wants — is
+a separate closed app and there is no source to integrate. "Integrate the entire code and
+workings of OpenPlan3D" is possible for the editor half and impossible for the capture half, and
+it is better to know that now than after planning around it.
+
+The capture has to be written. It always did; the roadmap said so from Phase 0. Copying what an
+app *does* carries no licence obligation at all, so the feature list is fair game — the code is
+simply not there to take.
+
+### What this means for the build
+
+| | Source available | Status |
+|---|---|---|
+| 2D/3D editor, exporters | MIT, theirs | can take, mostly superseded by `core` + `web/` |
+| LiDAR room capture | **none** | write it, on Apple's RoomPlan |
+| AR measure without LiDAR | **none** | write it, on ARKit |
+| Photos taken during the scan | **none — and nobody has it** | write it; the differentiator |
+
+The last row is worth its own line. Their app hands off a scan. It does not hand off a scan with
+every photograph tied to the pose it was taken from. Two real exports proved that composition
+works — 292 camera poses landing inside the room model once `referenceOriginTransform` is
+inverted — so it is buildable, and it is the thing `photo.ts` and `obstruction.ts` were written
+against.
+
+### The constraint on how it gets built
+
+This container is Linux with no Swift toolchain and no Xcode. Swift can be written here; it
+cannot be compiled or run here, and it will not be reported as working on the strength of
+reading it. Whatever is written has to be built and run by Sam on a Mac, and the parts that can
+be verified here — the capture file format, the live-measurement arithmetic, the photo-to-wall
+composition — stay in `core` where they are tested.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
