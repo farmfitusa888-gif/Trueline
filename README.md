@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **98 passing, 0 failing** (`npm test`) |
+| Tests | **125 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -64,6 +64,10 @@ every number scanned, verified or derived and refuses to let a sensor's guess re
 Also built: the rectilinear solver that re-closes a room around a typed measurement, and the
 zone model that splits an open plan into named areas without pretending there is a wall
 between them.
+
+Also built: **manual draw mode** — a room typed in wall by wall, with the closing wall worked
+out rather than asked for, and the DXF completion that gives every dimension the geometry a
+viewer needs to draw it.
 
 Not built yet: the iOS scanner, the web viewer, the API, anything with a screen.
 
