@@ -123,30 +123,57 @@ function cross(a: Vec2, b: Vec2): bigint {
   return a.x * b.y - a.y * b.x;
 }
 
+/**
+ * How much of a ray has to be horizontal before its bearing means anything.
+ *
+ * 0.15 is about 8.6 degrees off vertical. Below that a corner of the frame is
+ * pointing at the floor or the ceiling, and which way it "faces" on a plan is
+ * decided by hand tremor. On the two real scans this refuses 0 of 292
+ * photographs in the kitchen and 7 of 314 in the garage, where somebody was
+ * looking down at the slab.
+ */
+const MIN_HORIZONTAL_RAY = 0.15;
+
 /* ---------------------------------------------------------------- the work */
 
 /**
  * Turns one captured frame into a `Photo` the room model can reason about.
  *
- * Three things come out of the camera transform. ARKit's camera looks down its
- * own **negative Z**, its **positive X** is the photographer's right, and its
- * origin is where they were standing. The horizontal half-angle of the lens is
- * `cx / fx` as a tangent, straight out of the intrinsics — no lens table, no
- * assumed field of view, and it changes shot to shot as the camera refocuses,
- * which is why it is read per photo rather than once.
+ * ARKit's camera looks down its own negative Z, and its origin is where the
+ * photographer stood. The lens angles come from the intrinsics — `cx / fx`
+ * across the image and `cy / fy` up it, as tangents — so there is no lens table
+ * and no assumed field of view, and they are read per photo because they change
+ * as the camera refocuses.
  *
- * The two edges of the frame are then `forward ± tan(half) x right`. Which of
- * those is `leftEdge` is decided by **testing**, not by reasoning about
- * handedness: the plan flips one axis relative to ARKit, and getting that sign
- * wrong once already cost a day. Whichever assignment puts the camera's own
- * forward direction inside its own wedge is the correct one, and that is
- * checkable in two cross products.
+ * **The image's axes are not the world's.** This is where it went wrong for a
+ * long time. ARKit reports the camera in its own landscape frame whatever way
+ * the phone is being held, so for somebody scanning a room in portrait — which
+ * is everybody — the image's "right" points at the ceiling. Both of Sam's scans
+ * say so plainly: the world-y component of the camera's X axis has a median of
+ * **0.978** in the kitchen and **0.946** in the garage. Straight up.
+ *
+ * Sweeping `forward ± tan(cx/fx) × cameraX` therefore swept the *vertical* field
+ * of view, and its shadow on the plan was a **4.5 degree** slit where the
+ * photograph really covers **62 degrees**. Every answer about which walls a
+ * photograph showed came out of that slit.
+ *
+ * So the wedge is built from the frustum itself: the four corner rays,
+ * `forward ± tan(hx)·right ± tan(hy)·up`, projected onto the plan, and the
+ * widest wedge that contains all four. That is correct for a phone held any way
+ * up and tilted at any angle, because it never assumes which image axis is
+ * horizontal — it works out what the pyramid actually covers.
+ *
+ * A photograph aimed too steeply has no honest answer: point at your feet and
+ * the direction you are facing is barely a direction at all. Those are refused
+ * rather than guessed at, and `importPhotos` reports them.
  */
 export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
   const m = captured.cameraPoseARFrame;
   const fx = captured.intrinsics[0];
   const cx = captured.intrinsics[2];
-  if (fx === undefined || cx === undefined || fx <= 0) {
+  const fy = captured.intrinsics[4];
+  const cy = captured.intrinsics[5];
+  if (fx === undefined || cx === undefined || fy === undefined || cy === undefined || fx <= 0 || fy <= 0) {
     throw new CaptureError(
       `Photo "${captured.id}" has no usable camera intrinsics, so there is no way to know how ` +
         `wide a view it took in. It cannot be placed against a wall.`
@@ -174,6 +201,7 @@ export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
   const position = [at(m, 3, 0), at(m, 3, 1), at(m, 3, 2)];
   const forward = [-at(m, 2, 0), -at(m, 2, 1), -at(m, 2, 2)];
   const right = [at(m, 0, 0), at(m, 0, 1), at(m, 0, 2)];
+  const up = [at(m, 1, 0), at(m, 1, 1), at(m, 1, 2)];
 
   // Y is up, so the plan is x and z. Then the datum rotation the importer
   // chose, so photos and walls share one set of axes.
@@ -182,23 +210,56 @@ export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
 
   const [px, py] = plan(position[0]!, position[2]!);
   const [fxp, fyp] = plan(forward[0]!, forward[2]!);
-  const [rxp, ryp] = plan(right[0]!, right[2]!);
 
   // Into the frame the plan is drawn in — see `RoomFrame.origin`. Only the
   // position moves; a direction is unchanged by a translation.
   const atPoint: Point = { x: nm(px) - frame.origin.x, y: nm(py) - frame.origin.y };
+  // Too steep to have a bearing at all. Checked before anything is built from
+  // it, so a photograph of the floor says it is a photograph of the floor
+  // rather than failing later as a vector of zero length.
+  const steep = (ray: readonly number[]): boolean => {
+    const length = Math.hypot(ray[0]!, ray[1]!, ray[2]!);
+    return length === 0 || Math.hypot(ray[0]!, ray[2]!) / length < MIN_HORIZONTAL_RAY;
+  };
+  const refuseSteep = (): never => {
+    throw new CaptureError(
+      `Photo "${captured.id}" was taken pointing too steeply up or down to say which walls it ` +
+        `shows. It is within ` +
+        `${Math.round(Math.asin(MIN_HORIZONTAL_RAY) * (180 / Math.PI))} degrees of vertical, and ` +
+        `a direction that steep is not a direction on a plan.`
+    );
+  };
+  if (steep(forward)) refuseSteep();
+
   const forwardVec = direction(fxp, fyp, 'view direction');
 
-  const tanHalf = cx / fx;
-  const edgeA = direction(fxp + tanHalf * rxp, fyp + tanHalf * ryp, 'frame edge');
-  const edgeB = direction(fxp - tanHalf * rxp, fyp - tanHalf * ryp, 'frame edge');
+  // The four corners of the frustum, in the world, then on the plan.
+  const hx = cx / fx;
+  const hy = cy / fy;
+  const corners: Vec2[] = [];
+  for (const u of [1, -1]) {
+    for (const v of [1, -1]) {
+      const ray = [0, 1, 2].map((i) => forward[i]! + u * hx * right[i]! + v * hy * up[i]!);
+      if (steep(ray)) refuseSteep();
+      const [x, y] = plan(ray[0]!, ray[2]!);
+      corners.push(direction(x, y, 'frame corner'));
+    }
+  }
 
-  // `insideWedge` sweeps counter-clockwise from the right edge to the left edge.
-  // The camera's own forward is always inside its own frame, so whichever
-  // assignment satisfies that is the one.
-  const aIsRight = cross(edgeA, forwardVec) >= 0n && cross(edgeB, forwardVec) <= 0n;
-  const bIsRight = cross(edgeB, forwardVec) >= 0n && cross(edgeA, forwardVec) <= 0n;
-  if (aIsRight === bIsRight) {
+  // The wedge that holds all four. `insideWedge` sweeps counter-clockwise from
+  // the right edge to the left edge, so the right edge is the corner every
+  // other corner is counter-clockwise of, and the left edge is the one every
+  // other corner is clockwise of. Exact integer cross products, no angles.
+  const rightEdge = corners.find((a) => corners.every((b) => cross(a, b) >= 0n));
+  const leftEdge = corners.find((a) => corners.every((b) => cross(b, a) >= 0n));
+  if (!rightEdge || !leftEdge) {
+    throw new CaptureError(
+      `Photo "${captured.id}" covers half the compass or more once flattened onto the plan, ` +
+        `which means it was pointed nearly along the floor or the ceiling. There is no wedge ` +
+        `that describes what it shows.`
+    );
+  }
+  if (cross(rightEdge, forwardVec) < 0n || cross(forwardVec, leftEdge) < 0n) {
     throw new CaptureError(
       `Photo "${captured.id}" has a field of view that does not contain the direction it was ` +
         `pointing. Its camera intrinsics and its transform disagree.`
@@ -209,12 +270,7 @@ export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
     id: captured.id,
     takenAt: captured.takenAt,
     trigger: captured.trigger,
-    pose: {
-      at: atPoint,
-      forward: forwardVec,
-      rightEdge: aIsRight ? edgeA : edgeB,
-      leftEdge: aIsRight ? edgeB : edgeA,
-    },
+    pose: { at: atPoint, forward: forwardVec, rightEdge, leftEdge },
   };
 }
 

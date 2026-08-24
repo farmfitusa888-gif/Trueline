@@ -1333,6 +1333,67 @@ None of the measurements were wrong. Lengths and areas come from the polygon and
 are relative, so the kitchen is still 175.3 sq ft. What was wrong was every
 statement relating a photograph or a piece of furniture to a wall.
 
+## The image's axes are not the world's — a 4.5 degree slit
+
+Sam said the bedroom door was on the right in the room and on the left on the
+plan. Testing that claim against the camera data found the third bug of the
+evening, and the largest.
+
+**What was measured.** ARKit reports the camera in its own landscape frame
+whatever way the phone is being held. Both real scans were walked in portrait,
+and the numbers are not subtle — the world-y component of the camera's X axis,
+the image's "right":
+
+| | median | min | max |
+|---|---|---|---|
+| kitchen, camera +X | **0.978** | 0.586 | 1.000 |
+| kitchen, camera +Y | 0.052 | 0.000 | 0.220 |
+| garage, camera +X | **0.946** | 0.312 | 1.000 |
+
+The image's right points at the ceiling. `toPhoto` built its wedge as
+`forward ± tan(cx/fx) × cameraX`, which therefore swept the **vertical** field of
+view, and its shadow on the plan was a slit:
+
+| | wedge in use | wedge the photo really covers |
+|---|---|---|
+| kitchen | 4.5° | **61.5°** |
+| garage | 4.8° | **68.9°** |
+
+Every answer about which walls a photograph showed came out of a 4.5 degree
+slit. That is also why the mean never moved when the frame offset was fixed: a
+slit sees about one wall wherever you put it.
+
+**The fix.** The wedge comes from the frustum itself — the four corner rays
+`forward ± tan(hx)·right ± tan(hy)·up`, projected onto the plan, and the widest
+wedge containing all four, found with exact integer cross products. It never
+assumes which image axis is horizontal, so it is right for a phone held any way
+up at any tilt.
+
+**What it changed on the real scans.** Kitchen: mean walls per photograph 1.10 →
+**2.26**, max 3 → 7, every wall photographed. Garage: 1.89, every wall
+photographed, and **20 of 314 frames refused** as pointing too steeply to have a
+bearing — somebody looking down at the slab. Refusing those is the point: a
+photograph of the floor has no honest answer about which walls it shows, and
+`MIN_HORIZONTAL_RAY = 0.15` (about 8.6° off vertical) is where it stops
+pretending.
+
+**Tests.** A camera rolled into portrait must cover tens of degrees, not a slit —
+that test throws against the old code, because a perfectly upright phone gave it
+a wedge of zero width. And a photograph aimed at the floor must be refused by
+name rather than failing later as a vector of zero length.
+
+## The plan is not mirrored, and here is why
+
+Sam's other reading — that the drawing is a mirror image — is worth answering
+with the derivation rather than an opinion. Screen right is world +x, screen up
+is world +z, so the direction into the screen is x × z = −y. The viewer is above
+the room looking down. That is a correct bird's-eye view, not its mirror.
+
+What it is *not* is oriented. The datum is the longest wall, so the plan can come
+out at any rotation, and a door on the right becomes a door on the left under a
+180 degree turn. That is what makes it look wrong, and it is why the drawing now
+carries the walk and the window instead of a compass.
+
 ## A plan with a north arrow on it
 
 The same drawing had a compass rose. There is no compass in the data — RoomPlan

@@ -304,3 +304,64 @@ test('a photo is placed against the room, not against where the scan began', () 
   // A translation turns nothing, so the view direction is untouched by it.
   assert.deepEqual(startedAtTheSink.pose.forward, startedAtTheDoor.pose.forward);
 });
+
+/* --------------------------------------------------- how the phone is held */
+
+/**
+ * The same camera, held in portrait.
+ *
+ * ARKit reports the camera in its own landscape frame however the phone is
+ * being held, so holding it upright rolls the image axes 90 degrees about the
+ * view direction: the image's "right" now points at the ceiling and the image's
+ * "up" points along the wall. Both of Sam's scans are like this — the world-y
+ * component of the camera's X axis has a median of 0.978 in the kitchen.
+ */
+function portrait(position: [number, number, number]): CapturedPhoto {
+  return {
+    ...camera(position, 0),
+    // Columns: right = world up, up = world -x, back = world +z.
+    cameraPoseARFrame: [
+      0, 1, 0, 0,
+      -1, 0, 0, 0,
+      0, 0, 1, 0,
+      position[0], position[1], position[2], 1,
+    ],
+  };
+}
+
+/** The angle between the two edges of a photo's wedge, in degrees. */
+function spread(photo: ReturnType<typeof toPhoto>): number {
+  const { rightEdge: r, leftEdge: l } = photo.pose;
+  const dot = Number(r.x * l.x + r.y * l.y);
+  const det = Number(r.x * l.y - r.y * l.x);
+  return (Math.atan2(det, dot) * 180) / Math.PI;
+}
+
+test('a photo taken in portrait covers the room, not a slit through it', () => {
+  // The bug: the wedge was `forward ± tan(cx/fx) × cameraX`, and cameraX points
+  // at the ceiling when the phone is upright. Its shadow on the plan was 4.5
+  // degrees wide on real scans, where the photograph covers 62. Every answer
+  // about which walls a photograph showed came out of that slit.
+  const held = toPhoto(portrait([3, 1.6, 2]), PLAIN);
+  assert.ok(
+    spread(held) > 40,
+    `a portrait photo should cover tens of degrees, not ${spread(held).toFixed(1)}`
+  );
+
+  // And it is the same pyramid either way up, so a level landscape shot of the
+  // same scene covers a comparable amount of the room.
+  const flat = toPhoto(camera([3, 1.6, 2], 0), PLAIN);
+  assert.ok(spread(flat) > 40);
+});
+
+test('a photo of the floor is refused rather than pointed somewhere', () => {
+  // Straight down: every corner of the frame is within a few degrees of
+  // vertical, and which way it "faces" on a plan is hand tremor. 20 of the
+  // garage's 314 frames are like this — somebody looking at the slab.
+  const down: CapturedPhoto = {
+    ...camera([3, 1.6, 2], 0),
+    // Columns: right = world +x, up = world +z, back = world +y (looking down).
+    cameraPoseARFrame: [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 3, 1.6, 2, 1],
+  };
+  assert.throws(() => toPhoto(down, PLAIN), /too steeply|half the compass/);
+});
