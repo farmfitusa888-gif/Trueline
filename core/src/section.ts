@@ -318,13 +318,17 @@ export function sectionFor(room: Room, eye: Viewpoint, options: { height?: Nanom
 }
 
 /**
- * Is the eye over the room's footprint?
+ * Is this point over the room's footprint?
+ *
+ * Takes a plain plan point rather than a viewpoint: a section's eye asks it,
+ * and so does the health check that wants to know whether the photographer was
+ * standing in the room. Height has never had anything to do with the answer.
  *
  * Ray casting on exact integers: count the edges a ray due east from the point
  * crosses. Horizontal edges are skipped and each edge is half-open at its upper
  * end, so a ray that grazes a corner is counted once rather than twice or none.
  */
-export function insidePlan(room: Room, eye: Viewpoint): boolean {
+export function insidePlan(room: Room, eye: Point): boolean {
   const points = corners(room);
   let inside = false;
   for (let i = 0; i < points.length; i += 1) {

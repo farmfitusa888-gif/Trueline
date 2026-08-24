@@ -331,6 +331,10 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
     return toDatum({ x: world(0), y: world(2) }, datum);
   });
 
+  // Where the outline actually is, before the wall chain is re-laid from the
+  // origin. Everything not derived from the chain is measured against this.
+  const origin: Point = outline[0]!;
+
   const wallEnds = new Map<string, [Point, Point]>();
   for (const wall of scan.walls) {
     const [a, b] = surfaceEnds(wall);
@@ -459,12 +463,16 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
       sourceIds,
       notes,
     },
-    footprints: readObjects(scan, datum),
-    frame: {
-      datum,
-      referenceOriginTransform: (scan as { referenceOriginTransform?: readonly number[] })
-        .referenceOriginTransform ?? null,
-    },
+    // The wall chain is laid out from (0, 0) by `corners()`, so everything else
+    // read out of this scan is moved into that frame here rather than left in
+    // the scanner's own metres. One frame, established once, at the only place
+    // that knows both. See `RoomFrame.origin`.
+    footprints: readObjects(scan, datum).map((f) => ({
+      ...f,
+      min: { x: f.min.x - origin.x, y: f.min.y - origin.y },
+      max: { x: f.max.x - origin.x, y: f.max.y - origin.y },
+    })),
+    frame: { datum, origin },
   };
 }
 

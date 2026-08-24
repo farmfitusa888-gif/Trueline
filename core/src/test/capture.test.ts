@@ -35,8 +35,14 @@ const room: Room = {
   ceilingHeight: verified(parseLength(`2400mm`), 'sam', T0, 'tape'),
 };
 
+/** Metres to the nanometre integers the plan is kept in. */
+const nm = (metres: number) => BigInt(Math.round(metres * Number(NM_PER_METRE)));
+
+/** A room whose first corner is already at the plan origin, so nothing shifts. */
+const NOWHERE = { x: 0n, y: 0n };
+
 /** No rotation and no reference transform: ARKit's axes are the room's. */
-const PLAIN: RoomFrame = { datum: { x: 1, y: 0 }, referenceOriginTransform: null };
+const PLAIN: RoomFrame = { datum: { x: 1, y: 0 }, origin: NOWHERE };
 const room2frame = PLAIN;
 
 /**
@@ -127,37 +133,26 @@ test('a wider lens takes in more of the wall it is pointing at', () => {
 test('the room datum is applied, so photos and walls share one set of axes', () => {
   // A datum of (0, -1) is what the importer picks when the longest wall runs
   // along the scan's -z. It maps (x, z) to (-z, x).
-  const turned: RoomFrame = { datum: { x: 0, y: -1 }, referenceOriginTransform: null };
+  const turned: RoomFrame = { datum: { x: 0, y: -1 }, origin: NOWHERE };
   const photo = toPhoto(camera([2, 1.6, 3], 0), turned);
   assert.deepEqual(photo.pose.at, { x: -3n * NM_PER_METRE, y: 2n * NM_PER_METRE });
 });
 
-test('referenceOriginTransform is inverted, not applied forwards', () => {
-  // The room sits 5 m along +x of the ARKit world, unrotated. A camera at world
-  // x = 7 is therefore at room x = 2.
-  const shifted: RoomFrame = {
-    datum: { x: 1, y: 0 },
-    referenceOriginTransform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 0, 0, 1],
-  };
-  const photo = toPhoto(camera([7, 1.6, 3], 0), shifted);
-  assert.equal(photo.pose.at.x, 2n * NM_PER_METRE);
-  assert.equal(photo.pose.at.y, 3n * NM_PER_METRE);
-});
-
-test('a rotated reference transform turns the view direction with the position', () => {
-  // A quarter turn about Y. The transform maps room to world, and its first
-  // column says the room's +x is the world's -z — so the world's +z is the
-  // room's -x, and a camera 4 m along the world's z is 4 m along the room's -x.
-  const quarter: RoomFrame = {
-    datum: { x: 1, y: 0 },
-    referenceOriginTransform: [0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-  };
-  const photo = toPhoto(camera([0, 1.6, 4], 0), quarter);
-  assert.equal(photo.pose.at.x, -4n * NM_PER_METRE);
-  assert.equal(photo.pose.at.y, 0n);
-  // The view direction turned with the position rather than staying put: in the
-  // world it faced -z, and in the room that is +x.
-  assert.deepEqual(photo.pose.forward, { x: 1_000_000_000n, y: 0n });
+test('a camera pose and a wall are read in the same space', () => {
+  // This used to invert `referenceOriginTransform` before placing a pose, on
+  // the reasoning that RoomPlan surfaces are in the room's frame while ARFrames
+  // are in the world's. The importer reads surface transforms as world
+  // coordinates, so that rotated the photographer and not the room, and put
+  // them through the wall.
+  //
+  // Two real scans measured it. Counting camera positions that land inside the
+  // floor polygon: Gilbert's kitchen 172 of 292 with the transform applied and
+  // 292 of 292 without it; Sam's garage 145 of 314 with and 250 of 314 without,
+  // and that garage has a 15 ft opening somebody stands in to scan it.
+  //
+  // So a pose gets the datum rotation and the origin shift, and nothing else.
+  const photo = toPhoto(camera([2, 1.6, 3], 0), PLAIN);
+  assert.deepEqual(photo.pose.at, { x: 2n * NM_PER_METRE, y: 3n * NM_PER_METRE });
 });
 
 /* ------------------------------------------------------------------ heights */
@@ -169,17 +164,13 @@ test('camera height above the floor is reported, as the sanity check it is', () 
     device: 'iPhone14,3',
     photos: [camera([3, 1.55, 2], 0), { ...camera([3, 1.7, 2], 0), id: 'p2' }],
   };
-  const heights = heightsAboveFloor(manifest, PLAIN, 0n);
+  const heights = heightsAboveFloor(manifest, 0n);
   assert.deepEqual(heights, [1550n * NM_PER_METRE / 1000n, 1700n * NM_PER_METRE / 1000n]);
   assert.ok(heights.every((h) => h >= PLAUSIBLE_CAMERA_HEIGHT.low && h <= PLAUSIBLE_CAMERA_HEIGHT.high));
 
   // A pose in a different coordinate system to the room shows up here and
   // nowhere else — which is the point of measuring it.
-  const wrong = heightsAboveFloor(
-    { ...manifest, photos: [camera([3, 40, 2], 0)] },
-    PLAIN,
-    0n
-  );
+  const wrong = heightsAboveFloor({ ...manifest, photos: [camera([3, 40, 2], 0)] }, 0n);
   assert.ok(wrong[0]! > PLAUSIBLE_CAMERA_HEIGHT.high);
 });
 
@@ -295,4 +286,21 @@ test('what the camera sees is the same whichever way the room was walked', () =>
     'the same photo of the same wall sees the same amount of it'
   );
   assert.ok(forwards.visibleLength > 0n);
+});
+
+test('a photo is placed against the room, not against where the scan began', () => {
+  // The same camera, in the same place in the same kitchen, from two captures
+  // that started in different corners of it. RoomPlan counts metres from
+  // wherever somebody pressed start, so the numbers in the two files differ by
+  // however far apart those two corners are. The plan must not.
+  const startedAtTheDoor = toPhoto(camera([2, 1.5, 3], 0), PLAIN);
+  const startedAtTheSink = toPhoto(camera([2 + 9.4, 1.5, 3 - 6.1], 0), {
+    ...PLAIN,
+    origin: { x: nm(9.4), y: nm(-6.1) },
+  });
+
+  assert.equal(startedAtTheSink.pose.at.x, startedAtTheDoor.pose.at.x);
+  assert.equal(startedAtTheSink.pose.at.y, startedAtTheDoor.pose.at.y);
+  // A translation turns nothing, so the view direction is untouched by it.
+  assert.deepEqual(startedAtTheSink.pose.forward, startedAtTheDoor.pose.forward);
 });

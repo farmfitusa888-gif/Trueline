@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NM_PER_METRE, formatMetric, parseLength } from '../length.ts';
 import { isVerified, verify } from '../measurement.ts';
-import { area, closes, formatSquareFeet, isDiagonal, runLength } from '../room.ts';
+import { area, closes, corners, formatSquareFeet, isDiagonal, runLength, runOf } from '../room.ts';
 import { assertIssuable, readiness } from '../issue.ts';
 import {
   type ImportReport,
@@ -516,4 +516,70 @@ test('an open span is checked too: something can stand in a garage door opening'
   const open = obstructions(room, footprints).find((o) => o.wallId === 'opening-1')!;
   assert.ok(open.by.includes('pallet'));
   assert.ok(open.blockedPerMille > 0n);
+});
+
+/* ------------------------------------------------- where the scan started */
+
+/**
+ * The same scan, with the whole building moved somewhere else in the scanner's
+ * world.
+ *
+ * RoomPlan's coordinates are metres from wherever the person pressed start, so
+ * two captures of the same kitchen have different numbers in them for the same
+ * corner. Nothing about the finished plan may depend on that.
+ */
+function movedBy(source: RoomPlanExport, dx: number, dz: number): RoomPlanExport {
+  const move = (m: readonly number[]): number[] => {
+    const out = [...m];
+    out[12] = (out[12] ?? 0) + dx;
+    out[14] = (out[14] ?? 0) + dz;
+    return out;
+  };
+  const surfaces = (list: readonly RoomPlanSurface[] | undefined) =>
+    (list ?? []).map((s) => ({ ...s, transform: move(s.transform) }));
+  return {
+    ...source,
+    walls: surfaces(source.walls),
+    doors: surfaces(source.doors),
+    windows: surfaces(source.windows),
+    openings: surfaces(source.openings),
+    objects: surfaces(source.objects),
+    floors: (source.floors ?? []).map((f) => ({ ...f, transform: move(f.transform) })),
+  };
+}
+
+test('where somebody started the scan changes nothing on the plan', () => {
+  const here = importRoomPlan(scan(), { at: AT });
+  const there = importRoomPlan(movedBy(scan(), 37.4, -18.25), { at: AT });
+
+  const shape = (r: typeof here) =>
+    r.room.walls.map((w) => {
+      const run = runOf(w);
+      return `${w.id} ${formatMetric(runLength(w))} ${run.x},${run.y}`;
+    });
+  assert.deepEqual(shape(there), shape(here), 'the room changed shape when the scan moved');
+
+  // The one that was wrong: furniture came back in the scanner's own metres
+  // while the walls were laid out from the plan origin, so every footprint sat
+  // however far the person had walked before pressing start. In Gilbert's
+  // kitchen that was eight feet, and it silently moved which walls the app
+  // called blocked.
+  assert.deepEqual(there.footprints, here.footprints, 'furniture moved with the scanner');
+});
+
+test('furniture lands inside the room it was scanned in', () => {
+  const { room, footprints } = importRoomPlan(movedBy(scan(), 37.4, -18.25), { at: AT });
+  const outline = corners(room);
+  const xs = outline.map((p) => p.x);
+  const ys = outline.map((p) => p.y);
+  const low = { x: xs.reduce((a, b) => (a < b ? a : b)), y: ys.reduce((a, b) => (a < b ? a : b)) };
+  const high = { x: xs.reduce((a, b) => (a > b ? a : b)), y: ys.reduce((a, b) => (a > b ? a : b)) };
+
+  const bench = footprints[0];
+  assert.ok(bench, 'the bench should have been read');
+  assert.ok(
+    bench.min.x >= low.x && bench.max.x <= high.x && bench.min.y >= low.y && bench.max.y <= high.y,
+    `the bench is outside the room: x ${bench.min.x}..${bench.max.x} in ${low.x}..${high.x}, ` +
+      `y ${bench.min.y}..${bench.max.y} in ${low.y}..${high.y}`
+  );
 });

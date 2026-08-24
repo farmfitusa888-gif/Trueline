@@ -1275,6 +1275,87 @@ None of this is compiled yet either. What can be said is that the two failures
 are understood rather than guessed at, and that both fixes are the documented
 way round them.
 
+## Two coordinate frames, and 286 photographs in the wrong place
+
+Sam said the plan I drew of Gilbert's kitchen looked flipped. Chasing that found
+a bug that had been live in the app since photographs were added, and it is the
+worst kind: everything it produced was confident, plausible and wrong.
+
+**What was wrong.** A `Room` is a shape, not a place — `corners()` walks the wall
+chain from (0, 0), because a chain of headings and lengths has no opinion about
+where it starts. Everything else read out of a scan — furniture, camera poses —
+came back in the scanner's own metres, counted from wherever somebody pressed
+start. Those are two different frames. In Gilbert's kitchen they were **7.93 ft
+apart in x and 8.38 ft in y**.
+
+On top of that, `toPhoto` was inverting `referenceOriginTransform` before placing
+a pose, on the reasoning that RoomPlan surfaces are in the room's frame while
+ARFrames are in the world's. The importer reads surface transforms as world
+coordinates, so that rotated the photographer and not the room. Counting camera
+positions that land inside the floor polygon settles which is right:
+
+| | with the transform | without it |
+|---|---|---|
+| Gilbert's kitchen | 172 of 292 | **292 of 292** |
+| Sam's garage | 145 of 314 | **250 of 314** |
+
+The 64 left outside the garage are a garage: it has a 15 ft opening across the
+front and somebody scanning it stands in the doorway.
+
+**What it cost.** Photographs per wall on the kitchen, before and after:
+
+| | wall-1 | wall-2 | wall-3 | wall-5 | opening-1 |
+|---|---|---|---|---|---|
+| before | 41 | 21 | 65 | 84 | 76 |
+| after | 57 | 75 | 108 | 11 | 9 |
+
+**286 of 292 photographs changed which walls they were said to show.** And the
+summary statistic did not move at all: mean walls-in-frame per photo was 1.10
+before and 1.10 after. A camera misplaced by eight feet inside a small room
+still sees about one wall — just not that one. This is exactly why the number I
+reported when photos were built was not evidence of anything.
+
+**The fix.** `RoomFrame` gains an `origin`: where the room's first corner sits in
+the datum frame. The importer, the one place that knows both frames, subtracts
+it from every footprint and hands it to `toPhoto`. The reference transform is not
+applied at all, and `invertRigid` went with it — a function nothing calls is dead
+weight.
+
+**What stops it happening again.** Two tests that fail against the old code:
+the same scan imported twice, once with the whole building moved 37.4 m by
+-18.25 m in the scanner's world, must produce identical footprints; and
+furniture must land inside the room it was scanned in. Plus a check on every
+capture from now on — `checkCapture` counts photographs taken from outside the
+floor outline. Most of them outside is a `stop`, a few is a `note`, because a
+few is a garage door.
+
+None of the measurements were wrong. Lengths and areas come from the polygon and
+are relative, so the kitchen is still 175.3 sq ft. What was wrong was every
+statement relating a photograph or a piece of furniture to a wall.
+
+## A plan with a north arrow on it
+
+The same drawing had a compass rose. There is no compass in the data — RoomPlan
+gives no heading, and the datum is the longest wall, which is a choice this
+importer made. `north`, `south`, `east` and `west` in the code are names for the
+axes of that datum, not directions in the world, and putting an N on a drawing
+asserted something the file does not contain.
+
+Replaced with what the file does contain: the 292 camera positions, drawn as the
+path the person actually walked, and the window. A room is oriented by its
+window and where somebody started, not by a direction nobody recorded.
+
+## `11.7` is not eleven foot seven
+
+Gilbert taped two walls and both came back "11.7". The parser reads a bare
+decimal as feet, so `11.7` is 11' 8 3/8" — an inch and three eighths from what a
+person standing in a kitchen means by it, and a verified dimension is treated as
+exact from then on, so nothing downstream would ever question it.
+
+Guessing which was meant would be inventing a measurement. So the tape box shows
+its reading back instead, live, while there is still a chance to disagree with
+it: **Reads as 11' 8 3/8" — For 11 foot 7 type 11'7"**. The parser is unchanged.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.

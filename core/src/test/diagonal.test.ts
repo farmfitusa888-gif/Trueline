@@ -274,9 +274,9 @@ test('the section and dollhouse geometry handles the chamfer', () => {
   // The chamfer faces out to the north-east, so both components point positive.
   assert.ok(normals[2]!.x > 0n && normals[2]!.y > 0n);
 
-  assert.equal(insidePlan(r, { x: parseLength(`2'`), y: parseLength(`2'`), height: 0n }), true);
+  assert.equal(insidePlan(r, { x: parseLength(`2'`), y: parseLength(`2'`) }), true);
   assert.equal(
-    insidePlan(r, { x: parseLength(`11' 6"`), y: parseLength(`9' 6"`), height: 0n }),
+    insidePlan(r, { x: parseLength(`11' 6"`), y: parseLength(`9' 6"`) }),
     false,
     'the cut-off corner is outside the room'
   );

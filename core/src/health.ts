@@ -6,6 +6,7 @@ import { type PhotoImport, PLAUSIBLE_CAMERA_HEIGHT } from './capture.ts';
 import { type Photo } from './photo.ts';
 import { unphotographedWalls } from './photo.ts';
 import { closedWithoutBeingChecked } from './issue.ts';
+import { insidePlan } from './section.ts';
 
 /**
  * Is this capture any good?
@@ -221,6 +222,38 @@ export function checkCapture(input: HealthInput): Finding[] {
           'above the floor. A person holds a phone somewhere between knee and head height, so ' +
           'anything else means the poses and the room are in different coordinate systems. ' +
           'Nothing should be drawn from this until it is worked out.',
+      });
+    }
+  }
+
+  // Height catches a capture whose poses are in the wrong space vertically.
+  // This catches one that is wrong across the floor, which is what happens when
+  // the poses and the walls have had different rotations or origins applied to
+  // them — and it is what happened here: every photograph was placed against
+  // walls eight feet from where they are, and every number that came out of it
+  // looked perfectly reasonable.
+  if (input.photos && input.photos.length > 0) {
+    const outside = input.photos.filter((p) => !insidePlan(room, p.pose.at));
+    // Somebody scanning a garage stands in the doorway, so a handful outside is
+    // a room with a wide opening, not a broken frame. Most of them outside is
+    // not something a person does.
+    if (outside.length * 2 > input.photos.length) {
+      findings.push({
+        severity: 'stop',
+        what: 'The photographer appears to have been standing outside this room',
+        detail:
+          `${outside.length} of ${input.photos.length} photographs were taken from a position ` +
+          'outside the floor outline. A few is a wide opening somebody stood in; most of them ' +
+          'means the photographs and the walls are not in the same coordinate system, and ' +
+          'nothing that relates one to the other can be believed until that is worked out.',
+      });
+    } else if (outside.length > 0) {
+      findings.push({
+        severity: 'note',
+        what: `${outside.length} photograph${outside.length === 1 ? ' was' : 's were'} taken from outside the room`,
+        detail:
+          'Normal where a room has a wide opening — a garage door, a span into the next room — ' +
+          'and worth knowing, because those are the shots that see the outside face of a wall.',
       });
     }
   }

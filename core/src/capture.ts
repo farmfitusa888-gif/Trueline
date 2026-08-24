@@ -59,8 +59,21 @@ export const PHOTO_MANIFEST_SCHEMA = 'trueline.photos.v1';
 export interface RoomFrame {
   /** The unit direction the importer made "east". */
   readonly datum: { readonly x: number; readonly y: number };
-  /** RoomPlan's room-to-world transform, or null when the scan had none. */
-  readonly referenceOriginTransform: readonly number[] | null;
+  /**
+   * Where the room's first corner sits in the datum frame.
+   *
+   * A `Room` is a shape, not a place: `corners()` walks the wall chain from
+   * (0, 0), because a chain of headings and lengths has no opinion about where
+   * it starts. Everything else read out of a scan — furniture, camera poses —
+   * arrives in the scanner's own coordinates, metres from wherever the person
+   * pressed start.
+   *
+   * Those two frames are not the same one, and in Gilbert's kitchen they were
+   * 7.93 ft apart in x and 8.38 ft in y. Anything comparing a photograph or a
+   * sofa against a wall was comparing it against a wall eight feet from where
+   * it is. Subtracting this puts everything in the frame the plan is drawn in.
+   */
+  readonly origin: Point;
 }
 
 export class CaptureError extends PhotoError {}
@@ -110,18 +123,6 @@ function cross(a: Vec2, b: Vec2): bigint {
   return a.x * b.y - a.y * b.x;
 }
 
-/** Inverse of a rotation-plus-translation, without inverting a general matrix. */
-function invertRigid(m: readonly number[]): { rows: number[][]; offset: number[] } {
-  const rows = [
-    [at(m, 0, 0), at(m, 0, 1), at(m, 0, 2)],
-    [at(m, 1, 0), at(m, 1, 1), at(m, 1, 2)],
-    [at(m, 2, 0), at(m, 2, 1), at(m, 2, 2)],
-  ];
-  const t = [at(m, 3, 0), at(m, 3, 1), at(m, 3, 2)];
-  const offset = rows.map((row) => -(row[0]! * t[0]! + row[1]! * t[1]! + row[2]! * t[2]!));
-  return { rows, offset };
-}
-
 /* ---------------------------------------------------------------- the work */
 
 /**
@@ -152,24 +153,30 @@ export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
     );
   }
 
-  // ARKit world -> the room's own frame.
-  const world = [at(m, 3, 0), at(m, 3, 1), at(m, 3, 2)];
-  const forwardWorld = [-at(m, 2, 0), -at(m, 2, 1), -at(m, 2, 2)];
-  const rightWorld = [at(m, 0, 0), at(m, 0, 1), at(m, 0, 2)];
+  // A camera pose and a wall are already in the same space.
+  //
+  // This used to invert `referenceOriginTransform` first, on the reasoning that
+  // RoomPlan surfaces are in the room's frame and ARFrames are in the world's.
+  // That reasoning was wrong, and two real scans say so: the importer reads
+  // wall and floor transforms as world coordinates, so rotating only the
+  // cameras by 86 degrees put the photographer through the wall. Counting how
+  // many camera positions land inside the floor polygon settles it —
+  //
+  //     Gilbert's kitchen   172 of 292 with the transform, 292 of 292 without
+  //     Sam's garage        145 of 314 with it,            250 of 314 without
+  //
+  // — and the 64 left outside the garage are a garage: it has a 15 ft opening
+  // across the front and somebody scanning it stands in the doorway.
+  //
+  // `checkCapture` now counts this on every scan, so if a capture ever does
+  // arrive in a different frame, it says so instead of quietly mislocating
+  // every photograph in it.
+  const position = [at(m, 3, 0), at(m, 3, 1), at(m, 3, 2)];
+  const forward = [-at(m, 2, 0), -at(m, 2, 1), -at(m, 2, 2)];
+  const right = [at(m, 0, 0), at(m, 0, 1), at(m, 0, 2)];
 
-  let position = world;
-  let forward = forwardWorld;
-  let right = rightWorld;
-  if (frame.referenceOriginTransform) {
-    const { rows, offset } = invertRigid(frame.referenceOriginTransform);
-    const rotate = (v: number[]) => rows.map((row) => row[0]! * v[0]! + row[1]! * v[1]! + row[2]! * v[2]!);
-    position = rows.map((row, i) => row[0]! * world[0]! + row[1]! * world[1]! + row[2]! * world[2]! + offset[i]!);
-    forward = rotate(forwardWorld);
-    right = rotate(rightWorld);
-  }
-
-  // The room's frame is y-up, so the plan is x and z. Then the datum rotation
-  // the importer chose, so photos and walls share one set of axes.
+  // Y is up, so the plan is x and z. Then the datum rotation the importer
+  // chose, so photos and walls share one set of axes.
   const d = frame.datum;
   const plan = (x: number, z: number): [number, number] => [x * d.x + z * d.y, -x * d.y + z * d.x];
 
@@ -177,7 +184,9 @@ export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
   const [fxp, fyp] = plan(forward[0]!, forward[2]!);
   const [rxp, ryp] = plan(right[0]!, right[2]!);
 
-  const atPoint: Point = { x: nm(px), y: nm(py) };
+  // Into the frame the plan is drawn in — see `RoomFrame.origin`. Only the
+  // position moves; a direction is unchanged by a translation.
+  const atPoint: Point = { x: nm(px) - frame.origin.x, y: nm(py) - frame.origin.y };
   const forwardVec = direction(fxp, fyp, 'view direction');
 
   const tanHalf = cx / fx;
@@ -256,16 +265,13 @@ export function importPhotos(manifest: PhotoManifest, frame: RoomFrame): PhotoIm
  */
 export function heightsAboveFloor(
   manifest: PhotoManifest,
-  frame: RoomFrame,
   floorLevel: Nanometres
 ): Nanometres[] {
   return manifest.photos.map((captured) => {
     const m = captured.cameraPoseARFrame;
-    const world = [at(m, 3, 0), at(m, 3, 1), at(m, 3, 2)];
-    if (!frame.referenceOriginTransform) return nm(world[1]!) - floorLevel;
-    const { rows, offset } = invertRigid(frame.referenceOriginTransform);
-    const y = rows[1]![0]! * world[0]! + rows[1]![1]! * world[1]! + rows[1]![2]! * world[2]! + offset[1]!;
-    return nm(y) - floorLevel;
+    // Y is up in ARKit and in the room alike, and the plan's origin shift is a
+    // move across the floor, so height is the pose's own y and nothing else.
+    return nm(at(m, 3, 1)) - floorLevel;
   });
 }
 
