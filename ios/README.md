@@ -13,18 +13,23 @@ all of it in one app, with nothing to export and nothing to upload.
 ## Building it
 
 ```bash
+cd ~
+git clone https://github.com/farmfitusa888-gif/trueline.git
+cd trueline
 open ios/Trueline.xcodeproj
 ```
 
-That is the whole setup. No Homebrew, no XcodeGen, no command line. In Xcode:
-select the **Trueline** target → **Signing & Capabilities** → set **Team** to
-your Apple Developer account. Plug in the phone, choose it as the destination,
-press **Run**.
+That is the whole setup. No Homebrew, no XcodeGen, no Node. In Xcode: select the
+**Trueline** target → **Signing & Capabilities** → set **Team** to your Apple
+Developer account. Plug in the phone, choose it as the destination, press
+**Run**.
 
-The project's first build phase runs `npm install && npm run build` at the top
-of the repository and copies `web/dist` into the app, so the screens in the app
-are always the ones in this commit. If it cannot find `npm` it says so and uses
-whatever was copied last time rather than failing the build.
+**Node is optional.** The built web app is committed at `Trueline/Web`, so a Mac
+with nothing installed but Xcode produces a working app. If `npm` *is* on the
+path, the project's first build phase runs `npm install && npm run build` at the
+top of the repository and copies `web/dist` over it, so a screen edited five
+minutes ago is in the build. If it is not, the build phase says so and uses the
+committed bundle — which CI proves is the current one on every push.
 
 **Device only.** ARKit does not run in the simulator.
 

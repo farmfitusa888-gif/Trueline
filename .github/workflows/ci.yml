@@ -32,6 +32,20 @@ jobs:
       - run: npm run typecheck -w web
       - run: npm run build -w web
 
+      # The built web app is committed under ios/Trueline/Web so that a Mac with
+      # no Node on it still produces a working app — the correction screens are
+      # inside the phone app, and a missing bundle is a blank screen. A
+      # committed artefact goes stale silently, so this proves it has not: the
+      # build is byte-identical across runs, and any difference here means
+      # somebody changed a screen and did not ship it.
+      - name: The bundle in the iOS app is the current build
+        run: |
+          if ! diff -r web/dist ios/Trueline/Web; then
+            echo "::error::ios/Trueline/Web is not the current web build."
+            echo "Run: rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/"
+            exit 1
+          fi
+
   # LibreCAD's printer will not draw our file even with layouts, while Autodesk
   # draws the same bytes correctly. That makes it a harness limitation rather
   # than a product defect, so this job reports and does not gate.

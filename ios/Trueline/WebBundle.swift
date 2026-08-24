@@ -58,6 +58,12 @@ final class WebBundle: NSObject, WKURLSchemeHandler {
                 // so to the engine rather than relying on it not trying.
                 "Content-Security-Policy":
                     "default-src 'self' 'unsafe-inline' data: blob:; connect-src 'self'",
+                // The built page tags its module script `crossorigin`, which
+                // puts the fetch in CORS mode even though it is same-origin.
+                // Spec says that passes; a custom scheme is exactly where an
+                // engine might decide otherwise, and this costs nothing —
+                // no origin outside the app can reach this scheme to ask.
+                "Access-Control-Allow-Origin": "*",
             ]
         )!
 

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The app mark, redrawn for 16 px: the dimension line keeps its end ticks
+       but at this size they are part of the bar, and the bob is heavier. -->
+  <rect width="64" height="64" rx="13" fill="#14181B"/>
+  <g stroke="#F4F6F7" stroke-linecap="butt">
+    <line x1="13" y1="21" x2="51" y2="21" stroke-width="6"/>
+    <line x1="14.5" y1="16" x2="14.5" y2="27" stroke-width="4"/>
+    <line x1="49.5" y1="16" x2="49.5" y2="27" stroke-width="4"/>
+    <line x1="32" y1="21" x2="32" y2="40" stroke-width="6"/>
+  </g>
+  <polygon points="32,38 41,45 41,48 32,59 23,48 23,45" fill="#B8590A"/>
+</svg>

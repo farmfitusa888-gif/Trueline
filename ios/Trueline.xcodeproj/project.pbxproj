@@ -184,7 +184,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n# Xcode's PATH has neither Homebrew nor nvm on it, so look where a login\n# shell would rather than assuming.\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH\"\nROOT=\"$SRCROOT/..\"\nif ! command -v npm >/dev/null 2>&1; then\n  echo \"warning: npm not found - using whatever is already in Trueline/Web\"\n  exit 0\nfi\n( cd \"$ROOT\" && npm install --silent && npm run build --silent )\nrm -rf \"$SRCROOT/Trueline/Web\"\nmkdir -p \"$SRCROOT/Trueline/Web\"\ncp -R \"$ROOT/web/dist/.\" \"$SRCROOT/Trueline/Web/\"\n";
+			shellScript = "set -e\n# Xcode's PATH has neither Homebrew nor nvm on it, so look where a login\n# shell would rather than assuming.\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH\"\nROOT=\"$SRCROOT/..\"\nif ! command -v npm >/dev/null 2>&1; then\n  echo \"warning: npm not found - building with the web bundle committed to the repository. It is the current one unless a screen was changed without rebuilding, which CI would have caught.\"\n  exit 0\nfi\n( cd \"$ROOT\" && npm install --silent && npm run build --silent )\nrm -rf \"$SRCROOT/Trueline/Web\"\nmkdir -p \"$SRCROOT/Trueline/Web\"\ncp -R \"$ROOT/web/dist/.\" \"$SRCROOT/Trueline/Web/\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
