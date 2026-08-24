@@ -7,7 +7,7 @@ import { importRoomPlan } from '../../core/src/import-roomplan.ts';
 import type { Footprint } from '../../core/src/obstruction.ts';
 import { makeCased, makeOpen, makeWall, verifyWall } from '../../core/src/edit.ts';
 import { loadProject, saveProject } from '../../core/src/persist.ts';
-import { type PhotoManifest, type RoomFrame, importPhotos } from '../../core/src/capture.ts';
+import { type PhotoImport, type PhotoManifest, type RoomFrame, importPhotos } from '../../core/src/capture.ts';
 import type { Photo } from '../../core/src/photo.ts';
 
 /**
@@ -44,6 +44,8 @@ export interface Loaded {
    * handed the room over.
    */
   readonly photos: readonly Photo[];
+  /** Photographs the import would not place, so the screen can say which and why. */
+  readonly rejectedPhotos: PhotoImport['rejected'];
   /** The coordinate frame the room came in on, so more photos can be placed later. */
   readonly frame: RoomFrame;
   /** Rooms as they were before each edit, most recent last. */
@@ -98,22 +100,27 @@ export function reduce(state: State, action: Action): State {
       try {
         const { room, report, footprints, frame } = importRoomPlan(action.json as never, {
           at: action.at,
+          // What the capture was called beats RoomPlan's guess at what kind of
+          // room it is, which is often nothing at all.
+          name: action.fileName,
         });
 
         // Photographs are optional: a scan dropped in from a file has none, and
         // one handed over by the scanner in this app has hundreds. Either way a
         // photo that will not place is named rather than dropped.
+        // A handful of refused photographs is normal — the first frames of a
+        // scan are taken while the phone is still pointed at the floor. That is
+        // a line in the findings list, not a red panel across the top of the
+        // screen: an alarm that fires on every scan teaches people to close
+        // alarms. Only a manifest that will not read at all is an error.
         let photos: readonly Photo[] = [];
+        let rejectedPhotos: PhotoImport['rejected'] = [];
         let photoTrouble: string | null = null;
         if (action.photos) {
           try {
             const imported = importPhotos(action.photos as PhotoManifest, frame);
             photos = imported.photos;
-            if (imported.rejected.length > 0) {
-              photoTrouble =
-                `${imported.rejected.length} photo${imported.rejected.length === 1 ? '' : 's'} ` +
-                `could not be placed against the room: ${imported.rejected[0]!.reason}`;
-            }
+            rejectedPhotos = imported.rejected;
           } catch (error) {
             photoTrouble = message(error);
           }
@@ -127,6 +134,7 @@ export function reduce(state: State, action: Action): State {
             report,
             footprints,
             photos,
+            rejectedPhotos,
             frame,
             undo: [],
             lastEdit: null,
@@ -183,6 +191,7 @@ export function reduce(state: State, action: Action): State {
             },
             footprints: [],
             photos: [],
+            rejectedPhotos: [],
             frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
             undo: [],
             lastEdit: null,
@@ -221,6 +230,7 @@ export function reduce(state: State, action: Action): State {
             report: extras.report,
             footprints: extras.footprints ?? [],
             photos: extras.photos ?? [],
+            rejectedPhotos: [],
             frame: extras.frame ?? { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
             undo: [],
             lastEdit: `Picked up where you left off — saved ${when(saved.savedAt)}.`,

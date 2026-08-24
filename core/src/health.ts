@@ -50,6 +50,15 @@ export interface Finding {
   readonly detail: string;
 }
 
+/**
+ * How wide a window gets before it is probably not a window.
+ *
+ * 8 ft. A picture window that size exists; a garage door that size is the norm,
+ * and Sam's own garage came back with one 16' 11 13/16" across labelled window.
+ * The number is a prompt to look, not a rule about buildings.
+ */
+export const WIDEST_LIKELY_WINDOW: Nanometres = 8n * 12n * 25400000n;
+
 /** Apple's own recommended maximum for one capture. */
 export const ROOMPLAN_MAX_SIDE: Nanometres = 9n * NM_PER_METRE;
 
@@ -256,6 +265,29 @@ export function checkCapture(input: HealthInput): Finding[] {
           'and worth knowing, because those are the shots that see the outside face of a wall.',
       });
     }
+  }
+
+  // RoomPlan classifies what it sees, and a garage door is a big flat rectangle
+  // in a wall. Sam's own garage came back with a "window" 16' 11 13/16" wide.
+  // Nothing downstream can tell the difference, and the difference is the price
+  // of a garage door against the price of a window.
+  const generous = room.walls.flatMap((wall) =>
+    (wall.openings ?? [])
+      .filter((o) => o.kind === 'window' && o.width.value > WIDEST_LIKELY_WINDOW)
+      .map((o) => ({ wall, opening: o }))
+  );
+  if (generous.length > 0) {
+    findings.push({
+      severity: 'check',
+      what: `${generous.length === 1 ? 'A window' : `${generous.length} windows`} too wide to be a window`,
+      detail:
+        generous
+          .map((g) => `${formatFeetInches(g.opening.width.value)} across ${g.wall.id}`)
+          .join('; ') +
+        `. Anything past ${formatFeetInches(WIDEST_LIKELY_WINDOW)} is usually a garage door, a ` +
+        'slider, or a wide opening the scanner filled in. It is priced as glazing until somebody ' +
+        'says otherwise.',
+    });
   }
 
   /* -------------------------------------------------------- always worth saying */

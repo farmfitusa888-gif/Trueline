@@ -1417,6 +1417,72 @@ Guessing which was meant would be inventing a measurement. So the tape box shows
 its reading back instead, live, while there is still a chance to disagree with
 it: **Reads as 11' 8 3/8" — For 11 foot 7 type 11'7"**. The parser is unchanged.
 
+## Trueline scanned a real room, and the same garage twice
+
+Sam built the app in Xcode, scanned his own garage with it, and sent the
+capture back. It is the first time this pipeline has run end to end on hardware:
+55 photographs with poses, a `room.json`, a `room.usdz`, all written by our own
+code, all read by the importer without a complaint.
+
+**The two-scanner check, on one garage.**
+
+| | OpenPlan3D, earlier | Trueline, tonight | apart by |
+|---|---|---|---|
+| area | 418.0 sq ft | 411.8 sq ft | 6.2 sq ft, 1.5% |
+| long walls | 21' 5 7/16" | 21' 3 13/16" | **1 5/8"** |
+| short wall | 19' 5 13/16" | 19' 3 3/4" | **2 1/16"** |
+
+Both inside RoomPlan's own published ±50 mm, which is ±2". Two independent
+captures of one room, through two different apps, agree to within the tolerance
+the sensor claims. That is the end-to-end confirmation the project has been
+waiting for, and it is still not a measurement: neither number has had a tape on
+it, and the walls disagree by more than a wall's worth of drywall.
+
+They disagree structurally too. The earlier scan found the garage door as a
+15' 9 9/16" open span between two stub walls; tonight's found four solid walls
+with a **16' 11 13/16" "window"** in one of them. Same door, classified two ways
+by the same framework on two days.
+
+**What Sam's own capture exposed, all now fixed:**
+
+- The room was called **"unidentified"**. That is RoomPlan's label for a room it
+  could not classify — a status, not a name — and it was going straight to the
+  screen. The capture's own name is used instead.
+- **Two refused photographs raised a red alarm panel** across the top of the
+  screen. The first frames of any scan are taken while the phone still points at
+  the floor, so that alarm would fire on every scan somebody ever took, and an
+  alarm that always fires is furniture. It is a line in the findings now.
+- A **17-foot window** went through without comment. `checkCapture` now says so:
+  anything past 8 ft is usually a garage door, a slider or a wide opening, and
+  the difference is what it costs.
+
+## The 3D view is the plan, seen from somewhere else
+
+Sam asked where the 3D model goes after a scan, and for a toggle between the
+blueprint and it, with the walls still tappable on both.
+
+The scanner does write `room.usdz` and Apple's viewer will open it. It is
+useless for this: a usdz is a mesh, and a mesh does not know which triangle is
+the wall you just measured. You cannot tap it and have the room re-solve.
+
+So `project.ts` draws the model instead — an axonometric dollhouse, near walls
+taken off, drag to walk around it — and **every face carries the id of the wall
+it came from**. Tapping a wall in 3D opens the same tape box as tapping it on
+the plan, and typing a number re-solves the same room. One measurement engine,
+two ways of looking at it. Parallel projection, not perspective: nobody should
+take a measurement off a drawing where the far end of a wall is drawn shorter
+than the near end.
+
+Floats live in that one file and nowhere else in `core`. A projection decides
+where ink goes on a screen and never what a wall measures.
+
+**A bug worth keeping.** Openings were sorted by depth like everything else, and
+an opening lies in the plane of its own wall — the same distance away. On Sam's
+garage the window averaged 7.15 to its wall's 6.46, so it was drawn first and
+the wall painted over it. Solids are ordered by depth now, and each wall's
+openings follow it immediately: an opening is drawn on its own wall or not at
+all.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.

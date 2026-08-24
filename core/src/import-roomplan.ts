@@ -425,7 +425,11 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
   const tallest = scan.walls.reduce((best, w) => Math.max(best, w.dimensions[1] ?? 0), 0);
   if (tallest <= 0) throw new ImportError('No wall in the scan has a height, so the room has no ceiling.');
 
-  const name = options.name ?? scan.sections?.[0]?.label ?? 'Room';
+  // RoomPlan labels a room it could not classify "unidentified", which is a
+  // status, not a name. Sam's garage came through as a room called
+  // "unidentified" and that is what the screen showed him.
+  const label = scan.sections?.[0]?.label;
+  const name = options.name ?? (label && label !== 'unidentified' ? label : 'Room');
   const idOf = new Map(sourceIds.map((s) => [s.sourceIdentifier, s.id]));
   const withOpenings = attachOpenings(scan, walls, outline, datum, weld, measured, options.at, tolerance, idOf);
 

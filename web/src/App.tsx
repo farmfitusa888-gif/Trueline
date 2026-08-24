@@ -9,6 +9,7 @@ import { LEGEND, Plan } from './Plan.tsx';
 import { Corrections } from './Corrections.tsx';
 import { FieldSheet } from './FieldSheet.tsx';
 import { Mark } from './Mark.tsx';
+import { Room3D } from './Room3D.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -153,6 +154,9 @@ function Opener({ onOpen }: { onOpen: (json: unknown, fileName: string) => void 
 export function App() {
   const [state, dispatch] = useReducer(reduce, EMPTY);
   const [saveTrouble, setSaveTrouble] = useState<string | null>(null);
+  // Plan or room. The same model, the same selection, the same tape box under
+  // both — switching view never changes what is being measured.
+  const [look, setLook] = useState<'plan' | 'room'>('plan');
   const loaded = state.loaded;
 
   // Let the scanner in — and pick up whatever was being corrected last time.
@@ -257,21 +261,55 @@ export function App() {
                   {formatSquareFeet(derived.area.value)}
                 </p>
               </div>
-              <Plan
-                room={loaded.room}
-                selected={state.selected}
-                obstructions={derived.obstructions}
-                footprints={loaded.footprints}
-                onSelect={(wallId) => dispatch({ type: 'select', wallId })}
-              />
-              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-slate-500">
-                {LEGEND.map((item) => (
-                  <li key={item.label} className="flex items-center gap-1.5">
-                    <span className={`inline-block h-2 w-4 rounded-sm ${item.className}`} />
-                    {item.label}
-                  </li>
+
+              <div
+                role="tablist"
+                aria-label="How to look at this room"
+                className="mb-3 flex gap-1 rounded-lg bg-slate-100 p-1"
+              >
+                {(['plan', 'room'] as const).map((which) => (
+                  <button
+                    key={which}
+                    type="button"
+                    role="tab"
+                    aria-selected={look === which}
+                    onClick={() => setLook(which)}
+                    className={`min-h-11 flex-1 rounded-md px-4 font-medium ${
+                      look === which
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-600 active:bg-slate-200'
+                    }`}
+                  >
+                    {which === 'plan' ? 'Blueprint' : '3D'}
+                  </button>
                 ))}
-              </ul>
+              </div>
+
+              {look === 'plan' ? (
+                <>
+                  <Plan
+                    room={loaded.room}
+                    selected={state.selected}
+                    obstructions={derived.obstructions}
+                    footprints={loaded.footprints}
+                    onSelect={(wallId) => dispatch({ type: 'select', wallId })}
+                  />
+                  <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-slate-500">
+                    {LEGEND.map((item) => (
+                      <li key={item.label} className="flex items-center gap-1.5">
+                        <span className={`inline-block h-2 w-4 rounded-sm ${item.className}`} />
+                        {item.label}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <Room3D
+                  room={loaded.room}
+                  selected={state.selected}
+                  onSelect={(wallId) => dispatch({ type: 'select', wallId })}
+                />
+              )}
             </div>
 
             {selectedWall && (
@@ -342,6 +380,7 @@ export function App() {
               obstructions={derived.obstructions}
               punchList={derived.punchList}
               photos={loaded.photos}
+              rejectedPhotos={loaded.rejectedPhotos}
               selected={state.selected}
               onSelect={(wallId) => dispatch({ type: 'select', wallId })}
               onMake={(wallId, as) => dispatch({ type: 'make', wallId, as })}

@@ -6,6 +6,7 @@ import { type Readiness, trustLabel } from '../../core/src/issue.ts';
 import { type PunchListItem, type WallObstruction, describe } from '../../core/src/obstruction.ts';
 import { checkCapture } from '../../core/src/health.ts';
 import type { Photo } from '../../core/src/photo.ts';
+import type { PhotoImport } from '../../core/src/capture.ts';
 
 /**
  * What the import decided, and what to do about each one.
@@ -24,6 +25,7 @@ export interface CorrectionsProps {
   readonly obstructions: readonly WallObstruction[];
   readonly punchList: readonly PunchListItem[];
   readonly photos: readonly Photo[];
+  readonly rejectedPhotos: PhotoImport['rejected'];
   readonly selected: string | null;
   readonly onSelect: (wallId: string) => void;
   readonly onMake: (wallId: string, as: 'wall' | 'open' | 'cased') => void;
@@ -61,6 +63,7 @@ export function Corrections({
   obstructions,
   punchList,
   photos,
+  rejectedPhotos,
   selected,
   onSelect,
   onMake,
@@ -68,7 +71,7 @@ export function Corrections({
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
   // The same checks the command-line tool ran, on screen, because the app put
   // the file here and should be the one to say whether it is any good.
-  const findings = checkCapture({ room, report, photos });
+  const findings = checkCapture({ room, report, photos, rejectedPhotos });
   const openSpans = room.walls.filter((w) => w.open);
   const inTheWay = obstructions.filter((o) => o.blockedLength > 0n);
 
