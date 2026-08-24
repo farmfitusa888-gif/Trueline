@@ -24,6 +24,11 @@ That is the whole setup. No Homebrew, no XcodeGen, no Node. In Xcode: select the
 Developer account. Plug in the phone, choose it as the destination, press
 **Run**.
 
+The bundle identifier is `com.sunnyacres.trueline`, set in the project rather
+than typed in every time. It is the app's permanent name to Apple: change it
+after a build has gone to App Store Connect and that is a new app record with no
+testers on it, so it is set now, before the first upload.
+
 **Node is optional.** The built web app is committed at `Trueline/Web`, so a Mac
 with nothing installed but Xcode produces a working app. If `npm` *is* on the
 path, the project's first build phase runs `npm install && npm run build` at the
