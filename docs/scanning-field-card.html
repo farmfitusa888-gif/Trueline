@@ -38,7 +38,7 @@
 </style></head><body>
 
 <header class="mast"><div class="brand">True<span>line</span></div>
-  <div class="sub">Field card &mdash; how to measure a room<br>Rev 4 &middot; iPhone / iPad &mdash; with LiDAR or without</div></header>
+  <div class="sub">Field card &mdash; how to measure a room<br>Rev 5 &middot; iPhone / iPad &mdash; with LiDAR or without</div></header>
 
 <section>
   <h2><span class="n">01</span>Where to stand</h2>
@@ -355,14 +355,24 @@ done properly beats twenty done badly.</footer>
 
 <div class="pb"></div>
 <header class="mast"><div class="brand">True<span>line</span></div>
-  <div class="sub">Field card &mdash; page 5<br>What happens to the scan</div></header>
+  <div class="sub">Field card &mdash; page 5<br>What the app does with it</div></header>
 
 <section>
-  <h2><span class="n">09</span>Open the scan and check it</h2>
-  <p>Take the <b>room.json</b> out of the export and drop it on the Trueline page in any browser,
-  on the phone you scanned with. Nothing is uploaded &mdash; the file is read on the device and
-  stays there. You get the plan, the floor area, and every dimension marked with where it came from.</p>
-  <figure><svg viewBox="0 0 620 196" xmlns="http://www.w3.org/2000/svg" role="img"
+  <h2><span class="n">09</span>Three different taps &mdash; only one is during the capture</h2>
+  <table>
+    <thead><tr><th style="width:24%">When</th><th style="width:26%">Do you tap?</th><th>What is happening</th></tr></thead>
+    <tr><td class="k">Scanning<br>(LiDAR)</td><td><b>No.</b> Never tap the walls on screen.</td><td>The sensor finds the walls while you walk. Your job is where you stand and how you move &mdash; pages 1, 2 and 4.</td></tr>
+    <tr><td class="k">Measuring<br>(no LiDAR)</td><td><b>Yes &mdash; the floor.</b></td><td>No sensor, so you place each corner: aim at its foot, tap. Page 6.</td></tr>
+    <tr><td class="k">Correcting<br>(after either)</td><td><b>Yes &mdash; the drawing.</b></td><td>Tap a wall on the plan and type what your tape says. This is the one that turns a scan into a measurement.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="n">10</span>It opens itself</h2>
+  <p>No export, no file to find, no browser. The moment a capture ends the plan is on screen: the
+  area, every dimension marked with where it came from, and what the app thinks is wrong with the
+  capture. Nothing is uploaded.</p>
+  <figure><svg viewBox="0 0 620 150" xmlns="http://www.w3.org/2000/svg" role="img"
   aria-label="What each kind of line on the Trueline plan means"><defs>
   <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
     <path d="M0,0 L10,5 L0,10 z" fill="#14181B"/></marker>
@@ -373,74 +383,75 @@ done properly beats twenty done badly.</footer>
   <pattern id="hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
     <line x1="0" y1="0" x2="0" y2="6" stroke="#9AA4AA" stroke-width="2"/></pattern>
 </defs>
-  <text x="0" y="11" font-size="11" font-weight="bold" fill="#14181B">THE PLAN ON SCREEN &#8212; WHAT EACH LINE MEANS</text>
+  <text x="0" y="10" font-size="11" font-weight="bold" fill="#14181B">THE PLAN ON SCREEN &#8212; WHAT EACH LINE MEANS</text>
 
   <!-- a small room, one edge of each kind -->
-  <rect x="14" y="30" width="250" height="140" fill="#E8EDEF"/>
+  <rect x="14" y="26" width="230" height="112" fill="#E8EDEF"/>
 
   <!-- measured: heavy ink -->
-  <line x1="14" y1="30" x2="264" y2="30" stroke="#14181B" stroke-width="6" stroke-linecap="round"/>
-  <text x="139" y="24" font-size="10.5" text-anchor="middle" fill="#14181B" font-weight="bold">12' 3 1/2"</text>
+  <line x1="14" y1="26" x2="244" y2="26" stroke="#14181B" stroke-width="6" stroke-linecap="round"/>
+  <text x="129" y="20" font-size="10" text-anchor="middle" fill="#14181B" font-weight="bold">12&#39; 3 1/2&quot;</text>
 
   <!-- scanned: amber -->
-  <line x1="264" y1="30" x2="264" y2="170" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
+  <line x1="244" y1="26" x2="244" y2="138" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
 
   <!-- blocked: amber with a red dashed overlay -->
-  <line x1="14" y1="170" x2="264" y2="170" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
-  <line x1="14" y1="170" x2="264" y2="170" stroke="#B4232A" stroke-width="2" stroke-dasharray="7 5"/>
-  <rect x="34" y="141" width="150" height="27" fill="#9AA4AA" opacity="0.45" stroke="#4A5459"
+  <line x1="14" y1="138" x2="244" y2="138" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
+  <line x1="14" y1="138" x2="244" y2="138" stroke="#B4232A" stroke-width="2" stroke-dasharray="7 5"/>
+  <rect x="32" y="114" width="140" height="22" fill="#9AA4AA" opacity="0.45" stroke="#4A5459"
         stroke-width="1" stroke-dasharray="3 3"/>
-  <text x="109" y="159" font-size="9.5" text-anchor="middle" fill="#14181B">counter</text>
+  <text x="102" y="129" font-size="9.5" text-anchor="middle" fill="#14181B">counter</text>
 
   <!-- open span: thin dotted -->
-  <line x1="14" y1="30" x2="14" y2="170" stroke="#7E888E" stroke-width="2.4" stroke-dasharray="2 9"
+  <line x1="14" y1="26" x2="14" y2="138" stroke="#7E888E" stroke-width="2.4" stroke-dasharray="2 9"
         stroke-linecap="round"/>
 
   <!-- the key -->
-  <g font-size="11" fill="#14181B">
-    <line x1="300" y1="42" x2="352" y2="42" stroke="#14181B" stroke-width="6" stroke-linecap="round"/>
-    <text x="364" y="46" font-weight="bold">Measured</text>
-    <text x="364" y="60" font-size="10" fill="#4A5459">somebody put a tape on it. It never moves again.</text>
+  <g font-size="10.5" fill="#14181B">
+    <line x1="278" y1="30" x2="326" y2="30" stroke="#14181B" stroke-width="6" stroke-linecap="round"/>
+    <text x="338" y="34" font-weight="bold">Measured</text>
+    <text x="424" y="34" font-size="9.5" fill="#4A5459">a tape was on it. It never moves again.</text>
 
-    <line x1="300" y1="83" x2="352" y2="83" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
-    <text x="364" y="87" font-weight="bold">Scanned</text>
-    <text x="364" y="101" font-size="10" fill="#4A5459">the sensor's own number. Carries a band.</text>
+    <line x1="278" y1="66" x2="326" y2="66" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
+    <text x="338" y="70" font-weight="bold">Scanned</text>
+    <text x="424" y="70" font-size="9.5" fill="#4A5459">the sensor&#8217;s number. Carries a band.</text>
 
-    <line x1="300" y1="124" x2="352" y2="124" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
-    <line x1="300" y1="124" x2="352" y2="124" stroke="#B4232A" stroke-width="2" stroke-dasharray="7 5"/>
-    <text x="364" y="128" font-weight="bold">Something was in the way</text>
-    <text x="364" y="142" font-size="10" fill="#4A5459">tape this one first, whatever the number says.</text>
+    <line x1="278" y1="102" x2="326" y2="102" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
+    <line x1="278" y1="102" x2="326" y2="102" stroke="#B4232A" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="338" y="106" font-weight="bold">Blocked</text>
+    <text x="424" y="106" font-size="9.5" fill="#4A5459">tape this one first, whatever it says.</text>
 
-    <line x1="300" y1="165" x2="352" y2="165" stroke="#7E888E" stroke-width="2.4" stroke-dasharray="2 9"
+    <line x1="278" y1="138" x2="326" y2="138" stroke="#7E888E" stroke-width="2.4" stroke-dasharray="2 9"
           stroke-linecap="round"/>
-    <text x="364" y="169" font-weight="bold">No wall here</text>
-    <text x="364" y="183" font-size="10" fill="#4A5459">an opening. No drywall, no paint, no baseboard.</text>
+    <text x="338" y="142" font-weight="bold">No wall</text>
+    <text x="424" y="142" font-size="9.5" fill="#4A5459">an opening. No drywall, no baseboard.</text>
   </g>
 </svg></figure>
 </section>
 
 <section>
-  <h2><span class="n">10</span>What the scanner never tells you</h2>
+  <h2><span class="n">11</span>What the scanner never tells you</h2>
   <table>
-    <tr><td class="k">Wall thickness</td><td>Not in the file at all. Every thickness on the drawing is one the app chose &mdash; check it against a door jamb.</td></tr>
+    <tr><td class="k">Wall thickness</td><td>Not captured at all. Every thickness on the drawing is one the app chose &mdash; check it at a door jamb.</td></tr>
     <tr><td class="k">Window sill height</td><td>Never stated. It is worked out from the window's centre, so it is worth a tape.</td></tr>
     <tr><td class="k">Door &amp; window sizes</td><td>Out by more than a foot in both directions on two real scans &mdash; a 6&#8242;8&#8243; door read as 6&#8242;10&#8243; and as 5&#8242;7&#8243;. Never order against one.</td></tr>
-    <tr><td class="k">Which walls are yours</td><td>A scan can pick up a wall of the room next door through a doorway. The app drops it and says so &mdash; read that line.</td></tr>
-    <tr><td class="k">Where there is no wall</td><td>A garage door or a wide opening comes in as a gap, not a wall. If it really is a wall, say so on the screen before anything gets priced.</td></tr>
+    <tr><td class="k">Which walls are yours</td><td>A scan can pick up the room next door through a doorway. The app drops it and says so &mdash; read that line.</td></tr>
+    <tr><td class="k">Where there is no wall</td><td>A garage door or wide opening comes in as a gap. If it really is a wall, say so before anything gets priced.</td></tr>
   </table>
 </section>
 
 <section>
-  <h2><span class="n">11</span>Type the tape numbers in</h2>
-  <p>Tap a wall, type what your tape says &mdash; <span class="k">12' 3 1/2"</span>, or just
-  <span class="k">12.5</span> for feet &mdash; and the whole room re-solves around it. The other
-  walls give ground in proportion to how unsure the sensor was about each of them, and the one you
-  measured never moves again.</p>
+  <h2><span class="n">12</span>Type the tape numbers in</h2>
+  <p>Tap a wall on the plan, type what your tape says &mdash; <span class="k">12' 3 1/2"</span>, or
+  just <span class="k">12.5</span> for feet &mdash; and the room re-solves around it. Every other
+  wall gives ground in proportion to how unsure the sensor was about it, and the one you measured
+  never moves again.</p>
   <p><b>Watch for this:</b> if it says a wall had to move <em>further than the scanner's own
   tolerance</em>, that wall is the next one to tape. It is the room telling you where it is wrong.</p>
   <div class="warn"><span class="lbl">It is saved, but it is not backed up</span>
-  Your corrections survive closing the tab, on that browser and that device only. Clearing site data
-  clears them. Until accounts exist, finish a room in one visit.</div>
+  Corrections are kept inside the app and survive closing it &mdash; on that phone only. Deleting the
+  app deletes them. The captures themselves also sit in the <b>Files</b> app under Trueline, so a
+  room can be copied off; until accounts exist that is the only backup there is.</div>
 </section>
 
 <footer>Nothing on the drawing is a measurement until somebody has stood behind it. That is the
@@ -451,7 +462,7 @@ whole point of the tape log on the previous page &mdash; and of the amber lines 
   <div class="sub">Field card &mdash; page 6<br>No LiDAR? Walk the room instead</div></header>
 
 <section>
-  <h2><span class="n">12</span>Which one this phone does</h2>
+  <h2><span class="n">13</span>Which one this phone does</h2>
   <p>The first screen offers two ways in. <b>Scan</b> sweeps the room with the depth sensor and comes
   back with walls, doors and windows already found. <b>Measure</b> uses the camera only: you walk the
   room and tap the corners yourself. You do not have to know which phone is which &mdash; if
@@ -459,7 +470,7 @@ whole point of the tape log on the previous page &mdash; and of the amber lines 
 </section>
 
 <section>
-  <h2><span class="n">13</span>Walking a room with the camera</h2>
+  <h2><span class="n">14</span>Walking a room with the camera</h2>
   <figure><svg viewBox="0 0 620 176" xmlns="http://www.w3.org/2000/svg" role="img"
   aria-label="Plan view of tapping each corner of a room with AR, and re-tapping the first corner to close"><defs>
   <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
@@ -529,7 +540,7 @@ whole point of the tape log on the previous page &mdash; and of the amber lines 
 </section>
 
 <section>
-  <h2><span class="n">14</span>What a walked room does not come with</h2>
+  <h2><span class="n">15</span>What a walked room does not come with</h2>
   <table>
     <tr><td class="k">Doors &amp; windows</td><td>Not found for you &mdash; add them on the plan afterwards.</td></tr>
     <tr><td class="k">Ceiling height</td><td>Nothing measures it. The app starts at 8&#8242; &plusmn;6&#8243; and marks it assumed. Tape it.</td></tr>

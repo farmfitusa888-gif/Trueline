@@ -163,50 +163,50 @@ OPENPLAN = f'''<svg viewBox="0 0 620 168" xmlns="http://www.w3.org/2000/svg" rol
 # the tape is not the person looking at the screen. Every state is drawn with a
 # distinct line weight and dash as well as a colour, so it still reads after a
 # black-and-white photocopy.
-PLANKEY = f'''<svg viewBox="0 0 620 196" xmlns="http://www.w3.org/2000/svg" role="img"
+PLANKEY = f'''<svg viewBox="0 0 620 150" xmlns="http://www.w3.org/2000/svg" role="img"
   aria-label="What each kind of line on the Trueline plan means">{DEFS}
-  <text x="0" y="11" font-size="11" font-weight="bold" fill="#14181B">THE PLAN ON SCREEN &#8212; WHAT EACH LINE MEANS</text>
+  <text x="0" y="10" font-size="11" font-weight="bold" fill="#14181B">THE PLAN ON SCREEN &#8212; WHAT EACH LINE MEANS</text>
 
   <!-- a small room, one edge of each kind -->
-  <rect x="14" y="30" width="250" height="140" fill="#E8EDEF"/>
+  <rect x="14" y="26" width="230" height="112" fill="#E8EDEF"/>
 
   <!-- measured: heavy ink -->
-  <line x1="14" y1="30" x2="264" y2="30" stroke="#14181B" stroke-width="6" stroke-linecap="round"/>
-  <text x="139" y="24" font-size="10.5" text-anchor="middle" fill="#14181B" font-weight="bold">12' 3 1/2"</text>
+  <line x1="14" y1="26" x2="244" y2="26" stroke="#14181B" stroke-width="6" stroke-linecap="round"/>
+  <text x="129" y="20" font-size="10" text-anchor="middle" fill="#14181B" font-weight="bold">12&#39; 3 1/2&quot;</text>
 
   <!-- scanned: amber -->
-  <line x1="264" y1="30" x2="264" y2="170" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
+  <line x1="244" y1="26" x2="244" y2="138" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
 
   <!-- blocked: amber with a red dashed overlay -->
-  <line x1="14" y1="170" x2="264" y2="170" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
-  <line x1="14" y1="170" x2="264" y2="170" stroke="#B4232A" stroke-width="2" stroke-dasharray="7 5"/>
-  <rect x="34" y="141" width="150" height="27" fill="#9AA4AA" opacity="0.45" stroke="#4A5459"
+  <line x1="14" y1="138" x2="244" y2="138" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
+  <line x1="14" y1="138" x2="244" y2="138" stroke="#B4232A" stroke-width="2" stroke-dasharray="7 5"/>
+  <rect x="32" y="114" width="140" height="22" fill="#9AA4AA" opacity="0.45" stroke="#4A5459"
         stroke-width="1" stroke-dasharray="3 3"/>
-  <text x="109" y="159" font-size="9.5" text-anchor="middle" fill="#14181B">counter</text>
+  <text x="102" y="129" font-size="9.5" text-anchor="middle" fill="#14181B">counter</text>
 
   <!-- open span: thin dotted -->
-  <line x1="14" y1="30" x2="14" y2="170" stroke="#7E888E" stroke-width="2.4" stroke-dasharray="2 9"
+  <line x1="14" y1="26" x2="14" y2="138" stroke="#7E888E" stroke-width="2.4" stroke-dasharray="2 9"
         stroke-linecap="round"/>
 
   <!-- the key -->
-  <g font-size="11" fill="#14181B">
-    <line x1="300" y1="42" x2="352" y2="42" stroke="#14181B" stroke-width="6" stroke-linecap="round"/>
-    <text x="364" y="46" font-weight="bold">Measured</text>
-    <text x="364" y="60" font-size="10" fill="#4A5459">somebody put a tape on it. It never moves again.</text>
+  <g font-size="10.5" fill="#14181B">
+    <line x1="278" y1="30" x2="326" y2="30" stroke="#14181B" stroke-width="6" stroke-linecap="round"/>
+    <text x="338" y="34" font-weight="bold">Measured</text>
+    <text x="424" y="34" font-size="9.5" fill="#4A5459">a tape was on it. It never moves again.</text>
 
-    <line x1="300" y1="83" x2="352" y2="83" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
-    <text x="364" y="87" font-weight="bold">Scanned</text>
-    <text x="364" y="101" font-size="10" fill="#4A5459">the sensor's own number. Carries a band.</text>
+    <line x1="278" y1="66" x2="326" y2="66" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
+    <text x="338" y="70" font-weight="bold">Scanned</text>
+    <text x="424" y="70" font-size="9.5" fill="#4A5459">the sensor&#8217;s number. Carries a band.</text>
 
-    <line x1="300" y1="124" x2="352" y2="124" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
-    <line x1="300" y1="124" x2="352" y2="124" stroke="#B4232A" stroke-width="2" stroke-dasharray="7 5"/>
-    <text x="364" y="128" font-weight="bold">Something was in the way</text>
-    <text x="364" y="142" font-size="10" fill="#4A5459">tape this one first, whatever the number says.</text>
+    <line x1="278" y1="102" x2="326" y2="102" stroke="#B8590A" stroke-width="6" stroke-linecap="round"/>
+    <line x1="278" y1="102" x2="326" y2="102" stroke="#B4232A" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="338" y="106" font-weight="bold">Blocked</text>
+    <text x="424" y="106" font-size="9.5" fill="#4A5459">tape this one first, whatever it says.</text>
 
-    <line x1="300" y1="165" x2="352" y2="165" stroke="#7E888E" stroke-width="2.4" stroke-dasharray="2 9"
+    <line x1="278" y1="138" x2="326" y2="138" stroke="#7E888E" stroke-width="2.4" stroke-dasharray="2 9"
           stroke-linecap="round"/>
-    <text x="364" y="169" font-weight="bold">No wall here</text>
-    <text x="364" y="183" font-size="10" fill="#4A5459">an opening. No drywall, no paint, no baseboard.</text>
+    <text x="338" y="142" font-weight="bold">No wall</text>
+    <text x="424" y="142" font-size="9.5" fill="#4A5459">an opening. No drywall, no baseboard.</text>
   </g>
 </svg>'''
 

@@ -59,7 +59,7 @@ def html(body_pt=9.2, lead=1.34, rows=7):
     return f'''<!doctype html><html><head><meta charset="utf-8"><title>Trueline Field Card</title>
 <style>{css(body_pt, lead)}</style></head><body>
 
-{mast("Field card &mdash; how to measure a room<br>Rev 4 &middot; iPhone / iPad &mdash; with LiDAR or without")}
+{mast("Field card &mdash; how to measure a room<br>Rev 5 &middot; iPhone / iPad &mdash; with LiDAR or without")}
 
 <section>
   <h2><span class="n">01</span>Where to stand</h2>
@@ -173,38 +173,49 @@ done properly beats twenty done badly.</footer>
 <footer>{FOOT3}</footer>
 
 <div class="pb"></div>
-{mast("Field card &mdash; page 5<br>What happens to the scan")}
+{mast("Field card &mdash; page 5<br>What the app does with it")}
 
 <section>
-  <h2><span class="n">09</span>Open the scan and check it</h2>
-  <p>Take the <b>room.json</b> out of the export and drop it on the Trueline page in any browser,
-  on the phone you scanned with. Nothing is uploaded &mdash; the file is read on the device and
-  stays there. You get the plan, the floor area, and every dimension marked with where it came from.</p>
-  <figure>{PLANKEY}</figure>
-</section>
-
-<section>
-  <h2><span class="n">10</span>What the scanner never tells you</h2>
+  <h2><span class="n">09</span>Three different taps &mdash; only one is during the capture</h2>
   <table>
-    <tr><td class="k">Wall thickness</td><td>Not in the file at all. Every thickness on the drawing is one the app chose &mdash; check it against a door jamb.</td></tr>
-    <tr><td class="k">Window sill height</td><td>Never stated. It is worked out from the window's centre, so it is worth a tape.</td></tr>
-    <tr><td class="k">Door &amp; window sizes</td><td>Out by more than a foot in both directions on two real scans &mdash; a 6&#8242;8&#8243; door read as 6&#8242;10&#8243; and as 5&#8242;7&#8243;. Never order against one.</td></tr>
-    <tr><td class="k">Which walls are yours</td><td>A scan can pick up a wall of the room next door through a doorway. The app drops it and says so &mdash; read that line.</td></tr>
-    <tr><td class="k">Where there is no wall</td><td>A garage door or a wide opening comes in as a gap, not a wall. If it really is a wall, say so on the screen before anything gets priced.</td></tr>
+    <thead><tr><th style="width:24%">When</th><th style="width:26%">Do you tap?</th><th>What is happening</th></tr></thead>
+    <tr><td class="k">Scanning<br>(LiDAR)</td><td><b>No.</b> Never tap the walls on screen.</td><td>The sensor finds the walls while you walk. Your job is where you stand and how you move &mdash; pages 1, 2 and 4.</td></tr>
+    <tr><td class="k">Measuring<br>(no LiDAR)</td><td><b>Yes &mdash; the floor.</b></td><td>No sensor, so you place each corner: aim at its foot, tap. Page 6.</td></tr>
+    <tr><td class="k">Correcting<br>(after either)</td><td><b>Yes &mdash; the drawing.</b></td><td>Tap a wall on the plan and type what your tape says. This is the one that turns a scan into a measurement.</td></tr>
   </table>
 </section>
 
 <section>
-  <h2><span class="n">11</span>Type the tape numbers in</h2>
-  <p>Tap a wall, type what your tape says &mdash; <span class="k">12' 3 1/2"</span>, or just
-  <span class="k">12.5</span> for feet &mdash; and the whole room re-solves around it. The other
-  walls give ground in proportion to how unsure the sensor was about each of them, and the one you
-  measured never moves again.</p>
+  <h2><span class="n">10</span>It opens itself</h2>
+  <p>No export, no file to find, no browser. The moment a capture ends the plan is on screen: the
+  area, every dimension marked with where it came from, and what the app thinks is wrong with the
+  capture. Nothing is uploaded.</p>
+  <figure>{PLANKEY}</figure>
+</section>
+
+<section>
+  <h2><span class="n">11</span>What the scanner never tells you</h2>
+  <table>
+    <tr><td class="k">Wall thickness</td><td>Not captured at all. Every thickness on the drawing is one the app chose &mdash; check it at a door jamb.</td></tr>
+    <tr><td class="k">Window sill height</td><td>Never stated. It is worked out from the window's centre, so it is worth a tape.</td></tr>
+    <tr><td class="k">Door &amp; window sizes</td><td>Out by more than a foot in both directions on two real scans &mdash; a 6&#8242;8&#8243; door read as 6&#8242;10&#8243; and as 5&#8242;7&#8243;. Never order against one.</td></tr>
+    <tr><td class="k">Which walls are yours</td><td>A scan can pick up the room next door through a doorway. The app drops it and says so &mdash; read that line.</td></tr>
+    <tr><td class="k">Where there is no wall</td><td>A garage door or wide opening comes in as a gap. If it really is a wall, say so before anything gets priced.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="n">12</span>Type the tape numbers in</h2>
+  <p>Tap a wall on the plan, type what your tape says &mdash; <span class="k">12' 3 1/2"</span>, or
+  just <span class="k">12.5</span> for feet &mdash; and the room re-solves around it. Every other
+  wall gives ground in proportion to how unsure the sensor was about it, and the one you measured
+  never moves again.</p>
   <p><b>Watch for this:</b> if it says a wall had to move <em>further than the scanner's own
   tolerance</em>, that wall is the next one to tape. It is the room telling you where it is wrong.</p>
   <div class="warn"><span class="lbl">It is saved, but it is not backed up</span>
-  Your corrections survive closing the tab, on that browser and that device only. Clearing site data
-  clears them. Until accounts exist, finish a room in one visit.</div>
+  Corrections are kept inside the app and survive closing it &mdash; on that phone only. Deleting the
+  app deletes them. The captures themselves also sit in the <b>Files</b> app under Trueline, so a
+  room can be copied off; until accounts exist that is the only backup there is.</div>
 </section>
 
 <footer>Nothing on the drawing is a measurement until somebody has stood behind it. That is the
@@ -214,7 +225,7 @@ whole point of the tape log on the previous page &mdash; and of the amber lines 
 {mast("Field card &mdash; page 6<br>No LiDAR? Walk the room instead")}
 
 <section>
-  <h2><span class="n">12</span>Which one this phone does</h2>
+  <h2><span class="n">13</span>Which one this phone does</h2>
   <p>The first screen offers two ways in. <b>Scan</b> sweeps the room with the depth sensor and comes
   back with walls, doors and windows already found. <b>Measure</b> uses the camera only: you walk the
   room and tap the corners yourself. You do not have to know which phone is which &mdash; if
@@ -222,7 +233,7 @@ whole point of the tape log on the previous page &mdash; and of the amber lines 
 </section>
 
 <section>
-  <h2><span class="n">13</span>Walking a room with the camera</h2>
+  <h2><span class="n">14</span>Walking a room with the camera</h2>
   <figure>{WALKTAP}</figure>
   <table>
     <tr><td class="k">1. Find the floor</td><td>Move the phone slowly across the floor until the app says it has one. Nothing can be tapped before that &mdash; it says so rather than guess.</td></tr>
@@ -239,7 +250,7 @@ whole point of the tape log on the previous page &mdash; and of the amber lines 
 </section>
 
 <section>
-  <h2><span class="n">14</span>What a walked room does not come with</h2>
+  <h2><span class="n">15</span>What a walked room does not come with</h2>
   <table>
     <tr><td class="k">Doors &amp; windows</td><td>Not found for you &mdash; add them on the plan afterwards.</td></tr>
     <tr><td class="k">Ceiling height</td><td>Nothing measures it. The app starts at 8&#8242; &plusmn;6&#8243; and marks it assumed. Tape it.</td></tr>
