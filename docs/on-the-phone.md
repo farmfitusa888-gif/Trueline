@@ -1,6 +1,6 @@
 # Getting the current build onto your phone, and what to test on it
 
-Everything below has been run and passes on this machine: 389 tests, both
+Everything below has been run and passes on this machine: 410 tests, both
 typechecks, the web build, and the app driven end to end in a browser against
 your own garage scan. **None of it has been run on a phone since the plan was
 un-mirrored.** That is what this page is for.
@@ -59,6 +59,12 @@ signing** and pick your team. Bundle ID stays `com.sunnyacres.trueline`.
 
 ## Part 3 — what to test, in this order
 
+**Before anything else, once:** the scan you showed me that said *"The scan has
+no walls"* was written by an old build that saved a capture with nothing in it.
+That folder cannot be repaired — there is no room in the file. The list no
+longer offers it: it now says *"No walls in this one — the capture did not
+finish"* and will not open. **Swipe left on it and delete it.**
+
 Twenty-five minutes, in a real room with a tape in your pocket. Ordered so the ones
 that matter most come first, and so a failure early tells you the most.
 
@@ -77,18 +83,30 @@ caught it and why only a person standing in the room can confirm it.
 - **Fail:** it is on the other side. Tell me which room and which wall, and
   send the scan.
 
-### 2. Measure — the AR path that did nothing
+### 2. Measure — the AR path that did nothing, second attempt
 
-You tapped Measure and nothing happened. The cause was found and fixed: the
-screen was watching one object and the taps were changing a different one
-nested inside it, so SwiftUI was never told anything had changed. **That fix
-has never been run on a device.**
+You reported this twice. The first fix was real and was not the whole thing: a
+nested object SwiftUI never watched. The second cause is that `ARSCNView` takes
+the AR session's delegate for itself, so the floor detection could be silently
+disconnected depending on the order the screen came up in — and when it is, the
+instruction never moves past *"move the phone slowly across the floor"* and
+every tap is refused, over a live camera picture.
+
+The floor is now read straight off the current frame instead, which nothing can
+take. Three other things changed with it: anything the reticle lands on counts
+as a floor; when nothing is under the ray, it meets the floor's known height
+instead (the far corner of a room is often past where any plane has grown to);
+and the tracker's own complaint is now the message you see.
 
 - First screen → **Measure a room**.
-- Walk the room tapping each corner.
-- **Pass:** a dot lands at every corner, the running length updates as you go,
-  and after four corners the **Close the room** button becomes tappable.
-- **Fail:** taps land but nothing on screen changes. That is the same bug back.
+- **Pass:** within a few seconds of moving the phone, the message changes from
+  *"Starting up"* or *"Move the phone slowly from side to side"* to
+  *"Point at the foot of a corner and tap"*, and the reticle goes solid.
+- Tap each corner walking round. Wall lengths appear along the bottom as you go.
+- After four corners **Done** becomes tappable.
+- **If it still fails: tell me the exact words on the screen.** They are now
+  different for every reason it can fail — starting up, moving too fast, not
+  enough detail, relocalizing — and that sentence is the diagnosis.
 
 ### 3. Blueprint / 3D toggle
 
