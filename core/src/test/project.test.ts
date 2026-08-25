@@ -1,9 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLength } from '../length.ts';
 import { scanned, verified } from '../measurement.ts';
 import { type Heading, type Room, type Wall } from '../room.ts';
-import { DEFAULT_CAMERA, ProjectionError, project } from '../project.ts';
+import { NM_PER_FOOT, parseLength } from '../length.ts';
+import { insidePlan } from '../section.ts';
+import {
+  DEFAULT_CAMERA,
+  ProjectionError,
+  STANDING_EYE,
+  project,
+  projectFrom,
+  standingInside,
+} from '../project.ts';
 
 /**
  * The 3D view is the plan seen from somewhere else, and it has to stay the
@@ -197,4 +205,114 @@ test('an object the scan saw edge-on is not drawn as a stray line', () => {
   const flat = { ...bench, max: { x: parseLength(`2'`), y: parseLength(`3'`) } };
   const { facets } = project(room, DEFAULT_CAMERA, 1000, [flat]);
   assert.equal(facets.filter((f) => f.kind === 'object').length, 0);
+});
+
+/* -------------------------------------------------------- standing inside */
+
+/**
+ * The interior view: standing in the room rather than orbiting it.
+ *
+ * Two things are worth testing and neither is "does it look right". One, every
+ * face still carries its wall's id, because that is what makes this the same
+ * screen as the plan rather than a picture of one. Two, the near clip actually
+ * works -- a wall you are standing against runs from in front of you to behind
+ * you, and the part behind has no projection at all. Left unclipped it comes
+ * out mirrored across the screen and paints over the room, and it looks like a
+ * rendering bug rather than an arithmetic one.
+ */
+
+test('standing in the room, every face still knows its wall', () => {
+  const { facets } = projectFrom(room, standingInside(room));
+  const walls = facets.filter((f) => f.kind === 'wall');
+  assert.ok(walls.length > 0);
+  for (const facet of walls) {
+    assert.ok(room.walls.some((wall) => wall.id === facet.wallId), facet.wallId);
+  }
+});
+
+test('from the middle of the room, all four walls are in the model', () => {
+  // Not all in frame -- the field of view is 72 degrees and the room has four
+  // sides. But nothing is dropped for being on the wrong side of anything: from
+  // inside, there is no wrong side.
+  const { facets, hidden } = projectFrom(room, { ...standingInside(room), turn: 0 });
+  const drawn = new Set(facets.filter((f) => f.kind === 'wall').map((f) => f.wallId));
+  assert.equal(drawn.size + hidden.length, 4);
+});
+
+test('the ceiling is drawn, because from inside it is part of the room', () => {
+  // The orbit view leaves it off -- looking down at a lid is never what was
+  // wanted. From inside, a room with no ceiling is a film set.
+  const { facets } = projectFrom(room, standingInside(room));
+  assert.ok(facets.some((f) => f.wallId === 'ceiling'));
+  assert.ok(facets.some((f) => f.wallId === 'floor'));
+});
+
+test('a wall behind you is clipped away rather than drawn mirrored', () => {
+  // Standing at the south wall looking north: the south wall is behind the eye.
+  // Unclipped, its vertices divide by a negative depth and it lands on screen
+  // upside down and enormous.
+  const at = { x: 10n * NM_PER_FOOT, y: NM_PER_FOOT / 2n };
+  const { facets, hidden } = projectFrom(room, {
+    at,
+    height: STANDING_EYE,
+    turn: 0, // along +y, away from the south wall
+    tilt: 0,
+  });
+  assert.ok(hidden.includes('south'), `hidden was ${hidden.join(', ')}`);
+  assert.equal(facets.filter((f) => f.wallId === 'south' && f.kind === 'wall').length, 0);
+});
+
+test('nothing that is drawn lands at infinity', () => {
+  // The near clip's real job. Every surviving vertex has to be a finite number
+  // a browser can put on a screen; one NaN in a polygon loses the whole face.
+  for (const turn of [0, 45, 90, 180, 270]) {
+    const { facets } = projectFrom(room, {
+      at: { x: NM_PER_FOOT / 4n, y: NM_PER_FOOT / 4n }, // in a corner, against two walls
+      height: STANDING_EYE,
+      turn,
+      tilt: 0,
+    });
+    for (const facet of facets) {
+      for (const point of facet.points) {
+        assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y),
+          `turn ${turn}: ${facet.wallId} produced ${point.x}, ${point.y}`);
+      }
+    }
+  }
+});
+
+test('looking up puts more ceiling in frame than looking level', () => {
+  const eye = standingInside(room);
+  const area = (tilt: number) => {
+    const ceiling = projectFrom(room, { ...eye, tilt }).facets.find((f) => f.wallId === 'ceiling');
+    if (!ceiling) return 0;
+    // Shoelace, on screen coordinates. Absolute, because winding is not the
+    // question here.
+    let twice = 0;
+    for (let i = 0; i < ceiling.points.length; i += 1) {
+      const a = ceiling.points[i]!;
+      const b = ceiling.points[(i + 1) % ceiling.points.length]!;
+      twice += a.x * b.y - b.x * a.y;
+    }
+    return Math.abs(twice) / 2;
+  };
+  assert.ok(area(60) > area(0), 'looking up should show more ceiling');
+});
+
+test('a viewpoint that is not a number is refused rather than drawn as NaN', () => {
+  assert.throws(
+    () => projectFrom(room, { ...standingInside(room), turn: Number.NaN }),
+    ProjectionError
+  );
+});
+
+test('the default place to stand is inside the room and faces its longest wall', () => {
+  const eye = standingInside(room);
+  assert.ok(insidePlan(room, eye.at), 'the viewer should start inside the room');
+  // The longest walls are south and north, both 20 ft. Standing in the middle
+  // and facing one of them means looking along -y or +y: turn 0 or 180.
+  assert.ok(
+    Math.abs(eye.turn) < 1 || Math.abs(eye.turn - 180) < 1,
+    `faced ${eye.turn} degrees`
+  );
 });
