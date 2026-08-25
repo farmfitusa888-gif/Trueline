@@ -5,7 +5,8 @@ import { type Room, isDiagonal, runLength } from '../../core/src/room.ts';
 import type { ImportReport } from '../../core/src/import-roomplan.ts';
 import { type Readiness, trustLabel } from '../../core/src/issue.ts';
 import { type PunchListItem, type WallObstruction, describe } from '../../core/src/obstruction.ts';
-import { checkCapture } from '../../core/src/health.ts';
+import { blockers, checkCapture } from '../../core/src/health.ts';
+import { areaInDoubt } from '../../core/src/trace.ts';
 import type { Photo } from '../../core/src/photo.ts';
 import type { PhotoImport } from '../../core/src/capture.ts';
 
@@ -79,13 +80,18 @@ export function Corrections({
   onSelect,
   onMake,
 }: CorrectionsProps) {
-  const { len } = useUnits();
+  const { len, area: showArea } = useUnits();
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
   // The same checks the command-line tool ran, on screen, because the app put
   // the file here and should be the one to say whether it is any good.
+  // How much better a tape would make this room, as an area rather than a
+  // tolerance: a band in millimetres is not an argument anybody acts on.
+  const doubt = areaInDoubt(room);
+
   const findings = checkCapture({
     room, report, photos, rejectedPhotos, refusedPins, cameraHeights,
   });
+  const stops = blockers(findings);
   const openSpans = room.walls.filter((w) => w.open);
   const inTheWay = obstructions.filter((o) => o.blockedLength > 0n);
 
@@ -112,9 +118,21 @@ export function Corrections({
 
       {findings.length > 0 && (
         <Card
-          tone={findings.some((f) => f.severity === 'stop') ? 'stop' : 'do'}
+          tone={stops.length > 0 ? 'stop' : 'do'}
           title={`What this capture looks like — ${findings.length} thing${findings.length === 1 ? '' : 's'} to know`}
         >
+          {/* What actually stops a drawing, counted before the list of
+              everything. `blockers` is the same filter the readiness check
+              uses, so "how many things stop this" is answered in one place
+              rather than by two `.filter(severity === 'stop')` calls that can
+              drift apart. */}
+          {stops.length > 0 && (
+            <p className="font-semibold text-red-800">
+              {stops.length} of {findings.length}{' '}
+              {stops.length === 1 ? 'stops this being issued' : 'stop this being issued'} as a
+              dimensioned drawing.
+            </p>
+          )}
           <ul className="space-y-3">
             {findings.map((finding) => (
               <li key={finding.what}>
@@ -143,6 +161,16 @@ export function Corrections({
             Ranked by how much floor area each one's uncertainty puts in doubt, and by how much of
             it the scanner could actually see.
           </p>
+          {/* The argument for spending two minutes with a tape, in the units
+              the argument is actually about. `areaInDoubt` has been able to
+              say this since trace.ts was written and nothing asked it. */}
+          {doubt > 0n && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+              <strong className="tabular-nums">{showArea(doubt)}</strong> of floor is in doubt
+              across this room as it stands. Two minutes with a tape on the walls below takes most
+              of that to nothing.
+            </p>
+          )}
           <ol className="space-y-2">
             {punchList.slice(0, 4).map((item, i) => {
               const wall = room.walls.find((w) => w.id === item.wallId);

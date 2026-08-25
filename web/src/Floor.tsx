@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { Join } from '../../core/src/floor.ts';
+import { type Join, floorQuantities } from '../../core/src/floor.ts';
 import { type DrawnOpening, couldBeTheSame, extentOf, floorPlan, placedArea } from '../../core/src/floorplan.ts';
 import { floorOf, joinBetween, loadJoins, saveJoins, savedRooms } from './floorStore.ts';
 import { useUnits } from './units.tsx';
@@ -39,6 +39,27 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
       return { it: floorPlan(floorOf(rooms, joins)), trouble: null as string | null };
     } catch (error) {
       return { it: null, trouble: error instanceof Error ? error.message : String(error) };
+    }
+  }, [rooms, joins]);
+
+  /**
+   * What the whole floor takes, across every room that could be placed.
+   *
+   * The floor view showed a shape and an area and nothing that could be
+   * ordered off it. `floorQuantities` has been able to answer this since
+   * `floor.ts` was written and nothing called it -- found by
+   * `npm run what-is-left`.
+   *
+   * Rooms that could not be placed are left out by `layout` and named, never
+   * quietly added in: a total that silently includes a room nobody could place
+   * is a total that is wrong in a way nobody can see.
+   */
+  const totals = useMemo(() => {
+    try {
+      return floorQuantities(floorOf(rooms, joins));
+    } catch {
+      // The plan itself already says why it could not be laid out, above.
+      return null;
     }
   }, [rooms, joins]);
 
@@ -124,6 +145,36 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
             {len(extent.x)} × {len(extent.y)} · {area(placedArea(plan.it))}
           </p>
         </div>
+
+        {totals && (
+          <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 rounded-md bg-slate-50 px-3 py-2
+                         text-sm sm:grid-cols-4">
+            <div className="flex justify-between gap-2 sm:block">
+              <dt className="text-slate-600">Flooring</dt>
+              <dd className="font-semibold tabular-nums text-slate-900">
+                {area(totals.floorArea)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2 sm:block">
+              <dt className="text-slate-600">Ceiling</dt>
+              <dd className="font-semibold tabular-nums text-slate-900">
+                {area(totals.ceilingArea)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2 sm:block">
+              <dt className="text-slate-600">Wall face</dt>
+              <dd className="font-semibold tabular-nums text-slate-900">
+                {area(totals.wallFaceArea * 2n)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2 sm:block">
+              <dt className="text-slate-600">Baseboard</dt>
+              <dd className="font-semibold tabular-nums text-slate-900">
+                {len(totals.baseboardRun)}
+              </dd>
+            </div>
+          </dl>
+        )}
 
         <svg
           viewBox={`0 0 ${box} ${box}`}

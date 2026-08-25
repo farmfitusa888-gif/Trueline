@@ -31,6 +31,7 @@ import {
   NOBODY,
   STARTING_TERMS,
   chosenOption,
+  describeProposal,
   missingFromProposal,
   optionFrom,
   proposalOf,
@@ -332,6 +333,12 @@ export function Agree({
             </button>
           )}
         </div>
+
+        {/* The proposal in one sentence, the way the document opens.
+            It says whether the numbers are measured in the same breath as the
+            price, because a client reading a total is exactly the person
+            entitled to know it came off a scan nobody has checked. */}
+        <p className="mt-2 text-sm text-slate-700">{describeProposal(proposal)}</p>
 
         {missing.length > 0 && (
           <p className="mt-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900">

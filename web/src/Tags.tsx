@@ -8,6 +8,8 @@ import {
   CONDITION,
   CONDITIONS,
   describeTag,
+  tagsInTheOpen,
+  tagsOnWall,
   tagCounts,
 } from '../../core/src/tag.ts';
 import { Wants } from './Measure.tsx';
@@ -67,6 +69,10 @@ export function Tags({
   const [wants, setWants] = useState<string | null>(null);
 
   const counts = tagCounts(tags);
+  const byWall = room.walls
+    .map((wall) => ({ wallId: wall.id, on: tagsOnWall(tags, wall.id) }))
+    .filter((group) => group.on.length > 0);
+  const loose = tagsInTheOpen(tags);
 
   /**
    * A point on a wall, a stated distance from its first corner.
@@ -239,24 +245,61 @@ export function Tags({
         <Wants say={wants} />
       </div>
 
+      {/* Grouped by wall, in the order things were found, with whatever
+          belongs to no wall at the end. A flat list of nine reads as nine
+          unrelated notes; grouped, it reads as what is in each wall -- which
+          is how somebody about to open one asks the question. */}
       {tags.length > 0 && (
         <ul className="mt-5 divide-y divide-slate-100 border-t border-slate-200 pt-2">
-          {tags.map((tag) => (
-            <li key={tag.id} className="flex items-start justify-between gap-3 py-3">
-              <span className="text-sm text-slate-800">{describeTag(tag)}</span>
-              <button
-                type="button"
-                onClick={() => onRemove(tag.id)}
-                aria-label={`Take off ${describeTag(tag)}`}
-                className="min-h-11 shrink-0 rounded-md border border-slate-300 px-3 text-sm
-                           font-medium text-slate-700 active:bg-slate-100"
-              >
-                Take it off
-              </button>
+          {byWall.map(({ wallId, on }) => (
+            <li key={wallId} className="pt-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {wallId}
+              </p>
+              <ul className="divide-y divide-slate-100">
+                {on.map((tag) => (
+                  <li key={tag.id} className="flex items-start justify-between gap-3 py-3">
+                    <span className="text-sm text-slate-800">{describeTag(tag)}</span>
+                    <button
+                      type="button"
+                      onClick={() => onRemove(tag.id)}
+                      aria-label={`Take off ${describeTag(tag)}`}
+                      className="min-h-11 shrink-0 rounded-md border border-slate-300 px-3 text-sm
+                                 font-medium text-slate-700 active:bg-slate-100"
+                    >
+                      Take it off
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
+          {loose.length > 0 && (
+            <li className="pt-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                In the open
+              </p>
+              <ul className="divide-y divide-slate-100">
+                {loose.map((tag) => (
+                  <li key={tag.id} className="flex items-start justify-between gap-3 py-3">
+                    <span className="text-sm text-slate-800">{describeTag(tag)}</span>
+                    <button
+                      type="button"
+                      onClick={() => onRemove(tag.id)}
+                      aria-label={`Take off ${describeTag(tag)}`}
+                      className="min-h-11 shrink-0 rounded-md border border-slate-300 px-3 text-sm
+                                 font-medium text-slate-700 active:bg-slate-100"
+                    >
+                      Take it off
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          )}
         </ul>
       )}
+
     </section>
   );
 }

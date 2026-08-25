@@ -46,6 +46,27 @@ def exports(text: str) -> list[str]:
     return re.findall(r'^export\s+(?:async\s+)?function\s+([A-Za-z_]\w*)', text, re.M)
 
 
+def withoutComments(text: str) -> str:
+    """Comments out, so a name mentioned in prose is not counted as a use."""
+    text = re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)
+    return re.sub(r'//[^\n]*', ' ', text)
+
+
+def usedInOwnFile(text: str, name: str) -> bool:
+    """Whether the file that declares this also calls it.
+
+    Counted, and it has to be. The first version of this check ignored the
+    declaring file entirely and reported `zone.ts: openPerimeter` as
+    unreferenced -- while `quantities`, four functions below it in the same
+    file, calls it on every takeoff. A helper called only by its own module is
+    an ordinary, correct thing; reporting it wastes the reader's attention on
+    the list, which is the one thing a list like this cannot afford.
+
+    One occurrence is the declaration. Two or more means somebody uses it.
+    """
+    return len(re.findall(r'\b' + re.escape(name) + r'\b', withoutComments(text))) > 1
+
+
 def main() -> int:
     sources = {}
     for path in sorted(CORE.rglob('*.ts')):
@@ -65,7 +86,8 @@ def main() -> int:
             continue
         for name in exports(text):
             pattern = re.compile(r'\b' + re.escape(name) + r'\b')
-            inApp = False
+            # Its own module counts as a caller.
+            inApp = usedInOwnFile(text, name)
             inTest = False
             for other, body in {**sources, **web}.items():
                 if other == path:

@@ -657,6 +657,15 @@ export function App() {
                       })
                     }
                     onDelete={() => dispatch({ type: 'deleteWall', wallId: selectedWall.id })}
+                        onHeight={(text) =>
+                          dispatch({
+                            type: 'wallHeight',
+                            wallId: selectedWall.id,
+                            text,
+                            by: 'me',
+                            when: new Date().toISOString(),
+                          })
+                        }
                     onNotch={(out, along, outId, alongId) =>
                       dispatch({
                         type: 'notch',

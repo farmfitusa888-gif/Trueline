@@ -1,4 +1,4 @@
-import { type Nanometres, abs, add, formatFeetInches, hypotenuse } from './length.ts';
+import { type Nanometres, add, formatFeetInches, hypotenuse } from './length.ts';
 import {
   type Opening,
   type Point,
@@ -495,11 +495,3 @@ export function floorQuantities(floor: Floor): FloorQuantities {
   };
 }
 
-/** How far the floor reaches each way, once everything is placed. */
-export function floorExtent(floor: Floor): { x: Nanometres; y: Nanometres } {
-  const { placed } = layout(floor);
-  const all = placed.flatMap((p) => p.outline);
-  if (all.length === 0) return { x: 0n, y: 0n };
-  const b = bounds(all);
-  return { x: abs(b.hi.x - b.lo.x), y: abs(b.hi.y - b.lo.y) };
-}

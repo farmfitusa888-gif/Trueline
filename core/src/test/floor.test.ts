@@ -8,12 +8,12 @@ import {
   type Join,
   type Placed,
   FloorError,
-  floorExtent,
   floorQuantities,
   layout,
   overlaps,
   turnPoint,
 } from '../floor.ts';
+import { extentOf, floorPlan } from '../floorplan.ts';
 
 /**
  * Two rooms, and the place every scanner in the field gives up.
@@ -365,7 +365,12 @@ test('a room nobody could place is left out of the total rather than quietly add
 });
 
 test('the floor measures what a person would measure across the outside of it', () => {
-  const e = floorExtent(floor);
+  // Through `floorPlan` and `extentOf`, which is the pair the app actually
+  // draws with. There used to be a second function in `floor.ts` computing
+  // this same number a second way, and nothing called it: two derivations of
+  // one datum is two chances to disagree, which is the rule this whole package
+  // is built on. It was deleted and the assertion moved here rather than lost.
+  const e = extentOf(floorPlan(floor));
   assert.equal(formatFeetInches(e.x), `20'`);
   // 12 ft of kitchen, a 4 1/2 inch wall, and 8 ft of hall.
   assert.equal(formatFeetInches(e.y), `20' 4 1/2"`);

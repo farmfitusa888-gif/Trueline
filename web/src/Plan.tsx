@@ -8,8 +8,8 @@ import type { Footprint, WallObstruction } from '../../core/src/obstruction.ts';
 import type { NorthOnPlan } from '../../core/src/capture.ts';
 import {
   type Damage,
-  WATER_CATEGORY,
   damageOnPlan,
+  describeDamage,
   damageRunOnPlan,
 } from '../../core/src/damage.ts';
 import { type Tag, CONDITION, describeTag } from '../../core/src/tag.ts';
@@ -618,10 +618,11 @@ export function Plan({
       */}
       {damages.map((damage) => {
         const run = damageRunOnPlan(room, damage);
-        const label =
-          damage.kind === 'water' && damage.category
-            ? `${damage.kind}, ${WATER_CATEGORY[damage.category].plain} — ${damage.note}`
-            : `${damage.kind} — ${damage.note}`;
+        // The kind and the category in `damage.ts`'s own words, then what the
+        // person wrote. This label was built by hand here, so the plan and the
+        // claim document described the same damage two different ways -- and
+        // `describeDamage` existed the whole time, calling nothing.
+        const label = `${describeDamage(room, damage)} — ${damage.note}`;
 
         if (run) {
           return (

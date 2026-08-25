@@ -4,6 +4,7 @@ import type { Room } from '../../core/src/room.ts';
 import {
   type Draft,
   addWall,
+  reviseWall,
   finish,
   remaining,
   removeWall,
@@ -45,6 +46,9 @@ export function Draw({
   const [name, setName] = useState('');
   const [ceiling, setCeiling] = useState(`8'`);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [fixing, setFixing] = useState<string | null>(null);
+  const [fixTo, setFixTo] = useState('');
+  const [fixTrouble, setFixTrouble] = useState<string | null>(null);
   const [heading, setHeading] = useState<Heading>('east');
   const [trouble, setTrouble] = useState<string | null>(null);
 
@@ -164,22 +168,90 @@ export function Draw({
       {draft.walls.length > 0 && (
         <ol className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
           {draft.walls.map((wall) => (
-            <li key={wall.id} className="flex items-baseline justify-between gap-3 py-2">
-              <span className="text-slate-700">
-                {wall.id} — {wall.heading}
-              </span>
-              <span className="flex items-baseline gap-3">
-                <span className="tabular-nums font-semibold text-slate-900">
-                  {len(wall.length.value)}
+            <li key={wall.id} className="py-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-700">
+                  {wall.id} — {wall.heading}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setDraft(removeWall(draft, wall.id))}
-                  className="min-h-11 text-sm text-slate-500 underline underline-offset-4"
-                >
-                  Remove
-                </button>
-              </span>
+                <span className="flex items-baseline gap-3">
+                  <span className="tabular-nums font-semibold text-slate-900">
+                    {len(wall.length.value)}
+                  </span>
+                  {/* Fixing a wall already entered.
+                      Without this a typo on the second of eight walls meant
+                      starting the room again: removing a wall in the middle
+                      breaks the chain, and adding one puts it back on the end.
+                      `reviseWall` has handled it since draft.ts was written and
+                      nothing called it -- and it keeps the old value on the
+                      record rather than overwriting it, which is the same rule
+                      a tape reading follows. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFixing(fixing === wall.id ? null : wall.id);
+                      setFixTo('');
+                      setFixTrouble(null);
+                    }}
+                    aria-label={`Fix the length of ${wall.id}`}
+                    aria-expanded={fixing === wall.id}
+                    className="min-h-11 text-sm text-slate-500 underline underline-offset-4"
+                  >
+                    {fixing === wall.id ? 'Leave it' : 'Fix'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraft(removeWall(draft, wall.id))}
+                    aria-label={`Remove ${wall.id}`}
+                    className="min-h-11 text-sm text-slate-500 underline underline-offset-4"
+                  >
+                    Remove
+                  </button>
+                </span>
+              </div>
+
+              {fixing === wall.id && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <input
+                    value={fixTo}
+                    onChange={(event) => { setFixTo(event.target.value); setFixTrouble(null); }}
+                    inputMode="text"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    placeholder={len(wall.length.value)}
+                    aria-label={`What ${wall.id} really is`}
+                    className="min-h-12 flex-1 rounded-md border border-slate-300 px-3 py-2
+                               tabular-nums focus:border-sky-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (fixTo.trim() === '') {
+                        setFixTrouble(`Type what ${wall.id} really is — 12' 4".`);
+                        return;
+                      }
+                      try {
+                        setDraft(
+                          reviseWall(draft, wall.id, fixTo.trim(), new Date().toISOString())
+                        );
+                        setFixing(null);
+                        setFixTo('');
+                        setFixTrouble(null);
+                      } catch (error) {
+                        setFixTrouble(error instanceof Error ? error.message : String(error));
+                      }
+                    }}
+                    aria-label={`Set what ${wall.id} really is`}
+                    className="min-h-12 shrink-0 rounded-md bg-slate-900 px-4 font-semibold
+                               text-white active:bg-slate-700"
+                  >
+                    Set
+                  </button>
+                  {fixTrouble && (
+                    <p role="alert" className="basis-full text-sm text-red-700">{fixTrouble}</p>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ol>

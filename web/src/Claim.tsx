@@ -5,6 +5,7 @@ import {
   type Cause,
   type Claim as ClaimRecord,
   claimReport,
+  describeParty,
   missingFromClaim,
   overlappingDamage,
 } from '../../core/src/claim.ts';
@@ -238,6 +239,27 @@ export function Claim({
               />
             </div>
           </div>
+
+          {/* Who this claim is between, in one line each, the way the claim
+              document prints them. `describeParty` is what the document uses,
+              so a name and a phone number are formatted once and read the same
+              on the screen and on the paperwork. */}
+          {(describeParty(claim.owner) || describeParty(claim.adjuster)) && (
+            <dl className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm">
+              {describeParty(claim.owner) && (
+                <div className="flex flex-wrap gap-x-2">
+                  <dt className="text-slate-500">Owner</dt>
+                  <dd className="text-slate-900">{describeParty(claim.owner)}</dd>
+                </div>
+              )}
+              {describeParty(claim.adjuster) && (
+                <div className="mt-0.5 flex flex-wrap gap-x-2">
+                  <dt className="text-slate-500">Adjuster</dt>
+                  <dd className="text-slate-900">{describeParty(claim.adjuster)}</dd>
+                </div>
+              )}
+            </dl>
+          )}
 
           {missing.length > 0 && (
             <p className="mt-3 text-sm text-amber-800">

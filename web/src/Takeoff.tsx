@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import { useUnits } from './units.tsx';
 import { type Boundary, report, roomQuantities, splitByBoundary } from '../../core/src/zone.ts';
-import { takeoff as buildTakeoff } from '../../core/src/takeoff.ts';
+import { takeoff as buildTakeoff, wallSchedule } from '../../core/src/takeoff.ts';
 import { type Readiness, trustLabel } from '../../core/src/issue.ts';
 import { order, tradeOf, wordFor } from '../../core/src/trade.ts';
 
@@ -67,9 +67,20 @@ export function Takeoff({
     }
   }, [room, divide]);
 
+  /**
+   * Every wall, with what it measures and who stands behind the number.
+   *
+   * A schedule is a drawing deliverable in its own right -- it is what a
+   * framer or a supplier reads instead of counting lines off a plan -- and
+   * `wallSchedule` has produced one since `takeoff.ts` was written without
+   * anything calling it. Shown under Show, and sent with the takeoff, because
+   * a table nobody can copy is a table nobody uses.
+   */
+  const schedule = useMemo(() => wallSchedule(room), [room]);
+
   async function copy() {
     try {
-      await navigator.clipboard.writeText(sheet.text);
+      await navigator.clipboard.writeText(`${sheet.text}\n\nEVERY WALL\n${schedule}`);
       setTold('Copied.');
     } catch {
       setTold('This browser would not let the app reach the clipboard.');
@@ -84,7 +95,10 @@ export function Takeoff({
       return;
     }
     try {
-      await navigator.share({ title: `${room.name} — takeoff`, text: sheet.text });
+      await navigator.share({
+        title: `${room.name} — takeoff`,
+        text: `${sheet.text}\n\nEVERY WALL\n${schedule}`,
+      });
     } catch (error) {
       // Cancelling is not failing. Anything else is, and falling back to the
       // clipboard beats a button that silently does nothing twice.
@@ -188,6 +202,19 @@ export function Takeoff({
       {/* The same numbers, split the way the space is. Below the whole rather
           than instead of it: the whole is what gets ordered, and the split is
           what gets priced and scheduled. */}
+      {/* The wall schedule, behind Show with the workings. It is a monospaced
+          table on purpose: it is read down a column. */}
+      {open && (
+        <div className="mt-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Every wall
+          </h3>
+          <div className="mt-1 overflow-x-auto rounded-md bg-slate-50 p-3">
+            <pre className="whitespace-pre text-xs leading-relaxed text-slate-800">{schedule}</pre>
+          </div>
+        </div>
+      )}
+
       {perZone?.report && (
         <div className="mt-5 rounded-md border border-violet-200 bg-violet-50 p-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-violet-900">

@@ -21,6 +21,7 @@ import {
   notchCorner,
   renameRoom,
   renameWall,
+  setWallHeight,
   splitWall,
   unverifyWall,
 } from '../../core/src/edit.ts';
@@ -308,6 +309,14 @@ export type Action =
       by: string;
     }
   | { type: 'untag'; tagId: string }
+  | {
+      type: 'wallHeight';
+      wallId: string;
+      /** Empty puts the wall back to the room's ceiling height. */
+      text: string;
+      by: string;
+      when: string;
+    }
   | { type: 'divide'; boundary: Boundary; names: readonly [string, string] }
   | { type: 'undivide' }
   | { type: 'unmark'; damageId: string }
@@ -893,6 +902,41 @@ export function reduce(state: State, action: Action): State {
           loaded,
           room,
           `Took the tape reading off ${action.wallId}. It is back to what it was before.`
+        );
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    /**
+     * How high one wall stands, when it is not the room's ceiling.
+     *
+     * A pony wall, a breakfast bar, a half wall with a counter on it. The only
+     * way to give a wall its own height was to SPLIT one -- the second piece
+     * got a height and an existing wall could never be given one, so a room
+     * scanned with a pony wall already in it had no way to say so. `edit.ts`
+     * has had `setWallHeight` the whole time; nothing called it.
+     */
+    case 'wallHeight': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const blank = action.text.trim() === '';
+        const room = setWallHeight(
+          loaded.room,
+          action.wallId,
+          blank ? undefined : parseLength(action.text, { defaultUnit: 'ft' }),
+          action.by,
+          action.when,
+          'tape'
+        );
+        return edited(
+          state,
+          loaded,
+          room,
+          blank
+            ? `${action.wallId} goes to the ceiling again.`
+            : `${action.wallId} stands ${action.text.trim()}.`
         );
       } catch (error) {
         return { ...state, error: message(error) };

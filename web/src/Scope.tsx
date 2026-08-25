@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
-import type { Damage } from '../../core/src/damage.ts';
+import { type Damage, affectedPerMille } from '../../core/src/damage.ts';
 import { SCOPE_ITEMS, damageScope } from '../../core/src/scope.ts';
 import { pricing } from '../../core/src/company.ts';
 import { type Rate, money, parseMoney, quote } from '../../core/src/price.ts';
@@ -34,6 +34,8 @@ export function Scope({
   const [copied, setCopied] = useState<string | null>(null);
 
   const { book } = useMemo(() => pricing(company), [company]);
+  const affected = affectedPerMille(room, damages);
+
   const sheet = useMemo(
     () => damageScope(room, damages, new Date().toLocaleString()),
     [room, damages]
@@ -149,6 +151,24 @@ export function Scope({
           Your rates
         </button>
       </div>
+
+      {/* Patch or gut, as a share of the room's own wall face.
+          The question an adjuster and a contractor are both answering in their
+          heads before anything else, and the room already knows enough to
+          answer it. In tenths of a percent so it stays an integer -- nothing
+          here is ever a float. */}
+      {damages.length > 0 && (
+        <p className="mt-2 text-sm text-slate-600">
+          The damage covers{' '}
+          <strong className="tabular-nums">{Number(affected) / 10}%</strong> of this room's wall
+          face.{' '}
+          {affected >= 500n
+            ? 'Over half of it — this is a gut rather than a patch, and it is worth saying so on the estimate.'
+            : affected >= 200n
+              ? 'Enough that patching and repainting one wall will not match; price the whole surface.'
+              : 'A patch. The rest of the room is untouched.'}
+        </p>
+      )}
 
       {stages.map((stage) => {
         const inStage = sheet.lines.filter((l) => l.stage === stage);

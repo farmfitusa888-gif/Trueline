@@ -262,21 +262,3 @@ export function importPins(manifest: PinManifest, frame: RoomFrame, room: Room):
   }
   return { pins, refused };
 }
-
-/**
- * What to say on screen about a set of pins that has just come in.
- *
- * Plain, and it says the refusals out loud. A contractor who marked six things
- * and sees four needs to be told, in the room, while he can still mark the
- * other two.
- */
-export function describePins(result: PinImport): string {
-  const placed = result.pins.length;
-  const lost = result.refused.length;
-  if (placed === 0 && lost === 0) return 'Nothing was marked during the walk.';
-  const put = placed === 1 ? '1 thing marked on the walk is on the plan'
-    : `${placed} things marked on the walk are on the plan`;
-  if (lost === 0) return `${put}.`;
-  return `${put}, and ${lost === 1 ? 'one is not' : `${lost} are not`}: ` +
-    result.refused.map((r) => r.reason).join(' ');
-}

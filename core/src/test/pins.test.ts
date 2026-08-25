@@ -8,7 +8,6 @@ import {
   type CapturedPin,
   type PinManifest,
   PIN_MANIFEST_SCHEMA,
-  describePins,
   importPins,
   toDamage,
   wallNear,
@@ -232,15 +231,13 @@ test('a manifest from a different version is refused rather than guessed at', ()
   );
 });
 
-test('the screen is told how many were placed and how many were not', () => {
+test('a refusal comes back with its reason, for the finding that reports it', () => {
+  // `describePins` used to phrase this for a screen and was deleted: the
+  // health check already raises a `stop` quoting every refusal, and two ways
+  // of saying one thing is two things to keep in step. What has to survive is
+  // that the reason travels with the refusal at all.
   const result = importPins(manifest([pin({ id: 'a' }), pin({ id: 'b', note: '' })]), PLAIN, room);
-  const said = describePins(result);
-  assert.match(said, /1 thing marked on the walk is on the plan/);
-  assert.match(said, /one is not/);
-  assert.match(said, /dot on a drawing/);
-});
-
-test('a walk with nothing marked says so plainly', () => {
-  assert.equal(describePins(importPins(manifest([]), PLAIN, room)),
-    'Nothing was marked during the walk.');
+  assert.equal(result.pins.length, 1);
+  assert.equal(result.refused.length, 1);
+  assert.match(result.refused[0]!.reason, /dot on a drawing/);
 });

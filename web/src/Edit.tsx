@@ -62,6 +62,7 @@ export function EditWall({
   onDrag,
   onUnverify,
   onSplit,
+  onHeight,
   onDelete,
   onNotch,
 }: {
@@ -71,6 +72,8 @@ export function EditWall({
   readonly onDrag: (text: string) => void;
   readonly onUnverify: () => void;
   readonly onSplit: (at: string, newId: string, height: string) => void;
+  /** How high this wall stands. Empty puts it back to the room's ceiling. */
+  readonly onHeight: (text: string) => void;
   readonly onDelete: () => void;
   readonly onNotch: (out: string, along: string, outId: string, alongId: string) => void;
 }) {
@@ -82,6 +85,8 @@ export function EditWall({
   const [moveWants, setMoveWants] = useState<string | null>(null);
   const [cutAt, setCutAt] = useState('');
   const [cutWants, setCutWants] = useState<string | null>(null);
+  const [standsAt, setStandsAt] = useState('');
+  const [heightWants, setHeightWants] = useState<string | null>(null);
   const [cutName, setCutName] = useState('');
   const [cutHigh, setCutHigh] = useState('');
   const [notchOut, setNotchOut] = useState('');
@@ -212,8 +217,62 @@ export function EditWall({
         </Row>
       )}
 
+      {/* A pony wall, a breakfast bar, a half wall with a counter on it.
+        Until now the only way to give a wall its own height was to cut one
+        in two -- so a room scanned with a pony wall already in it could not
+        say so, and every quantity treated it as full height. */}
+      <Row label="It does not go to the ceiling">
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={standsAt}
+            onChange={(event) => { setStandsAt(event.target.value); setHeightWants(null); }}
+            inputMode="text"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder={len((wall.height ?? room.ceilingHeight).value)}
+            aria-label="How high this wall stands"
+            className="min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 tabular-nums
+                       focus:border-sky-500 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (standsAt.trim() === '') {
+                setHeightWants('Type how high it stands — 3\' 6" for a bar, 7\' for a partition.');
+                return;
+              }
+              setHeightWants(null);
+              onHeight(standsAt);
+            }}
+            aria-label="Set how high this wall stands"
+            className="min-h-12 shrink-0 rounded-md border border-slate-300 px-4 font-medium
+                       text-slate-700 active:bg-slate-100"
+          >
+            Set
+          </button>
+          {wall.height !== undefined && (
+            <button
+              type="button"
+              onClick={() => { setStandsAt(''); setHeightWants(null); onHeight(''); }}
+              className="min-h-12 shrink-0 rounded-md border border-slate-300 px-4 font-medium
+                         text-slate-700 active:bg-slate-100"
+            >
+              It does go to the ceiling
+            </button>
+          )}
+        </div>
+        <Wants say={heightWants} />
+        <p className="mt-1 text-xs text-slate-500">
+          It stops taking board, paint and base above this, and the takeoff moves with it.{' '}
+          {wall.height === undefined
+            ? `It goes to the room's ceiling at ${len(room.ceilingHeight.value)} today.`
+            : `It stands ${len(wall.height.value)} today.`}
+        </p>
+      </Row>
+
       {!wall.open && (
-        <Row label="Cut it in two">
+      <Row label="Cut it in two">
           <div className="mt-1 grid grid-cols-3 gap-2">
             <input
               value={cutAt}
