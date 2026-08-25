@@ -75,7 +75,11 @@ function outward(
 }
 
 /**
- * A dimension, legible over whatever it lands on.
+ * A number or a word, legible over whatever it lands on.
+ *
+ * Exported because the elevation draws labels over damage for the same reason
+ * the plan draws them over walls, and two halo implementations would be two
+ * things that render differently in the same picture.
  *
  * The white outline is a separate element drawn first rather than
  * `paint-order: stroke` on one, because the canvas rasteriser behind
@@ -83,7 +87,7 @@ function outward(
  * between the digits. What is on screen and what gets sent have to be the same
  * drawing, so the drawing uses what both agree about.
  */
-function Label({
+export function Label({
   x,
   y,
   dy,
@@ -283,11 +287,27 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
         return (
           <g
             key={w.id}
+            // A wall on the plan is a control, so it is one: named, reachable by
+            // keyboard, and it says whether it is picked. Marking damage and
+            // typing a tape reading both start by choosing a wall, and a plan
+            // that can only be operated by touching a line on an SVG shuts
+            // those out for anybody working on a laptop or a screen reader.
+            role="button"
+            tabIndex={0}
+            aria-label={`${w.open ? 'Open span' : 'Wall'} ${w.id}, ${len(runLength(wall))}`}
+            aria-pressed={isSelected}
             onClick={(event) => {
               event.stopPropagation();
               onSelect(isSelected ? null : w.id);
             }}
-            className="cursor-pointer"
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              event.stopPropagation();
+              onSelect(isSelected ? null : w.id);
+            }}
+            className="cursor-pointer focus:outline-none focus-visible:outline focus-visible:outline-2
+                       focus-visible:outline-offset-2 focus-visible:outline-sky-500"
           >
             {/* A fat invisible line so a finger can hit a wall on a phone. */}
             <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={34} />

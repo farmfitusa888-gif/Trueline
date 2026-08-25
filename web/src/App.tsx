@@ -26,6 +26,8 @@ import { Floor } from './Floor.tsx';
 import { Draw } from './Draw.tsx';
 import { WallPhotos } from './WallPhotos.tsx';
 import { Elevation } from './Elevation.tsx';
+import { DamageOnWall } from './Damage.tsx';
+import { Claim } from './Claim.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -452,7 +454,23 @@ export function App() {
                   }
                 />
 
-                {!selectedWall.open && <Elevation room={loaded.room} wall={selectedWall} />}
+                {!selectedWall.open && (
+                  <Elevation room={loaded.room} wall={selectedWall} damages={loaded.damages} />
+                )}
+
+                {loaded.claim.on && (
+                  <DamageOnWall
+                    room={loaded.room}
+                    wall={selectedWall}
+                    damages={loaded.damages}
+                    onMark={(damage) => dispatch({ type: 'mark', damage })}
+                    onUnmark={(damageId) => dispatch({ type: 'unmark', damageId })}
+                    onCutTo={(damageId, text) => dispatch({ type: 'cutTo', damageId, text })}
+                    onReading={(damageId, reading) =>
+                      dispatch({ type: 'reading', damageId, reading })
+                    }
+                  />
+                )}
 
                 <WallPhotos room={loaded.room} wallId={selectedWall.id} photos={loaded.photos} />
 
@@ -501,6 +519,13 @@ export function App() {
             <div data-sheet="yes">
               <Takeoff room={loaded.room} readiness={derived.state} />
             </div>
+
+            <Claim
+              room={loaded.room}
+              damages={loaded.damages}
+              claim={loaded.claim}
+              onChange={(claim) => dispatch({ type: 'claim', claim })}
+            />
 
             <Price room={loaded.room} />
 

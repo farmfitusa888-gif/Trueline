@@ -1,4 +1,4 @@
-import { formatFeetInches } from './length.ts';
+import { type Nanometres, formatFeetInches } from './length.ts';
 import { type Room, RoomError, formatSquareFeet } from './room.ts';
 import { readiness, trustLabel } from './issue.ts';
 import { roomQuantities } from './zone.ts';
@@ -97,6 +97,27 @@ export interface ClaimLine {
   readonly value: string;
 }
 
+/**
+ * How this document reads numbers.
+ *
+ * Passed in rather than decided here, because the same claim has to print in
+ * feet for one contractor and in millimetres for another, and a report that
+ * formatted for itself would be the one screen in the app printing the other
+ * system. Nothing formatted here is ever read back — these are strings for a
+ * page, and the integers behind them are untouched either way.
+ */
+export interface ReportFormat {
+  readonly len: (value: Nanometres) => string;
+  /** An area in the doubled unit `area()` keeps. */
+  readonly area: (halfSquareNanometres: bigint) => string;
+}
+
+/** What it reads as when nobody says otherwise. */
+export const IMPERIAL_REPORT: ReportFormat = {
+  len: formatFeetInches,
+  area: (halfSquareNanometres) => formatSquareFeet(halfSquareNanometres),
+};
+
 export interface ClaimReport {
   readonly heading: string;
   /** The claim's own facts, in the order an adjuster reads them. */
@@ -140,7 +161,8 @@ export function claimReport(
   room: Room,
   damages: readonly Damage[],
   claim: Claim,
-  at: string
+  at: string,
+  format: ReportFormat = IMPERIAL_REPORT
 ): ClaimReport {
   const state = readiness(room);
   const totals = damageTotals(room, damages);
@@ -160,18 +182,21 @@ export function claimReport(
   add('Adjuster', describeParty(claim.adjuster));
   add('Notes', claim.note);
 
-  const SQ_FT = 304_800_000n * 304_800_000n;
   const affectedFace = totals.faceArea;
   const share = q.wallFaceArea === 0n ? 0n : (affectedFace * 1000n) / q.wallFaceArea;
+  // Wall face is kept in plain square nanometres, floors and ceilings in the
+  // doubled unit. Doubling here rather than at either source keeps the one
+  // conversion in the one place that prints both.
+  const face = (plain: bigint) => format.area(2n * plain);
 
   return {
     heading: `${room.name}${claim.claimNumber ? ` — claim ${claim.claimNumber}` : ''}`,
     about,
     room: [
-      { label: 'Floor area', value: formatSquareFeet(q.floorArea) },
-      { label: 'Ceiling height', value: formatFeetInches(room.ceilingHeight.value) },
-      { label: 'Wall face', value: `${Number((q.wallFaceArea * 10n) / SQ_FT) / 10} sq ft` },
-      { label: 'Baseboard', value: formatFeetInches(q.baseboardRun) },
+      { label: 'Floor area', value: format.area(q.floorArea) },
+      { label: 'Ceiling height', value: format.len(room.ceilingHeight.value) },
+      { label: 'Wall face', value: face(q.wallFaceArea) },
+      { label: 'Baseboard', value: format.len(q.baseboardRun) },
     ],
     damages: damages.map((damage) => {
       const quantity = totals.each.find((x) => x.damageId === damage.id)!;
@@ -182,11 +207,11 @@ export function claimReport(
           : '';
       const pieces: string[] = [];
       if (quantity.faceArea > 0n) {
-        pieces.push(`${Number((quantity.faceArea * 10n) / SQ_FT) / 10} sq ft of wall face`);
+        pieces.push(`${face(quantity.faceArea)} of wall face`);
       }
-      if (quantity.flatArea > 0n) pieces.push(formatSquareFeet(quantity.flatArea));
+      if (quantity.flatArea > 0n) pieces.push(format.area(quantity.flatArea));
       if (quantity.baseboardRun > 0n) {
-        pieces.push(`${formatFeetInches(quantity.baseboardRun)} of baseboard`);
+        pieces.push(`${format.len(quantity.baseboardRun)} of baseboard`);
       }
       return {
         id: damage.id,
@@ -217,15 +242,13 @@ export function claimReport(
     totals: [
       {
         label: 'Wall face affected',
-        value: `${Number((affectedFace * 10n) / SQ_FT) / 10} sq ft of ${
-          Number((q.wallFaceArea * 10n) / SQ_FT) / 10
-        } sq ft — ${Number(share) / 10}%`,
+        value: `${face(affectedFace)} of ${face(q.wallFaceArea)} — ${Number(share) / 10}%`,
       },
       ...(totals.flatArea > 0n
-        ? [{ label: 'Floor or ceiling affected', value: formatSquareFeet(totals.flatArea) }]
+        ? [{ label: 'Floor or ceiling affected', value: format.area(totals.flatArea) }]
         : []),
       ...(totals.baseboardRun > 0n
-        ? [{ label: 'Baseboard affected', value: formatFeetInches(totals.baseboardRun) }]
+        ? [{ label: 'Baseboard affected', value: format.len(totals.baseboardRun) }]
         : []),
       ...(totals.pins > 0
         ? [

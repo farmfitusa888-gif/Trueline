@@ -5,6 +5,7 @@ import { scanned, verified, verify } from '../measurement.ts';
 import type { Heading, Room, Wall } from '../room.ts';
 import type { Damage } from '../damage.ts';
 import { type Claim, NO_CLAIM, claimReport, missingFromClaim, overlappingDamage } from '../claim.ts';
+import { showArea, showLength } from '../company.ts';
 
 /**
  * The claim: whose loss it is, what happened, and who is paying.
@@ -113,7 +114,7 @@ test('every damage carries its own quantity, its workings and its photographs', 
   const [only] = report.damages;
   assert.match(only!.headline, /water damage to north/);
   assert.match(only!.headline, /Category 2/, 'the adjuster wants the category');
-  assert.match(only!.summary, /18 sq ft of wall face/);
+  assert.match(only!.summary, /18\.0 sq ft of wall face/);
   assert.match(only!.summary, /9' of baseboard/);
   assert.match(only!.workings, /9' along north/);
   assert.deepEqual(only!.photos, ['photo-12', 'photo-13']);
@@ -143,7 +144,7 @@ test('how much of the room is affected, as the share an adjuster asks for', () =
   const report = claimReport(room, [waterline], full, '26 Aug 2026');
   const line = report.totals.find((l) => l.label === 'Wall face affected')!;
   // 60 ft of wall at 9 ft is 540 sq ft; 18 of it is 3.3%.
-  assert.match(line.value, /18 sq ft of 540 sq ft/);
+  assert.match(line.value, /18\.0 sq ft of 540\.0 sq ft/);
   assert.match(line.value, /3\.3%/);
 });
 
@@ -230,4 +231,20 @@ test('marks at different heights on the same stretch do not overlap', () => {
     },
   };
   assert.deepEqual(overlappingDamage([waterline, above]), []);
+});
+
+test('the document reads in whatever the contractor reads in', () => {
+  const report = claimReport(room, [waterline], full, '26 Aug 2026', {
+    len: (v) => showLength(v, 'metric'),
+    area: (a) => showArea(a, 'metric'),
+  });
+  // The same integers. Only the sentence changes: nothing here is ever read
+  // back into the model, so a units preference can never become a rounding.
+  assert.match(report.damages[0]!.summary, /1\.7 m² of wall face/);
+  assert.match(report.damages[0]!.summary, /2743 mm of baseboard/);
+  assert.match(
+    report.totals.find((l) => l.label === 'Wall face affected')!.value,
+    /1\.7 m² of 50\.2 m² — 3\.3%/
+  );
+  assert.equal(report.room.find((l) => l.label === 'Ceiling height')!.value, '2743 mm');
 });

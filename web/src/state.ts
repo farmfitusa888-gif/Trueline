@@ -27,6 +27,9 @@ import {
   northOnPlan,
 } from '../../core/src/capture.ts';
 import type { Photo } from '../../core/src/photo.ts';
+import type { Damage, Reading } from '../../core/src/damage.ts';
+import { validateDamage } from '../../core/src/damage.ts';
+import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
 import { handBack } from './bridge.ts';
 
 /**
@@ -82,6 +85,16 @@ export interface Loaded {
   readonly north: NorthOnPlan | null;
   /** The coordinate frame the room came in on, so more photos can be placed later. */
   readonly frame: RoomFrame;
+  /**
+   * What is wrong with this room, and whose claim it is.
+   *
+   * Kept beside the room rather than inside it, and that is the point: a room
+   * is a measurement of a building and a damage is an observation about part of
+   * it. Correcting a wall must not disturb what somebody marked, and marking
+   * damage must not touch a dimension.
+   */
+  readonly damages: readonly Damage[];
+  readonly claim: Claim;
   /** Rooms as they were before each edit, most recent last. */
   readonly undo: readonly Room[];
   /** What the last edit did, for the line under the plan. */
@@ -173,6 +186,19 @@ export type Action =
       at: string;
     }
   | { type: 'removeOpening'; wallId: string; openingId: string }
+  /**
+   * Marking what is wrong with the room.
+   *
+   * A damage is an observation about part of a building, kept beside the room
+   * rather than inside it. Marking one moves no wall and changes no dimension,
+   * and correcting a wall leaves every mark exactly where it was.
+   */
+  | { type: 'mark'; damage: Damage }
+  | { type: 'unmark'; damageId: string }
+  /** A cut height decided, or taken off again. Seen and decided stay apart. */
+  | { type: 'cutTo'; damageId: string; text: string | null }
+  | { type: 'reading'; damageId: string; reading: Reading }
+  | { type: 'claim'; claim: Claim }
   | { type: 'undo' }
   | { type: 'dismissError' }
   | { type: 'close' };
@@ -210,6 +236,8 @@ function restored(saved: SavedProject, note: string): State {
     photos?: readonly Photo[];
     frame?: RoomFrame;
     north?: NorthOnPlan;
+    damages?: readonly Damage[];
+    claim?: Claim;
   };
   if (!extras.report) throw new Error('That saved room has no import report with it.');
   return {
@@ -223,6 +251,8 @@ function restored(saved: SavedProject, note: string): State {
       rejectedPhotos: [],
       north: (extras.north as NorthOnPlan | undefined) ?? null,
       frame: extras.frame ?? { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
+      damages: extras.damages ?? [],
+      claim: extras.claim ?? NO_CLAIM,
       undo: [],
       lastEdit: note,
       fileName: saved.fileName,
@@ -293,6 +323,8 @@ export function reduce(state: State, action: Action): State {
             rejectedPhotos,
             north,
             frame,
+            damages: [],
+            claim: NO_CLAIM,
             undo: [],
             lastEdit: null,
             fileName: action.fileName,
@@ -361,6 +393,8 @@ export function reduce(state: State, action: Action): State {
             rejectedPhotos: [],
             north: null,
             frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
+            damages: [],
+            claim: NO_CLAIM,
             undo: [],
             lastEdit: null,
             fileName: action.fileName,
@@ -402,6 +436,8 @@ export function reduce(state: State, action: Action): State {
           rejectedPhotos: [],
           north: null,
           frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
+          damages: [],
+          claim: NO_CLAIM,
           undo: [],
           lastEdit: null,
           fileName: action.fileName,
@@ -640,6 +676,93 @@ export function reduce(state: State, action: Action): State {
       }
     }
 
+    case 'mark': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        // Checked against the room before it is kept. A mark that runs off the
+        // end of its wall is not a small error: every quantity clips it
+        // silently, and the claim comes out short on a wall the damage is not
+        // even on.
+        validateDamage(loaded.room, action.damage);
+        return {
+          ...state,
+          error: null,
+          loaded: {
+            ...loaded,
+            damages: [...loaded.damages.filter((d) => d.id !== action.damage.id), action.damage],
+            lastEdit: `Marked ${action.damage.kind} damage.`,
+          },
+        };
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'unmark': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          damages: loaded.damages.filter((d) => d.id !== action.damageId),
+          lastEdit: 'Took a mark off.',
+        },
+      };
+    }
+
+    case 'cutTo': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const damage = loaded.damages.find((d) => d.id === action.damageId);
+        if (!damage) return state;
+        const { cutTo: _was, ...bare } = damage;
+        const next: Damage =
+          action.text === null
+            ? bare
+            : { ...damage, cutTo: parseLength(action.text, { defaultUnit: 'ft' }) };
+        validateDamage(loaded.room, next);
+        return {
+          ...state,
+          error: null,
+          loaded: {
+            ...loaded,
+            damages: loaded.damages.map((d) => (d.id === next.id ? next : d)),
+            lastEdit:
+              action.text === null
+                ? 'Back to the damage as it was seen.'
+                : `Cutting to ${formatFeetInches(next.cutTo!)}.`,
+          },
+        };
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'reading': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          damages: loaded.damages.map((d) =>
+            d.id === action.damageId ? { ...d, readings: [...d.readings, action.reading] } : d
+          ),
+          lastEdit: `Logged ${action.reading.value} ${action.reading.scale}.`,
+        },
+      };
+    }
+
+    case 'claim':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, claim: action.claim } }
+        : state;
+
     case 'undo': {
       const loaded = state.loaded;
       if (!loaded || loaded.undo.length === 0) return state;
@@ -691,6 +814,8 @@ export function persist(loaded: Loaded, at: string): string | null {
         photos: loaded.photos,
         frame: loaded.frame,
         north: loaded.north,
+        damages: loaded.damages,
+        claim: loaded.claim,
       },
     });
     // The app first, and in its own right. It writes the room into the scan's

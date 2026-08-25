@@ -1,7 +1,9 @@
 import type { Room, Wall } from '../../core/src/room.ts';
 import { runLength } from '../../core/src/room.ts';
 import { isVerified } from '../../core/src/measurement.ts';
+import { type Damage, patchOnWall } from '../../core/src/damage.ts';
 import { useUnits } from './units.tsx';
+import { Label } from './Plan.tsx';
 
 /**
  * The wall seen straight on, which is what most of the trades actually work off.
@@ -23,7 +25,15 @@ import { useUnits } from './units.tsx';
 const PAD = 78;
 const SIDE = 560;
 
-export function Elevation({ room, wall }: { readonly room: Room; readonly wall: Wall }) {
+export function Elevation({
+  room,
+  wall,
+  damages = [],
+}: {
+  readonly room: Room;
+  readonly wall: Wall;
+  readonly damages?: readonly Damage[];
+}) {
   const { len } = useUnits();
 
   const length = runLength(wall);
@@ -91,6 +101,92 @@ export function Elevation({ room, wall }: { readonly room: Room; readonly wall: 
           stroke="#0f172a"
           strokeWidth={6}
         />
+
+        {/*
+          The damage, drawn on the wall it is on.
+          
+          This is the drawing the whole insurance side exists to produce: the
+          wall, its openings, and the shape of what is wrong with it, to scale,
+          on one picture an adjuster can look at. Nothing else in the field draws
+          this because nothing else knows how long the wall is.
+          
+          Drawn under the openings, so a window inside a flood cut still reads as
+          a window — which matters, because a window inside the cut is not board
+          and is not charged for.
+        */}
+        {damages.map((damage) => {
+          const shape = damage.shape;
+          if (shape.kind === 'surface' && shape.wallId === wall.id) {
+            return (
+              <rect
+                key={damage.id}
+                x={PAD}
+                y={PAD}
+                width={SIDE}
+                height={drawnHeight}
+                fill="#dc2626"
+                fillOpacity={0.16}
+                stroke="#dc2626"
+                strokeWidth={3}
+              />
+            );
+          }
+          if (shape.kind !== 'patch' || shape.wallId !== wall.id) return null;
+
+          const seen = patchOnWall(room, shape);
+          // The damage as seen, and the cut as decided, drawn as two different
+          // things — because they are. A solid edge is what somebody saw; a
+          // dashed one above it is what somebody decided to cut to.
+          const cut =
+            damage.cutTo === undefined
+              ? null
+              : Number(damage.cutTo) / Number((wall.height ?? room.ceilingHeight).value);
+          const left = PAD + seen.along[0] * SIDE;
+          const width = (seen.along[1] - seen.along[0]) * SIDE;
+          const bottom = PAD + drawnHeight - seen.height[0] * drawnHeight;
+          const seenTop = PAD + drawnHeight - seen.height[1] * drawnHeight;
+          const cutTop = cut === null ? seenTop : PAD + drawnHeight - cut * drawnHeight;
+
+          return (
+            <g key={damage.id}>
+              {cut !== null && (
+                <rect
+                  x={left}
+                  y={cutTop}
+                  width={width}
+                  height={bottom - cutTop}
+                  fill="#dc2626"
+                  fillOpacity={0.08}
+                  stroke="#dc2626"
+                  strokeWidth={2}
+                  strokeDasharray="10 6"
+                />
+              )}
+              <rect
+                x={left}
+                y={seenTop}
+                width={width}
+                height={bottom - seenTop}
+                fill="#dc2626"
+                fillOpacity={0.18}
+                stroke="#dc2626"
+                strokeWidth={3}
+              />
+              <Label
+                x={left + width / 2}
+                y={(seenTop + bottom) / 2}
+                dy={0}
+                anchor="middle"
+                size={20}
+                weight={600}
+                fill="#b91c1c"
+                halo={7}
+              >
+                {damage.kind}
+              </Label>
+            </g>
+          );
+        })}
 
         {openings.map((opening) => {
           const left = x(opening.offsetFromStart.value);
@@ -187,6 +283,13 @@ export function Elevation({ room, wall }: { readonly room: Room; readonly wall: 
           {len(height)}
         </text>
       </svg>
+
+      {damages.some((d) => d.cutTo !== undefined && d.shape.kind === 'patch' && d.shape.wallId === wall.id) && (
+        <p className="mt-1 text-sm text-slate-600">
+          The solid red is what was seen. The dashed red above it is what you decided to cut to —
+          two different claims, kept apart.
+        </p>
+      )}
 
       {openings.some((o) => o.kind === 'window' && o.sillHeight === undefined) && (
         <p className="mt-1 text-sm text-amber-800">
