@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import { readiness } from '../../core/src/issue.ts';
-import { fileNameFor, planPng, planSvg, printOnly, sendPicture } from './sheet.ts';
+import { roomToDxf } from '../../core/src/dxf/room.ts';
+import { fileNameFor, planPng, planSvg, printOnly, sendFile, sendPicture } from './sheet.ts';
+import { useUnits } from './units.tsx';
 
 /**
  * Getting the drawing to somebody who is not holding this phone.
@@ -17,9 +19,42 @@ import { fileNameFor, planPng, planSvg, printOnly, sendPicture } from './sheet.t
  */
 
 export function Sheet({ room }: { readonly room: Room }) {
+  const { company } = useUnits();
   const [told, setTold] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const unchecked = readiness(room).blocking.length > 0;
+
+  /**
+   * The drawing as CAD, for whoever asks for one.
+   *
+   * magicplan's own help page says their DXF to SketchUp and AutoCAD does not
+   * include dimensions, so an architect or a cabinet shop gets a shape with no
+   * numbers on it and measures the building again. This one carries them — and
+   * it carries the thing nothing else about provenance survives the trip into
+   * CAD: the measured walls are dimensioned on their own layer, so switching one
+   * layer off in a viewer shows exactly which numbers anybody stood behind.
+   */
+  async function cad() {
+    setBusy(true);
+    setTold(null);
+    try {
+      const { dxf } = roomToDxf(room, {
+        units: company.units === 'metric' ? 'mm' : 'in',
+        company: company.name,
+        at: new Date().toLocaleDateString(),
+      });
+      const said = await sendFile(
+        new Blob([dxf], { type: 'application/dxf' }),
+        fileNameFor(room.name, 'dxf'),
+        `${room.name} — drawing`
+      );
+      if (said) setTold(said);
+    } catch (error) {
+      setTold(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function picture() {
     setBusy(true);
@@ -75,7 +110,21 @@ export function Sheet({ room }: { readonly room: Room }) {
         >
           Print it
         </button>
+        <button
+          type="button"
+          onClick={() => void cad()}
+          disabled={busy}
+          className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700
+                     active:bg-slate-100 disabled:opacity-60"
+        >
+          CAD drawing
+        </button>
       </div>
+      <p className="mt-2 text-xs text-slate-500 print:hidden">
+        The CAD drawing is a DXF — it opens in AutoCAD, SketchUp and the free Autodesk viewer,
+        and it keeps its dimensions. Walls you have taped are dimensioned on their own layer, so
+        whoever opens it can switch off everything nobody stood behind.
+      </p>
 
       {told && (
         <p aria-live="polite" className="mt-2 text-sm text-slate-600">

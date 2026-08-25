@@ -22,6 +22,7 @@ import { Settings } from './Settings.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Draw } from './Draw.tsx';
 import { WallPhotos } from './WallPhotos.tsx';
+import { Elevation } from './Elevation.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -413,6 +414,8 @@ export function App() {
                     })
                   }
                 />
+
+                {!selectedWall.open && <Elevation room={loaded.room} wall={selectedWall} />}
 
                 <WallPhotos room={loaded.room} wallId={selectedWall.id} photos={loaded.photos} />
 

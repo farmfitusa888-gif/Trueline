@@ -1,5 +1,69 @@
 # tools
 
+## What is now verified, and by what
+
+**2026-08-25.** `core/src/dxf/room.ts` writes a room out as a drawing, and
+`garage-export.dxf` beside this file is the real garage scan exported through
+it, with one wall taped so the drawing carries one measured dimension and three
+scanned ones.
+
+`ezdxf-render.png` is that file drawn by **ezdxf's own renderer**, and it settles
+the question this README has been open on since 2026-08-20:
+
+| Claim | Status |
+|---|---|
+| The file is structurally valid | **VERIFIED** — `ezdxf` audit: 0 errors, 0 fixes |
+| Geometry is exact | **VERIFIED** — the walls draw at 255.82 and 234.00 inches, which is 21' 3 13/16" and the taped 19' 6" |
+| Confidence as layers | **VERIFIED** — the taped wall's dimension draws green on `DIM-VERIFIED`, the other three yellow on `DIM-SCANNED` |
+| **Dimension text renders** | **VERIFIED in ezdxf's renderer.** The numbers are drawn. |
+| Dimension text renders **in Autodesk** | **STILL NOT VERIFIED.** Nobody has opened this file there. |
+
+**The hypothesis in the last section of this file was right.** It said the
+missing piece was the generated geometry block — *"the last thing both failing
+consumers have in common"* — because a viewer draws a dimension from its stored
+block while real CAD regenerates it from the definition points. The export now
+runs every drawing through `completeDxf`, every dimension gets a block, and
+ezdxf's renderer draws the numbers. That is the same renderer that produced no
+text before.
+
+**What may still be said to a customer, and what may not.** The geometry, the
+layers and the text have been watched rendering, by one renderer. Autodesk
+Viewer is the tool a customer opens and this file has not been opened there.
+Until it has, the honest line is *"dimensions and confidence layers, in a DXF"*
+— and the sentence "verified in AutoCAD" is not available.
+
+## The bug this found, which was real and would have shipped
+
+The first version dimensioned walls with `addLinearDim`. A linear dimension
+measures along an angle stored on the entity, and `@tarikjabiri/dxf` writes that
+angle as **zero for every one of them**. So on any room, the two walls running
+north-south would have been dimensioned **0.00** — on a drawing that otherwise
+looked completely fine, opened by an architect who would then have measured the
+building again.
+
+`addAlignedDim` measures along the segment between its own definition points, so
+it is right whichever way a wall runs, and right for a chamfer, which a linear
+dimension would have measured as its horizontal component. It is also what
+`completeDxf` already knew how to build geometry for.
+
+Two smaller things from the same session: the library's own `offset` puts every
+dimension on a rectangular room in one of two places, so two of the four drew on
+top of each other — the export now says where each dimension line goes; and
+LibreCAD's `dxf2pdf` prints a blank page for **`proof.dxf` too**, which settles
+that as a harness limitation rather than anything about a particular file.
+
+## A parser is not a renderer, and this is the third time
+
+`ezdxf`'s `get_measurement()` reports **0.0** for both north-south dimensions in
+a file whose definition points are plainly `(0,0)` to `(0,234)`. It projects
+along the `angle` attribute, which an aligned dimension does not carry. The
+drawn text in the same file, from the same library, reads 234.00.
+
+That is the third time a helper function in this toolchain has reported
+something that was not true of the file. Verify against something that draws.
+
+---
+
 ## verify-dxf-dimensions.cjs
 
 Proves the claim the product is sold on: **a DXF that keeps its dimensions.**

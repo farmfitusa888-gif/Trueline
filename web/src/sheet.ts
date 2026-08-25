@@ -113,16 +113,20 @@ export function fileNameFor(room: string, extension: string): string {
   return `${clean} plan.${extension}`;
 }
 
-/**
- * Hands the picture to whatever the phone uses to send things, or saves it.
- *
- * Web Share with a file is what puts a drawing into Messages on an iPhone, which
- * is how it actually reaches a client. Where that is not available — a desktop
- * browser, an older web view — it falls back to a download, and says which of
- * the two happened rather than leaving somebody looking for a share sheet that
- * never opened.
- */
 export async function sendPicture(blob: Blob, name: string, title: string): Promise<string> {
+  return await sendFile(blob, name, title);
+}
+
+/**
+ * Hands any file to whatever the phone uses to send things, or saves it.
+ *
+ * Web Share with a file is what puts something into Messages on an iPhone,
+ * which is how a drawing actually reaches a client. Where that is not available
+ * — a desktop browser, an older web view — it falls back to a download, and
+ * says which of the two happened rather than leaving somebody looking for a
+ * share sheet that never opened.
+ */
+export async function sendFile(blob: Blob, name: string, title: string): Promise<string> {
   const file = new File([blob], name, { type: blob.type });
   const share = navigator.share as ((data: ShareData) => Promise<void>) | undefined;
   const canShareFiles = navigator.canShare?.({ files: [file] }) ?? false;
