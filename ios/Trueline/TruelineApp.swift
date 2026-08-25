@@ -4,6 +4,9 @@ import SwiftUI
 struct TruelineApp: App {
     @StateObject private var store = ProjectStore()
     @StateObject private var backup = Backup()
+    /// Whether this person has paid. Asked once at launch, corrected whenever
+    /// StoreKit says anything, and read by every screen that gates on it.
+    @StateObject private var subscription = Subscription()
     /// The navigation stack, held here rather than inside the list.
     ///
     /// Finishing a capture replaces the capture screen with the review rather
@@ -14,9 +17,14 @@ struct TruelineApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationStack(path: $path) {
-                ProjectsScreen(store: store, backup: backup, path: $path)
+                ProjectsScreen(store: store, backup: backup, subscription: subscription, path: $path)
             }
             .task {
+                // Before anything else: what has been paid for. A screen that
+                // draws a paywall over somebody who has already subscribed,
+                // even for a moment, is the worst first impression this app
+                // could make on the person who has paid for it.
+                await subscription.refresh()
                 // Ask iCloud whether there is anywhere to put a copy, once, at
                 // start-up. Everything else waits on the answer, and the answer
                 // is shown on the list rather than kept quiet.

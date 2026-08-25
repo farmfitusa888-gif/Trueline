@@ -1,4 +1,5 @@
 import type { Action } from './state.ts';
+import { setEntitlement } from './entitlementStore.ts';
 
 /**
  * How the scanner hands a room over.
@@ -42,6 +43,19 @@ export interface TruelineBridge {
   openSaved(project: string): void;
   /** Called with the contractor's profile, when the app is keeping one. */
   openCompany(company: string): void;
+  /**
+   * Whether this person has paid.
+   *
+   * Handed in by the app rather than asked for: StoreKit is on the Swift side
+   * and a web view cannot reach it. What it unlocks comes from
+   * `core/src/entitlement.ts`, which the Swift half is generated from, so the
+   * gate is one list rather than two.
+   *
+   * A browser that is not inside the app never receives this call, which is
+   * why the default has to be honest about being unknown rather than being
+   * `false` -- see `entitlementStore.ts`.
+   */
+  setSubscribed(paid: boolean): void;
   /** Version of this contract, so a mismatched app build can say so. */
   readonly version: 1;
 }
@@ -233,7 +247,18 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     });
   };
 
-  window.trueline = { open, openTrace, openSaved, openCompany, version: BRIDGE_VERSION };
+  const setSubscribed = (paid: boolean) => {
+    setEntitlement(paid === true);
+  };
+
+  window.trueline = {
+    open,
+    openTrace,
+    openSaved,
+    openCompany,
+    setSubscribed,
+    version: BRIDGE_VERSION,
+  };
 
   const waiting = window.truelinePayload;
   delete window.truelinePayload;

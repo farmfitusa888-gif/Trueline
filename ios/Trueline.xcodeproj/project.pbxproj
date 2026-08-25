@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B5FB642000E31B6B6F08259D /* Entitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F19B08B728EA3668918F1E /* Entitlement.swift */; };
+		5704CC77803FEAD82D7E9435 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF064C61BAC96F4E29D8599 /* PaywallView.swift */; };
+		29D0D6D2DACCCB591B11C7C1 /* Subscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2159A21116B79E08796803F1 /* Subscription.swift */; };
 		00E2612DA11E8090779C51D7 /* MeasureScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 818B362019396853724060C1 /* MeasureScene.swift */; };
 		220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3D10EAA50BB9071F0948FA /* TruelineApp.swift */; };
 		D11C22FC215A4E923A59B0BC /* ProjectsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C95EB9D0408516F5196654B /* ProjectsScreen.swift */; };
@@ -30,6 +33,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		48F19B08B728EA3668918F1E /* Entitlement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entitlement.swift; sourceTree = "<group>"; };
+		EAF064C61BAC96F4E29D8599 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		2159A21116B79E08796803F1 /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
 		818B362019396853724060C1 /* MeasureScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasureScene.swift; sourceTree = "<group>"; };
 		FD3D10EAA50BB9071F0948FA /* TruelineApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TruelineApp.swift; sourceTree = "<group>"; };
 		4C95EB9D0408516F5196654B /* ProjectsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsScreen.swift; sourceTree = "<group>"; };
@@ -97,6 +103,9 @@
 				AE28D0C5C19BF5AD12E5F77E /* ARMeasureModel.swift */,
 				9A72E1F4C0B846D3A5170E2B /* Backup.swift */,
 				818B362019396853724060C1 /* MeasureScene.swift */,
+				2159A21116B79E08796803F1 /* Subscription.swift */,
+				EAF064C61BAC96F4E29D8599 /* PaywallView.swift */,
+				48F19B08B728EA3668918F1E /* Entitlement.swift */,
 				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
 				6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */,
 				DA1B9D64EFC2ED4C64672F34 /* Web */,
@@ -207,6 +216,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */,
+				B5FB642000E31B6B6F08259D /* Entitlement.swift in Sources */,
+				5704CC77803FEAD82D7E9435 /* PaywallView.swift in Sources */,
+				29D0D6D2DACCCB591B11C7C1 /* Subscription.swift in Sources */,
 				00E2612DA11E8090779C51D7 /* MeasureScene.swift in Sources */,
 				D11C22FC215A4E923A59B0BC /* ProjectsScreen.swift in Sources */,
 				1C5A53064896C146AD8102A9 /* ScanScreen.swift in Sources */,

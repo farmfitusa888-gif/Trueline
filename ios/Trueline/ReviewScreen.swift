@@ -9,10 +9,12 @@ struct ReviewScreen: View {
     let scan: SavedScan
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
+    @ObservedObject var subscription: Subscription
     @State private var sharing = false
 
     var body: some View {
         CorrectView(
+            subscribed: subscription.subscribed,
             roomJSON: scan.roomJSON,
             photosJSON: scan.photosJSON,
             traceJSON: scan.traceJSON,

@@ -44,6 +44,7 @@ const parts = [
   'a7-client.mjs',
   'a8-agree.mjs',
   'a9-trade.mjs',
+  'a10-gate.mjs',
 ];
 
 function run(part) {

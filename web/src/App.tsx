@@ -20,6 +20,7 @@ import { Thickness } from './Thickness.tsx';
 import { Measure } from './Measure.tsx';
 import { planThumbnail } from './sheet.ts';
 import { Agree } from './Agree.tsx';
+import { Gate } from './Locked.tsx';
 import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Sections.tsx';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
@@ -710,12 +711,15 @@ export function App() {
             </Panel>
 
             <Panel section="takeoff" active={section}>
+              <Gate feature="takeoff">
               <div data-sheet="yes">
                 <Takeoff room={loaded.room} readiness={derived.state} />
               </div>
+              </Gate>
             </Panel>
 
             <Panel section="agree" active={section}>
+              <Gate feature="proposal">
               <Agree
                 room={loaded.room}
                 overrides={loaded.overrides}
@@ -724,9 +728,11 @@ export function App() {
                 onProposal={(proposal) => dispatch({ type: 'proposal', proposal })}
                 onBaseline={(baseline) => dispatch({ type: 'baseline', baseline })}
               />
+              </Gate>
             </Panel>
 
             <Panel section="price" active={section}>
+              <Gate feature="pricing">
               <Price
                 room={loaded.room}
                 overrides={loaded.overrides}
@@ -735,9 +741,11 @@ export function App() {
               />
 
               <JobStatus room={loaded.room} fileName={loaded.fileName} />
+              </Gate>
             </Panel>
 
             <Panel section="claim" active={section}>
+              <Gate feature="insurance">
               <Claim
                 room={loaded.room}
                 damages={loaded.damages}
@@ -757,12 +765,15 @@ export function App() {
                   claim={loaded.claim}
                 />
               )}
+              </Gate>
             </Panel>
 
             <Panel section="files" active={section}>
+              <Gate feature="exports">
               <Sheet room={loaded.room} photos={loaded.photos} overrides={loaded.overrides} />
 
               <FieldSheet room={loaded.room} footprints={loaded.footprints} />
+              </Gate>
             </Panel>
 
             <p className="px-1 text-xs text-slate-400 print:hidden">

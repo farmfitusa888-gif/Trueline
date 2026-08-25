@@ -26,6 +26,14 @@ struct CorrectView: UIViewRepresentable {
     /// The room as somebody already corrected it, if they have. Outranks the
     /// capture: it is the same room with tape readings in it.
     let correctedJSON: Data
+    /// Whether this person has paid.
+    ///
+    /// Handed across rather than asked for by the web half: StoreKit lives on
+    /// this side and a web view has no way to ask it. The list of what that
+    /// unlocks is shared -- `Entitlement.swift` is generated from the same
+    /// TypeScript the web screens import -- so both halves gate on one list.
+    let subscribed: Bool
+
     let title: String
     /// Where this scan lives, so a save can land beside the capture it came from.
     let folder: URL
@@ -252,6 +260,21 @@ struct CorrectView: UIViewRepresentable {
                     """
                 )
             }
+
+            // Then whether anything is paid for, before the room: a screen that
+            // draws itself locked and then unlocks a frame later has shown
+            // somebody who paid a paywall, which is the worst thing this app
+            // can do to the person funding it.
+            run(
+                on: webView,
+                """
+                (function () {
+                  if (window.trueline && window.trueline.setSubscribed) {
+                    window.trueline.setSubscribed(\(parent.subscribed ? "true" : "false"));
+                  }
+                })();
+                """
+            )
 
             // A walked room and a scanned room go across the same hook and come
             // out the same on the other side. Which one this is, is the only

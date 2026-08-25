@@ -31,6 +31,13 @@ if ! npm run verify --silent; then
   exit 1
 fi
 
+# The paywall's gate is generated from the TypeScript that defines it.
+if ! node --experimental-strip-types core/tools/gen-entitlement.mjs --check; then
+  echo
+  echo "\u2717 ios/Trueline/Entitlement.swift is out of date. Regenerate it."
+  exit 1
+fi
+
 # No Swift compiler on this machine, so this is the only thing between a typo
 # and a Mac. A grammar, not a compiler -- see the file's own header.
 if command -v python3 >/dev/null 2>&1 && ! python3 core/tools/check-swift.py; then
