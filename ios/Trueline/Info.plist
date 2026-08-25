@@ -20,6 +20,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Trueline uses the camera to measure the room and to photograph it while you walk, so every dimension has a picture behind it. Nothing leaves this device.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Trueline puts the days you have scheduled into your own calendar, in a calendar of its own that you can switch off. It only adds — it never reads what else is in there.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Trueline puts the days you have scheduled into your own calendar, in a calendar of its own that you can switch off. It only adds — it never reads what else is in there.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Trueline reads the compass so it can put north on your drawing. Your position is never used, never stored and never sent anywhere.</string>
 	<key>UIApplicationSceneManifest</key>

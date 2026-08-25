@@ -16,6 +16,7 @@ struct ProjectsScreen: View {
     /// Whether this person has paid, so the list can offer the subscription and
     /// hand the answer to the correction screens.
     @ObservedObject var subscription: Subscription
+    @ObservedObject var calendar: JobCalendar
     /// The whole stack, owned above this screen.
     ///
     /// It has to be, because finishing a capture does not *push* the review —
@@ -176,13 +177,13 @@ struct ProjectsScreen: View {
                 ARMeasureScreen(store: store, backup: backup, onFinished: show)
             case .open(let entry):
                 if let scan = store.load(entry) {
-                    ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription)
+                    ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar)
                 } else {
                     Text("That capture could not be read. Its room.json or trace.json is missing.")
                         .padding()
                 }
             case .review(let scan):
-                ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription)
+                ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar)
             }
         }
         .onAppear { store.refresh() }

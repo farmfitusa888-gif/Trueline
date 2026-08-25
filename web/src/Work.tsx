@@ -36,6 +36,7 @@ import {
   next,
   visitOf,
 } from '../../core/src/schedule.ts';
+import { handBackVisits } from './bridge.ts';
 import { useQuote } from './quoteOf.ts';
 import { sendFile } from './sheet.ts';
 import { useUnits } from './units.tsx';
@@ -100,6 +101,7 @@ export function Work({
   const [dueAt, setDueAt] = useState('');
   const [payTo, setPayTo] = useState('');
   const [trouble, setTrouble] = useState<string | null>(null);
+  const [calendarNote, setCalendarNote] = useState<string | null>(null);
 
   const where = proposal?.client.address ?? '';
   const changes: ChangeOrder | null = baseline ? changesSince(baseline, current) : null;
@@ -211,6 +213,25 @@ export function Work({
             </ul>
             <button
               type="button"
+              onClick={() => {
+                const wrote = handBackVisits(visits, company.name);
+                setCalendarNote(
+                  wrote
+                    ? `${visits.length} ${visits.length === 1 ? 'day' : 'days'} put in your ` +
+                      'own calendar. Days already added are not added twice.'
+                    : null
+                );
+              }}
+              className="mt-3 min-h-11 rounded-md bg-slate-900 px-4 text-sm font-semibold
+                         text-white active:bg-slate-700"
+            >
+              Add to my calendar
+            </button>
+            {calendarNote && (
+              <p className="mt-1 text-xs text-emerald-800">{calendarNote}</p>
+            )}
+            <button
+              type="button"
               onClick={() =>
                 void sendFile(
                   new Blob(
@@ -224,8 +245,13 @@ export function Work({
               className="mt-3 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-medium
                          text-slate-700 active:bg-slate-100"
             >
-              Send the calendar
+              Send it to somebody
             </button>
+            <p className="mt-1 text-xs text-slate-500">
+              The first puts these days in your own iPhone calendar — no service, no monthly
+              fee, and already on every device you own. The second sends a file anybody's
+              calendar reads, whatever they use.
+            </p>
           </>
         )}
       </section>

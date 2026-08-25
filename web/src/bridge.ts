@@ -134,6 +134,24 @@ export function handBackCompany(company: string): void {
  * device's store and the screen still shows it; what it does not get is a
  * backup, and the claim screen says so rather than implying one.
  */
+/**
+ * Hands the scheduled days to the app, for the phone's own calendar.
+ *
+ * Nothing happens outside the app, and that is right rather than a limitation:
+ * a browser has no calendar to write to. The `.ics` file is what serves
+ * everybody else, including the client.
+ */
+export function handBackVisits(visits: unknown, company: string): boolean {
+  const post = handler('calendar');
+  if (!post) return false;
+  try {
+    post.postMessage({ visits: JSON.stringify(visits), company });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function handBackDamagePhoto(
   fileName: string,
   photoName: string,

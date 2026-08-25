@@ -34,6 +34,9 @@ struct CorrectView: UIViewRepresentable {
     /// TypeScript the web screens import -- so both halves gate on one list.
     let subscribed: Bool
 
+    /// Days to put in the phone's own calendar.
+    let onVisits: ([JobCalendar.Visit], String) -> Void
+
     let title: String
     /// Where this scan lives, so a save can land beside the capture it came from.
     let folder: URL
@@ -76,6 +79,8 @@ struct CorrectView: UIViewRepresentable {
         // back — so a picture taken on the claim screen is visible on the claim
         // screen, on this phone and on the next one.
         configuration.userContentController.add(context.coordinator, name: "photo")
+        // The days somebody has scheduled, on their way to the calendar app.
+        configuration.userContentController.add(context.coordinator, name: "calendar")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -151,6 +156,19 @@ struct CorrectView: UIViewRepresentable {
                     let data = project.data(using: .utf8)
                 else { return }
                 parent.onSave(data)
+
+            case "calendar":
+                // Handed over as JSON rather than as a dictionary, so the shape
+                // is decoded once, by Codable, against a type -- rather than
+                // pulled apart key by key with a cast per field, which is how a
+                // renamed field becomes a visit that silently never appears.
+                guard
+                    let json = body["visits"] as? String,
+                    let data = json.data(using: .utf8),
+                    let visits = try? JSONDecoder().decode([JobCalendar.Visit].self, from: data)
+                else { return }
+                let company = (body["company"] as? String) ?? ""
+                parent.onVisits(visits, company)
 
             case "company":
                 guard

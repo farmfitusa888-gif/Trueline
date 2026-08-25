@@ -10,11 +10,15 @@ struct ReviewScreen: View {
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
     @ObservedObject var subscription: Subscription
+    @ObservedObject var calendar: JobCalendar
     @State private var sharing = false
 
     var body: some View {
         CorrectView(
             subscribed: subscription.subscribed,
+            onVisits: { visits, company in
+                Task { await calendar.put(visits, company: company) }
+            },
             roomJSON: scan.roomJSON,
             photosJSON: scan.photosJSON,
             traceJSON: scan.traceJSON,

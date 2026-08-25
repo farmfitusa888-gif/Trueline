@@ -7,6 +7,8 @@ struct TruelineApp: App {
     /// Whether this person has paid. Asked once at launch, corrected whenever
     /// StoreKit says anything, and read by every screen that gates on it.
     @StateObject private var subscription = Subscription()
+    /// The phone's own calendar, written into and never read.
+    @StateObject private var calendar = JobCalendar()
     /// The navigation stack, held here rather than inside the list.
     ///
     /// Finishing a capture replaces the capture screen with the review rather
@@ -17,7 +19,13 @@ struct TruelineApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationStack(path: $path) {
-                ProjectsScreen(store: store, backup: backup, subscription: subscription, path: $path)
+                ProjectsScreen(
+                    store: store,
+                    backup: backup,
+                    subscription: subscription,
+                    calendar: calendar,
+                    path: $path
+                )
             }
             .task {
                 // Before anything else: what has been paid for. A screen that

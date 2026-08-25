@@ -32,8 +32,31 @@ t = await page.locator('body').innerText();
 check('a visit lands in the list', /Kitchen — tear out/.test(t), t.slice(0, 500));
 check('and the next one is called out', /^[\s\S]*Next:/.test(t), t.slice(0, 400));
 
-check('a calendar file can be sent',
-  (await page.getByRole('button', { name: 'Send the calendar' }).count()) === 1);
+check('a calendar file can be sent to anybody',
+  (await page.getByRole('button', { name: 'Send it to somebody' }).count()) === 1);
+check('and the phone can put them in its own calendar',
+  (await page.getByRole('button', { name: 'Add to my calendar' }).count()) === 1);
+
+// Inside the app that button reaches the phone. Outside it there is no
+// calendar to reach, so it has to say nothing rather than claim it worked.
+await page.evaluate(() => {
+  window.__calendarCalls = [];
+  window.webkit = {
+    messageHandlers: {
+      calendar: { postMessage: (m) => window.__calendarCalls.push(m) },
+    },
+  };
+});
+await page.getByRole('button', { name: 'Add to my calendar' }).click();
+await page.waitForTimeout(300);
+const calls = await page.evaluate(() => window.__calendarCalls ?? []);
+check('the app is handed the days, as JSON it can decode', calls.length === 1, JSON.stringify(calls));
+check('and every field the phone needs is in them',
+  calls.length === 1 && ['id', 'what', 'where', 'starts', 'ends', 'note']
+    .every((key) => key in (JSON.parse(calls[0].visits)[0] ?? {})),
+  calls.length === 1 ? calls[0].visits : 'nothing sent');
+check('and the screen says what happened',
+  /put in your own calendar/.test(await page.locator('body').innerText()));
 
 /* ------------------------------- price it, propose it, sign it */
 

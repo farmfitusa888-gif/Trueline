@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		431341F6EFB7F6667CA3C19C /* Calendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413B1ADF6E4754D38FD3CF58 /* Calendar.swift */; };
 		B5FB642000E31B6B6F08259D /* Entitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F19B08B728EA3668918F1E /* Entitlement.swift */; };
 		5704CC77803FEAD82D7E9435 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF064C61BAC96F4E29D8599 /* PaywallView.swift */; };
 		29D0D6D2DACCCB591B11C7C1 /* Subscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2159A21116B79E08796803F1 /* Subscription.swift */; };
@@ -33,6 +34,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		413B1ADF6E4754D38FD3CF58 /* Calendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Calendar.swift; sourceTree = "<group>"; };
 		48F19B08B728EA3668918F1E /* Entitlement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entitlement.swift; sourceTree = "<group>"; };
 		EAF064C61BAC96F4E29D8599 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		2159A21116B79E08796803F1 /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
@@ -106,6 +108,7 @@
 				2159A21116B79E08796803F1 /* Subscription.swift */,
 				EAF064C61BAC96F4E29D8599 /* PaywallView.swift */,
 				48F19B08B728EA3668918F1E /* Entitlement.swift */,
+				413B1ADF6E4754D38FD3CF58 /* Calendar.swift */,
 				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
 				6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */,
 				DA1B9D64EFC2ED4C64672F34 /* Web */,
@@ -216,6 +219,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */,
+				431341F6EFB7F6667CA3C19C /* Calendar.swift in Sources */,
 				B5FB642000E31B6B6F08259D /* Entitlement.swift in Sources */,
 				5704CC77803FEAD82D7E9435 /* PaywallView.swift in Sources */,
 				29D0D6D2DACCCB591B11C7C1 /* Subscription.swift in Sources */,
