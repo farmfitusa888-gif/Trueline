@@ -74,14 +74,38 @@ if ! git diff --quiet -- "$pbx"; then
   team="$(git diff -U0 -- "$pbx" \
     | sed -n 's/^+[[:space:]]*DEVELOPMENT_TEAM = \(.*\);$/\1/p' \
     | head -1 | tr -d '"')"
-  other="$(git diff -U0 -- "$pbx" | grep -E '^[+-][^+-]' \
-    | grep -vcE 'DEVELOPMENT_TEAM|CODE_SIGN_STYLE|LastUpgradeCheck')"
-  if [ "${other:-0}" -gt 0 ]; then
+  # Everything Xcode writes into the project file when somebody ticks
+  # "Automatically manage signing" and picks a team. It is more than the team:
+  #
+  #   DEVELOPMENT_TEAM                 the team, in the build settings
+  #   DevelopmentTeam                  the same team again, in TargetAttributes
+  #   CODE_SIGN_STYLE / ProvisioningStyle   Automatic, in both places
+  #   CODE_SIGN_IDENTITY               "Apple Development"
+  #   PROVISIONING_PROFILE_SPECIFIER   emptied when signing goes automatic
+  #   LastUpgradeCheck / LastSwiftUpdateCheck   Xcode's own bookkeeping
+  #
+  # The first version of this list knew three of those, so a project file
+  # Xcode had touched exactly as intended was refused as "a real edit" and the
+  # build stopped before the compiler. Anything NOT on this list is still a
+  # real edit and still stops -- adding an entitlements file is how a
+  # capability arrives, and throwing that away silently would be worse than
+  # any amount of stopping.
+  signing='DEVELOPMENT_TEAM|DevelopmentTeam|CODE_SIGN_STYLE|ProvisioningStyle|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE_SPECIFIER|PROVISIONING_PROFILE|LastUpgradeCheck|LastSwiftUpdateCheck'
+  real="$(git diff -U0 -- "$pbx" | grep -E '^[+-][^+-]' | grep -vE "$signing")"
+  if [ -n "$real" ]; then
     bad "The project file has changes that are not just your signing team."
     echo "     That is a real edit and this script will not throw it away."
-    echo "     Look at it with:  git diff -- $pbx"
+    echo
+    echo "     Here it is, rather than a command to go and look at it:"
+    printf '%s\n' "$real" | sed 's/^/       /' | head -30
+    lines="$(printf '%s\n' "$real" | grep -c .)"
+    [ "$lines" -gt 30 ] && echo "       ... and $((lines - 30)) more lines"
+    echo
     echo "     Keep it:   git stash push -- $pbx     (then re-run this script)"
     echo "     Drop it:   git checkout -- $pbx       (then re-run this script)"
+    echo
+    echo "     If those lines are only signing, tell me and I will widen the"
+    echo "     list above -- that is a bug in this script, not in your project."
     exit 1
   fi
   if [ -n "$team" ] && ! is_team "$team"; then
