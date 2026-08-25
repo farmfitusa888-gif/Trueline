@@ -28,6 +28,7 @@ import { WallPhotos } from './WallPhotos.tsx';
 import { Elevation } from './Elevation.tsx';
 import { DamageOnWall } from './Damage.tsx';
 import { Claim } from './Claim.tsx';
+import { Scope } from './Scope.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -531,6 +532,10 @@ export function App() {
               claim={loaded.claim}
               onChange={(claim) => dispatch({ type: 'claim', claim })}
             />
+
+            {/* The restoration sheet, only on a job that is one, and never
+                folded into the takeoff above it. Two payers, two sheets. */}
+            {loaded.claim.on && <Scope room={loaded.room} damages={loaded.damages} />}
 
             <Price room={loaded.room} />
 

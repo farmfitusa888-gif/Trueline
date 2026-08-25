@@ -151,13 +151,28 @@ function hundredths(quantity: string): bigint {
 }
 
 /**
- * The takeoff, priced.
+ * The least a line has to say to be priced.
+ *
+ * A takeoff line satisfies this and so does a damage scope line, which is the
+ * point: a remodel and a restoration are two different sheets going to two
+ * different payers, and they price through one function so a rate can never
+ * mean one thing on one of them and something else on the other.
+ */
+export interface Priceable {
+  readonly what: string;
+  readonly quantity: string;
+  readonly unit: PriceUnit | 'in';
+  readonly provenance: 'measured' | 'scanned';
+}
+
+/**
+ * A sheet of quantities, priced.
  *
  * Every line is a rate the contractor set times a quantity the geometry
  * produced. Rounding happens once per line, half away from zero, so a client
  * adding the column up by hand gets the total on the page.
  */
-export function quote(lines: readonly TakeoffLine[], book: PriceBook): Quote {
+export function quote(lines: readonly Priceable[], book: PriceBook): Quote {
   const byItem = new Map(book.rates.map((r) => [`${r.item}|${r.unit}`, r]));
   const priced: PricedLine[] = [];
   const unpriced: string[] = [];
