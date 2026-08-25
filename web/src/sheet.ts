@@ -108,9 +108,9 @@ export async function planThumbnail(source: SVGSVGElement, width = 320): Promise
 }
 
 /** A file name somebody can find again, with nothing in it a filesystem hates. */
-export function fileNameFor(room: string, extension: string): string {
+export function fileNameFor(room: string, extension: string, kind = 'plan'): string {
   const clean = room.replace(/[^\w -]/g, '').trim() || 'room';
-  return `${clean} plan.${extension}`;
+  return `${clean} ${kind}.${extension}`;
 }
 
 export async function sendPicture(blob: Blob, name: string, title: string): Promise<string> {

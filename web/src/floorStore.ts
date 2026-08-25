@@ -1,4 +1,5 @@
 import type { Room } from '../../core/src/room.ts';
+import type { Damage } from '../../core/src/damage.ts';
 import type { Floor, Join } from '../../core/src/floor.ts';
 import { loadProject } from '../../core/src/persist.ts';
 import { STORAGE_PREFIX } from './state.ts';
@@ -25,6 +26,14 @@ export interface SavedRoom {
   readonly fileName: string;
   readonly room: Room;
   readonly savedAt: string;
+  /**
+   * What is wrong with it, on a job that is a claim.
+   *
+   * Carried here because a claim covers a job and a job is several rooms, and
+   * only one of them is open. Empty on every room nobody has marked, which is
+   * every room on every remodel.
+   */
+  readonly damages: readonly Damage[];
 }
 
 /** Every corrected room in this browser's storage, newest first. */
@@ -48,7 +57,13 @@ export function savedRooms(): SavedRoom[] {
       const text = window.localStorage.getItem(key);
       if (!text) continue;
       const saved = loadProject(text);
-      out.push({ fileName: saved.fileName, room: saved.room, savedAt: saved.savedAt });
+      const damages = (saved.extras as { damages?: readonly Damage[] }).damages ?? [];
+      out.push({
+        fileName: saved.fileName,
+        room: saved.room,
+        savedAt: saved.savedAt,
+        damages,
+      });
     } catch {
       // A room that will not load is one this build cannot read. It is skipped
       // here rather than taking the floor down — the screen that opens it will
