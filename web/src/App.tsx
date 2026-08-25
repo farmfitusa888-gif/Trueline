@@ -20,6 +20,8 @@ import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
 import { Settings } from './Settings.tsx';
 import { Sheet } from './Sheet.tsx';
+import { Price } from './Price.tsx';
+import { JobStatus } from './JobStatus.tsx';
 import { Draw } from './Draw.tsx';
 import { WallPhotos } from './WallPhotos.tsx';
 import { Elevation } from './Elevation.tsx';
@@ -464,6 +466,10 @@ export function App() {
             <div data-sheet="yes">
               <Takeoff room={loaded.room} readiness={derived.state} />
             </div>
+
+            <Price room={loaded.room} />
+
+            <JobStatus room={loaded.room} fileName={loaded.fileName} />
 
             <Sheet room={loaded.room} />
 

@@ -2,6 +2,7 @@ import { type Nanometres, NM_PER_MM, formatFeetInches, parseLength } from './len
 import { type Measurement, verified } from './measurement.ts';
 import { RoomError } from './room.ts';
 import { type AssemblyId, assemblyById } from './thickness.ts';
+import { type JobRecord, type PriceBook, type Rate, learn } from './price.ts';
 
 /**
  * Whose business this is, and how they like their numbers.
@@ -63,6 +64,25 @@ export interface Company {
 
   /** What the walls are, unless a job says otherwise. */
   readonly defaultAssembly?: AssemblyId;
+
+  /**
+   * What this business charges.
+   *
+   * Here rather than in its own store because it belongs to the business and
+   * not to a job — the same reason the licence number is here. Empty until
+   * somebody fills it in, and an empty book prices nothing rather than
+   * pricing everything at zero.
+   */
+  readonly prices?: PriceBook;
+
+  /**
+   * What was quoted and what happened to it.
+   *
+   * The record the learning needs, and useful on its own: what went out last
+   * month and what came back. Nothing is learned from it until three won jobs
+   * agree — see `price.ts`.
+   */
+  readonly jobs?: readonly JobRecord[];
 }
 
 export const EMPTY_COMPANY: Company = {
@@ -75,6 +95,32 @@ export const EMPTY_COMPANY: Company = {
   useDefaultCeiling: false,
   defaultCeiling: `8'`,
 };
+
+/**
+ * The book to price with, and what history would say instead.
+ *
+ * Learned rates never overwrite typed ones. A typed rate is something a person
+ * decided, and this hands back what the won jobs say **beside** it so they can
+ * decide again — which is the difference between a tool and a tool that quietly
+ * changes somebody's prices.
+ */
+export function pricing(company: Company): {
+  readonly book: PriceBook;
+  readonly suggestions: readonly Rate[];
+} {
+  const book = company.prices ?? { rates: [] };
+  const learned = learn(company.jobs ?? []);
+  const typed = new Set(book.rates.map((r) => `${r.item}|${r.unit}`));
+  return {
+    book,
+    // Only where history has something to say that the book does not already
+    // say the same way. A suggestion identical to the typed rate is noise.
+    suggestions: learned.filter((r) => {
+      const existing = book.rates.find((x) => x.item === r.item && x.unit === r.unit);
+      return !typed.has(`${r.item}|${r.unit}`) || existing?.cents !== r.cents;
+    }),
+  };
+}
 
 /** True when there is enough here to put on something a client will see. */
 export function isPresentable(company: Company): boolean {
