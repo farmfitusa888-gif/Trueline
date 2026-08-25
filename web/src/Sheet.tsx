@@ -2,6 +2,11 @@ import { useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import { readiness } from '../../core/src/issue.ts';
 import { roomToDxf } from '../../core/src/dxf/room.ts';
+import { pricing } from '../../core/src/company.ts';
+import { takeoff } from '../../core/src/takeoff.ts';
+import { quote } from '../../core/src/price.ts';
+import { photosOfWall, type Photo } from '../../core/src/photo.ts';
+import { clientFile } from './clientFile.ts';
 import { fileNameFor, planPng, planSvg, printOnly, sendFile, sendPicture } from './sheet.ts';
 import { useUnits } from './units.tsx';
 
@@ -18,8 +23,68 @@ import { useUnits } from './units.tsx';
  * frame, and nothing downstream of it will ever mention that again.
  */
 
-export function Sheet({ room }: { readonly room: Room }) {
-  const { company } = useUnits();
+/**
+ * The best photograph of each wall, shrunk to something that can be texted.
+ *
+ * One scan's photographs are 26 MB, and a client file that will not go through
+ * a message has failed at the only thing it does. So: one picture per wall, the
+ * one showing most of it, drawn into a canvas at a few hundred pixels and
+ * encoded as a JPEG. A homeowner looking at a photograph of their own kitchen
+ * gets far more out of the file than one looking at a line drawing, and this is
+ * the version of that which fits.
+ */
+async function smallShots(
+  room: Room,
+  photos: readonly Photo[],
+  len: (v: bigint) => string
+): Promise<{ src: string; caption: string }[]> {
+  const out: { src: string; caption: string }[] = [];
+  for (const wall of room.walls) {
+    if (wall.open) continue;
+    const best = photosOfWall(photos, room, wall.id)[0];
+    if (!best?.photo.fileName) continue;
+    try {
+      const shrunk = await shrink(`photos/${best.photo.fileName}`, best.photo.upright ?? 0);
+      out.push({ src: shrunk, caption: `${len(best.inFrame.visibleLength)} of one wall` });
+    } catch {
+      // A picture that will not load is left out. The file is still a file.
+    }
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
+/** One photograph, turned the right way up and made small enough to send. */
+async function shrink(src: string, upright: number, side = 560): Promise<string> {
+  const image = new Image();
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('not there'));
+    image.src = src;
+  });
+  const quarter = upright === 90 || upright === 270;
+  const width = quarter ? image.naturalHeight : image.naturalWidth;
+  const height = quarter ? image.naturalWidth : image.naturalHeight;
+  const scale = Math.min(1, side / Math.max(width, height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('no canvas');
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate((upright * Math.PI) / 180);
+  context.drawImage(
+    image,
+    (-image.naturalWidth * scale) / 2,
+    (-image.naturalHeight * scale) / 2,
+    image.naturalWidth * scale,
+    image.naturalHeight * scale
+  );
+  return canvas.toDataURL('image/jpeg', 0.72);
+}
+
+export function Sheet({ room, photos }: { readonly room: Room; readonly photos: readonly Photo[] }) {
+  const { company, len } = useUnits();
   const [told, setTold] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const unchecked = readiness(room).blocking.length > 0;
@@ -77,6 +142,45 @@ export function Sheet({ room }: { readonly room: Room }) {
     }
   }
 
+  /**
+   * One file a homeowner can open, with no app and no login.
+   *
+   * Matterport's whole business is this one feature and they charge from $65 a
+   * month for it. It needs no server: everything a client should see fits in a
+   * single HTML file that can be texted, emailed or AirDropped, and then opened
+   * on anything, offline, forever, by somebody who has never heard of this app.
+   */
+  async function forClient() {
+    setBusy(true);
+    setTold(null);
+    try {
+      const svg = document.querySelector<SVGSVGElement>('svg[aria-label^="Plan of"]');
+      const sheet = takeoff(room, new Date().toLocaleString(), { company: company.name });
+      const { book } = pricing(company);
+      const costed = quote(sheet.lines, book);
+      const shots = await smallShots(room, photos, len);
+      const html = clientFile({
+        room,
+        company,
+        takeoff: sheet,
+        ...(costed.lines.length > 0 ? { quote: costed } : {}),
+        plan: svg,
+        photos: shots,
+        at: new Date().toLocaleDateString(),
+      });
+      const said = await sendFile(
+        new Blob([html], { type: 'text/html;charset=utf-8' }),
+        fileNameFor(room.name, 'html'),
+        room.name
+      );
+      if (said) setTold(said);
+    } catch (error) {
+      setTold(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section data-sheet="no" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="font-semibold text-slate-900">Send the drawing</h2>
@@ -96,12 +200,21 @@ export function Sheet({ room }: { readonly room: Room }) {
       <div className="mt-3 flex flex-wrap gap-2 print:hidden">
         <button
           type="button"
-          onClick={() => void picture()}
+          onClick={() => void forClient()}
           disabled={busy}
           className="min-h-12 rounded-md bg-slate-900 px-5 font-semibold text-white active:bg-slate-700
                      disabled:opacity-60"
         >
-          {busy ? 'Making it…' : 'Save as a picture'}
+          {busy ? 'Making it…' : 'Send to the client'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void picture()}
+          disabled={busy}
+          className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700
+                     active:bg-slate-100 disabled:opacity-60"
+        >
+          Just the drawing
         </button>
         <button
           type="button"
@@ -120,6 +233,12 @@ export function Sheet({ room }: { readonly room: Room }) {
           CAD drawing
         </button>
       </div>
+      <p className="mt-2 text-xs text-slate-500 print:hidden">
+        <strong className="font-semibold text-slate-700">Send to the client</strong> makes one
+        file with the drawing, the room, what it takes, what it costs and a few photographs in
+        it — your name at the top. They open it in any browser: no app, no login, no account,
+        and it still works in five years with no signal.
+      </p>
       <p className="mt-2 text-xs text-slate-500 print:hidden">
         The CAD drawing is a DXF — it opens in AutoCAD, SketchUp and the free Autodesk viewer,
         and it keeps its dimensions. Walls you have taped are dimensioned on their own layer, so

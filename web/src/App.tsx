@@ -506,7 +506,7 @@ export function App() {
 
             <JobStatus room={loaded.room} fileName={loaded.fileName} />
 
-            <Sheet room={loaded.room} />
+            <Sheet room={loaded.room} photos={loaded.photos} />
 
             <FieldSheet room={loaded.room} footprints={loaded.footprints} />
 
