@@ -54,6 +54,16 @@ jobs:
       # away from "the project file cannot be parsed" — which reads, on the
       # only Mac that matters, as the app being gone. This parses it and
       # resolves every object id in it.
+      # There is no Swift compiler here and download.swift.org is refused by
+      # the network policy, so this is a grammar rather than a compiler: it
+      # says a file is not Swift, not that the code is wrong. Xcode is still
+      # the first real compiler. It catches the whole class of damage a
+      # scripted edit does, which is the class that was reaching the Mac.
+      - name: The Swift parses
+        run: |
+          pip install --quiet tree_sitter tree_sitter_swift
+          python3 core/tools/check-swift.py
+
       - name: The Xcode project file still parses
         run: python3 core/tools/check-pbxproj.py
 

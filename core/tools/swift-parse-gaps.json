@@ -1,0 +1,6 @@
+{
+  "Backup.swift": {
+    "sha256": "679cdb5a319b30a94b89b88cba355443585dcc550e7ea49796206601036b9cb6",
+    "why": "uses `switch try await`, `if let x = try? await y()` and a nil-coalesced optional cast in a guard -- all valid Swift the tree-sitter grammar rejects. Read line by line on 2026-08-25."
+  }
+}

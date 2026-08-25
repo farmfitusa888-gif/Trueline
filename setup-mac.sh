@@ -161,6 +161,19 @@ if ! git diff --quiet -- "$pbx"; then
   git checkout -- "$pbx" && ok "cleared — your team is in $local_cfg"
 fi
 
+say "The Swift itself"
+if command -v python3 >/dev/null 2>&1; then
+  if python3 core/tools/check-swift.py >/dev/null 2>&1; then
+    ok "every file parses"
+  else
+    warn "Something does not parse. This is a grammar and not a compiler, so"
+    warn "Xcode is the one that decides — but it is usually right:"
+    python3 core/tools/check-swift.py 2>&1 | sed 's/^/     /' | head -12
+  fi
+else
+  warn "No python3 on this Mac, so the Swift cannot be parse-checked here."
+fi
+
 say "The Xcode project file itself"
 if command -v python3 >/dev/null 2>&1; then
   if python3 core/tools/check-pbxproj.py >/dev/null 2>&1; then

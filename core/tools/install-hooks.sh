@@ -31,6 +31,14 @@ if ! npm run verify --silent; then
   exit 1
 fi
 
+# No Swift compiler on this machine, so this is the only thing between a typo
+# and a Mac. A grammar, not a compiler -- see the file's own header.
+if command -v python3 >/dev/null 2>&1 && ! python3 core/tools/check-swift.py; then
+  echo
+  echo "\u2717 Some Swift does not parse. See above."
+  exit 1
+fi
+
 # The Xcode project file is hand-edited here -- there is no Xcode on the machine
 # this is written on -- and a pbxproj that does not parse is an app that will not
 # open, found out on the Mac rather than here.
