@@ -1,0 +1,222 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trueline — tests 2 and 20</title>
+<style>
+  @page { size: letter; margin: 11mm 11mm 9mm; }
+  * { box-sizing:border-box; } html,body { margin:0; padding:0; }
+  body { font-family:"Liberation Sans",Arial,sans-serif; color:#14181B;
+         font-size:8.6pt; line-height:1.29; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  header.mast { border-bottom:2.5pt solid #14181B; padding-bottom:6pt; margin-bottom:9pt;
+                display:flex; justify-content:space-between; align-items:flex-end; gap:12pt; }
+  .brand { font-size:19pt; font-weight:bold; letter-spacing:-0.5pt; line-height:1; }
+  .brand span { color:#B8590A; }
+  .sub { flex:0 0 auto; white-space:nowrap; font-size:7.4pt; color:#4A5459; letter-spacing:.6pt;
+         text-transform:uppercase; font-family:"DejaVu Sans Mono",monospace; text-align:right; line-height:1.5; }
+  h1 { font-size:13pt; margin:0 0 1pt; letter-spacing:-0.3pt; }
+  h1 .n { font-family:"DejaVu Sans Mono",monospace; color:#B8590A; font-size:10pt; margin-right:7pt; }
+  .why { font-size:8.4pt; color:#4A5459; margin:0 0 7pt; padding-bottom:5pt;
+         border-bottom:1pt solid #B9C1C6; }
+  h2 { font-size:9.4pt; margin:8pt 0 3pt; letter-spacing:-0.1pt; text-transform:uppercase;
+       font-size:7.8pt; letter-spacing:.8pt; color:#4A5459;
+       font-family:"DejaVu Sans Mono",monospace; }
+  section { margin-bottom:7pt; break-inside:avoid; }
+  p { margin:0 0 4pt; }
+  ol.steps { margin:0; padding:0; list-style:none; counter-reset:s; }
+  ol.steps li { position:relative; padding-left:20pt; margin-bottom:4.5pt; break-inside:avoid; }
+  ol.steps li::before { content:counter(s); counter-increment:s; position:absolute; left:0; top:0.3pt;
+    width:13.5pt; height:13.5pt; border-radius:50%; background:#14181B; color:#fff;
+    font-family:"DejaVu Sans Mono",monospace; font-size:8pt; font-weight:bold;
+    display:flex; align-items:center; justify-content:center; }
+  .says { font-family:"DejaVu Sans Mono",monospace; font-size:8.2pt; background:#EEF1F2;
+          padding:0.5pt 3.5pt; border-radius:2pt; white-space:nowrap; }
+  .tap { font-weight:bold; }
+  table { border-collapse:collapse; width:100%; font-size:8.2pt; margin:3pt 0 2pt; }
+  th,td { border:0.7pt solid #9AA4AA; padding:3pt 5pt; text-align:left; vertical-align:top; }
+  th { background:#E4E9EB; font-size:7.4pt; text-transform:uppercase; letter-spacing:.5pt; }
+  td.k { white-space:nowrap; font-family:"DejaVu Sans Mono",monospace; width:33%; }
+  td.b { height:17pt; background:#FCFCFD; }
+  .pass { border-left:3pt solid #1F6B3F; background:#EEF6F1; padding:4.5pt 8pt; margin:4pt 0; }
+  .fail { border-left:3pt solid #A32020; background:#FBEFEF; padding:4.5pt 8pt; margin:4pt 0; }
+  .warn { border-left:3pt solid #B8590A; background:#FBF3EA; padding:4.5pt 8pt; margin:4pt 0; }
+  .lbl { font-family:"DejaVu Sans Mono",monospace; font-size:7.4pt; text-transform:uppercase;
+         letter-spacing:.8pt; display:block; margin-bottom:1.5pt; }
+  .pass .lbl { color:#1F6B3F; } .fail .lbl { color:#A32020; } .warn .lbl { color:#B8590A; }
+  .swatch { display:inline-block; width:8pt; height:8pt; border-radius:1.5pt; vertical-align:-0.5pt;
+            margin-right:2.5pt; }
+  footer { break-inside:avoid; margin-top:7pt; padding-top:4pt; border-top:0.7pt solid #B9C1C6;
+           font-size:7pt; color:#5B656B; line-height:1.4; }
+  .pb { break-before:page; }
+</style></head><body>
+
+<header class="mast"><div class="brand">True<span>line</span></div>
+  <div class="sub">On the phone &mdash; tests 2 and 20<br>The two that decide whether this works</div></header>
+
+<h1><span class="n">02</span>Measure a room &mdash; the AR path</h1>
+<p class="why">Twice you reported this doing nothing. This is not a test of how
+accurate it is. It is a test of whether it gets from a live camera picture to a
+closed room <b>at all</b>. Take a tape anyway &mdash; step 9 is worth having.</p>
+
+<section>
+<h2>Before you start</h2>
+<p>A room with <b>four square corners</b> and the floor visible all the way round
+&mdash; a bedroom or your garage. Not an L-shape, not the kitchen with an island.
+Lights on. You need to be able to walk the whole perimeter without climbing over
+anything.</p>
+</section>
+
+<section>
+<h2>What to do</h2>
+<ol class="steps">
+<li>First screen &rarr; <span class="tap">Measure a room</span>. The camera comes up.</li>
+<li>Watch the sentence at the top. It will say <span class="says">Starting up&hellip;</span>
+    then most likely <span class="says">Move the phone slowly from side to side to start tracking</span>.
+    Do that &mdash; slowly, a couple of feet each way.</li>
+<li>When tracking settles, it says <span class="says">Lay the phone flat on the floor and tap Set floor</span>.
+    <b>Put the phone face up on the floor</b>, flat, and tap <span class="tap">Set floor</span>.
+    <br>If your phone found the floor by itself it says <span class="says">Floor found</span> instead
+    and you can skip this &mdash; both are a pass.</li>
+<li>Pick the phone up. It should now read
+    <span class="says">Floor set — phone is 3&#39;4&quot; above it</span> (your height, whatever it is)
+    and the instruction changes to <span class="says">Point at the foot of a corner and tap</span>.
+    <b>The dot in the middle of the screen goes solid.</b></li>
+<li>Point the dot at <b>the foot of a corner</b> &mdash; where the two walls meet the floor,
+    not up at eye level &mdash; and tap the big round button.</li>
+<li>Walk to the next corner. It says <span class="says">Walk to the next corner and tap</span>.
+    Tap it. Then <span class="says">Keep going round. Tap the first corner again when you get back to it</span>.</li>
+<li>Wall lengths appear along the bottom as you go &mdash; <span class="says">wall 1</span>,
+    <span class="says">wall 2</span>&hellip; <b>Read them as they land.</b> That is the app measuring in front of you.</li>
+<li>Back at the first corner it says
+    <span class="says">You are back at the first corner — tap it again to finish</span>. Tap it.
+    <span class="tap">Done</span> is now tappable (it needs four corners). Type the room name
+    into <span class="says">What is this room?</span> and tap <span class="tap">Done</span>.</li>
+<li><b>Now the tape.</b> Measure two walls that meet at a corner &mdash; one running
+    each way &mdash; and write them here against what the app said:</li>
+</ol>
+<table>
+<tr><th>Wall</th><th>What the app said</th><th>Your tape</th><th>Off by</th></tr>
+<tr><td class="k">wall 1</td><td class="b"></td><td class="b"></td><td class="b"></td></tr>
+<tr><td class="k">wall 2</td><td class="b"></td><td class="b"></td><td class="b"></td></tr>
+</table>
+<p style="font-size:8pt;color:#4A5459">Corner-tapping by hand is not LiDAR. A couple of
+inches out is normal and is the whole reason the app refuses to call it measured. What
+matters is that it <i>finished</i>.</p>
+</section>
+
+<div class="pass"><span class="lbl">Pass</span>
+The dot went solid, four taps landed, lengths appeared, <b>Done</b> worked, and the
+room opened on the review screen.</div>
+
+<div class="fail"><span class="lbl">Fail &mdash; and what to send me</span>
+<b>The exact sentence on the screen, word for word.</b> It is different for every
+reason this can fail, and that sentence is the diagnosis. Do not paraphrase it.</div>
+
+<section>
+<h2>If it stalls, this is what it is telling you</h2>
+<table>
+<tr><th>On screen</th><th>What it means</th><th>What to do</th></tr>
+<tr><td class="k">Slow down — the phone is moving too fast to track</td>
+    <td>You are sweeping it.</td><td>Move at walking pace or slower.</td></tr>
+<tr><td class="k">Not enough detail to track</td>
+    <td>Blank walls, bare floor, low light.</td><td>More light. Point at something with pattern in it.</td></tr>
+<tr><td class="k">Finding where it is again — hold still a moment</td>
+    <td>It lost itself, usually a fast turn.</td><td>Stand still. It comes back.</td></tr>
+<tr><td class="k">It is not flat enough to tell where the floor is.</td>
+    <td>Phone was tilted on <b>Set floor</b>.</td><td>Flat on the floor, screen up, then tap.</td></tr>
+<tr><td class="k">Point further down — the middle of the screen has to be on the floor</td>
+    <td>You aimed at the corner at eye level.</td><td>Aim at the <b>foot</b> of the corner.</td></tr>
+<tr><td class="k">This device cannot track its position well enough</td>
+    <td>Not a real phone, or too old.</td><td>A simulator will never pass this. Use the iPhone.</td></tr>
+</table>
+</section>
+
+<footer>Test 2 exists because the first two fixes were real and were not the whole thing.
+The floor height is now read straight off the current camera frame, which nothing else can
+take away from it &mdash; and if the phone never finds the floor on its own, you tell it where
+the floor is by putting the phone on it.</footer>
+
+<h1 style="margin-top:11pt"><span class="n">20</span>Changing the room</h1>
+<p class="why">Everything this app promises comes down to one thing: <b>a number you
+moved by hand must never be able to pass as a number you measured.</b> Step 4 is the
+test. If it ever fails, nothing else on any of these sheets is worth anything.</p>
+
+<section>
+<h2>Start from the room you just walked, or any saved scan</h2>
+<ol class="steps">
+<li><b>Rename the room.</b> Top of the plan &rarr; <span class="tap">Rename</span>.
+    Give it the name you would say out loud &mdash; &ldquo;Gilbert&rsquo;s kitchen&rdquo;.
+    <br><b>Check:</b> that name now heads the drawing, the takeoff and the claim document.
+    It used to say <span class="says">garage.json</span>.</li>
+<li><b>Name a wall.</b> Tap a wall on the plan &rarr; <span class="tap">Change this wall</span>
+    &rarr; <span class="says">Call it something</span>. Type &ldquo;behind the washer&rdquo;.
+    <br><b>Check:</b> anything marked on that wall moved with it.</li>
+<li><b>Move one wall.</b> Same panel &rarr; <span class="says">Move it — without a tape</span>.
+    Type a length a foot or two off what it says &mdash; then <span class="tap">Move it</span>.
+    <br><b>Check three things:</b> the wall goes exactly where you put it; the rest of the room
+    gives way around it; and the wall turns
+    <span class="swatch" style="background:#7c3aed"></span><b>violet</b> with
+    <span class="says">moved by hand</span> beside the number. The legend under the plan
+    grows a <span class="says">Moved by hand</span> entry.</li>
+<li><b>Now move all four walls.</b> One at a time, same way.
+    <div class="pass" style="margin:4pt 0 0"><span class="lbl">This is the test</span>
+    With every wall in the room moved by hand, the plan must <b>still</b> say
+    <span class="says">SCANNED — no wall here has had a tape on it. These numbers will move.</span>
+    and the app must <b>still</b> ask you to put a tape on one wall running each way.</div>
+    <div class="fail" style="margin:3pt 0 0"><span class="lbl">Fail</span>
+    If anywhere &mdash; plan, takeoff, price, client file, claim &mdash; now says the room is
+    measured, <b>stop and tell me immediately.</b> Send the scan. That is the one bug
+    that would make this app dishonest.</div></li>
+<li><b>Put a real tape on that wall.</b> Measure it properly, then
+    <span class="says">It has had a tape on it</span> &rarr; type the reading.
+    <br><b>Check:</b> the wall goes <span class="swatch" style="background:#14181B"></span><b>black</b>,
+    says measured, and the whole room re-solves around it.</li>
+<li><b>Try to drag that same wall again.</b>
+    <br><b>Check:</b> it will not let you. The panel now offers only
+    <span class="tap">Take the tape reading off</span> &mdash; because dragging a measured wall
+    would quietly replace a measurement with a guess while the plan still said somebody
+    measured this room.</li>
+</ol>
+</section>
+
+<section>
+<h2>Then the shape edits &mdash; each has one thing to watch</h2>
+<table>
+<tr><th>What you tap</th><th>What it is for</th><th>What must happen</th></tr>
+<tr><td class="k">Cut it in two</td>
+    <td>A pony wall meeting a full-height one.</td>
+    <td>It asks how high the second piece is, and <b>refuses</b> if your answer makes the
+        two pieces identical. That refusal is correct &mdash; two walls in line alike in
+        every way are one wall written twice.</td></tr>
+<tr><td class="k">Notch the corner after it</td>
+    <td>An alcove the scanner flattened.</td>
+    <td>It puts <b>two</b> walls in, not one &mdash; a room with square corners always has an
+        even number of sides. <b>The room does not change size:</b> the two walls beside
+        the corner give up the length.</td></tr>
+<tr><td class="k">There is no wall here at all</td>
+    <td>A side the scan invented.</td>
+    <td>The line under the plan <b>names which walls moved and by how far</b>.
+        Undo is one tap.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Write down anything that surprised you</h2>
+<table>
+<tr><th>Step</th><th>What you expected</th><th>What happened</th></tr>
+<tr><td class="b"></td><td class="b"></td><td class="b"></td></tr>
+<tr><td class="b"></td><td class="b"></td><td class="b"></td></tr>
+<tr><td class="b"></td><td class="b"></td><td class="b"></td></tr>
+</table>
+</section>
+
+<div class="warn"><span class="lbl">Colours on the plan</span>
+<span class="swatch" style="background:#14181B"></span>Measured &nbsp;
+<span class="swatch" style="background:#B8590A"></span>Scanned &nbsp;
+<span class="swatch" style="background:#7c3aed"></span>Moved by hand &nbsp;
+<span class="swatch" style="background:#94a3b8"></span>No wall here &nbsp;
+<span class="swatch" style="background:#dc2626"></span>Something in the way</div>
+
+<footer>A dragged wall re-solves the room exactly as a tape reading does &mdash; same solver,
+same arithmetic. The only difference is what the room is then allowed to claim about itself,
+and that difference is the product.</footer>
+
+</body></html>

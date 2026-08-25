@@ -102,19 +102,47 @@ after="$(git rev-parse --short HEAD)"
 if [ "$before" = "$after" ]; then ok "Already up to date at $after"; else ok "$before → $after"; fi
 echo "     $(git log -1 --format='%s')"
 
-if [ -n "$team" ]; then
-  say "Your signing team, back where it was"
-  sed -i.setupbak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $team;/g" "$pbx"
-  rm -f "$pbx.setupbak"
-  n="$(grep -c "DEVELOPMENT_TEAM = $team;" "$pbx")"
-  if [ "$n" -gt 0 ]; then
-    ok "$team is set again in $n place(s) — Xcode will not ask you for it"
-    echo "     git will show the project file as changed. That is this line, and"
-    echo "     this script will lift it out again on every pull."
+say "Your signing team, off the tracked file for good"
+# The project file no longer carries a team: it reads
+# $(TRUELINE_DEVELOPMENT_TEAM), which comes from ios/Signing.local.xcconfig --
+# a file git ignores. So a team picked in Xcode survives every pull without
+# anything having to hold it, and a fresh clone still builds with no team at
+# all. Anything found in the project file gets moved there once, here.
+local_cfg="ios/Signing.local.xcconfig"
+have=""
+[ -f "$local_cfg" ] && have="$(sed -n 's/^[[:space:]]*TRUELINE_DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*//p' "$local_cfg" | head -1 | tr -d ' \r')"
+
+if [ -n "$have" ]; then
+  ok "$have — in $local_cfg, which git ignores. Nothing to do."
+  [ -n "$team" ] && [ "$team" != "$have" ] && \
+    warn "Xcode had also written $team into the project file. $have is the one being used."
+elif [ -n "$team" ]; then
+  printf 'TRUELINE_DEVELOPMENT_TEAM = %s\n' "$team" > "$local_cfg"
+  ok "moved $team out of the project file and into $local_cfg"
+  echo "     git ignores that file, so no pull can ever stop on it again."
+else
+  warn "No team set yet. Pick yours once in Xcode:"
+  echo "     Trueline → Signing & Capabilities → tick Automatically manage"
+  echo "     signing → Team. Run this script again afterwards and it will move"
+  echo "     it out of the tracked file for you."
+fi
+
+if ! git diff --quiet -- "$pbx"; then
+  warn "The project file is showing as changed again. Clearing it:"
+  git checkout -- "$pbx" && ok "cleared — your team is in $local_cfg"
+fi
+
+say "The Xcode project file itself"
+if command -v python3 >/dev/null 2>&1; then
+  if python3 core/tools/check-pbxproj.py >/dev/null 2>&1; then
+    ok "parses, and every reference in it resolves"
   else
-    warn "Could not put $team back. Pick your team once more in Xcode:"
-    echo "     Trueline → Signing & Capabilities → Team"
+    bad "It does not parse. Xcode will refuse to open the project."
+    python3 core/tools/check-pbxproj.py 2>&1 | sed 's/^/     /'
+    exit 1
   fi
+else
+  warn "No python3 on this Mac, so the project file cannot be checked here."
 fi
 
 say "The web screens inside the app"

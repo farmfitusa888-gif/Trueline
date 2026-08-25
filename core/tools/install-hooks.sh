@@ -31,6 +31,15 @@ if ! npm run verify --silent; then
   exit 1
 fi
 
+# The Xcode project file is hand-edited here -- there is no Xcode on the machine
+# this is written on -- and a pbxproj that does not parse is an app that will not
+# open, found out on the Mac rather than here.
+if ! python3 core/tools/check-pbxproj.py; then
+  echo
+  echo "\u2717 ios/Trueline.xcodeproj/project.pbxproj would not open in Xcode."
+  exit 1
+fi
+
 # The built web app is committed into the iOS project so a Mac with no Node on
 # it still produces a working app. CI fails when it goes stale; catching it
 # here saves the round trip.

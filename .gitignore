@@ -11,3 +11,6 @@ docs/build/guide.html
 # What the audit produces as it runs. The fixtures beside them are checked in;
 # the output is not — it is regenerated every run and differs by the minute.
 web/audit/audit-*
+
+# The Apple developer team ID, which belongs to a Mac and not to a repository.
+ios/Signing.local.xcconfig

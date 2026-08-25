@@ -1,0 +1,22 @@
+// Where your Apple developer team ID comes from.
+//
+// It used to live in project.pbxproj, which is tracked. Xcode writes it there
+// the moment you pick a team, so every pull after that stopped with "your local
+// changes would be overwritten by merge" and named a file nobody had edited on
+// purpose. A team ID belongs to a Mac, not to a repository.
+//
+// So it lives in Signing.local.xcconfig instead, which git ignores. The `?`
+// below means "include it if it is there": with no such file the build settings
+// resolve exactly as they did before — empty, and Xcode asks you for a team
+// like it does on any fresh clone. Nothing here is required for the app to
+// build on a machine that has never seen it.
+//
+// setup-mac.sh writes the local file for you the first time it finds a team in
+// the project file. To write it by hand:
+//
+//     echo 'TRUELINE_DEVELOPMENT_TEAM = YOURTEAMID' > ios/Signing.local.xcconfig
+//
+// Your team ID is the ten characters in Xcode → Settings → Accounts, or at
+// developer.apple.com → Membership.
+
+#include? "Signing.local.xcconfig"

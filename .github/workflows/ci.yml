@@ -49,6 +49,14 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+      # No Xcode here, and none on the machine this project is written on, so
+      # the project file is hand-edited and a hand-edited pbxproj is one typo
+      # away from "the project file cannot be parsed" — which reads, on the
+      # only Mac that matters, as the app being gone. This parses it and
+      # resolves every object id in it.
+      - name: The Xcode project file still parses
+        run: python3 core/tools/check-pbxproj.py
+
       # The built web app is committed under ios/Trueline/Web so that a Mac
       # with no Node on it still produces a working app — the correction
       # screens are inside the phone app, and a missing bundle is a blank

@@ -51,8 +51,18 @@ find ~ -maxdepth 5 -type d -name trueline 2>/dev/null
 That prints the path. Use it in place of `~/trueline` and run the three
 commands again.
 
-**If `git pull` says you have local changes**, nothing is lost — run this and
-then pull again:
+**If `git pull` says you have local changes** and names
+`ios/Trueline.xcodeproj/project.pbxproj`, that is Xcode having written your
+signing team into a tracked file. Throw that one line away and pull again —
+from then on `setup-mac.sh` lifts it out before every pull and puts it back
+after, so this cannot happen twice:
+
+```bash
+git checkout -- ios/Trueline.xcodeproj/project.pbxproj
+git pull
+```
+
+**If it names any other file**, nothing is lost — put it aside and pull:
 
 ```bash
 git stash
@@ -121,11 +131,18 @@ as a floor; when nothing is under the ray, it meets the floor's known height
 instead (the far corner of a room is often past where any plane has grown to);
 and the tracker's own complaint is now the message you see.
 
+**There is a card for this one — `docs/tests-2-and-20-card.pdf`, two pages,
+every sentence on it quoted from the source that prints it.** The short form:
+
 - First screen → **Measure a room**.
-- **Pass:** within a few seconds of moving the phone, the message changes from
-  *"Starting up"* or *"Move the phone slowly from side to side"* to
-  *"Point at the foot of a corner and tap"*, and the reticle goes solid.
-- Tap each corner walking round. Wall lengths appear along the bottom as you go.
+- Once tracking settles it says *"Lay the phone flat on the floor and tap Set
+  floor"*. Put the phone face up on the floor, flat, and tap **Set floor**. If
+  your phone found the floor by itself it says *"Floor found"* instead — both
+  are a pass.
+- **Pass:** the message then changes to *"Point at the foot of a corner and
+  tap"* and the reticle goes solid.
+- Tap the **foot** of each corner walking round — where the walls meet the
+  floor, not at eye level. Wall lengths appear along the bottom as you go.
 - After four corners **Done** becomes tappable.
 - **If it still fails: tell me the exact words on the screen.** They are now
   different for every reason it can fail — starting up, moving too fast, not
@@ -357,6 +374,8 @@ a claim number field on every kitchen.
   it.
 
 ### 20. Changing the room — new
+
+**On the card too — `docs/tests-2-and-20-card.pdf`, page 2.**
 
 - Top of the plan: **Rename**. Give the room the name you would say out loud.
   **Pass:** it heads the drawing, the takeoff and the claim document. It used
