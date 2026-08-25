@@ -153,7 +153,23 @@ sheet of plywood through that.
   says by how much and what the wall measures, so you know which of the two to
   go and measure.
 
-### 7. The takeoff, off the phone
+### 7. The drawing, on paper and in a message
+
+- Under the takeoff: **Send the drawing**, with **Save as a picture** and
+  **Print it**.
+- **Save as a picture** should open the iPhone share sheet with a PNG. Text it
+  to yourself.
+- **Pass:** the picture has a title block under the drawing — room name, area,
+  ceiling, and in amber, *"SCANNED — no wall here has had a tape on it. These
+  numbers will move."* Once you have taped a wall each way, that line changes
+  by itself.
+- Every dimension now sits **outside** the wall it names rather than on top of
+  it, which is how a drawing is supposed to read. Check nothing runs off the
+  edge on your room.
+- **Print it** should give you the drawing and the takeoff on paper, and
+  nothing else off the screen — no buttons, no tabs, no header.
+
+### 8. The takeoff, off the phone
 
 - **Send it** should open the iPhone share sheet — text it to yourself.
 - **Pass:** what arrives says *"THESE ARE THE SCANNER'S NUMBERS"* until a wall
@@ -161,7 +177,7 @@ sheet of plywood through that.
 - **Spreadsheet** saves a CSV. Every row carries its own unit and its own
   provenance in their own columns.
 
-### 8. Typing a tape reading
+### 9. Typing a tape reading
 
 - Tap a wall. Put a real tape on it. Type what the tape says.
 - **Pass:** that wall is now marked measured and never moves again; the other
@@ -169,13 +185,13 @@ sheet of plywood through that.
   and whether any moved further than the scanner's own tolerance.
 - **This is the whole product.** No other scanning app re-solves the room.
 
-### 9. Compass
+### 10. Compass
 
 - Scan with the phone away from a truck, a panel or a fridge.
 - **Pass:** the N arrow on the plan points the same way your phone's Compass
   app does, and the drawing says **±N°** — how much the phone itself doubted it.
 
-### 10. Two scans, two sets of corrections
+### 11. Two scans, two sets of corrections
 
 - Scan the kitchen, correct a wall. Go back. Scan the garage. Go back. Open the
   kitchen again.
@@ -185,9 +201,8 @@ sheet of plywood through that.
 
 ### Not built yet, so do not test for them
 
-Thumbnails on the scan list, multiple rooms stitched into a floor, printing,
-saving the drawing as an image, ESX export, and accounts or sharing between
-phones. They are next, in that order.
+Thumbnails on the scan list, multiple rooms stitched into a floor, ESX export,
+and accounts or sharing between phones. They are next, in that order.
 
 ---
 

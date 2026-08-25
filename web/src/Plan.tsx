@@ -1,5 +1,6 @@
 import { NM_PER_FOOT, formatFeetInches } from '../../core/src/length.ts';
-import { type Room, isDiagonal, runLength } from '../../core/src/room.ts';
+import { type Room, area, formatSquareFeet, isDiagonal, runLength } from '../../core/src/room.ts';
+import { readiness, trustLabel } from '../../core/src/issue.ts';
 import { toRenderModel } from '../../core/src/render.ts';
 import type { Footprint, WallObstruction } from '../../core/src/obstruction.ts';
 import type { NorthOnPlan } from '../../core/src/capture.ts';
@@ -20,11 +21,15 @@ import type { NorthOnPlan } from '../../core/src/capture.ts';
 // The drawing is scaled to about half size on a phone, so every user unit here
 // paints at roughly half a CSS pixel. The dimensions are the whole product and
 // they were landing at about 7 px — unreadable at arm's length in daylight, so
-// the type doubled. The margin has to hold them: a label like 19' 3 3/4" at
-// this size is about 170 units wide, and half of it hangs off the wall it
-// names. Cut the padding without growing it and the numbers run off the sheet,
-// which is what happened the first time.
-const PAD = 96;
+// the type doubled. The margin has to hold them: a label like 21' 3 13/16" at
+// this size is about 180 units wide, and every dimension now sits *outside* the
+// wall it names rather than on top of it, so the margin has to hold a whole one
+// on the left and the right. Cut this without shrinking the type and the
+// numbers run off the sheet, which is what happened the first time.
+const PAD = 190;
+
+/** How far off its wall a dimension sits. Enough to clear the line and its halo. */
+const LABEL_OFFSET = 22;
 
 export interface PlanProps {
   readonly room: Room;
@@ -35,6 +40,79 @@ export interface PlanProps {
   /** What the scan found standing in the room. Drawn so "could not see it" has a picture. */
   readonly footprints: readonly Footprint[];
   readonly onSelect: (wallId: string | null) => void;
+}
+
+/**
+ * Where a wall's dimension goes: off the wall, away from the room.
+ *
+ * The direction is from the middle of the room towards the middle of the wall,
+ * which for any wall on the outline points out of the building. A side wall then
+ * anchors its text at the near end and grows outward, so the number never
+ * crosses the line it names; a top or bottom wall keeps its text centred and
+ * moves up or down.
+ */
+function outward(
+  x: number,
+  y: number,
+  fromX: number,
+  fromY: number,
+  extra = 0
+): { x: number; y: number; dy: number; anchor: 'start' | 'middle' | 'end' } {
+  const dx = x - fromX;
+  const dy = y - fromY;
+  const length = Math.hypot(dx, dy) || 1;
+  const nx = dx / length;
+  const ny = dy / length;
+  const push = LABEL_OFFSET + extra;
+  if (Math.abs(nx) > Math.abs(ny)) {
+    // A side wall. Anchor at the wall and let the number run outward.
+    return { x: x + nx * push, y: y + extra, dy: 10, anchor: nx > 0 ? 'start' : 'end' };
+  }
+  // A top or bottom wall. Centred, above or below.
+  return { x, y: y + ny * push, dy: ny > 0 ? 26 : -8, anchor: 'middle' };
+}
+
+/**
+ * A dimension, legible over whatever it lands on.
+ *
+ * The white outline is a separate element drawn first rather than
+ * `paint-order: stroke` on one, because the canvas rasteriser behind
+ * "save as a picture" ignores that property and renders the halo as blobs
+ * between the digits. What is on screen and what gets sent have to be the same
+ * drawing, so the drawing uses what both agree about.
+ */
+function Label({
+  x,
+  y,
+  dy,
+  anchor,
+  size,
+  weight,
+  fill,
+  halo,
+  children,
+}: {
+  x: number;
+  y: number;
+  dy: number;
+  anchor: 'start' | 'middle' | 'end';
+  size: number;
+  weight: number;
+  fill: string;
+  halo: number;
+  children: string;
+}) {
+  const common = { x, y, dy, textAnchor: anchor, fontSize: size, fontWeight: weight };
+  return (
+    <>
+      <text {...common} fill="none" stroke="#ffffff" strokeWidth={halo} strokeLinejoin="round">
+        {children}
+      </text>
+      <text {...common} fill={fill}>
+        {children}
+      </text>
+    </>
+  );
 }
 
 /** Nanometres to feet, for the object boxes. Same boundary rule as `render.ts`. */
@@ -68,7 +146,27 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
   const scaleY = (y: number) => PAD + insetY + (maxY - y) * scale;
 
   const viewWidth = SIDE + PAD * 2;
-  const viewHeight = SIDE + PAD * 2;
+  // Room for a title block under the drawing. It is part of this SVG rather
+  // than a second thing rendered beside it, because this element is what gets
+  // printed and what gets serialised into the image somebody saves — and two
+  // renderings of the same facts is how an export starts disagreeing with the
+  // screen.
+  const BLOCK = 118;
+  const viewHeight = SIDE + PAD * 2 + BLOCK;
+
+  // The middle of the room in screen units, so every dimension can be pushed
+  // *away* from it. A label centred on its own wall sits on top of the line and,
+  // on a side wall, half of it lands inside the room over the floor — which is
+  // where the white halo behind it turned into a row of blobs between the
+  // digits on the exported picture. A drawing puts its dimensions outside.
+  const midX = model.walls.reduce((t, w) => t + px(w.start.x), 0) / model.walls.length;
+  const midY = model.walls.reduce((t, w) => t + scaleY(w.start.y), 0) / model.walls.length;
+
+  const state = readiness(room);
+  const caveat =
+    state.blocking.length > 0
+      ? 'SCANNED — no wall here has had a tape on it. These numbers will move.'
+      : 'Measured — a tape has been on a wall running each way.';
 
   return (
     <svg
@@ -77,11 +175,15 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
       // cost the page its scrolling: a thumb starting anywhere on the drawing,
       // which is most of the screen, could not scroll down to the corrections.
       className="w-full h-auto select-none"
+      // Named here rather than inherited from the page. This element is
+      // serialised whole to make the image somebody saves, and outside the page
+      // it inherits nothing at all — the export has to carry its own type.
+      fontFamily="ui-sans-serif, -apple-system, 'Helvetica Neue', Arial, sans-serif"
       role="img"
       aria-label={`Plan of ${room.name}`}
       onClick={() => onSelect(null)}
     >
-      <rect x="0" y="0" width={viewWidth} height={viewHeight} className="fill-white" />
+      <rect x="0" y="0" width={viewWidth} height={viewHeight} fill="#ffffff" />
 
       {/*
         North, when the phone knew it — and its doubt beside it, always.
@@ -108,12 +210,13 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
             x={0}
             y={54}
             textAnchor="middle"
-            className="text-[22px] font-semibold"
+            fontSize={22}
+            fontWeight={600}
             fill="#0f172a"
           >
             N
           </text>
-          <text x={0} y={76} textAnchor="middle" className="text-[17px]" fill="#64748b">
+          <text x={0} y={76} textAnchor="middle" fontSize={17} fill="#64748b">
             ±{Math.round(north.accuracy)}°
           </text>
         </g>
@@ -122,7 +225,7 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
       {/* The floor, so the inside of the room reads as inside. */}
       <polygon
         points={model.walls.map((w) => `${px(w.start.x)},${scaleY(w.start.y)}`).join(' ')}
-        className="fill-slate-100"
+        fill="#f1f5f9"
       />
 
       {/* Whatever was standing in the room when it was scanned. Faint, because it
@@ -135,7 +238,7 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
           y={scaleY(feet(f.max.y))}
           width={Math.abs(px(feet(f.max.x)) - px(feet(f.min.x)))}
           height={Math.abs(scaleY(feet(f.min.y)) - scaleY(feet(f.max.y)))}
-          className="fill-slate-300/50 stroke-slate-400"
+          fill="#cbd5e1" fillOpacity={0.5} stroke="#94a3b8"
           strokeWidth={1}
           strokeDasharray="3 3"
         >
@@ -198,30 +301,60 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
                 strokeOpacity={0.9}
               />
             )}
-            <text
-              x={mx}
-              y={my}
-              dy={-14}
-              textAnchor="middle"
-              className="text-[30px] font-semibold"
+            {/*
+              Twice, deliberately: a white outline underneath and the number on
+              top. `paint-order: stroke` says the same thing in one element and
+              a browser honours it on screen — but the canvas rasteriser that
+              turns this drawing into the picture somebody sends does not, and
+              it came out as a row of white blobs between the digits. Two
+              elements is what every rasteriser agrees about.
+            */}
+            <Label
+              {...outward(mx, my, midX, midY)}
+              size={30}
+              weight={600}
               fill={stroke}
-              style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: 10 }}
+              halo={7}
             >
               {formatFeetInches(runLength(wall))}
-            </text>
+            </Label>
             {isDiagonal(wall.heading) && (
-              <text x={mx} y={my} dy={28} textAnchor="middle" className="text-[22px]" fill="#64748b"
-                style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: 8 }}>
+              <Label
+                {...outward(mx, my, midX, midY, 34)}
+                size={22}
+                weight={400}
+                fill="#64748b"
+                halo={6}
+              >
                 angled
-              </text>
+              </Label>
             )}
           </g>
         );
       })}
 
       {model.walls.map((w) => (
-        <circle key={`${w.id}-corner`} cx={px(w.start.x)} cy={scaleY(w.start.y)} r={4} className="fill-slate-900" />
+        <circle key={`${w.id}-corner`} cx={px(w.start.x)} cy={scaleY(w.start.y)} r={4} fill="#0f172a" />
       ))}
+
+      {/* The title block. Everything a drawing has to say about itself before
+          anybody prices off it: which room, how big, and — the part no other
+          scanning app puts on a drawing — whether anybody stood behind it. */}
+      <g transform={`translate(0 ${SIDE + PAD * 2 - 18})`}>
+        <line x1={PAD / 2} y1={0} x2={viewWidth - PAD / 2} y2={0} stroke="#0f172a" strokeWidth={2} />
+        <text x={PAD / 2} y={38} fontSize={30} fontWeight={600} fill="#0f172a">
+          {room.name}
+        </text>
+        <text x={viewWidth - PAD / 2} y={38} textAnchor="end" fontSize={30} fill="#0f172a">
+          {formatSquareFeet(area(room).value)}
+        </text>
+        <text x={PAD / 2} y={72} fontSize={21} fill={state.blocking.length > 0 ? '#b45309' : '#0f172a'}>
+          {caveat}
+        </text>
+        <text x={PAD / 2} y={100} fontSize={19} fill="#64748b">
+          {trustLabel(state.trust)} · ceiling {formatFeetInches(room.ceilingHeight.value)} · Trueline
+        </text>
+      </g>
     </svg>
   );
 }

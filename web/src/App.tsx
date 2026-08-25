@@ -16,6 +16,7 @@ import { Thickness } from './Thickness.tsx';
 import { Measure } from './Measure.tsx';
 import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
+import { Sheet } from './Sheet.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -181,9 +182,9 @@ export function App() {
         />
       ) : (
         derived && (
-          <div className="space-y-5">
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
+          <div className="space-y-5 sheet-root">
+            <div data-sheet="yes" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div data-sheet="no" className="mb-2 flex items-baseline justify-between gap-3 px-1">
                 <h2 className="text-base font-semibold text-slate-900">{loaded.room.name}</h2>
                 <p className="text-sm tabular-nums text-slate-600">
                   {formatFeetInches(derived.extent.x)} × {formatFeetInches(derived.extent.y)} ·{' '}
@@ -193,6 +194,7 @@ export function App() {
 
               <div
                 role="tablist"
+                data-sheet="no"
                 aria-label="How to look at this room"
                 className="mb-3 flex gap-1 rounded-lg bg-slate-100 p-1"
               >
@@ -332,7 +334,11 @@ export function App() {
               }
             />
 
-            <Takeoff room={loaded.room} readiness={derived.state} />
+            <div data-sheet="yes">
+              <Takeoff room={loaded.room} readiness={derived.state} />
+            </div>
+
+            <Sheet room={loaded.room} />
 
             <FieldSheet room={loaded.room} footprints={loaded.footprints} />
 

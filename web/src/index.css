@@ -20,8 +20,10 @@
 }
 
 @layer utilities {
-  /* Printing is for one thing: the list of walls to go and measure. Everything
-     else on the page is a screen and prints as noise. */
+  /* Two things on this page are worth putting on paper and they are nothing
+     alike: the field list, which is a checklist to carry and write on, and the
+     drawing, which is a sheet to hand somebody. `sheet.ts` puts a class on the
+     body before opening the dialog to say which one was asked for. */
   @media print {
     body {
       background: white;
@@ -29,6 +31,21 @@
     main {
       max-width: none;
       padding: 0;
+    }
+    /* Print the drawing. Everything the sheet is not comes off the paper, said
+       as "not one of the marked ones" rather than as a list of what to hide —
+       a list goes stale the moment a card is added, and the failure is a
+       client's drawing with the app's controls printed across it. */
+    body.printing-plan header,
+    body.printing-plan .sheet-root > *:not([data-sheet='yes']),
+    body.printing-plan [data-sheet='yes'] [data-sheet='no'] {
+      display: none !important;
+    }
+    body.printing-plan [data-sheet='yes'] {
+      border: 0;
+      box-shadow: none;
+      padding: 0;
+      break-inside: avoid;
     }
   }
 }
