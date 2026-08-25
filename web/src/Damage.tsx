@@ -12,6 +12,8 @@ import {
   drying,
   suggestedCut,
 } from '../../core/src/damage.ts';
+import { DamagePhotos } from './DamagePhotos.tsx';
+import { forget } from './photoStore.ts';
 import { Measure } from './Measure.tsx';
 import { useUnits } from './units.tsx';
 
@@ -43,18 +45,23 @@ export function DamageOnWall({
   room,
   wall,
   damages,
+  scanName,
   onMark,
   onUnmark,
   onCutTo,
   onReading,
+  onPhotos,
 }: {
   readonly room: Room;
   readonly wall: Wall;
   readonly damages: readonly Mark[];
+  /** Which scan this is, so a photograph is filed with the room it belongs to. */
+  readonly scanName: string;
   readonly onMark: (damage: Mark) => void;
   readonly onUnmark: (id: string) => void;
   readonly onCutTo: (id: string, text: string | null) => void;
   readonly onReading: (id: string, reading: Reading) => void;
+  readonly onPhotos: (id: string, photos: readonly string[]) => void;
 }) {
   const { len, area } = useUnits();
   const [adding, setAdding] = useState<'patch' | 'whole' | 'pin' | null>(null);
@@ -280,9 +287,23 @@ export function DamageOnWall({
                       <ReadingBox onAdd={(reading) => onReading(damage.id, reading)} />
                     </div>
 
+                    <DamagePhotos
+                      damageId={damage.id}
+                      scanName={scanName}
+                      photos={damage.photos}
+                      onChange={(next) => onPhotos(damage.id, next)}
+                    />
+
                     <button
                       type="button"
-                      onClick={() => onUnmark(damage.id)}
+                      onClick={() => {
+                        // The photographs go with it. A picture whose mark has
+                        // been deleted is bytes nothing can reach, sitting in a
+                        // store with a finite quota — and the next photograph
+                        // somebody tries to take is the one that gets refused.
+                        for (const name of damage.photos) void forget(name);
+                        onUnmark(damage.id);
+                      }}
                       className="mt-3 min-h-11 text-sm text-slate-500 underline underline-offset-4"
                     >
                       Take this mark off

@@ -198,6 +198,7 @@ export type Action =
   /** A cut height decided, or taken off again. Seen and decided stay apart. */
   | { type: 'cutTo'; damageId: string; text: string | null }
   | { type: 'reading'; damageId: string; reading: Reading }
+  | { type: 'damagePhotos'; damageId: string; photos: readonly string[] }
   | { type: 'claim'; claim: Claim }
   | { type: 'undo' }
   | { type: 'dismissError' }
@@ -754,6 +755,27 @@ export function reduce(state: State, action: Action): State {
             d.id === action.damageId ? { ...d, readings: [...d.readings, action.reading] } : d
           ),
           lastEdit: `Logged ${action.reading.value} ${action.reading.scale}.`,
+        },
+      };
+    }
+
+    case 'damagePhotos': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      const before = loaded.damages.find((d) => d.id === action.damageId)?.photos.length ?? 0;
+      const after = action.photos.length;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          damages: loaded.damages.map((d) =>
+            d.id === action.damageId ? { ...d, photos: [...action.photos] } : d
+          ),
+          lastEdit:
+            after > before
+              ? `Photographed the damage — ${after} on this mark now.`
+              : `Took a photograph off. ${after} left on this mark.`,
         },
       };
     }

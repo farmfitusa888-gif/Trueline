@@ -101,6 +101,41 @@ export function handBackCompany(company: string): void {
   }
 }
 
+/**
+ * A photograph of the damage, back to the app that can keep it properly.
+ *
+ * The bytes are in this web view's IndexedDB, which is a cache: the operating
+ * system may take it back when the device is short of space, and it does not
+ * travel to a second phone. A photograph of a water line six weeks after the
+ * wall was closed up cannot be recreated — unlike a measurement, nobody can go
+ * back and take it again — so it is the one thing in this app that must not
+ * live only in a cache.
+ *
+ * So every damage photograph is also posted to the app, which writes it into
+ * the scan's own folder beside the capture and backs it up to the owner's
+ * iCloud. This is the expensive message on the bridge — a couple of hundred
+ * kilobytes — so it is sent once, when the picture is taken, and never again.
+ *
+ * A browser with no app around it has no handler. The picture is still in this
+ * device's store and the screen still shows it; what it does not get is a
+ * backup, and the claim screen says so rather than implying one.
+ */
+export function handBackDamagePhoto(
+  fileName: string,
+  photoName: string,
+  dataUrl: string
+): boolean {
+  const post = handler('photo');
+  if (!post) return false;
+  try {
+    post.postMessage({ fileName, photoName, photo: dataUrl, version: BRIDGE_VERSION });
+    return true;
+  } catch {
+    // Then this device's own store is the only copy, and the screen says so.
+    return false;
+  }
+}
+
 export function handBack(fileName: string, project: string): void {
   const saved = handler('saved');
   if (!saved) return;

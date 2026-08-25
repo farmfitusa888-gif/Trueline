@@ -86,6 +86,23 @@ do.** Not before.
 inside of somebody's house — their kitchen, their bathroom, their stuff. That
 should be a decision somebody makes per job, out loud, not a default.
 
+**One deliberate exception: a photograph of damage on an insurance job.** It is
+the only thing this app handles that cannot be produced a second time. A
+dimension somebody disputes can be measured again — that is the whole product.
+A water line that has been cut out and boarded over cannot be photographed by
+anybody, ever, and six weeks later that photograph is the entire argument with
+an adjuster. So it goes up, and it is not a default the way the sentence above
+means one: it only exists on a job where somebody turned insurance mode on,
+which is somebody deciding out loud.
+
+The cost is bounded rather than hoped about. The page caps a photograph at 2400
+pixels on the long edge before it is stored or sent — eight inches at 300 dpi,
+larger than it will ever be printed — and each one is its own CloudKit record
+with the image as an asset, so a failed upload costs that photograph and not
+the room. What is *not* synced is unchanged: the scanner's own walk-through
+photographs, which run to hundreds of megabytes and can be retaken by walking
+the room again.
+
 ## Why not simply keep it cloud-never
 
 Because the failure it leaves open is the one that loses you the customer. Every

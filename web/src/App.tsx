@@ -464,11 +464,15 @@ export function App() {
                     room={loaded.room}
                     wall={selectedWall}
                     damages={loaded.damages}
+                    scanName={loaded.fileName}
                     onMark={(damage) => dispatch({ type: 'mark', damage })}
                     onUnmark={(damageId) => dispatch({ type: 'unmark', damageId })}
                     onCutTo={(damageId, text) => dispatch({ type: 'cutTo', damageId, text })}
                     onReading={(damageId, reading) =>
                       dispatch({ type: 'reading', damageId, reading })
+                    }
+                    onPhotos={(damageId, photos) =>
+                      dispatch({ type: 'damagePhotos', damageId, photos })
                     }
                   />
                 )}

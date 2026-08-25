@@ -177,6 +177,28 @@ final class ProjectStore: ObservableObject {
         refresh()
     }
 
+    /// A photograph of damage, into the scan's own photo folder.
+    ///
+    /// The same folder the scanner's own photographs go in and the same one the
+    /// web view is already allowed to serve from, so a picture taken on the
+    /// claim screen is visible on the claim screen without a second path, a
+    /// second permission or a second bug.
+    ///
+    /// Returns whether it was written. A photograph that silently failed to
+    /// save is the worst outcome available here — the wall gets closed up on
+    /// the strength of a backup that does not exist.
+    @discardableResult
+    func writeDamagePhoto(_ jpeg: Data, named name: String, into folder: URL) -> Bool {
+        let photos = folder.appendingPathComponent("photos", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: photos, withIntermediateDirectories: true)
+            try jpeg.write(to: photos.appendingPathComponent(name), options: .atomic)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// The names of every scan on this phone, for working out what iCloud has
     /// that this device does not.
     var names: Set<String> { Set(scans.map(\.name)) }

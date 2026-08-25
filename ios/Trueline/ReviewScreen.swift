@@ -35,6 +35,13 @@ struct ReviewScreen: View {
             onThumbnail: { png in
                 store.writeThumbnail(png, into: scan.folder)
             },
+            onDamagePhoto: { name, jpeg in
+                // Disk first, same as a save: it is the copy that is true with
+                // no signal and no iCloud account, and it is the one the web
+                // view reads back to put the picture on the claim document.
+                guard store.writeDamagePhoto(jpeg, named: name, into: scan.folder) else { return }
+                Task { await backup.pushDamagePhoto(scan: scan.title, photo: name, jpeg: jpeg) }
+            },
             onCompany: { json in
                 store.writeCompany(json)
                 Task { await backup.pushCompany(json) }

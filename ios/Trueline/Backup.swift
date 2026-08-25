@@ -57,6 +57,9 @@ final class Backup: ObservableObject {
     /// same scan corrected twice replaces its own record rather than making a
     /// second one.
     private static let recordType = "Scan"
+    /// Photographs are their own record type: one per photograph, so a failed
+    /// upload costs that photograph and not the room it belongs to.
+    private static let photoRecordType = "DamagePhoto"
 
     private let container: CKContainer
     private var database: CKDatabase { container.privateCloudDatabase }
@@ -149,6 +152,86 @@ final class Backup: ObservableObject {
         } catch {
             state = .failed(Self.explain(error))
         }
+    }
+
+    /// A photograph of damage, into the owner's iCloud.
+    ///
+    /// Its own record rather than a field on the scan, and a `CKAsset` rather
+    /// than `Data`, for three reasons that all point the same way:
+    ///
+    ///   - CloudKit caps a record's own fields at a megabyte and an asset at
+    ///     far more. A photograph does not fit in a field.
+    ///   - An asset is uploaded as a file, so a photograph does not have to be
+    ///     re-sent every time a tape reading changes the room it belongs to.
+    ///   - One record per photograph means a failed upload loses that
+    ///     photograph and not the room, which is the right way round.
+    ///
+    /// The bytes are written to a temporary file because that is the only thing
+    /// `CKAsset` accepts, and removed afterwards whether or not the upload
+    /// worked. The copy that matters is already on disk in the scan's folder —
+    /// this is the backup, and it fails without taking anything with it.
+    func pushDamagePhoto(scan name: String, photo photoName: String, jpeg: Data) async {
+        if case .unavailable = state { return }
+        let temporary = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("jpg")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        do {
+            try jpeg.write(to: temporary, options: .atomic)
+            let id = CKRecord.ID(recordName: Self.photoRecordName(scan: name, photo: photoName))
+            let record = (try? await database.record(for: id))
+                ?? CKRecord(recordType: Self.photoRecordType, recordID: id)
+            record["scan"] = name as CKRecordValue
+            record["photoName"] = photoName as CKRecordValue
+            record["image"] = CKAsset(fileURL: temporary)
+            record["savedAt"] = Date() as CKRecordValue
+            _ = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .changedKeys)
+        } catch {
+            state = .failed(Self.explain(error))
+        }
+    }
+
+    /// Every damage photograph iCloud holds for one scan.
+    ///
+    /// For the second phone: it pulls the room out of iCloud and then has a
+    /// claim document referring to photographs it has never seen. Returned as
+    /// name-and-bytes so the caller writes them into the scan's own folder,
+    /// where everything else already looks for them.
+    func fetchDamagePhotos(scan name: String) async -> [(name: String, jpeg: Data)] {
+        let query = CKQuery(
+            recordType: Self.photoRecordType,
+            predicate: NSPredicate(format: "scan == %@", name)
+        )
+        var out: [(name: String, jpeg: Data)] = []
+        var cursor: CKQueryOperation.Cursor?
+        repeat {
+            do {
+                let page: (matchResults: [(CKRecord.ID, Result<CKRecord, Error>)], queryCursor: CKQueryOperation.Cursor?)
+                if let cursor {
+                    page = try await database.records(continuingMatchFrom: cursor)
+                } else {
+                    page = try await database.records(matching: query)
+                }
+                for (_, result) in page.matchResults {
+                    guard
+                        let record = try? result.get(),
+                        let photoName = record["photoName"] as? String,
+                        let asset = record["image"] as? CKAsset,
+                        let url = asset.fileURL,
+                        let data = try? Data(contentsOf: url)
+                    else { continue }
+                    out.append((name: photoName, jpeg: data))
+                }
+                cursor = page.queryCursor
+            } catch {
+                // Whatever came back before the failure is still worth having,
+                // and the room itself is already down. A claim missing one
+                // photograph is a claim; a claim that refused to open is not.
+                state = .failed(Self.explain(error))
+                return out
+            }
+        } while cursor != nil
+        return out
     }
 
     /// The contractor's own details, in their iCloud with everything else.
@@ -292,7 +375,8 @@ final class Backup: ObservableObject {
     /// difference between "the index is missing" and "there is nothing there" —
     /// so `explain` names it when CloudKit refuses the query.
     static let setupNote =
-        "mark recordName Queryable on the Scan record type, then deploy the schema."
+        "mark recordName Queryable on the Scan record type and the scan field Queryable on "
+        + "DamagePhoto, then deploy the schema."
 
     /// A record name from a folder name.
     ///
@@ -304,6 +388,17 @@ final class Backup: ObservableObject {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         return scan.addingPercentEncoding(withAllowedCharacters: allowed)?
             .replacingOccurrences(of: "%", with: "_") ?? scan
+    }
+
+    /// One photograph's record name: its scan and its own name, together.
+    ///
+    /// A CloudKit record name may hold ASCII letters, digits, `-`, `_` and `.`
+    /// and nothing else. `recordName(for:)` escapes down to the first four, so
+    /// a dot is a separator that escaping can never produce — which is what
+    /// makes two scans with a photograph of the same name impossible to
+    /// collide.
+    static func photoRecordName(scan: String, photo: String) -> String {
+        "\(recordName(for: scan)).\(recordName(for: photo))"
     }
 
     /// A CloudKit error as a sentence, not a code.

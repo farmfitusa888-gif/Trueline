@@ -33,6 +33,13 @@ struct CorrectView: UIViewRepresentable {
     let onSave: (Data) -> Void
     /// Called once when the plan is drawn, with a small PNG of it for the list.
     let onThumbnail: (Data) -> Void
+    /// Called with a photograph of damage, and the name to file it under.
+    ///
+    /// The one thing this app handles that cannot be recreated. A dimension can
+    /// be measured again — that is the whole product. A water line that has been
+    /// cut out and boarded over cannot be photographed by anybody, ever again,
+    /// and six weeks later that photograph is the argument.
+    let onDamagePhoto: (String, Data) -> Void
     /// Called when the contractor edits their own details. A licence number
     /// should be typed once in a lifetime, not once per phone.
     let onCompany: (Data) -> Void
@@ -56,6 +63,11 @@ struct CorrectView: UIViewRepresentable {
         // remember which was the kitchen.
         configuration.userContentController.add(context.coordinator, name: "thumbnail")
         configuration.userContentController.add(context.coordinator, name: "company")
+        // Photographs of damage. They go into the scan's own `photos` folder,
+        // which is the folder this same web view is already allowed to read
+        // back — so a picture taken on the claim screen is visible on the claim
+        // screen, on this phone and on the next one.
+        configuration.userContentController.add(context.coordinator, name: "photo")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -164,8 +176,52 @@ struct CorrectView: UIViewRepresentable {
                 else { return }
                 parent.onThumbnail(data)
 
+            case "photo":
+                // A data URL, and only a JPEG one, under a name this app
+                // chooses the shape of rather than the page. A web view is a
+                // program, and this is it handing the app a file to keep:
+                // "it said it was a picture" is not a reason to believe it is,
+                // and "it said where to put it" is not a reason to put it there.
+                let jpeg = "data:image/jpeg;base64,"
+                guard
+                    let name = body["photoName"] as? String,
+                    Self.isSafePhotoName(name),
+                    let url = body["photo"] as? String,
+                    url.hasPrefix(jpeg),
+                    let data = Data(base64Encoded: String(url.dropFirst(jpeg.count))),
+                    // A photograph off a phone, capped at a size no camera
+                    // exceeds after the page has shrunk it. Bigger than this is
+                    // not a photograph of a wall.
+                    data.count < 12_000_000,
+                    // JPEG's own first bytes, so what lands on disk with a
+                    // .jpg on the end really is one.
+                    data.starts(with: [0xFF, 0xD8, 0xFF])
+                else { return }
+                parent.onDamagePhoto(name, data)
+
             default:
                 return
+            }
+        }
+
+        /// Whether a name the page chose may be used as a file name.
+        ///
+        /// Letters, digits, dash and underscore, then exactly `.jpg`. No dots
+        /// in the stem, so `..` cannot appear; no slashes, so nothing can be
+        /// written outside the folder; a length cap, because some filesystems
+        /// refuse long names and a refusal here is silent data loss.
+        ///
+        /// Rejecting rather than sanitising is deliberate. A name that had to
+        /// be cleaned up is a name that no longer matches the one the damage is
+        /// carrying, and the photograph would be on disk under a name nothing
+        /// can find — which looks exactly like a photograph that was lost.
+        static func isSafePhotoName(_ name: String) -> Bool {
+            guard name.count > 4, name.count <= 120, name.hasSuffix(".jpg") else { return false }
+            let stem = name.dropLast(4)
+            guard !stem.isEmpty else { return false }
+            return stem.allSatisfy { character in
+                character.isASCII
+                    && (character.isLetter || character.isNumber || character == "-" || character == "_")
             }
         }
 

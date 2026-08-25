@@ -9,6 +9,7 @@ import {
   overlappingDamage,
 } from '../../core/src/claim.ts';
 import { useUnits } from './units.tsx';
+import { ReportPhotos } from './ReportPhotos.tsx';
 
 /**
  * Insurance mode: the switch, the claim's own facts, and the document.
@@ -280,6 +281,20 @@ export function Claim({
                     {damage.dryingNote && (
                       <p className="mt-1 text-xs text-slate-600">{damage.dryingNote}</p>
                     )}
+                    {damage.readings.length > 0 && (
+                      <dl className="mt-2 space-y-0.5">
+                        {damage.readings.map((reading) => (
+                          <div
+                            key={`${reading.label}-${reading.value}`}
+                            className="flex items-baseline justify-between gap-3 text-xs text-slate-600"
+                          >
+                            <dt>{reading.label}</dt>
+                            <dd className="tabular-nums">{reading.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                    <ReportPhotos photos={damage.photos} />
                   </li>
                 ))}
               </ul>
