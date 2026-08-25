@@ -88,7 +88,7 @@ export async function section(page, title) {
   await tab.click();
   const key = {
     Plan: 'plan', Room: 'room', Takeoff: 'takeoff', Price: 'price',
-    Agreement: 'agree', Insurance: 'claim', Files: 'files',
+    Agreement: 'agree', Work: 'work', Insurance: 'claim', Files: 'files',
   }[title];
   await page.waitForSelector(`[data-panel="${key}"]:not([hidden])`, { timeout: 5000 });
 }

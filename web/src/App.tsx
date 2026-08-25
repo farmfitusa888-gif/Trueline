@@ -21,6 +21,7 @@ import { Measure } from './Measure.tsx';
 import { planThumbnail } from './sheet.ts';
 import { Agree } from './Agree.tsx';
 import { Gate } from './Locked.tsx';
+import { Work } from './Work.tsx';
 import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Sections.tsx';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
@@ -741,6 +742,21 @@ export function App() {
               />
 
               <JobStatus room={loaded.room} fileName={loaded.fileName} />
+              </Gate>
+            </Panel>
+
+            <Panel section="work" active={section}>
+              <Gate feature="proposal">
+                <Work
+                  room={loaded.room}
+                  overrides={loaded.overrides}
+                  proposal={loaded.proposal}
+                  baseline={loaded.baseline}
+                  visits={loaded.visits}
+                  invoices={loaded.invoices}
+                  onVisits={(visits) => dispatch({ type: 'visits', visits })}
+                  onInvoices={(invoices) => dispatch({ type: 'invoices', invoices })}
+                />
               </Gate>
             </Panel>
 

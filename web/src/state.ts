@@ -39,7 +39,9 @@ import { validateDamage } from '../../core/src/damage.ts';
 import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
 import { type Override, validateOverride } from '../../core/src/override.ts';
 import { type Baseline } from '../../core/src/baseline.ts';
+import { type Invoice } from '../../core/src/invoice.ts';
 import { type Proposal } from '../../core/src/proposal.ts';
+import { type Visit } from '../../core/src/schedule.ts';
 import { handBack } from './bridge.ts';
 
 /**
@@ -129,6 +131,10 @@ export interface Loaded {
    * is a change order, which is the entire point of keeping it.
    */
   readonly baseline: Baseline | null;
+  /** When the work happens. Beside the room, like everything else about a job. */
+  readonly visits: readonly Visit[];
+  /** What has been asked for, in the order it was asked. */
+  readonly invoices: readonly Invoice[];
   /** Rooms as they were before each edit, most recent last. */
   readonly undo: readonly Room[];
   /** What the last edit did, for the line under the plan. */
@@ -254,6 +260,8 @@ export type Action =
   | { type: 'claim'; claim: Claim }
   | { type: 'proposal'; proposal: Proposal | null }
   | { type: 'baseline'; baseline: Baseline }
+  | { type: 'visits'; visits: readonly Visit[] }
+  | { type: 'invoices'; invoices: readonly Invoice[] }
   | { type: 'undo' }
   | { type: 'dismissError' }
   | { type: 'close' };
@@ -296,6 +304,8 @@ function restored(saved: SavedProject, note: string): State {
     claim?: Claim;
     proposal?: Proposal;
     baseline?: Baseline;
+    visits?: readonly Visit[];
+    invoices?: readonly Invoice[];
   };
   if (!extras.report) throw new Error('That saved room has no import report with it.');
   return {
@@ -314,6 +324,8 @@ function restored(saved: SavedProject, note: string): State {
       claim: extras.claim ?? NO_CLAIM,
       proposal: extras.proposal ?? null,
       baseline: extras.baseline ?? null,
+      visits: extras.visits ?? [],
+      invoices: extras.invoices ?? [],
       undo: [],
       lastEdit: note,
       fileName: saved.fileName,
@@ -389,6 +401,8 @@ export function reduce(state: State, action: Action): State {
             claim: NO_CLAIM,
             proposal: null,
             baseline: null,
+            visits: [],
+            invoices: [],
             undo: [],
             lastEdit: null,
             fileName: action.fileName,
@@ -462,6 +476,8 @@ export function reduce(state: State, action: Action): State {
             claim: NO_CLAIM,
             proposal: null,
             baseline: null,
+            visits: [],
+            invoices: [],
             undo: [],
             lastEdit: null,
             fileName: action.fileName,
@@ -508,6 +524,8 @@ export function reduce(state: State, action: Action): State {
           claim: NO_CLAIM,
           proposal: null,
           baseline: null,
+          visits: [],
+          invoices: [],
           undo: [],
           lastEdit: null,
           fileName: action.fileName,
@@ -1109,6 +1127,18 @@ export function reduce(state: State, action: Action): State {
         ? { ...state, loaded: { ...state.loaded, baseline: action.baseline } }
         : state;
 
+    case 'visits':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, visits: action.visits } }
+        : state;
+
+    // Invoices are appended, never edited: an invoice that has been sent and
+    // then quietly changed is the thing an invoice exists to prevent.
+    case 'invoices':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, invoices: action.invoices } }
+        : state;
+
     case 'undo': {
       const loaded = state.loaded;
       if (!loaded || loaded.undo.length === 0) return state;
@@ -1164,6 +1194,8 @@ export function persist(loaded: Loaded, at: string): string | null {
         claim: loaded.claim,
         proposal: loaded.proposal,
         baseline: loaded.baseline,
+        visits: loaded.visits,
+        invoices: loaded.invoices,
         overrides: loaded.overrides,
       },
     });
