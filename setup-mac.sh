@@ -3,7 +3,11 @@
 #
 # Run it in Terminal on the Mac:
 #
-#   cd ~/trueline && bash setup-mac.sh
+#   cd ~/trueline && git pull && bash setup-mac.sh
+#
+# `git pull` first the very first time: this script lives in the repository, so
+# it is not on your Mac until you have pulled once. "No such file or directory"
+# means exactly that.
 #
 # It does not install anything and it does not change any of your code. It
 # pulls, checks the things that have gone wrong before, and opens the project.

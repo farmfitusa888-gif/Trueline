@@ -14,11 +14,17 @@ Open **Terminal** (⌘-space, type `terminal`, Return) and paste this. `~` means
 your home folder; you do not type your username.
 
 ```bash
-cd ~/trueline && bash setup-mac.sh
+cd ~/trueline && git pull && bash setup-mac.sh
 ```
 
-That pulls, checks the four things that have gone wrong before, tells you what
-it found, and opens Xcode. It installs nothing and changes none of your code.
+`git pull` first, and that is not belt and braces: the script is *in* the
+repository, so the first time you run this it does not exist on your Mac yet.
+`bash: setup-mac.sh: No such file or directory` means exactly that and nothing
+worse.
+
+After the pull it checks the four things that have gone wrong before, tells you
+what it found, and opens Xcode. It installs nothing and changes none of your
+code.
 
 One of those four checks is worth knowing about, because it is why your phone
 looked a week out of date even after pulling: **the correction screens live in
