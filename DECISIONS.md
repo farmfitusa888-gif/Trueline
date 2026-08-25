@@ -1707,21 +1707,46 @@ paid for by the two beside the corner, and the room does not change size.
 
 ## Still open
 
-- **The batch photo delete spec** — checkboxes, select-all, and the warning when the photo
-  being deleted is the only one showing a wall. Decided (gap 3 above), not written.
-- **The scanner has never been compiled.** It is written — RoomPlan capture, photographs with
-  poses, AR measure, the correction screens in a web view, CloudKit backup including damage
-  photographs — and this container is Linux with no Swift toolchain, so not one line of it has
-  been through a compiler. Until it builds on a Mac the hosted page is still the only thing
-  that runs, and it reads scans rather than making them. **This is now the largest unverified
-  surface in the repository and it grows with every iOS commit.**
-- **Live damage pins during a scan.** Answered and specified — tap drops the point and grabs
-  the frame right then — and not built. It touches `ARMeasureSession`, which is the file behind
-  the "Measure a room still doesn't work" report, so it wants a build on a phone first.
-- **The four Matterport features.** Walk through the room in 3D rather than orbiting it,
-  measure anything on screen after leaving, tags pinned in space, dollhouse for a whole floor.
-  All four asked for, none built.
-- **`docs/on-the-phone.md` describes 22 tests and none have been run on a phone.**
+Updated 2026-08-25, after the first compiler this project has ever met.
+
+- **The scanner has never finished compiling.** Xcode on Sam's Mac has now
+  refused it five times, and every refusal was real: a signing placeholder
+  pointing at itself, `CorrectView(...)` called with its arguments out of
+  declaration order, `weak` on a protocol with no class bound, and `PinRecorder`
+  marked `@MainActor` while `CaptureWriter.write` reads it from a plain static
+  function. All five are fixed. **Nobody has watched the build get to the end**,
+  so the next error is the next thing to find out. This is still the largest
+  unverified surface in the repository.
+
+  What now stands between the code and a compiler is checked without one:
+  `check-swift.py` parses all 23 files, `check-swift-names.py` finds four
+  classes of error a parser cannot see, `check-pbxproj.py` reads the project
+  file, and `check-the-checks.py` breaks the real files on purpose and fails if
+  any of those goes green over it. Sixteen cases. That is not a compiler and is
+  not claimed to be one.
+
+- **A dollhouse for a whole floor.** The geometry exists and is tested —
+  `dollhouse()` in `section.ts` takes the ceiling off and drops the walls
+  standing between the eye and the room — and `Floor.tsx` draws every placed
+  room, in 2D. Nothing joins the two. One room in 3D has *Stand inside* and
+  *Cut it*; a floor has neither.
+
+  The other three of the four asked for are built: walking through a room in
+  perspective (`projectFrom` / `standingInside`, behind *Stand inside*),
+  measuring anything after leaving the room (the Measure screen), and tags
+  pinned in space (`tag.ts`, the *What is behind the wall* panel).
+
+- **The batch photo delete spec** — checkboxes, select-all, and the warning when
+  the photo being deleted is the only one showing a wall. Decided (gap 3 above),
+  not written.
+
+- **`docs/on-the-phone.md` describes 22 tests and none have been run on a
+  phone.** Gilbert's actual kitchen is the first one that matters.
+
+- **Rooms drawn by hand before 2026-08-25 used a hard-coded 8' ceiling**,
+  whatever the profile said, because *Your business* offered a default ceiling
+  that nothing read. Fixed. Any room drawn before then wants its height
+  checked before its quantities are trusted.
 
 Everything else: build proceeds.
 
