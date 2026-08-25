@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { formatFeetInches, parseLength } from '../../core/src/length.ts';
+import { formatFeetInches as exact, parseLength } from '../../core/src/length.ts';
+import { useUnits } from './units.tsx';
 import { isVerified } from '../../core/src/measurement.ts';
 import type { Room } from '../../core/src/room.ts';
 import {
@@ -36,6 +37,7 @@ export function Thickness({
   readonly selected: string | null;
   readonly onSet: (wallId: string | null, text: string | null, how: 'stated' | 'tape') => void;
 }) {
+  const { len } = useUnits();
   const [typed, setTyped] = useState('');
   const wall = selected ? room.walls.find((w) => w.id === selected) : undefined;
   // An open span has nothing built across it, so it has no thickness and is
@@ -53,7 +55,7 @@ export function Thickness({
   let reads: string | null = null;
   if (typed.trim() !== '') {
     try {
-      reads = `Reads as ${formatFeetInches(parseLength(typed.trim(), { defaultUnit: 'in' }))}`;
+      reads = `Reads as ${len(parseLength(typed.trim(), { defaultUnit: 'in' }))}`;
     } catch (error) {
       reads = error instanceof Error ? error.message : String(error);
     }
@@ -67,7 +69,7 @@ export function Thickness({
         </h2>
         {current && (
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatFeetInches(current.value)}
+            {len(current.value)}
           </span>
         )}
       </div>
@@ -87,7 +89,7 @@ export function Thickness({
               key={a.id}
               type="button"
               title={a.label}
-              onClick={() => onSet(scope, formatFeetInches(a.thickness), 'stated')}
+              onClick={() => onSet(scope, exact(a.thickness), 'stated')}
               className={`min-h-12 rounded-md px-4 font-semibold tabular-nums ${
                 on
                   ? 'bg-slate-900 text-white'
@@ -151,13 +153,13 @@ export function Thickness({
           {groups.map((g) => (
             <div key={g.thickness.toString()} className="flex items-baseline justify-between gap-4 py-2">
               <dt className="text-sm text-slate-700">
-                {g.assembly ? g.assembly.short : formatFeetInches(g.thickness)}
+                {g.assembly ? g.assembly.short : len(g.thickness)}
                 <span className="block text-xs text-slate-500">
                   {g.wallIds.join(', ')} · {g.how}
                 </span>
               </dt>
               <dd className="shrink-0 text-sm tabular-nums text-slate-900">
-                {formatFeetInches(g.jamb)} jamb
+                {len(g.jamb)} jamb
               </dd>
             </div>
           ))}

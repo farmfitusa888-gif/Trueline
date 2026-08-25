@@ -1,4 +1,5 @@
-import { formatFeetInches, formatMetric } from '../../core/src/length.ts';
+import { formatMetric } from '../../core/src/length.ts';
+import { useUnits } from './units.tsx';
 import { confidenceLabel, toleranceOf } from '../../core/src/measurement.ts';
 import { type Room, isDiagonal, runLength } from '../../core/src/room.ts';
 import type { ImportReport } from '../../core/src/import-roomplan.ts';
@@ -68,6 +69,7 @@ export function Corrections({
   onSelect,
   onMake,
 }: CorrectionsProps) {
+  const { len } = useUnits();
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
   // The same checks the command-line tool ran, on screen, because the app put
   // the file here and should be the one to say whether it is any good.
@@ -144,7 +146,7 @@ export function Corrections({
                     }`}
                   >
                     <span className="font-medium text-slate-900">
-                      {i + 1}. {formatFeetInches(runLength(wall))}
+                      {i + 1}. {len(runLength(wall))}
                       {wall.open ? ' opening' : ''}
                       {isDiagonal(wall.heading) ? ' (angled)' : ''}
                     </span>
@@ -173,7 +175,7 @@ export function Corrections({
                 onClick={() => onSelect(wall.id)}
                 className="font-medium text-slate-900 underline decoration-dotted underline-offset-4"
               >
-                {formatFeetInches(runLength(wall))} — show me
+                {len(runLength(wall))} — show me
               </button>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button onClick={() => onMake(wall.id, 'wall')}>It is a wall</Button>
@@ -196,7 +198,7 @@ export function Corrections({
               return (
                 <li key={o.wallId}>
                   <button type="button" onClick={() => onSelect(o.wallId)} className="text-left">
-                    <span className="font-medium text-slate-900">{formatFeetInches(runLength(wall))}</span>{' '}
+                    <span className="font-medium text-slate-900">{len(runLength(wall))}</span>{' '}
                     <span className="text-slate-600">
                       — {Number(o.blockedPerMille) / 10}% behind {o.by.length === 1 ? 'something' : `${o.by.length} things`}
                     </span>
@@ -212,7 +214,7 @@ export function Corrections({
         <Card tone="note" title={`${report.dropped.length} wall${report.dropped.length === 1 ? '' : 's'} left out`}>
           {report.dropped.map((wall) => (
             <p key={wall.identifier}>
-              <span className="font-medium text-slate-900">{formatFeetInches(wall.length)}</span> — {wall.reason}
+              <span className="font-medium text-slate-900">{len(wall.length)}</span> — {wall.reason}
             </p>
           ))}
           <p className="text-slate-500">
@@ -260,7 +262,7 @@ export function Corrections({
                   selected === wall.id ? 'font-semibold text-sky-700' : ''
                 }`}
               >
-                <span className="tabular-nums">{formatFeetInches(runLength(wall))}</span>
+                <span className="tabular-nums">{len(runLength(wall))}</span>
                 <span className="text-xs text-slate-500">
                   <span className="uppercase tracking-wide">
                     {wall.open ? 'no wall here' : confidenceLabel(wall.length)}

@@ -133,6 +133,14 @@ function inches(value: Nanometres): string {
 export interface TakeoffOptions {
   /** Where studs land. 16 in on centre unless the job says otherwise. */
   readonly spacing?: Spacing;
+  /**
+   * Whose takeoff this is.
+   *
+   * A sheet a contractor sends to a supplier or a sub should say whose it is,
+   * or the reply comes back to nobody. Left out when nothing has been set,
+   * rather than printed as an empty line.
+   */
+  readonly company?: string;
 }
 
 /**
@@ -366,7 +374,9 @@ export function takeoff(room: Room, at: string, options: TakeoffOptions = {}): T
     `${trustLabel(state.trust)}.\n` +
     `${caveat}\n` +
     thicknessNote +
-    `Taken off ${at} by Trueline.`;
+    (options.company && options.company.trim() !== ''
+      ? `${options.company.trim()} — taken off ${at} with Trueline.`
+      : `Taken off ${at} by Trueline.`);
 
   const header = 'item,quantity,unit,prices,workings,provenance,room,taken_off';
   const csv = [

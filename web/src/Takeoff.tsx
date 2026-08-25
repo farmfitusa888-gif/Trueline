@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { formatFeetInches } from '../../core/src/length.ts';
-import { type Room, formatSquareFeet } from '../../core/src/room.ts';
+import type { Room } from '../../core/src/room.ts';
+import { useUnits } from './units.tsx';
 import { roomQuantities } from '../../core/src/zone.ts';
 import { takeoff as buildTakeoff } from '../../core/src/takeoff.ts';
 import { type Readiness, trustLabel } from '../../core/src/issue.ts';
@@ -27,17 +27,14 @@ import { type Readiness, trustLabel } from '../../core/src/issue.ts';
  * they were facts.
  */
 
-const SQ_FT = 304_800_000n * 304_800_000n;
-
-function squareFeet(squareNanometres: bigint): string {
-  const tenths = (squareNanometres * 10n) / SQ_FT;
-  return `${Number(tenths) / 10} sq ft`;
-}
-
 export function Takeoff({ room, readiness }: { readonly room: Room; readonly readiness: Readiness }) {
+  const { area, run, company } = useUnits();
   const [open, setOpen] = useState(false);
   const [told, setTold] = useState<string | null>(null);
-  const sheet = useMemo(() => buildTakeoff(room, new Date().toLocaleString()), [room]);
+  const sheet = useMemo(
+    () => buildTakeoff(room, new Date().toLocaleString(), { company: company.name }),
+    [room, company.name]
+  );
 
   async function copy() {
     try {
@@ -104,23 +101,23 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
   const extras = sheet.lines.filter((line) => line.group !== undefined);
 
   const rows = [
-    { what: 'Floor', value: formatSquareFeet(q.it.floorArea), prices: 'flooring, tile, underlay' },
-    { what: 'Ceiling', value: formatSquareFeet(q.it.ceilingArea), prices: 'ceiling drywall and paint' },
+    { what: 'Floor', value: area(q.it.floorArea), prices: 'flooring, tile, underlay' },
+    { what: 'Ceiling', value: area(q.it.ceilingArea), prices: 'ceiling drywall and paint' },
     {
       what: 'Wall face',
-      value: squareFeet(q.it.wallFaceArea),
+      value: area(2n * q.it.wallFaceArea),
       prices: 'drywall and paint — every door and window taken off',
     },
     {
       what: 'Baseboard',
-      value: formatFeetInches(q.it.baseboardRun),
+      value: run(q.it.baseboardRun),
       prices: 'trim — doors taken off, windows left on',
     },
     ...(q.it.openRun > 0n
       ? [
           {
             what: 'Open span',
-            value: formatFeetInches(q.it.openRun),
+            value: run(q.it.openRun),
             prices: 'nothing built here — no drywall, no paint, no trim',
           },
         ]

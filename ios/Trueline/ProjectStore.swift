@@ -130,6 +130,20 @@ final class ProjectStore: ObservableObject {
     /// And the picture of its plan.
     static let thumbnailFile = "plan.png"
 
+    /// Where the contractor's own details live.
+    ///
+    /// Beside the scans rather than inside one, because they belong to the
+    /// business and not to a job. A few hundred bytes plus whatever a logo
+    /// weighs, and it goes to iCloud with everything else so a licence number
+    /// is typed once in a lifetime rather than once per phone.
+    var companyFile: URL { root.appendingPathComponent("company.json") }
+
+    var company: Data { (try? Data(contentsOf: companyFile)) ?? Data() }
+
+    func writeCompany(_ json: Data) {
+        try? json.write(to: companyFile, options: .atomic)
+    }
+
     /// Writes a corrected room into the scan's own folder.
     ///
     /// Until this existed, corrections lived only in the correction screens'

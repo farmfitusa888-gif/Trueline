@@ -1,4 +1,4 @@
-import { formatFeetInches } from '../../core/src/length.ts';
+import { useUnits } from './units.tsx';
 import { isVerified, toleranceOf } from '../../core/src/measurement.ts';
 import type { Room } from '../../core/src/room.ts';
 import { Measure } from './Measure.tsx';
@@ -28,6 +28,7 @@ export function Ceiling({
   readonly room: Room;
   readonly onSet: (text: string, how: 'stated' | 'tape') => void;
 }) {
+  const { len } = useUnits();
   const height = room.ceilingHeight;
   const measured = isVerified(height);
   const pony = room.walls.filter((w) => w.height !== undefined);
@@ -37,7 +38,7 @@ export function Ceiling({
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="font-semibold text-slate-900">How high is the ceiling?</h2>
         <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-          {formatFeetInches(height.value)}
+          {len(height.value)}
         </span>
       </div>
 
@@ -46,14 +47,14 @@ export function Ceiling({
           <>Measured. Every square foot of drywall and paint is built on this.</>
         ) : (
           <>
-            The scan took this from the tallest wall it saw, ± {formatFeetInches(toleranceOf(height))}.
+            The scan took this from the tallest wall it saw, ± {len(toleranceOf(height))}.
             Two inches out over this room is about {estimate(room)} of board and two coats on it.
           </>
         )}
       </p>
 
       <div className="mt-3 print:hidden">
-        <Measure label={`e.g. ${formatFeetInches(height.value)}`} onSubmit={(text) => onSet(text, 'tape')} />
+        <Measure label={`e.g. ${len(height.value)}`} onSubmit={(text) => onSet(text, 'tape')} />
       </div>
 
       {!measured && (
@@ -75,7 +76,7 @@ export function Ceiling({
 
       {pony.length > 0 && (
         <p className="mt-3 text-sm text-slate-600">
-          {pony.map((w) => `${w.id} stops at ${formatFeetInches(w.height!.value)}`).join(', ')} — a
+          {pony.map((w) => `${w.id} stops at ${len(w.height!.value)}`).join(', ')} — a
           pony wall or a bar. It still takes board, paint and base; it just does not go up.
         </p>
       )}

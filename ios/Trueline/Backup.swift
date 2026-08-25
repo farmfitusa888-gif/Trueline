@@ -151,6 +151,32 @@ final class Backup: ObservableObject {
         }
     }
 
+    /// The contractor's own details, in their iCloud with everything else.
+    ///
+    /// One record, not one per scan: it belongs to the business rather than to
+    /// a job, and it is what stops somebody retyping a licence number on a new
+    /// phone.
+    func pushCompany(_ json: Data) async {
+        if case .unavailable = state { return }
+        let id = CKRecord.ID(recordName: "company")
+        do {
+            let record = (try? await database.record(for: id))
+                ?? CKRecord(recordType: "Company", recordID: id)
+            record["profile"] = json as CKRecordValue
+            record["savedAt"] = Date() as CKRecordValue
+            _ = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .changedKeys)
+        } catch {
+            state = .failed(Self.explain(error))
+        }
+    }
+
+    /// The details as iCloud holds them, for a phone that has none yet.
+    func fetchCompany() async -> Data? {
+        let id = CKRecord.ID(recordName: "company")
+        guard let record = try? await database.record(for: id) else { return nil }
+        return record["profile"] as? Data
+    }
+
     /// Removes a scan's copy, for a scan somebody deleted on purpose.
     ///
     /// Deleting on the phone has to delete the copy, or the next device to sync

@@ -33,6 +33,11 @@ struct CorrectView: UIViewRepresentable {
     let onSave: (Data) -> Void
     /// Called once when the plan is drawn, with a small PNG of it for the list.
     let onThumbnail: (Data) -> Void
+    /// Called when the contractor edits their own details. A licence number
+    /// should be typed once in a lifetime, not once per phone.
+    let onCompany: (Data) -> Void
+    /// The details this app is already keeping, handed over on load.
+    let companyJSON: Data
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -50,6 +55,7 @@ struct CorrectView: UIViewRepresentable {
         // three folders called "Room 2026-08-24 1819" and left somebody to
         // remember which was the kitchen.
         configuration.userContentController.add(context.coordinator, name: "thumbnail")
+        configuration.userContentController.add(context.coordinator, name: "company")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -126,6 +132,19 @@ struct CorrectView: UIViewRepresentable {
                 else { return }
                 parent.onSave(data)
 
+            case "company":
+                guard
+                    let json = body["company"] as? String,
+                    !json.isEmpty,
+                    json.utf8.count < 1_000_000,
+                    let data = json.data(using: .utf8),
+                    // It has to be an object before it is written. A file this
+                    // app will hand back to the page later must be something
+                    // the page can read.
+                    (try? JSONSerialization.jsonObject(with: data)) is [String: Any]
+                else { return }
+                parent.onCompany(data)
+
             case "thumbnail":
                 // A data URL, and only a PNG one. Everything about it is
                 // checked before a byte is written: this is a web view handing
@@ -161,6 +180,23 @@ struct CorrectView: UIViewRepresentable {
         /// the classic way this breaks, on the first room somebody names with an
         /// apostrophe in it.
         private func hand(over webView: WKWebView) {
+            // The profile first, so the letterhead is on the drawing the moment
+            // it appears rather than a frame later.
+            if !parent.companyJSON.isEmpty,
+               let company = String(data: parent.companyJSON, encoding: .utf8) {
+                run(
+                    on: webView,
+                    """
+                    (function () {
+                      var company = \(quoted(company));
+                      if (window.trueline && window.trueline.openCompany) {
+                        window.trueline.openCompany(company);
+                      }
+                    })();
+                    """
+                )
+            }
+
             // A walked room and a scanned room go across the same hook and come
             // out the same on the other side. Which one this is, is the only
             // difference, and it stops here.

@@ -34,7 +34,12 @@ struct ReviewScreen: View {
             },
             onThumbnail: { png in
                 store.writeThumbnail(png, into: scan.folder)
-            }
+            },
+            onCompany: { json in
+                store.writeCompany(json)
+                Task { await backup.pushCompany(json) }
+            },
+            companyJSON: store.company
         )
             .ignoresSafeArea(.container, edges: .bottom)
             .navigationTitle(scan.title)

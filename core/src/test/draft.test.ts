@@ -188,3 +188,49 @@ test('bare numbers mean feet here, because that is what the field says', () => {
   d = addWall(d, 'b', 'north', '10', T0, { defaultUnit: 'in' });
   assert.equal(d.walls[1]!.length.value, parseLength(`10"`));
 });
+
+test('the closing wall the app suggests closes the room exactly', () => {
+  // The suggestion is worked out to the nanometre. Anything that rounds it on
+  // the way back in — formatting it to a sixteenth for a text field and parsing
+  // that — loses up to a thirty-second, and then the room does not close and
+  // `finish()` refuses it over a wall nobody typed. A room whose closing run is
+  // 13' 5 7/32" is enough to do it.
+  const odd = addWall(
+    addWall(
+      addWall(
+        startDraft({
+          id: 'd',
+          name: 'odd',
+          enteredBy: 'sam',
+          at: T0,
+          ceilingHeight: `8'`,
+        }),
+        'a',
+        'east',
+        `13' 5 7/32"`,
+        T0
+      ),
+      'b',
+      'north',
+      `9' 1 3/32"`,
+      T0
+    ),
+    'c',
+    'west',
+    `13' 5 7/32"`,
+    T0
+  );
+
+  const closing = suggestClosingWall(odd)!;
+  assert.ok(closing, 'three walls of a rectangle determine the fourth');
+
+  // Exactly as the screen passes it: the value, not the label on the button.
+  const finished = finish(addWall(odd, 'd', closing.heading, `${closing.length}nm`, T0));
+  assert.equal(closes(finished), true);
+
+  // And the lossy way round, written down so nobody reintroduces it.
+  assert.throws(
+    () => finish(addWall(odd, 'd', closing.heading, formatFeetInches(closing.length), T0)),
+    DraftError
+  );
+});

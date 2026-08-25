@@ -40,6 +40,8 @@ export interface TruelineBridge {
    * the owner's iCloud, and hands it straight back here.
    */
   openSaved(project: string): void;
+  /** Called with the contractor's profile, when the app is keeping one. */
+  openCompany(company: string): void;
   /** Version of this contract, so a mismatched app build can say so. */
   readonly version: 1;
 }
@@ -82,6 +84,23 @@ export function handBackThumbnail(fileName: string, dataUrl: string): void {
   }
 }
 
+/**
+ * The contractor's own details, back to the app that keeps them.
+ *
+ * A licence number should be typed once in a lifetime, not once per phone, so
+ * it goes in the scan folder's neighbour and into iCloud with everything else.
+ * Tiny — a few hundred bytes plus whatever a logo weighs.
+ */
+export function handBackCompany(company: string): void {
+  const post = handler('company');
+  if (!post) return;
+  try {
+    post.postMessage({ company, version: BRIDGE_VERSION });
+  } catch {
+    // The copy in this browser's storage is still there.
+  }
+}
+
 export function handBack(fileName: string, project: string): void {
   const saved = handler('saved');
   if (!saved) return;
@@ -121,6 +140,14 @@ function handler(name: string): { postMessage(body: unknown): void } | undefined
 
 export const BRIDGE_VERSION = 1;
 
+/** Whoever wants to know when the app hands a profile over. */
+const companyListeners = new Set<(company: string) => void>();
+
+export function onCompany(listen: (company: string) => void): () => void {
+  companyListeners.add(listen);
+  return () => companyListeners.delete(listen);
+}
+
 /**
  * Whether these screens are running inside the app or in a browser.
  *
@@ -156,6 +183,12 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     dispatch({ type: 'openSaved', project });
   };
 
+  // The profile is not part of the room, so it does not go through the reducer.
+  // The provider that owns it subscribes here instead.
+  const openCompany = (company: string) => {
+    for (const listen of companyListeners) listen(company);
+  };
+
   const openTrace = (trace: unknown, fileName?: string) => {
     dispatch({
       type: 'openTrace',
@@ -165,7 +198,7 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     });
   };
 
-  window.trueline = { open, openTrace, openSaved, version: BRIDGE_VERSION };
+  window.trueline = { open, openTrace, openSaved, openCompany, version: BRIDGE_VERSION };
 
   const waiting = window.truelinePayload;
   delete window.truelinePayload;

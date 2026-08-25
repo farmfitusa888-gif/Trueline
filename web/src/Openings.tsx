@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatFeetInches } from '../../core/src/length.ts';
+import { useUnits } from './units.tsx';
 import { isVerified, toleranceOf } from '../../core/src/measurement.ts';
 import { type Opening, type Room, type Wall, runLength } from '../../core/src/room.ts';
 import { Measure } from './Measure.tsx';
@@ -26,9 +26,9 @@ const NOUN: Record<Opening['kind'], string> = {
   cased: 'Cased opening',
 };
 
-function band(measurement: { provenance: unknown }): string {
+function band(measurement: { provenance: unknown }, len: (v: bigint) => string): string {
   const m = measurement as Parameters<typeof isVerified>[0];
-  return isVerified(m) ? 'measured' : `± ${formatFeetInches(toleranceOf(m))}`;
+  return isVerified(m) ? 'measured' : `± ${len(toleranceOf(m))}`;
 }
 
 function Row({
@@ -68,6 +68,7 @@ export function Openings({
   readonly wall: Wall;
   readonly onSet: (openingId: string, field: OpeningField, text: string) => void;
 }) {
+  const { len } = useUnits();
   const [open, setOpen] = useState<string | null>(null);
   const openings = wall.openings ?? [];
   if (openings.length === 0) return null;
@@ -75,7 +76,7 @@ export function Openings({
   return (
     <div className="mt-4 border-t border-sky-200 pt-3">
       <h3 className="text-sm font-semibold text-slate-900">
-        In this wall — {formatFeetInches(runLength(wall))} of it
+        In this wall — {len(runLength(wall))} of it
       </h3>
       <p className="mt-1 text-sm text-slate-600">
         The scanner is worse at these than at walls. A door is nearly always 6&rsquo;8&quot;, and
@@ -95,11 +96,11 @@ export function Openings({
                 <span className="text-slate-800">
                   {NOUN[o.kind]}
                   <span className="block text-xs text-slate-500">
-                    {formatFeetInches(o.offsetFromStart.value)} from the corner
+                    {len(o.offsetFromStart.value)} from the corner
                   </span>
                 </span>
                 <span className="shrink-0 tabular-nums text-slate-900">
-                  {formatFeetInches(o.width.value)} × {formatFeetInches(o.height.value)}
+                  {len(o.width.value)} × {len(o.height.value)}
                   <span className="ml-2 text-xs text-slate-500 underline underline-offset-4">
                     {showing ? 'Done' : 'Measure'}
                   </span>
@@ -110,40 +111,40 @@ export function Openings({
                 <div className="mt-1 divide-y divide-sky-100 rounded-md bg-white/60 px-3">
                   <Row
                     label="Width"
-                    value={formatFeetInches(o.width.value)}
-                    note={band(o.width)}
-                    hint={`e.g. ${formatFeetInches(o.width.value)}`}
+                    value={len(o.width.value)}
+                    note={band(o.width, len)}
+                    hint={`e.g. ${len(o.width.value)}`}
                     onSubmit={(text) => onSet(o.id, 'width', text)}
                   />
                   <Row
                     label="Height"
-                    value={formatFeetInches(o.height.value)}
-                    note={band(o.height)}
-                    hint={o.kind === 'window' ? `e.g. ${formatFeetInches(o.height.value)}` : `e.g. 6'8"`}
+                    value={len(o.height.value)}
+                    note={band(o.height, len)}
+                    hint={o.kind === 'window' ? `e.g. ${len(o.height.value)}` : `e.g. 6'8"`}
                     onSubmit={(text) => onSet(o.id, 'height', text)}
                   />
                   {o.kind === 'window' && (
                     <Row
                       label="Sill off the floor"
-                      value={o.sillHeight ? formatFeetInches(o.sillHeight.value) : 'not known'}
+                      value={o.sillHeight ? len(o.sillHeight.value) : 'not known'}
                       // RoomPlan never states a sill; where one exists it was
                       // worked back from the window's centre and its height.
-                      note={o.sillHeight ? band(o.sillHeight) : 'the scan never said'}
+                      note={o.sillHeight ? band(o.sillHeight, len) : 'the scan never said'}
                       hint={`e.g. 2'6"`}
                       onSubmit={(text) => onSet(o.id, 'sillHeight', text)}
                     />
                   )}
                   <Row
                     label="From the corner"
-                    value={formatFeetInches(o.offsetFromStart.value)}
-                    note={band(o.offsetFromStart)}
-                    hint={`e.g. ${formatFeetInches(o.offsetFromStart.value)}`}
+                    value={len(o.offsetFromStart.value)}
+                    note={band(o.offsetFromStart, len)}
+                    hint={`e.g. ${len(o.offsetFromStart.value)}`}
                     onSubmit={(text) => onSet(o.id, 'offsetFromStart', text)}
                   />
                   <p className="py-2 text-xs text-slate-500">
                     Measured from the first corner of {wall.id}, walking the room the way the
                     plan is numbered. Correcting any of these moves no walls — the ceiling is{' '}
-                    {formatFeetInches((wall.height ?? room.ceilingHeight).value)}.
+                    {len((wall.height ?? room.ceilingHeight).value)}.
                   </p>
                 </div>
               )}

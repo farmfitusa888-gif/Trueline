@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatFeetInches } from '../../core/src/length.ts';
+import { useUnits } from './units.tsx';
 import type { Room } from '../../core/src/room.ts';
 import {
   type Draft,
@@ -41,6 +41,7 @@ export function Draw({
   readonly onDone: (room: Room, name: string) => void;
   readonly onCancel: () => void;
 }) {
+  const { len } = useUnits();
   const [name, setName] = useState('');
   const [ceiling, setCeiling] = useState(`8'`);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -156,7 +157,7 @@ export function Draw({
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">{draft.name}</h2>
         <span className="text-sm text-slate-600">
-          ceiling {formatFeetInches(draft.ceilingHeight.value)}
+          ceiling {len(draft.ceilingHeight.value)}
         </span>
       </div>
 
@@ -169,7 +170,7 @@ export function Draw({
               </span>
               <span className="flex items-baseline gap-3">
                 <span className="tabular-nums font-semibold text-slate-900">
-                  {formatFeetInches(wall.length.value)}
+                  {len(wall.length.value)}
                 </span>
                 <button
                   type="button"
@@ -189,21 +190,27 @@ export function Draw({
           ? 'It closes. Finish when you are ready.'
           : draft.walls.length === 0
             ? 'Start at any corner and walk the room one wall at a time, all the way round.'
-            : `Still to come back: ${describe(left.x, 'east', 'west')}${
+            : `Still to come back: ${describe(left.x, 'east', 'west', len)}${
                 left.x !== 0n && left.y !== 0n ? ' and ' : ''
-              }${describe(left.y, 'north', 'south')}.`}
+              }${describe(left.y, 'north', 'south', len)}.`}
       </p>
 
       {closing && (
         <div className="mt-3 rounded-lg bg-slate-100 p-3">
           <p className="text-sm text-slate-700">
             The last wall has to run <strong>{closing.heading}</strong> for{' '}
-            <strong className="tabular-nums">{formatFeetInches(closing.length)}</strong>. The other
+            <strong className="tabular-nums">{len(closing.length)}</strong>. The other
             walls decide it, so there is nothing to measure.
           </p>
           <button
             type="button"
-            onClick={() => add(closing.heading, formatFeetInches(closing.length))}
+            // The exact value, not the one on the button. `suggestClosingWall`
+            // works the last wall out to the nanometre; rounding it to a
+            // sixteenth to put it in the field and parsing that back loses up
+            // to a thirty-second, and then the room does not close and
+            // `finish()` refuses it — over a wall nobody typed. A room ending
+            // 13' 5 7/32" is enough to do it.
+            onClick={() => add(closing.heading, `${closing.length}nm`)}
             className="mt-2 min-h-12 rounded-md bg-slate-900 px-5 font-semibold text-white active:bg-slate-700"
           >
             Add it
@@ -263,8 +270,13 @@ export function Draw({
 }
 
 /** "12' 4"" east", or nothing at all when there is nothing left that way. */
-function describe(value: bigint, positive: string, negative: string): string {
+function describe(
+  value: bigint,
+  positive: string,
+  negative: string,
+  len: (v: bigint) => string
+): string {
   if (value === 0n) return '';
   const abs = value < 0n ? -value : value;
-  return `${formatFeetInches(abs)} ${value > 0n ? positive : negative}`;
+  return `${len(abs)} ${value > 0n ? positive : negative}`;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { formatFeetInches } from '../../core/src/length.ts';
-import { area, formatSquareFeet, isDiagonal, runLength } from '../../core/src/room.ts';
+import { area, isDiagonal, runLength } from '../../core/src/room.ts';
+import { useUnits } from './units.tsx';
 import { readiness } from '../../core/src/issue.ts';
 import { extent } from '../../core/src/health.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
@@ -18,6 +18,7 @@ import { planThumbnail } from './sheet.ts';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
+import { Settings } from './Settings.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Draw } from './Draw.tsx';
 import { WallPhotos } from './WallPhotos.tsx';
@@ -134,12 +135,14 @@ function NothingHere({ onDraw }: { onDraw: () => void }) {
 }
 
 export function App() {
+  const { len, area: showArea } = useUnits();
   const [state, dispatch] = useReducer(reduce, EMPTY);
   const [saveTrouble, setSaveTrouble] = useState<string | null>(null);
   // Plan or room. The same model, the same selection, the same tape box under
   // both — switching view never changes what is being measured.
   const [look, setLook] = useState<'plan' | 'room'>('plan');
   const [drawing, setDrawing] = useState(false);
+  const [settings, setSettings] = useState(false);
   const loaded = state.loaded;
 
   // Let the scanner in — and pick up whatever was being corrected last time.
@@ -234,16 +237,32 @@ export function App() {
             True<span className="text-[#B8590A]">line</span>
           </span>
         </h1>
-        {loaded && (
+        <span className="flex shrink-0 items-baseline gap-4">
+          {loaded && (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'close' })}
+              className="text-sm text-slate-500 underline underline-offset-4"
+            >
+              Open another
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => dispatch({ type: 'close' })}
+            onClick={() => setSettings(!settings)}
+            aria-label="Your business"
             className="text-sm text-slate-500 underline underline-offset-4"
           >
-            Open another
+            {settings ? 'Close' : 'Your business'}
           </button>
-        )}
+        </span>
       </header>
+
+      {settings && (
+        <div className="mb-5">
+          <Settings onClose={() => setSettings(false)} />
+        </div>
+      )}
 
       {saveTrouble && (
         <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -290,8 +309,8 @@ export function App() {
               <div data-sheet="no" className="mb-2 flex items-baseline justify-between gap-3 px-1">
                 <h2 className="text-base font-semibold text-slate-900">{loaded.room.name}</h2>
                 <p className="text-sm tabular-nums text-slate-600">
-                  {formatFeetInches(derived.extent.x)} × {formatFeetInches(derived.extent.y)} ·{' '}
-                  {formatSquareFeet(derived.area.value)}
+                  {len(derived.extent.x)} × {len(derived.extent.y)} ·{' '}
+                  {showArea(derived.area.value)}
                 </p>
               </div>
 
@@ -351,7 +370,7 @@ export function App() {
               <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
                 <div className="flex items-baseline justify-between gap-3">
                   <h2 className="font-semibold text-slate-900">
-                    {formatFeetInches(runLength(selectedWall))}
+                    {len(runLength(selectedWall))}
                     {selectedWall.open ? ' — no wall here' : ''}
                     {isDiagonal(selectedWall.heading) ? ' — angled' : ''}
                   </h2>
@@ -368,7 +387,7 @@ export function App() {
                   this one never moves again.
                 </p>
                 <Measure
-                  label={`e.g. ${formatFeetInches(runLength(selectedWall))}`}
+                  label={`e.g. ${len(runLength(selectedWall))}`}
                   onSubmit={(text) =>
                     dispatch({
                       type: 'verify',

@@ -1,5 +1,7 @@
-import { NM_PER_FOOT, formatFeetInches } from '../../core/src/length.ts';
-import { type Room, area, formatSquareFeet, isDiagonal, runLength } from '../../core/src/room.ts';
+import { NM_PER_FOOT } from '../../core/src/length.ts';
+import { type Room, area, isDiagonal, runLength } from '../../core/src/room.ts';
+import { letterhead } from '../../core/src/company.ts';
+import { useUnits } from './units.tsx';
 import { readiness, trustLabel } from '../../core/src/issue.ts';
 import { toRenderModel } from '../../core/src/render.ts';
 import type { Footprint, WallObstruction } from '../../core/src/obstruction.ts';
@@ -132,6 +134,7 @@ function feet(nm: bigint): number {
 }
 
 export function Plan({ room, north, selected, obstructions, footprints, onSelect }: PlanProps) {
+  const { len, area: showArea, company } = useUnits();
   const model = toRenderModel(room, [], { unit: 'ft' });
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
 
@@ -160,7 +163,11 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
   // printed and what gets serialised into the image somebody saves — and two
   // renderings of the same facts is how an export starts disagreeing with the
   // screen.
-  const BLOCK = 118;
+  // Tall enough for the rows above plus however many letterhead lines this
+  // contractor has filled in. Fixed at the tallest and the drawing floats in
+  // white on a profile with only a name in it; computed, and it fits.
+  const head = letterhead(company);
+  const BLOCK = 132 + Math.max(head.length, 1) * 26;
   const viewHeight = SIDE + PAD * 2 + BLOCK;
 
   // The middle of the room in screen units, so every dimension can be pushed
@@ -333,7 +340,7 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
               fill={stroke}
               halo={7}
             >
-              {formatFeetInches(runLength(wall))}
+              {len(runLength(wall))}
             </Label>
             {isDiagonal(wall.heading) && (
               <Label
@@ -354,22 +361,63 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
         <circle key={`${w.id}-corner`} cx={px(w.start.x)} cy={scaleY(w.start.y)} r={4} fill="#0f172a" />
       ))}
 
-      {/* The title block. Everything a drawing has to say about itself before
-          anybody prices off it: which room, how big, and — the part no other
-          scanning app puts on a drawing — whether anybody stood behind it. */}
+      {/*
+        The title block: everything a drawing has to say about itself before
+        anybody prices off it. Which room, how big, whether anybody stood behind
+        it — and whose drawing it is.
+
+        Laid out in rows with the letterhead beneath rather than beside, because
+        beside it collided with the caveat the first time and printed a
+        contractor's name through the middle of the most important sentence on
+        the sheet.
+      */}
       <g transform={`translate(0 ${SIDE + PAD * 2 - 18})`}>
         <line x1={PAD / 2} y1={0} x2={viewWidth - PAD / 2} y2={0} stroke="#0f172a" strokeWidth={2} />
         <text x={PAD / 2} y={38} fontSize={30} fontWeight={600} fill="#0f172a">
           {room.name}
         </text>
         <text x={viewWidth - PAD / 2} y={38} textAnchor="end" fontSize={30} fill="#0f172a">
-          {formatSquareFeet(area(room).value)}
+          {showArea(area(room).value)}
         </text>
         <text x={PAD / 2} y={72} fontSize={21} fill={state.blocking.length > 0 ? '#b45309' : '#0f172a'}>
           {caveat}
         </text>
         <text x={PAD / 2} y={100} fontSize={19} fill="#64748b">
-          {trustLabel(state.trust)} · ceiling {formatFeetInches(room.ceilingHeight.value)} · Trueline
+          {trustLabel(state.trust)} · ceiling {len(room.ceilingHeight.value)}
+        </text>
+
+        {/* Whose drawing this is. A homeowner handed a drawing with somebody
+            else's brand on it is being handed a tool their contractor is
+            borrowing; with his name and his licence on it, it is his drawing,
+            and Trueline is the line underneath. */}
+        <line
+          x1={PAD / 2}
+          y1={118}
+          x2={viewWidth - PAD / 2}
+          y2={118}
+          stroke="#e2e8f0"
+          strokeWidth={1}
+        />
+        {head.map((line, i) => (
+          <text
+            key={line}
+            x={PAD / 2}
+            y={148 + i * 26}
+            fontSize={i === 0 ? 24 : 19}
+            fontWeight={i === 0 ? 600 : 400}
+            fill={i === 0 ? '#0f172a' : '#64748b'}
+          >
+            {line}
+          </text>
+        ))}
+        <text
+          x={viewWidth - PAD / 2}
+          y={148}
+          textAnchor="end"
+          fontSize={17}
+          fill="#94a3b8"
+        >
+          Trueline
         </text>
       </g>
     </svg>

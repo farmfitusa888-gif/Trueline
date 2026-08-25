@@ -1,5 +1,5 @@
 import { type CSSProperties, useMemo, useState } from 'react';
-import { formatFeetInches } from '../../core/src/length.ts';
+import { useUnits } from './units.tsx';
 import type { Room } from '../../core/src/room.ts';
 import { type Photo, photosOfWall } from '../../core/src/photo.ts';
 
@@ -61,6 +61,7 @@ export function WallPhotos({
   readonly wallId: string;
   readonly photos: readonly Photo[];
 }) {
+  const { len } = useUnits();
   const [big, setBig] = useState<string | null>(null);
   const [broken, setBroken] = useState<Set<string>>(new Set());
 
@@ -110,7 +111,7 @@ export function WallPhotos({
                     type="button"
                     onClick={() => setBig(big === photo.id ? null : photo.id)}
                     className="block"
-                    aria-label={`Photograph showing ${formatFeetInches(inFrame.visibleLength)} of ${wallId}`}
+                    aria-label={`Photograph showing ${len(inFrame.visibleLength)} of ${wallId}`}
                   >
                     <span
                       className={`flex ${SLOT.h} ${SLOT.w} items-center justify-center
@@ -129,7 +130,7 @@ export function WallPhotos({
                       />
                     </span>
                     <span className="mt-1 block text-center text-xs tabular-nums text-slate-500">
-                      {formatFeetInches(inFrame.visibleLength)}
+                      {len(inFrame.visibleLength)}
                     </span>
                   </button>
                 </li>
