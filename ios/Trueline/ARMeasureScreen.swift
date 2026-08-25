@@ -13,16 +13,24 @@ struct ARMeasureScreen: View {
     @StateObject private var model: ARMeasureModel
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
-    @Environment(\.dismiss) private var dismiss
+    /// Handed the finished walk, so the screen holding the stack can put the
+    /// review in this screen's place rather than on top of it.
+    let onFinished: (SavedScan) -> Void
 
-    init(store: ProjectStore, backup: Backup) {
+    init(store: ProjectStore, backup: Backup, onFinished: @escaping (SavedScan) -> Void) {
         self.store = store
         self.backup = backup
+        self.onFinished = onFinished
         _model = StateObject(wrappedValue: ARMeasureModel(store: store))
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        // The reticle is in its own centred layer. It used to be inside the
+        // bottom-aligned stack below, which drew it at the foot of the screen
+        // behind the controls while the ray was cast from the middle — so
+        // there was no aim point on screen at all, and the one thing this
+        // screen is for was invisible.
+        ZStack {
             ARViewport(session: model.session)
                 .ignoresSafeArea()
 
@@ -42,6 +50,7 @@ struct ARMeasureScreen: View {
                 lengths
                 controls
             }
+            .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .alert("That did not work", isPresented: model.showingFailure) {
             Button("Close", role: .cancel) { model.session.dismissFailure() }
@@ -50,9 +59,20 @@ struct ARMeasureScreen: View {
         }
         .onAppear { model.begin() }
         .onDisappear { model.session.stop() }
-        .navigationDestination(item: $model.finished) { scan in
-            ReviewScreen(scan: scan, store: store, backup: backup)
+        .onChange(of: model.finished) { _, scan in
+            guard let scan else { return }
+            onFinished(scan)
         }
+    }
+
+    private var floorControl: some View {
+        FloorControl(
+            from: model.session.floorFrom,
+            height: model.session.heightAboveFloor,
+            set: { model.session.setFloorFromDevice() },
+            clear: { model.session.clearFloor() }
+        )
+        .padding(.horizontal, 20)
     }
 
     private var lengths: some View {
@@ -80,6 +100,8 @@ struct ARMeasureScreen: View {
 
     private var controls: some View {
         VStack(spacing: 12) {
+            floorControl
+
             TextField("What is this room?", text: $model.name)
                 .textFieldStyle(.roundedBorder)
                 .submitLabel(.done)
@@ -112,6 +134,53 @@ struct ARMeasureScreen: View {
     }
 }
 
+/// Saying where the floor is, when the phone will not work it out.
+///
+/// Plane detection is free when it happens and cannot be relied on, and there
+/// is no way to find out from a phone why it did not fire. Three builds tried
+/// to make it work and the third screenshot still said "move the phone slowly
+/// across the floor" over a picture of a well-lit tiled floor. So the app stops
+/// requiring it: lay the phone on the floor, tap once, and every corner after
+/// that lands on a height a person stated.
+private struct FloorControl: View {
+    let from: ARMeasureSession.FloorFrom?
+    let height: Float?
+    let set: () -> Void
+    let clear: () -> Void
+
+    var body: some View {
+        switch from {
+        case .none:
+            VStack(spacing: 6) {
+                Text("Lay the phone flat on the floor, screen up")
+                    .font(.subheadline)
+                Button("Set floor", action: set)
+                    .font(.headline)
+                    .buttonStyle(.borderedProminent)
+            }
+        case .device:
+            HStack(spacing: 10) {
+                Text(
+                    height.map { "Floor set — phone is \(Formatting.feetInches(metres: $0)) above it" }
+                    ?? "Floor set"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                Button("Reset", action: clear)
+                    .font(.caption)
+            }
+        case .plane:
+            HStack(spacing: 10) {
+                Text("Floor found")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Set it myself", action: clear)
+                    .font(.caption)
+            }
+        }
+    }
+}
+
 /// The aim point. Solid when there is something to put a corner on, hollow when
 /// there is not — so a tap that would be refused looks refusable first.
 private struct Reticle: View {
@@ -134,6 +203,9 @@ private struct ARViewport: UIViewRepresentable {
         view.session = session.session
         view.automaticallyUpdatesLighting = true
         context.coordinator.view = view
+        // The session raycasts through this for a tap, so it cannot depend on
+        // the display link below having run. The link only moves the reticle.
+        session.aimer = context.coordinator
         context.coordinator.start()
         return view
     }

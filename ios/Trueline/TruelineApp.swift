@@ -4,11 +4,17 @@ import SwiftUI
 struct TruelineApp: App {
     @StateObject private var store = ProjectStore()
     @StateObject private var backup = Backup()
+    /// The navigation stack, held here rather than inside the list.
+    ///
+    /// Finishing a capture replaces the capture screen with the review rather
+    /// than pushing on top of it, and a screen cannot take itself out of a
+    /// stack it does not hold. See `ProjectsScreen.show`.
+    @State private var path: [ProjectsScreen.Route] = []
 
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                ProjectsScreen(store: store, backup: backup)
+            NavigationStack(path: $path) {
+                ProjectsScreen(store: store, backup: backup, path: $path)
             }
             .task {
                 // Ask iCloud whether there is anywhere to put a copy, once, at

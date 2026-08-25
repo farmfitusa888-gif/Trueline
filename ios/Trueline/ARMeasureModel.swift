@@ -53,7 +53,11 @@ final class ARMeasureModel: ObservableObject {
         // that looks broken.
         if let note = session.trackingNote { return note }
         if !session.floorFound {
-            return "Move the phone slowly across the floor until it finds it"
+            // Said as a thing to do rather than a thing to wait for. The old
+            // sentence — "move the phone slowly across the floor until it finds
+            // it" — asked somebody to wait for a detector that may never fire,
+            // with nothing to do about it and no way to tell.
+            return "Lay the phone flat on the floor and tap Set floor"
         }
         switch session.corners.count {
         case 0: return "Point at the foot of a corner and tap"

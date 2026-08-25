@@ -16,11 +16,14 @@ struct ScanScreen: View {
     @StateObject private var model: ScanModel
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
-    @Environment(\.dismiss) private var dismiss
+    /// Handed the finished scan, so the screen holding the stack can put the
+    /// review in this screen's place rather than on top of it.
+    let onFinished: (SavedScan) -> Void
 
-    init(store: ProjectStore, backup: Backup) {
+    init(store: ProjectStore, backup: Backup, onFinished: @escaping (SavedScan) -> Void) {
         self.store = store
         self.backup = backup
+        self.onFinished = onFinished
         _model = StateObject(wrappedValue: ScanModel(store: store))
     }
 
@@ -51,8 +54,9 @@ struct ScanScreen: View {
         .navigationBarBackButtonHidden(model.session.isRunning)
         .onAppear { model.begin() }
         .onDisappear { model.session.stop() }
-        .navigationDestination(item: $model.finished) { scan in
-            ReviewScreen(scan: scan, store: store, backup: backup)
+        .onChange(of: model.finished) { _, scan in
+            guard let scan else { return }
+            onFinished(scan)
         }
     }
 

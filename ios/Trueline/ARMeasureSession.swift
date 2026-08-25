@@ -33,8 +33,17 @@ final class ARMeasureSession: NSObject, ObservableObject {
         let placedAt: Date
     }
 
+    /// How the floor's height came to be known.
+    enum FloorFrom: Equatable {
+        /// ARKit's plane detector found one. Free when it happens.
+        case plane
+        /// Somebody put the phone on the floor and said so. Always available.
+        case device
+    }
+
     @Published private(set) var corners: [Placed] = []
-    @Published private(set) var floorFound = false
+    @Published private(set) var floorFrom: FloorFrom?
+    var floorFound: Bool { floorFrom != nil }
     @Published private(set) var aimingAt: SIMD3<Float>?
     @Published private(set) var failure: String?
     /// What the tracker is complaining about, in words, or nothing when it is
@@ -48,6 +57,16 @@ final class ARMeasureSession: NSObject, ObservableObject {
 
     let session = ARSession()
     private var floorHeight: Float?
+
+    /// Whatever can turn the middle of the screen into a ray.
+    ///
+    /// Held here so **tapping does not depend on the display link having run**.
+    /// It used to: the shutter read `aimingAt`, which only the link ever set,
+    /// so anything that stopped the link — and there is no way to tell from a
+    /// phone whether one is running — made every tap refuse over a live camera
+    /// picture. Now the link only moves the reticle, and the tap does its own
+    /// raycast. The reticle is cosmetic; the tap is the product.
+    weak var aimer: ARSCNViewProviding?
 
     /// Whether this phone can scan rather than only measure.
     ///
@@ -84,6 +103,54 @@ final class ARMeasureSession: NSObject, ObservableObject {
         session.pause()
     }
 
+    /// The floor is where the phone is, because somebody put it there.
+    ///
+    /// **This exists because plane detection cannot be relied on and there is
+    /// no way to find out from a phone why it did not fire.** Three builds have
+    /// now tried to make "the app finds the floor" work, and the third
+    /// screenshot still said "move the phone slowly across the floor" over a
+    /// picture of a well-lit tiled floor. So the app stops requiring it.
+    ///
+    /// A person laying the phone face-up on the floor states the floor's height
+    /// exactly — the camera is then a few millimetres above it, which is inside
+    /// the noise of everything else here — and it takes two seconds. Every
+    /// raycast afterwards meets that height, which is arithmetic this file
+    /// already does and `meetFloor` already refuses when the ray cannot reach.
+    ///
+    /// Plane detection still runs and still counts when it works. This is the
+    /// path that always works.
+    func setFloorFromDevice() {
+        guard let camera = session.currentFrame?.camera else {
+            failure = "The camera is not tracking yet. Give it a moment and try again."
+            return
+        }
+        // Level enough to be lying on the floor rather than being held. A phone
+        // pointed at a wall would set the floor at chest height and every
+        // corner after it would land in the air.
+        let up = SIMD3<Float>(camera.transform.columns.1.x,
+                              camera.transform.columns.1.y,
+                              camera.transform.columns.1.z)
+        guard abs(up.y) > 0.85 else {
+            failure = "Lay the phone flat on the floor, screen up, then tap Set floor. "
+                + "It is not flat enough to tell where the floor is."
+            return
+        }
+        floorHeight = camera.transform.columns.3.y
+        floorFrom = .device
+    }
+
+    /// Forgets the floor, for a room on a different level.
+    func clearFloor() {
+        floorHeight = nil
+        floorFrom = nil
+    }
+
+    /// How high the phone is above the floor right now, for the readout.
+    var heightAboveFloor: Float? {
+        guard let floorHeight, let camera = session.currentFrame?.camera else { return nil }
+        return camera.transform.columns.3.y - floorHeight
+    }
+
     /// Puts a corner where the reticle is pointing.
     ///
     /// Refuses rather than guessing when there is nothing to aim at: a tap that
@@ -91,18 +158,24 @@ final class ARMeasureSession: NSObject, ObservableObject {
     /// corner in the wrong place is a wall that is wrong by however far off it
     /// was.
     func tap() {
-        guard let at = aimingAt else {
+        // Raycast now rather than trusting whatever the display link last
+        // wrote. See `aimer`.
+        let at = aimer.flatMap(raycast(from:)) ?? aimingAt
+        guard let at else {
             // Whatever the tracker is unhappy about is the actual reason, so it
             // is what gets said. "The floor has not been found" over a picture
             // of a floor is an app arguing with its own screen.
             failure = trackingNote
                 ?? (floorFound
-                    ? "Point at the floor where the corner is, then tap."
-                    : "The floor has not been found yet. Move the phone slowly across the floor "
-                        + "until it has, then tap.")
+                    ? "Point further down — the middle of the screen has to be on the floor for "
+                        + "the app to work out where it is."
+                    : "Lay the phone flat on the floor, screen up, and tap Set floor. Then point "
+                        + "at the foot of a corner and tap.")
             return
         }
         corners.append(Placed(id: "c\(corners.count + 1)", position: at, placedAt: Date()))
+        // A tap that landed is proof the floor is known, whatever set it.
+        if floorFrom == nil { floorFrom = .plane }
     }
 
     func undoLastCorner() {
@@ -217,10 +290,13 @@ final class ARMeasureSession: NSObject, ObservableObject {
             let floors = anchors.compactMap { $0 as? ARPlaneAnchor }
                 .filter { $0.alignment == .horizontal }
             if !floors.isEmpty {
-                floorFound = true
                 let lowest = floors.map { $0.transform.columns.3.y }.min()
-                if let lowest, floorHeight == nil || lowest < floorHeight! {
+                // A plane never overrides a floor somebody stated. They put the
+                // phone on it; a detector that then finds a table top lower
+                // than it is wrong, and the person is not.
+                if let lowest, floorFrom != .device, floorHeight == nil || lowest < floorHeight! {
                     floorHeight = lowest
+                    floorFrom = .plane
                 }
             }
         }
@@ -230,7 +306,7 @@ final class ARMeasureSession: NSObject, ObservableObject {
         // detector has got round to naming. A person aiming at a spot and being
         // told the floor has not been found, while the reticle sits solid on
         // it, is the app arguing with its own screen.
-        if aimingAt != nil { floorFound = true }
+        if aimingAt != nil && floorFrom == nil { floorFrom = .plane }
         // Three corners is enough to be walking back to the first one, so the
         // live distance appears then — a tap earlier than `canClose` allows.
         if let first = corners.first, let aim = aimingAt, corners.count >= 3 {
@@ -267,12 +343,14 @@ extension ARMeasureSession: ARSessionDelegate {
             .filter { $0.alignment == .horizontal }
         guard !floors.isEmpty else { return }
         Task { @MainActor in
-            self.floorFound = true
             // The lowest horizontal plane is the floor; a table is also
-            // horizontal and is not what anybody is measuring to.
+            // horizontal and is not what anybody is measuring to. And nothing
+            // here overrides a floor somebody stated by putting the phone on it.
             let lowest = floors.map { $0.transform.columns.3.y }.min()
-            if let lowest, self.floorHeight == nil || lowest < self.floorHeight! {
+            if let lowest, self.floorFrom != .device,
+               self.floorHeight == nil || lowest < self.floorHeight! {
                 self.floorHeight = lowest
+                self.floorFrom = .plane
             }
         }
     }

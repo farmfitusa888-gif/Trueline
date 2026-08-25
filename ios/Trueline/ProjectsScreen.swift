@@ -13,7 +13,15 @@ import UIKit
 struct ProjectsScreen: View {
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
-    @State private var scanning = false
+    /// The whole stack, owned above this screen.
+    ///
+    /// It has to be, because finishing a capture does not *push* the review —
+    /// it **replaces** the capture with it. Left as a push, the back button
+    /// popped to the capture screen, whose `finished` was still set, and
+    /// SwiftUI shoved the review straight back on: "no way to go back, always
+    /// goes back into the scan project". A screen cannot take itself out of a
+    /// stack it does not hold.
+    @Binding var path: [Route]
 
     var body: some View {
         List {
@@ -160,9 +168,9 @@ struct ProjectsScreen: View {
         .navigationDestination(for: Route.self) { route in
             switch route {
             case .newScan:
-                ScanScreen(store: store, backup: backup)
+                ScanScreen(store: store, backup: backup, onFinished: show)
             case .newMeasure:
-                ARMeasureScreen(store: store, backup: backup)
+                ARMeasureScreen(store: store, backup: backup, onFinished: show)
             case .open(let entry):
                 if let scan = store.load(entry) {
                     ReviewScreen(scan: scan, store: store, backup: backup)
@@ -170,14 +178,27 @@ struct ProjectsScreen: View {
                     Text("That capture could not be read. Its room.json or trace.json is missing.")
                         .padding()
                 }
+            case .review(let scan):
+                ReviewScreen(scan: scan, store: store, backup: backup)
             }
         }
         .onAppear { store.refresh() }
+    }
+
+    /// A finished capture takes the capture screen's place in the stack.
+    ///
+    /// One route in, one route out — so back from the review is back to this
+    /// list, and there is no live camera screen left underneath waiting to push
+    /// the review on again.
+    private func show(_ scan: SavedScan) {
+        store.refresh()
+        path = [.review(scan)]
     }
 
     enum Route: Hashable {
         case newScan
         case newMeasure
         case open(ProjectStore.Entry)
+        case review(SavedScan)
     }
 }
