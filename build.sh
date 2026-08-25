@@ -69,7 +69,13 @@ if xcrun devicectl list devices >/dev/null 2>&1; then
     | grep -viE 'simulator|watch|tv|vision' \
     | head -1)"
   if [ -n "$line" ]; then
-    udid="$(printf '%s' "$line" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}|[0-9A-Fa-f]{40}' | head -1)"
+    # Three shapes, because Apple has used three. A modern phone reports a
+    # plain UUID (8-4-4-4-12); an older one reports 8-16; older still is 40 hex
+    # with no dashes. The first version of this only knew the last two, printed
+    # "No iPhone found", and then printed the iPhone underneath it.
+    udid="$(printf '%s' "$line" | grep -oE \
+      '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}|[0-9A-Fa-f]{40}' \
+      | head -1)"
     name="$(printf '%s' "$line" | awk '{print $1}')"
   fi
 fi

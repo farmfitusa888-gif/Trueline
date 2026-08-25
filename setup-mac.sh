@@ -83,6 +83,31 @@ else
   ok "nothing of yours in the project file"
 fi
 
+say "Files Xcode rewrites on its own"
+# The scheme is Xcode's housekeeping. It rewrites LastUpgradeVersion the first
+# time a newer Xcode opens the project, and that is enough to stop every pull
+# afterwards -- which is what happened, on a file nobody had deliberately
+# edited. Handled like the signing team: if the only difference is Xcode's own
+# bookkeeping, it goes; if there is anything else in it, this stops and says so,
+# because a scheme can carry real settings.
+scheme="$(git ls-files 'ios/**/*.xcscheme' | head -1)"
+if [ -n "$scheme" ] && ! git diff --quiet -- "$scheme"; then
+  other="$(git diff -U0 -- "$scheme" | grep -E '^[+-][^+-]' \
+    | grep -vcE 'LastUpgradeVersion|version = |buildArchitectures')"
+  if [ "${other:-0}" -gt 0 ]; then
+    bad "$(basename "$scheme") has changes that are not Xcode's own bookkeeping."
+    echo "     A scheme can carry real settings, so this will not throw it away."
+    echo "     Look:   git diff -- $scheme"
+    echo "     Keep:   git stash push -- $scheme"
+    echo "     Drop:   git checkout -- $scheme"
+    exit 1
+  fi
+  git checkout -- "$scheme"
+  ok "$(basename "$scheme") put back — that was Xcode noting its own version, nothing of yours"
+else
+  ok "nothing of Xcode's own in the way"
+fi
+
 say "Getting the latest code"
 # It used to stash whatever it found and pull over the top. That is a script
 # quietly moving somebody's unfinished work somewhere they did not ask for and
@@ -163,13 +188,19 @@ fi
 
 say "The Swift itself"
 if command -v python3 >/dev/null 2>&1; then
-  if python3 core/tools/check-swift.py >/dev/null 2>&1; then
-    ok "every file parses"
-  else
+  python3 core/tools/check-swift.py >/dev/null 2>&1
+  case $? in
+  0) ok "every file parses" ;;
+  2)
+    warn "The Swift grammar is not installed on this Mac, so nothing was checked."
+    echo "     It is optional and costs nothing:  pip3 install tree_sitter tree_sitter_swift"
+    ;;
+  *)
     warn "Something does not parse. This is a grammar and not a compiler, so"
     warn "Xcode is the one that decides — but it is usually right:"
     python3 core/tools/check-swift.py 2>&1 | sed 's/^/     /' | head -12
-  fi
+    ;;
+  esac
 else
   warn "No python3 on this Mac, so the Swift cannot be parse-checked here."
 fi

@@ -50,11 +50,12 @@ try:
     from tree_sitter import Language, Parser
     import tree_sitter_swift
 except ImportError:
-    print('The Swift grammar is not installed here.')
+    print('The Swift grammar is not installed here, so nothing was checked.')
     print('  pip install tree_sitter tree_sitter_swift')
-    print('Skipping the parse check rather than failing on it: a missing checker')
-    print('is a missing checker, not a broken file.')
-    sys.exit(0)
+    # Exit 2, not 0. A missing checker is not a passing check, and reporting it
+    # as one is worse than having no checker at all -- setup-mac.sh said "every
+    # file parses" on a Mac that had never parsed a thing.
+    sys.exit(2)
 
 import json
 
