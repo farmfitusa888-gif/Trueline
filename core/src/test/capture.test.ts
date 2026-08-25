@@ -339,6 +339,33 @@ function portrait(position: [number, number, number]): CapturedPhoto {
   };
 }
 
+/**
+ * The same viewpoint with the phone rolled about the direction it is pointing.
+ *
+ * `right` is the camera's own X axis — the image's left-to-right direction — in
+ * the world. Everything else is held: the camera stands in the same place
+ * looking the same way, so which walls it shows cannot change and only which
+ * way up the picture is can.
+ */
+function rolled(right: [number, number, number]): CapturedPhoto {
+  // Looking along world -z, so the roll axis is z and `up` is right x forward.
+  const forward: [number, number, number] = [0, 0, -1];
+  const up: [number, number, number] = [
+    right[1] * forward[2] - right[2] * forward[1],
+    right[2] * forward[0] - right[0] * forward[2],
+    right[0] * forward[1] - right[1] * forward[0],
+  ];
+  return {
+    ...camera([2, 1.6, 2], 0),
+    cameraPoseARFrame: [
+      right[0], right[1], right[2], 0,
+      up[0], up[1], up[2], 0,
+      -forward[0], -forward[1], -forward[2], 0,
+      2, 1.6, 2, 1,
+    ],
+  };
+}
+
 /** The angle between the two edges of a photo's wedge, in degrees. */
 function spread(photo: ReturnType<typeof toPhoto>): number {
   const { rightEdge: r, leftEdge: l } = photo.pose;
@@ -468,4 +495,37 @@ test('one room, three readings, one north', () => {
     assert.ok(Math.abs(north.x - norths[0]!.x) < 1e-6, `x drifted to ${north.x}`);
     assert.ok(Math.abs(north.y - norths[0]!.y) < 1e-6, `y drifted to ${north.y}`);
   }
+});
+
+/* --------------------------------------------- which way up the picture is */
+
+test('a phone held upright produces a picture that has to be turned a quarter clockwise', () => {
+  // ARKit hands every frame back in the device's landscape frame however the
+  // phone is held, and writes the JPEG that way with no orientation tag. Across
+  // all 55 photographs of the real garage the camera's X axis sits at a median
+  // of -0.978 against world up: the image's right-hand edge pointing at the
+  // floor. That is a phone held the ordinary way, and the picture is on its side.
+  const held = toPhoto(rolled([0, -0.978, 0.208]), PLAIN);
+  assert.equal(held.upright, 90);
+});
+
+test('a phone genuinely on its side needs no turn', () => {
+  const flat = toPhoto(rolled([1, 0.006, 0]), PLAIN);
+  assert.equal(flat.upright, 0);
+});
+
+test('a phone held upside down turns the other way', () => {
+  const other = toPhoto(rolled([0, 0.98, 0.2]), PLAIN);
+  assert.equal(other.upright, 270);
+});
+
+test('which way up is a display decision and moves nothing on the plan', () => {
+  // The same viewpoint, the phone rolled. Which walls it shows cannot change,
+  // because rolling a camera about the direction it points changes nothing about
+  // where it is or what is in front of it.
+  const a = toPhoto(rolled([0, -0.978, 0.208]), PLAIN);
+  const b = toPhoto(rolled([0, 0.978, -0.208]), PLAIN);
+  assert.notEqual(a.upright, b.upright);
+  assert.deepEqual(a.pose.at, b.pose.at);
+  assert.deepEqual(a.pose.forward, b.pose.forward);
 });

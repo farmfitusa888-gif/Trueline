@@ -147,6 +147,37 @@ export class CaptureError extends PhotoError {}
 
 /* ------------------------------------------------------------------ reading */
 
+/**
+ * How far the picture has to turn, clockwise, to put the world the right way up.
+ *
+ * ARKit reports every frame in the device's **landscape** frame regardless of
+ * how the phone is being held, and it writes the JPEG that way too, with no
+ * orientation tag on it. So a walk done in portrait — every walk anybody
+ * actually does — produces a folder of photographs lying on their side.
+ *
+ * The pose already knows. The camera's own X axis is the image's left-to-right
+ * direction in the world, so where that axis points relative to up says how the
+ * phone was held. Measured across all 55 photographs of Sam's garage it sits at
+ * a median of -0.978 against world up — the image's right-hand edge pointing at
+ * the floor, which is a phone held upright in the ordinary way. Turning the
+ * picture a quarter clockwise brings its left edge to the top, and the world
+ * with it.
+ *
+ * A threshold rather than an angle, because a picture can only be hung one of
+ * four ways round and there is no such thing as a photograph 37 degrees out.
+ * Below it, the phone was genuinely on its side and the frame is already level.
+ */
+const HELD_UPRIGHT = 0.5;
+
+function uprightTurn(right: readonly number[]): 0 | 90 | 180 | 270 {
+  const length = Math.hypot(right[0]!, right[1]!, right[2]!);
+  if (length === 0) return 0;
+  const againstUp = right[1]! / length;
+  if (againstUp <= -HELD_UPRIGHT) return 90;
+  if (againstUp >= HELD_UPRIGHT) return 270;
+  return 0;
+}
+
 function at(m: readonly number[], column: number, row: number): number {
   const value = m[column * 4 + row];
   if (value === undefined) {
@@ -360,6 +391,8 @@ export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
     id: captured.id,
     takenAt: captured.takenAt,
     trigger: captured.trigger,
+    ...(captured.fileName ? { fileName: captured.fileName } : {}),
+    upright: uprightTurn(right),
     pose: { at: atPoint, forward: forwardVec, rightEdge, leftEdge },
   };
 }

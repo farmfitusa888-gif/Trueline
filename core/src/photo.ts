@@ -45,6 +45,35 @@ export interface Photo {
   readonly pose: CameraPose;
   /** How it was triggered — the app captures on a new viewpoint, and on a tap. */
   readonly trigger: 'automatic' | 'manual';
+  /**
+   * What the file is called in the capture's own folder.
+   *
+   * Carried so a screen can actually show the picture. This module has been able
+   * to say which walls a photo shows since it was written, and nothing could put
+   * one in front of a person, because the model knew where a photo was taken
+   * from and not where it *is*. The image itself never enters the model — only
+   * its name, so whoever is holding the folder can find it.
+   */
+  readonly fileName?: string;
+  /**
+   * How far to turn the picture, clockwise, to put the world the right way up.
+   *
+   * **ARKit hands back every frame in the device's landscape frame, whatever
+   * way the phone was actually being held.** So a walk done in portrait — which
+   * is every walk anybody does — produces a folder of pictures lying on their
+   * side, and a contractor looking at his own garage sees it sideways.
+   *
+   * It is not guessed and it is not read off an EXIF tag that is not there. The
+   * camera's own X axis is in the pose: measured across all 55 photographs of
+   * Sam's garage, it points at the floor with a median dot product of -0.978
+   * against world up, which is a phone held upright. That is the number this is
+   * derived from, per photograph, so a phone turned sideways halfway through a
+   * walk comes out right too.
+   *
+   * A display quantity, never a measurement — the same boundary rule `render.ts`
+   * keeps. Nothing on the plan depends on it.
+   */
+  readonly upright?: 0 | 90 | 180 | 270;
 }
 
 export class PhotoError extends RoomError {}

@@ -18,6 +18,7 @@ import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Draw } from './Draw.tsx';
+import { WallPhotos } from './WallPhotos.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -328,6 +329,8 @@ export function App() {
                     })
                   }
                 />
+
+                <WallPhotos room={loaded.room} wallId={selectedWall.id} photos={loaded.photos} />
 
                 {!selectedWall.open && (
                   <button

@@ -22,10 +22,24 @@ final class WebBundle: NSObject, WKURLSchemeHandler {
     /// Where the built web app lives inside the app bundle.
     private let root: URL?
 
+    /// The capture folder whose photographs this page may show.
+    ///
+    /// One folder, the one being looked at. `photo.ts` has been able to say
+    /// which walls a photograph shows since it was written and nothing could put
+    /// one on a screen, because the pictures are files on the phone and the page
+    /// is a web view. Serving them under the page's own scheme is what closes
+    /// that — and scoping it to a single folder, set by the screen that opened
+    /// the scan, is what stops the page being a reader of the whole disk.
+    var photos: URL?
+
     override init() {
         root = Bundle.main.url(forResource: "Web", withExtension: nil)
         super.init()
     }
+
+    /// The path prefix the page asks for a photograph under. Must match
+    /// `PHOTO_BASE` in `WallPhotos.tsx`.
+    private static let photoPrefix = "/photos/"
 
     /// Whether there is a bundle to serve at all, so a build missing its web
     /// step can say so instead of looking like a hang.
@@ -37,7 +51,24 @@ final class WebBundle: NSObject, WKURLSchemeHandler {
             return
         }
 
-        guard let file = resolve(task.request.url, under: root) else {
+        // A photograph out of the capture being looked at, rather than a file
+        // from the app bundle. Same resolution rule, different root — and the
+        // root is one folder somebody opened, never the disk.
+        let path = task.request.url?.path ?? ""
+        let wantsPhoto = path.hasPrefix(Self.photoPrefix)
+        if wantsPhoto && photos == nil {
+            fail(task, "This scan's photographs are not available.")
+            return
+        }
+        let base = wantsPhoto ? photos! : root
+
+        guard
+            let file = resolve(
+                task.request.url,
+                under: base,
+                stripping: wantsPhoto ? Self.photoPrefix : nil
+            )
+        else {
             fail(task, "Not part of this app: \(task.request.url?.path ?? "—")")
             return
         }
@@ -82,9 +113,12 @@ final class WebBundle: NSObject, WKURLSchemeHandler {
     /// Standardising before the check is the point: `..` segments are resolved
     /// first, so a path that climbs out of the bundle fails the prefix test
     /// rather than sneaking through it.
-    private func resolve(_ url: URL?, under root: URL) -> URL? {
+    private func resolve(_ url: URL?, under root: URL, stripping prefix: String? = nil) -> URL? {
         guard let url else { return nil }
         var path = url.path
+        if let prefix, path.hasPrefix(prefix) {
+            path = "/" + String(path.dropFirst(prefix.count))
+        }
         if path.isEmpty || path == "/" { path = "/index.html" }
         let file = root.appendingPathComponent(path).standardizedFileURL
         let base = root.standardizedFileURL

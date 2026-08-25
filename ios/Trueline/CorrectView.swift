@@ -35,6 +35,10 @@ struct CorrectView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> WKWebView {
+        // Which capture's photographs this page may show — one folder, the one
+        // being looked at, and nothing else on the disk.
+        context.coordinator.bundle.photos = folder.appendingPathComponent("photos", isDirectory: true)
+
         let configuration = WKWebViewConfiguration()
         // The channel the correction screens save through. Without it a room
         // somebody corrected exists only in this web view's `localStorage`,
