@@ -1,4 +1,5 @@
 import ARKit
+import SceneKit
 import SwiftUI
 import UIKit
 
@@ -35,6 +36,10 @@ struct ARMeasureScreen: View {
                 .ignoresSafeArea()
 
             Reticle(ready: model.session.aimingAt != nil)
+                // The crosshair marks where the shutter aims. Touching the
+                // picture anywhere aims there instead, so the crosshair must
+                // never look like the only place a point can go.
+                .allowsHitTesting(false)
 
             VStack(spacing: 0) {
                 Text(model.instruction)
@@ -46,7 +51,10 @@ struct ARMeasureScreen: View {
                     .padding(.top, 12)
                     .padding(.horizontal, 20)
 
+                modes
+
                 Spacer()
+                readout
                 lengths
                 controls
             }
@@ -62,6 +70,43 @@ struct ARMeasureScreen: View {
         .onChange(of: model.finished) { _, scan in
             guard let scan else { return }
             onFinished(scan)
+        }
+    }
+
+    /// Walking a room, or measuring one thing.
+    private var modes: some View {
+        Picker("What are you measuring?", selection: Binding(
+            get: { model.session.mode },
+            set: { model.session.mode = $0 }
+        )) {
+            ForEach(ARMeasureSession.Mode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .frame(maxWidth: 320)
+    }
+
+    /// One measurement, big enough to read at arm's length and write down.
+    @ViewBuilder
+    private var readout: some View {
+        if model.session.mode == .distance {
+            VStack(spacing: 2) {
+                Text(model.session.spanLength.map { Formatting.feetInches(metres: $0) } ?? "—")
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Text(model.session.span.count == 2
+                     ? "touch anywhere to start another"
+                     : "touch each end")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+            .padding(.bottom, 12)
         }
     }
 
@@ -108,9 +153,24 @@ struct ARMeasureScreen: View {
                 .padding(.horizontal, 20)
 
             HStack(spacing: 20) {
-                Button("Undo") { model.session.undoLastCorner() }
-                    .disabled(model.session.corners.isEmpty)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                // A label and a border, not a word. "Undo doesn't work" was
+                // reported against a button whose only feedback was a number
+                // in a chip that had already scrolled away -- and going from
+                // two corners to one leaves the instruction saying exactly the
+                // same sentence, so nothing on screen changed. It says how many
+                // points are down, so taking one back is something you can see.
+                Button {
+                    model.session.undoLastCorner()
+                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                } label: {
+                    Label(model.undoTitle, systemImage: "arrow.uturn.backward")
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+                .disabled(!model.session.canUndo)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button {
                     model.session.tap()
@@ -121,10 +181,12 @@ struct ARMeasureScreen: View {
                         .frame(width: 66, height: 66)
                         .background(Circle().fill(.white.opacity(0.25)))
                 }
+                .accessibilityLabel("Put a point where the crosshair is")
 
                 Button("Done") { model.finish() }
                     .font(.headline)
-                    .disabled(!model.session.canClose)
+                    .disabled(!model.session.canClose || model.session.mode != .room)
+                    .opacity(model.session.mode == .room ? 1 : 0)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(.horizontal, 20)
@@ -183,15 +245,46 @@ private struct FloorControl: View {
 
 /// The aim point. Solid when there is something to put a corner on, hollow when
 /// there is not — so a tap that would be refused looks refusable first.
+/// Where the shutter aims.
+///
+/// The old one was a three-point ring in white at forty per cent, which over a
+/// lit wooden floor -- the surface this app is pointed at more than any other --
+/// is not there. Every stroke here is drawn twice: black underneath, white on
+/// top. That is how a crosshair stays visible on a white wall and a dark
+/// carpet without knowing which it is on.
 private struct Reticle: View {
     let ready: Bool
 
+    private let ring: CGFloat = 30
+    private let arm: CGFloat = 13
+
     var body: some View {
-        Circle()
-            .strokeBorder(ready ? .white : .white.opacity(0.4), lineWidth: 3)
-            .background(Circle().fill(ready ? .white.opacity(0.9) : .clear).frame(width: 8, height: 8))
-            .frame(width: 28, height: 28)
-            .shadow(radius: 3)
+        ZStack {
+            marks(colour: .black.opacity(0.55), width: 5)
+            marks(colour: .white, width: 2)
+            Circle()
+                .fill(ready ? Color.white : Color.white.opacity(0.35))
+                .frame(width: 5, height: 5)
+        }
+        .frame(width: ring + arm * 2, height: ring + arm * 2)
+        .animation(.easeOut(duration: 0.15), value: ready)
+        .accessibilityHidden(true)
+    }
+
+    private func marks(colour: Color, width: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .strokeBorder(colour, lineWidth: width)
+                .frame(width: ring, height: ring)
+            ForEach(0..<4, id: \.self) { quarter in
+                Capsule()
+                    .fill(colour)
+                    .frame(width: width, height: arm)
+                    .offset(y: -(ring / 2 + arm / 2 + 3))
+                    .rotationEffect(.degrees(Double(quarter) * 90))
+            }
+        }
+        .opacity(ready ? 1 : 0.75)
     }
 }
 
@@ -206,11 +299,27 @@ private struct ARViewport: UIViewRepresentable {
         // The session raycasts through this for a tap, so it cannot depend on
         // the display link below having run. The link only moves the reticle.
         session.aimer = context.coordinator
+        context.coordinator.scene.attach(to: view)
+
+        // Touching the picture is how a point gets chosen. Recognisers here
+        // rather than a SwiftUI gesture because the point has to be in this
+        // view's own coordinates to be raycast through, and a SwiftUI gesture
+        // on a layout that ignores the safe area is a coordinate space you
+        // have to reason about instead of one you are handed.
+        let tap = UITapGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.touched(_:)))
+        view.addGestureRecognizer(tap)
+
+        let drag = UIPanGestureRecognizer(target: context.coordinator,
+                                          action: #selector(Coordinator.dragged(_:)))
+        view.addGestureRecognizer(drag)
+
         context.coordinator.start()
         return view
     }
 
     func updateUIView(_ view: ARSCNView, context: Context) {}
+
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session) }
 
@@ -221,6 +330,10 @@ private struct ARViewport: UIViewRepresentable {
     @MainActor
     final class Coordinator: ARSCNViewProviding {
         weak var view: ARSCNView?
+        let scene = MeasureScene()
+        /// Whether this drag started on a corner. A drag that did not is
+        /// ignored to its end, so a thumb steadying the phone never moves one.
+        private var dragging = false
         private let session: ARMeasureSession
         private var link: CADisplayLink?
 
@@ -232,6 +345,7 @@ private struct ARViewport: UIViewRepresentable {
             let link = CADisplayLink(target: DisplayLinkProxy { [weak self] in
                 guard let self else { return }
                 self.session.updateAim(using: self)
+                self.redraw()
             }, selector: #selector(DisplayLinkProxy.fire))
             link.preferredFrameRateRange = CAFrameRateRange(minimum: 10, maximum: 30, preferred: 20)
             link.add(to: .main, forMode: .common)
@@ -240,8 +354,67 @@ private struct ARViewport: UIViewRepresentable {
 
         func raycastQueryFromCentre() -> ARRaycastQuery? {
             guard let view else { return nil }
-            let centre = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-            return view.raycastQuery(from: centre, allowing: .estimatedPlane, alignment: .horizontal)
+            return raycastQuery(at: CGPoint(x: view.bounds.midX, y: view.bounds.midY))
+        }
+
+        func raycastQuery(at point: CGPoint) -> ARRaycastQuery? {
+            view?.raycastQuery(from: point, allowing: .estimatedPlane, alignment: .horizontal)
+        }
+
+        func screenPoint(for world: SIMD3<Float>) -> CGPoint? {
+            guard let view else { return nil }
+            let projected = view.projectPoint(SCNVector3(world.x, world.y, world.z))
+            // Behind the camera, or past the far plane: on screen it would be a
+            // point somewhere it is not, and a finger would grab the wrong one.
+            guard projected.z > 0, projected.z < 1 else { return nil }
+            return CGPoint(x: CGFloat(projected.x), y: CGFloat(projected.y))
+        }
+
+        @objc func touched(_ gesture: UITapGestureRecognizer) {
+            guard let view else { return }
+            session.place(at: gesture.location(in: view))
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+
+        /// Dragging a corner you have already put down.
+        ///
+        /// Only ever a corner: a drag that does not start on one is let go, so
+        /// a thumb sliding across the picture to steady the phone does not pick
+        /// up the nearest point and carry it across the room.
+        @objc func dragged(_ gesture: UIPanGestureRecognizer) {
+            guard let view else { return }
+            let point = gesture.location(in: view)
+            switch gesture.state {
+            case .began:
+                dragging = session.grab(at: point)
+            case .changed:
+                guard dragging else { return }
+                session.dragHeld(to: point)
+            case .ended, .cancelled, .failed:
+                guard dragging else { return }
+                dragging = false
+                session.release()
+            default:
+                break
+            }
+        }
+
+        /// Draws the corners and walls into the scene, every frame the link runs.
+        func redraw() {
+            switch session.mode {
+            case .room:
+                scene.draw(corners: session.corners.map(\.position),
+                           held: session.held,
+                           aim: session.aimingAt,
+                           closes: session.canClose,
+                           length: { Formatting.feetInches(metres: $0) })
+            case .distance:
+                scene.draw(corners: session.span.map(\.position),
+                           held: nil,
+                           aim: session.span.count == 1 ? session.aimingAt : nil,
+                           closes: false,
+                           length: { Formatting.feetInches(metres: $0) })
+            }
         }
 
         deinit {

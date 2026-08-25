@@ -164,6 +164,32 @@ def main():
         print(f'  {o.get("name")}: base configuration set, '
               f'DEVELOPMENT_TEAM = $(TRUELINE_DEVELOPMENT_TEAM)')
 
+    # Every Swift file on disk has to be in the target. One that is not
+    # compiles for nobody: Xcode never sees it, and the build error names the
+    # call site rather than the file that is missing. There is no Xcode here to
+    # drag one in, so the project is edited by script and this is what proves
+    # the script did it.
+    swift_dir = os.path.join(os.path.dirname(PBX), '..', 'Trueline')
+    on_disk = sorted(f for f in os.listdir(swift_dir) if f.endswith('.swift'))
+
+    compiled = set()
+    for o in objects.values():
+        if o.get('isa') != 'PBXSourcesBuildPhase':
+            continue
+        for f in o.get('files', []):
+            ref = objects.get(f, {}).get('fileRef')
+            path = objects.get(ref, {}).get('path')
+            if path:
+                compiled.add(path)
+
+    missing = [f for f in on_disk if f not in compiled]
+    if missing:
+        for f in missing:
+            print(f'  ios/Trueline/{f} is on disk but not in the target')
+        print('  Add it with: python3 core/tools/add-swift-file.py <name>.swift')
+        sys.exit(1)
+    print(f'all {len(on_disk)} Swift files on disk are in the target')
+
     print('OK')
 
 

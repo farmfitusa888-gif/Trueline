@@ -51,7 +51,22 @@ final class ARMeasureModel: ObservableObject {
         // reason nothing else is happening. A screen that says "point at a
         // corner and tap" while the tracker cannot see anything is a screen
         // that looks broken.
+        // A finger on a corner is the most specific thing happening, so it is
+        // what the sentence is about while it lasts.
+        if session.held != nil { return "Moving that corner — let go to drop it" }
         if let note = session.trackingNote { return note }
+
+        if session.mode == .distance {
+            if !session.floorFound {
+                return "Lay the phone flat on the floor and tap Set floor"
+            }
+            switch session.span.count {
+            case 0: return "Touch one end of what you are measuring"
+            case 1: return "Now touch the other end"
+            default: return "Touch anywhere to measure something else"
+            }
+        }
+
         if !session.floorFound {
             // Said as a thing to do rather than a thing to wait for. The old
             // sentence — "move the phone slowly across the floor until it finds
@@ -60,15 +75,30 @@ final class ARMeasureModel: ObservableObject {
             return "Lay the phone flat on the floor and tap Set floor"
         }
         switch session.corners.count {
-        case 0: return "Point at the foot of a corner and tap"
-        case 1, 2: return "Walk to the next corner and tap"
+        // "Touch", not "point and tap": the picture is the control now. The
+        // shutter still aims down the crosshair, for a hand on a ladder.
+        case 0: return "Touch the foot of a corner — anywhere on the picture"
+        case 1, 2: return "Walk to the next corner and touch it"
         default:
             if let back = session.distanceToStart, back < 0.6 {
-                return "You are back at the first corner — tap it again to finish"
+                return "You are back at the first corner — touch it again to finish"
             }
-            return "Keep going round. Tap the first corner again when you get back to it"
+            return "Keep going round. Touch the first corner again when you get back to it"
         }
     }
+
+    /// What Undo takes back, said as a count.
+    ///
+    /// Undo used to be the word on its own, and taking a corner back changed
+    /// nothing anybody could see: the instruction for two corners and for one
+    /// is the same sentence, and the wall chips are small and at the bottom.
+    /// A button that says "Undo 4" and then "Undo 3" has visibly done something.
+    var undoTitle: String {
+        let count = session.mode == .room ? session.corners.count : session.span.count
+        return count > 0 ? "Undo \(count)" : "Undo"
+    }
+
+
 
     func begin() {
         // `onAppear` fires again when somebody comes back from the review

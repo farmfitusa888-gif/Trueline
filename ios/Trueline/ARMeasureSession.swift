@@ -41,7 +41,25 @@ final class ARMeasureSession: NSObject, ObservableObject {
         case device
     }
 
+    /// What this screen is being used for.
+    ///
+    /// Walking a room and measuring the gap between two things are the same
+    /// raycast and different products: one ends in a saved room, the other ends
+    /// in a number somebody reads off the screen and writes on a pad. Keeping
+    /// them apart stops a countertop being recorded as a wall.
+    enum Mode: String, CaseIterable, Identifiable {
+        case room
+        case distance
+        var id: String { rawValue }
+        var title: String { self == .room ? "Room" : "Distance" }
+    }
+
+    @Published var mode: Mode = .room
     @Published private(set) var corners: [Placed] = []
+    /// The two ends of a one-off measurement, in `.distance` mode.
+    @Published private(set) var span: [Placed] = []
+    /// Which corner a finger is dragging, if any.
+    @Published private(set) var held: Int?
     @Published private(set) var floorFrom: FloorFrom?
     var floorFound: Bool { floorFrom != nil }
     @Published private(set) var aimingAt: SIMD3<Float>?
@@ -173,18 +191,117 @@ final class ARMeasureSession: NSObject, ObservableObject {
                         + "at the foot of a corner and tap.")
             return
         }
-        corners.append(Placed(id: "c\(corners.count + 1)", position: at, placedAt: Date()))
+        record(at)
+    }
+
+    /// Puts a point where somebody touched, rather than where the phone was
+    /// aimed.
+    ///
+    /// The shutter aims down the middle of the screen, which is right for one
+    /// hand on a ladder and wrong for everything else: the corner you want is
+    /// almost never in the centre of the picture, so the app was choosing the
+    /// point and the person was left arguing with it. A touch is a choice.
+    func place(at point: CGPoint) {
+        guard let query = aimer?.raycastQuery(at: point),
+              let at = resolve(query) else {
+            failure = whyNothingLanded()
+            return
+        }
+        record(at)
+    }
+
+    private func record(_ at: SIMD3<Float>) {
+        switch mode {
+        case .room:
+            corners.append(Placed(id: "c\(corners.count + 1)", position: at, placedAt: Date()))
+        case .distance:
+            // A third touch starts a new measurement rather than making a
+            // triangle nobody asked for.
+            if span.count >= 2 { span.removeAll() }
+            span.append(Placed(id: "s\(span.count + 1)", position: at, placedAt: Date()))
+        }
         // A tap that landed is proof the floor is known, whatever set it.
         if floorFrom == nil { floorFrom = .plane }
     }
 
+    /// How far a finger may be from a corner and still be taken to mean it.
+    ///
+    /// A finger pad covers about 44 points, which is why every button on this
+    /// phone is at least that. Half of that either side is the smallest target
+    /// somebody can hit deliberately and the largest they can hit by accident.
+    private let grabRadius: CGFloat = 44
+
+    /// Takes hold of the nearest corner to a touch, if one is near enough.
+    ///
+    /// - Returns: whether anything was taken hold of. When nothing is, the
+    ///   caller lets the gesture go, so dragging empty picture does not silently
+    ///   move a corner somewhere across the room.
+    @discardableResult
+    func grab(at point: CGPoint) -> Bool {
+        guard mode == .room, let aimer else { return false }
+        var best: (index: Int, distance: CGFloat)?
+        for (index, corner) in corners.enumerated() {
+            guard let on = aimer.screenPoint(for: corner.position) else { continue }
+            let away = hypot(on.x - point.x, on.y - point.y)
+            if away <= grabRadius && (best == nil || away < best!.distance) {
+                best = (index, away)
+            }
+        }
+        guard let best else { return false }
+        held = best.index
+        return true
+    }
+
+    /// Moves the corner being held to wherever the finger is now.
+    func dragHeld(to point: CGPoint) {
+        guard let held, corners.indices.contains(held),
+              let query = aimer?.raycastQuery(at: point),
+              let at = resolve(query) else { return }
+        let was = corners[held]
+        corners[held] = Placed(id: was.id, position: at, placedAt: was.placedAt)
+    }
+
+    func release() {
+        held = nil
+    }
+
+    /// Why a touch produced no point, said as the reason it actually was.
+    private func whyNothingLanded() -> String {
+        trackingNote
+            ?? (floorFound
+                ? "Nothing there to measure — that part of the picture is not on a surface "
+                    + "the phone has worked out yet. Try a spot nearer the floor."
+                : "Lay the phone flat on the floor, screen up, and tap Set floor. Then touch "
+                    + "the foot of a corner.")
+    }
+
     func undoLastCorner() {
-        guard !corners.isEmpty else { return }
-        corners.removeLast()
+        switch mode {
+        case .room:
+            guard !corners.isEmpty else { return }
+            corners.removeLast()
+            // Holding an index that no longer exists is how a drag ends up
+            // moving the wrong corner, or crashing.
+            held = nil
+        case .distance:
+            guard !span.isEmpty else { return }
+            span.removeLast()
+        }
+    }
+
+    /// Whether there is anything for Undo to take back, in whichever mode.
+    var canUndo: Bool { mode == .room ? !corners.isEmpty : !span.isEmpty }
+
+    /// The one-off measurement, once both ends are down.
+    var spanLength: Float? {
+        guard span.count == 2 else { return nil }
+        return simd_distance(span[0].position, span[1].position)
     }
 
     func clear() {
         corners.removeAll()
+        span.removeAll()
+        held = nil
     }
 
     /// The corners as the model wants them: metres, plan x and y, in order.
@@ -206,8 +323,13 @@ final class ARMeasureSession: NSObject, ObservableObject {
     /// to land on even where no plane has been detected yet.
     private func raycast(from view: ARSCNViewProviding) -> SIMD3<Float>? {
         guard let query = view.raycastQueryFromCentre() else { return nil }
+        return resolve(query)
+    }
+
+    /// Turns a ray into a point in the room, or refuses.
+    private func resolve(_ query: ARRaycastQuery) -> SIMD3<Float>? {
         // An existing plane first: it is a real surface ARKit has seen. Falling
-        // back to the estimated one keeps the reticle usable in a corner the
+        // back to the estimated one keeps the point usable in a corner the
         // plane has not grown into yet.
         if let hit = session.raycast(query).first {
             return SIMD3<Float>(hit.worldTransform.columns.3.x,
@@ -218,10 +340,16 @@ final class ARMeasureSession: NSObject, ObservableObject {
         // at that height instead: the far corner of a room is often beyond
         // where any plane has grown to, and refusing there means refusing the
         // corners that are hardest to walk to.
-        if let height = floorHeight, let camera = session.currentFrame?.camera {
-            return Self.meetFloor(at: height, from: camera)
-        }
-        return nil
+        //
+        // The ray meant is **the query's own**, not the camera's. When a touch
+        // anywhere on the picture became a point, using the camera's centre ray
+        // here would have put every fallback corner in the middle of the screen
+        // instead of under the finger -- a wrong answer that looks like a right
+        // one, which is the worst kind this app can give.
+        guard let height = floorHeight else { return nil }
+        return Self.meet(floorAt: height,
+                         origin: query.origin,
+                         direction: query.direction)
     }
 
     /// Where the middle of the screen meets a floor at a known height.
@@ -235,10 +363,25 @@ final class ARMeasureSession: NSObject, ObservableObject {
         let m = camera.transform
         let eye = SIMD3<Float>(m.columns.3.x, m.columns.3.y, m.columns.3.z)
         let look = -SIMD3<Float>(m.columns.2.x, m.columns.2.y, m.columns.2.z)
+        return meet(floorAt: height, origin: eye, direction: look)
+    }
+
+    /// Where a ray meets a level floor at a known height.
+    ///
+    /// Refused when the ray points up or runs level, because a ray that never
+    /// reaches the floor has no answer and a made-up one is a corner in the
+    /// wrong place. Refused past thirty metres for the same reason: a ray a
+    /// fraction below level meets the floor in the next county.
+    static func meet(
+        floorAt height: Float,
+        origin: SIMD3<Float>,
+        direction: SIMD3<Float>
+    ) -> SIMD3<Float>? {
+        let look = simd_length(direction) > 0 ? simd_normalize(direction) : direction
         guard look.y < -0.05 else { return nil }
-        let distance = (height - eye.y) / look.y
+        let distance = (height - origin.y) / look.y
         guard distance > 0, distance < 30 else { return nil }
-        return eye + look * distance
+        return origin + look * distance
     }
 
     /// Everything the screen needs, read straight off the current frame.
@@ -367,4 +510,9 @@ extension ARMeasureSession: ARSessionDelegate {
 @MainActor
 protocol ARSCNViewProviding {
     func raycastQueryFromCentre() -> ARRaycastQuery?
+    /// A ray through a point somebody touched, so the point measured is the
+    /// point they chose rather than whatever the middle of the screen was on.
+    func raycastQuery(at point: CGPoint) -> ARRaycastQuery?
+    /// Where a placed corner is on screen right now, so a finger can find it.
+    func screenPoint(for world: SIMD3<Float>) -> CGPoint?
 }
