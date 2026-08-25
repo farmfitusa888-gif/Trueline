@@ -43,6 +43,7 @@ const parts = [
   'a6-persist.mjs',
   'a7-client.mjs',
   'a8-agree.mjs',
+  'a9-trade.mjs',
 ];
 
 function run(part) {

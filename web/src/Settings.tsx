@@ -3,6 +3,7 @@ import { formatFeetInches, parseLength } from '../../core/src/length.ts';
 import { type Company, letterhead } from '../../core/src/company.ts';
 import { ASSEMBLIES } from '../../core/src/thickness.ts';
 import { useUnits } from './units.tsx';
+import { TRADES, describeTrade, tradeOf } from '../../core/src/trade.ts';
 
 /**
  * Whose business this is.
@@ -177,6 +178,39 @@ export function Settings({ onClose }: { readonly onClose: () => void }) {
             </button>
           )}
         </div>
+      </div>
+
+      {/* ------------------------------------------------------------ trade */}
+      <div className="mt-5">
+        <span className="text-sm font-medium text-slate-700">What do you do?</span>
+        <div className="mt-1 grid gap-2 sm:grid-cols-2">
+          {TRADES.map((trade) => {
+            const picked = draft.trade === trade.id;
+            return (
+              <button
+                key={trade.id}
+                type="button"
+                onClick={() => set('trade', trade.id)}
+                aria-pressed={picked}
+                className={`min-h-16 rounded-md px-4 py-2 text-left ${
+                  picked
+                    ? 'bg-slate-900 text-white'
+                    : 'border border-slate-300 text-slate-700 active:bg-slate-100'
+                }`}
+              >
+                <span className="block font-semibold">{trade.name}</span>
+                <span className={`block text-xs ${picked ? 'text-slate-300' : 'text-slate-500'}`}>
+                  {trade.does}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+          {describeTrade(tradeOf(draft.trade))}{' '}
+          Like the units above, this is a way of reading: it changes the order and the words,
+          never a number. A rate you set stays set if you change your mind.
+        </p>
       </div>
 
       {/* ------------------------------------------------------------ units */}

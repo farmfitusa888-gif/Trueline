@@ -3,6 +3,7 @@ import { type Measurement, verified } from './measurement.ts';
 import { RoomError } from './room.ts';
 import { type AssemblyId, assemblyById } from './thickness.ts';
 import { type JobRecord, type PriceBook, type Rate, learn } from './price.ts';
+import { NO_TRADE } from './trade.ts';
 
 /**
  * Whose business this is, and how they like their numbers.
@@ -50,6 +51,16 @@ export interface Company {
   readonly units: Units;
 
   /**
+   * What this company does, so the app says their words.
+   *
+   * Presentation only, exactly like `units`: it changes which takeoff lines
+   * come first and what they are called, and never what any of them is. A rate
+   * is stored against the app's own item name whatever trade is selected, so
+   * changing trade cannot orphan a price somebody has set.
+   */
+  readonly trade: string;
+
+  /**
    * Whether to start a new room at the height below rather than the scanner's.
    *
    * A toggle rather than a value that is always used, deliberately. A scanner
@@ -92,6 +103,7 @@ export const EMPTY_COMPANY: Company = {
   licence: '',
   insurance: '',
   units: 'imperial',
+  trade: NO_TRADE,
   useDefaultCeiling: false,
   defaultCeiling: `8'`,
 };

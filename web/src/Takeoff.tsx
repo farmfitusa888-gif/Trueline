@@ -4,6 +4,7 @@ import { useUnits } from './units.tsx';
 import { roomQuantities } from '../../core/src/zone.ts';
 import { takeoff as buildTakeoff } from '../../core/src/takeoff.ts';
 import { type Readiness, trustLabel } from '../../core/src/issue.ts';
+import { order, tradeOf, wordFor } from '../../core/src/trade.ts';
 
 /**
  * What this room takes.
@@ -98,9 +99,14 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
   // The lines wall thickness unlocks — jamb, wrap, plates, studs, footprint —
   // kept in their own block rather than mixed into the finishes, because they
   // are a different trade reading a different column.
-  const extras = sheet.lines.filter((line) => line.group !== undefined);
+  // What the person holding the phone calls these, and which ones they care
+  // about first. Applied here, at the point of display: the sheet, the quote
+  // and every rate underneath are in the app's own words, so changing trade
+  // reorders a screen and moves nothing.
+  const trade = tradeOf(company.trade);
+  const extras = order(trade, sheet.lines.filter((line) => line.group !== undefined));
 
-  const rows = [
+  const rows = order(trade, [
     { what: 'Floor', value: area(q.it.floorArea), prices: 'flooring, tile, underlay' },
     { what: 'Ceiling', value: area(q.it.ceilingArea), prices: 'ceiling drywall and paint' },
     {
@@ -122,7 +128,7 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
           },
         ]
       : []),
-  ];
+  ]);
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -141,7 +147,7 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
         {rows.map((row) => (
           <div key={row.what} className="flex items-baseline justify-between gap-4 py-3">
             <dt className="text-slate-700">
-              {row.what}
+              {wordFor(trade, row.what)}
               {open && <span className="block text-xs text-slate-500">{row.prices}</span>}
             </dt>
             <dd className="shrink-0 font-semibold tabular-nums text-slate-900">{row.value}</dd>
@@ -158,7 +164,7 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
             {extras.map((line) => (
               <div key={line.what} className="flex items-baseline justify-between gap-4 py-3">
                 <dt className="text-slate-700">
-                  {line.what}
+                  {wordFor(trade, line.what)}
                   {open && <span className="block text-xs text-slate-500">{line.workings}</span>}
                 </dt>
                 <dd className="shrink-0 font-semibold tabular-nums text-slate-900">

@@ -11,6 +11,7 @@ import { decode, encode } from '../../core/src/persist.ts';
 import type { Rate } from '../../core/src/price.ts';
 import type { JobRecord } from '../../core/src/price.ts';
 import { handBackCompany, onCompany } from './bridge.ts';
+import { NO_TRADE, tradeOf } from '../../core/src/trade.ts';
 
 /**
  * How this contractor reads a number, and who they are.
@@ -66,6 +67,9 @@ export function loadCompany(): Company {
       insurance: typeof raw.insurance === 'string' ? raw.insurance : '',
       ...(typeof raw.logo === 'string' ? { logo: raw.logo } : {}),
       units: raw.units === 'metric' ? 'metric' : 'imperial',
+      // Through tradeOf so a profile naming a trade this build does not have
+      // opens in plain words instead of refusing.
+      trade: tradeOf(typeof raw.trade === 'string' ? raw.trade : NO_TRADE).id,
       useDefaultCeiling: raw.useDefaultCeiling === true,
       defaultCeiling: typeof raw.defaultCeiling === 'string' ? raw.defaultCeiling : `8'`,
       ...(raw.defaultAssembly ? { defaultAssembly: raw.defaultAssembly } : {}),
