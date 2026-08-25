@@ -1,6 +1,6 @@
 # Getting the current build onto your phone, and what to test on it
 
-Everything below has been run and passes on this machine: 410 tests, both
+Everything below has been run and passes on this machine: 462 tests, both
 typechecks, the web build, and the app driven end to end in a browser against
 your own garage scan. **None of it has been run on a phone since the plan was
 un-mirrored.** That is what this page is for.
@@ -236,12 +236,62 @@ phone, or an old drawing for a building you cannot get into.
   since every length was typed by a person the app cannot choose which one is
   wrong.
 
+### 13. Your business, and the units
+
+- Top right: **Your business**. Name, phone, email, licence, insurance, and a
+  logo from your photos. **Pass:** it appears on the plan's title block, on the
+  takeoff and on anything you send a client.
+- Same screen: **Feet and inches / Metric**. **Pass:** every number on every
+  screen changes together, and switching back gives you exactly what you had.
+- **What a new room starts at** — the ceiling-height override is a toggle and it
+  is off. Turn it on only if your houses really are all the same: a scanner
+  measuring a ceiling off a wall it could see beats a habit.
+
+### 14. What it comes to
+
+- Under the takeoff: **What it comes to** → **Set your rates**. Type what you
+  charge per square foot, per foot, per door.
+- **Pass:** the room prices itself, every line showing the rate times the
+  quantity so you can check it by hand, and it says out loud when the money is
+  resting on a scan nobody has taped.
+- **What happened to it** — quoted, won, lost. Three won jobs that agree on a
+  rate and the app will start telling you what you actually charge.
+
+### 15. The client file — the one to show Gilbert
+
+- **Send the drawing** → **Send to the client**.
+- **Pass:** one HTML file lands in your share sheet. Text it to yourself and
+  open it. It has your name at the top, the drawing, what is in the room, what
+  it comes to, photographs of the actual room, and — in amber — where the
+  numbers came from.
+- **Turn off wifi and mobile data, then open it again.** It must look identical.
+  Nothing in it is fetched from anywhere.
+
+### 16. The floor
+
+- Top right: **The floor**. Every room on the phone.
+- A room nothing is joined to stands off to one side, dashed, labelled *not
+  joined yet*.
+- Tap a doorway in one room, then the same doorway in the other. **Pass:** the
+  rooms snap together, back to back, the thickness of the wall between them
+  apart.
+- If you join three rooms in a ring, it will tell you how far the loop misses
+  closing by. That number is every scan's error added up, and no other app will
+  show it to you.
+
+### 17. CAD, for whoever asks
+
+- **Send the drawing** → **CAD drawing**. A DXF, in your chosen units.
+- **Pass:** it opens in the free Autodesk viewer. The walls you taped are
+  dimensioned in green on their own layer; the scanner's are yellow. Switch the
+  yellow layer off and what is left is everything somebody stood behind.
+- **This is the one I would most like a result on.** It has been drawn correctly
+  by one renderer here and never opened in Autodesk by anybody.
+
 ### Not built yet, so do not test for them
 
-Thumbnails on the scan list, multiple rooms stitched into a floor, ESX export,
-and accounts or sharing between phones. They are next, in that order — and the
-last of those is waiting on one decision from you (see the recommendation I
-sent about local-first vs never-leaves-the-phone).
+Multiple floors with stairs, exteriors, a hosted client link, and accounts that
+join two phones to one job. `docs/v3.md` has the order and the reasoning.
 
 ---
 

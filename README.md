@@ -42,18 +42,22 @@ Full research: [`MARKET-RESEARCH.md`](./MARKET-RESEARCH.md). Decisions: [`DECISI
 
 ## Build order
 
-1. **One room, done properly** — scan, correct, 2D + 3D, dimensioned PDF.
-2. **Stitch rooms into a floor** — the hard problem, taken while the codebase is small.
-3. Projects, accounts, sharing · client output · scan → quantities → price.
+1. **One room, done properly** — scan, correct, 2D + 3D, dimensioned CAD out. **Done.**
+2. **Stitch rooms into a floor** — the hard problem, taken while the codebase was small.
+   **Done:** rooms joined by tapping the same door in each, placed exactly, with loop
+   closure reported rather than smoothed away.
+3. **Out the door** — takeoff, price book, priced quote, one self-contained file a
+   homeowner opens with no app and no login. **Done.**
 
-Then: multiple floors with stairs, exteriors, site and lot. Android once the data format
+Next, in `docs/v3.md`: scan → priced scope, the hosted client link, re-scan and diff,
+exteriors. Then multiple floors with stairs, site and lot. Android once the data format
 is proven.
 
 ## Status
 
 | | |
 |---|---|
-| Tests | **410 passing, 0 failing** (`npm test`) |
+| Tests | **462 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
