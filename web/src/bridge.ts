@@ -62,13 +62,35 @@ export interface TruelineBridge {
  * A browser with no app around it has no message handler, and nothing here
  * fails when there is none. The page is the same page either way.
  */
-export function handBack(fileName: string, project: string): void {
-  const handlers = (
+function handler(name: string): { postMessage(body: unknown): void } | undefined {
+  return (
     window as unknown as {
       webkit?: { messageHandlers?: Record<string, { postMessage(body: unknown): void }> };
     }
-  ).webkit?.messageHandlers;
-  const saved = handlers?.saved;
+  ).webkit?.messageHandlers?.[name];
+}
+
+/**
+ * A picture of the plan, for the app's own list of scans.
+ *
+ * The list of scans on the phone showed three folders called "Room 2026-08-24
+ * 1819" and left somebody to remember which was the kitchen. This is the
+ * drawing, small, so the list shows the room rather than the timestamp. Sent
+ * once when a room opens rather than on every keystroke: it is a picture of a
+ * room, and a room does not change shape while somebody types.
+ */
+export function handBackThumbnail(fileName: string, dataUrl: string): void {
+  const post = handler('thumbnail');
+  if (!post) return;
+  try {
+    post.postMessage({ fileName, thumbnail: dataUrl, version: BRIDGE_VERSION });
+  } catch {
+    // A list without a picture is a list. Nothing depends on this.
+  }
+}
+
+export function handBack(fileName: string, project: string): void {
+  const saved = handler('saved');
   if (!saved) return;
   try {
     saved.postMessage({ fileName, project, version: BRIDGE_VERSION });

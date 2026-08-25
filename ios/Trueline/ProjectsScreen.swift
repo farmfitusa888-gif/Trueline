@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// What is on this phone.
 ///
@@ -52,16 +53,42 @@ struct ProjectsScreen: View {
                 Section("On this phone") {
                     ForEach(store.scans) { entry in
                         NavigationLink(value: Route.open(entry)) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(entry.name)
-                                if entry.hasRoom {
-                                    Text(entry.kind)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                } else {
-                                    Text("Nothing in this one — the capture did not finish")
-                                        .font(.caption)
-                                        .foregroundStyle(.orange)
+                            HStack(spacing: 12) {
+                                // The drawing, so the list shows the room
+                                // rather than the timestamp. Three folders
+                                // called "Room 2026-08-24 1819" told nobody
+                                // which one was the kitchen.
+                                Group {
+                                    if let picture = entry.thumbnail,
+                                       let data = try? Data(contentsOf: picture),
+                                       let image = UIImage(data: data) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .scaledToFit()
+                                    } else {
+                                        // A scan nobody has opened yet has no
+                                        // drawing, because the drawing is made
+                                        // by the screen that draws it. Say so
+                                        // with an outline rather than a gap.
+                                        Image(systemName: "square.dashed")
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .frame(width: 56, height: 56)
+                                .background(Color(.secondarySystemBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.name)
+                                    if entry.hasRoom {
+                                        Text(entry.kind)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Text("Nothing in this one — the capture did not finish")
+                                            .font(.caption)
+                                            .foregroundStyle(.orange)
+                                    }
                                 }
                             }
                         }

@@ -31,6 +31,8 @@ struct CorrectView: UIViewRepresentable {
     let folder: URL
     /// Called on every save, with the whole saved project.
     let onSave: (Data) -> Void
+    /// Called once when the plan is drawn, with a small PNG of it for the list.
+    let onThumbnail: (Data) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -44,6 +46,10 @@ struct CorrectView: UIViewRepresentable {
         // somebody corrected exists only in this web view's `localStorage`,
         // which is a cache the operating system is allowed to reclaim.
         configuration.userContentController.add(context.coordinator, name: "saved")
+        // And a picture of the plan, for the list of scans. The list showed
+        // three folders called "Room 2026-08-24 1819" and left somebody to
+        // remember which was the kitchen.
+        configuration.userContentController.add(context.coordinator, name: "thumbnail")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -109,14 +115,40 @@ struct CorrectView: UIViewRepresentable {
             _ controller: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
-            guard
-                message.name == "saved",
-                let body = message.body as? [String: Any],
-                let project = body["project"] as? String,
-                !project.isEmpty,
-                let data = project.data(using: .utf8)
-            else { return }
-            parent.onSave(data)
+            guard let body = message.body as? [String: Any] else { return }
+
+            switch message.name {
+            case "saved":
+                guard
+                    let project = body["project"] as? String,
+                    !project.isEmpty,
+                    let data = project.data(using: .utf8)
+                else { return }
+                parent.onSave(data)
+
+            case "thumbnail":
+                // A data URL, and only a PNG one. Everything about it is
+                // checked before a byte is written: this is a web view handing
+                // the app a file to keep, and "it said it was a picture" is not
+                // a reason to believe it is one.
+                guard
+                    let url = body["thumbnail"] as? String,
+                    let comma = url.firstIndex(of: ","),
+                    url.hasPrefix("data:image/png;base64,"),
+                    case let encoded = String(url[url.index(after: comma)...]),
+                    let data = Data(base64Encoded: encoded),
+                    // A thumbnail is a few kilobytes. Anything the size of a
+                    // photograph is not a thumbnail and is not written.
+                    data.count < 2_000_000,
+                    // PNG's own first eight bytes, so what lands on disk with a
+                    // .png on the end really is one.
+                    data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+                else { return }
+                parent.onThumbnail(data)
+
+            default:
+                return
+            }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

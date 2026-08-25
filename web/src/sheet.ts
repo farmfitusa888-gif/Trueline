@@ -85,6 +85,28 @@ export async function planPng(svg: string, width = 2000): Promise<Blob> {
   });
 }
 
+/**
+ * A small picture of the plan, for the list of scans.
+ *
+ * The list said "Room 2026-08-24 1819" three times and left somebody to
+ * remember which was the kitchen. A drawing is what a person recognises, and
+ * the drawing already exists — this is the same `<svg>` the page is showing,
+ * the same one that prints, at the size of a thumbnail. There is no second
+ * renderer, so the picture on the list cannot show a room the app does not have.
+ *
+ * Comes back as a data URL because it is handed to the native app across a
+ * message channel, which takes text.
+ */
+export async function planThumbnail(source: SVGSVGElement, width = 320): Promise<string> {
+  const blob = await planPng(planSvg(source), width);
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new SheetError('The thumbnail could not be read back.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 /** A file name somebody can find again, with nothing in it a filesystem hates. */
 export function fileNameFor(room: string, extension: string): string {
   const clean = room.replace(/[^\w -]/g, '').trim() || 'room';

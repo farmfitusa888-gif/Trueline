@@ -31,6 +31,9 @@ struct ReviewScreen: View {
                         corrected: project
                     )
                 }
+            },
+            onThumbnail: { png in
+                store.writeThumbnail(png, into: scan.folder)
             }
         )
             .ignoresSafeArea(.container, edges: .bottom)

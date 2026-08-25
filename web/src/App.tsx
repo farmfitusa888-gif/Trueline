@@ -14,6 +14,8 @@ import { Room3D } from './Room3D.tsx';
 import { Takeoff } from './Takeoff.tsx';
 import { Thickness } from './Thickness.tsx';
 import { Measure } from './Measure.tsx';
+import { planThumbnail } from './sheet.ts';
+import { handBackThumbnail } from './bridge.ts';
 import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
 import { Sheet } from './Sheet.tsx';
@@ -144,6 +146,32 @@ export function App() {
     if (!loaded) return;
     setSaveTrouble(persist(loaded, new Date().toISOString()));
   }, [loaded]);
+
+  // A picture of the plan for the app's list of scans, once per room. The list
+  // showed three folders called "Room 2026-08-24 1819" and left somebody to
+  // remember which was the kitchen. Keyed on the file name rather than the room
+  // so it is not remade on every keystroke: a room does not change shape while
+  // somebody types, and the drawing is only there to be recognised.
+  const fileName = loaded?.fileName;
+  useEffect(() => {
+    if (!fileName || look !== 'plan') return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      const svg = document.querySelector<SVGSVGElement>('svg[aria-label^="Plan of"]');
+      if (!svg) return;
+      void planThumbnail(svg)
+        .then((url) => {
+          if (!cancelled) handBackThumbnail(fileName, url);
+        })
+        // A list without a picture is a list. Nothing depends on this, and it
+        // must never be able to take the screen down.
+        .catch(() => undefined);
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [fileName, look]);
 
   const derived = useMemo(() => {
     if (!loaded) return null;

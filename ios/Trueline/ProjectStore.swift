@@ -21,6 +21,14 @@ final class ProjectStore: ObservableObject {
         let hasRoom: Bool
         /// Which way it was captured, for the line under its name.
         let kind: String
+        /// A small picture of the plan, once one has been drawn.
+        ///
+        /// A list of folders called "Room 2026-08-24 1819" tells nobody which
+        /// one was the kitchen. The drawing does, and the drawing already
+        /// exists — the correction screens hand a small PNG of it back when
+        /// they open a room, so the picture on this list cannot show a room the
+        /// app does not have.
+        let thumbnail: URL?
 
         var id: URL { folder }
     }
@@ -60,7 +68,11 @@ final class ProjectStore: ObservableObject {
                     ),
                     kind: FileManager.default.fileExists(
                         atPath: folder.appendingPathComponent("room.json").path
-                    ) ? "scanned" : "walked"
+                    ) ? "scanned" : "walked",
+                    thumbnail: {
+                        let picture = folder.appendingPathComponent(Self.thumbnailFile)
+                        return FileManager.default.fileExists(atPath: picture.path) ? picture : nil
+                    }()
                 )
             }
             .sorted { $0.modified > $1.modified }
@@ -91,6 +103,9 @@ final class ProjectStore: ObservableObject {
     /// What a corrected room is called inside a scan's folder.
     static let correctedFile = "corrected.json"
 
+    /// And the picture of its plan.
+    static let thumbnailFile = "plan.png"
+
     /// Writes a corrected room into the scan's own folder.
     ///
     /// Until this existed, corrections lived only in the correction screens'
@@ -111,6 +126,17 @@ final class ProjectStore: ObservableObject {
         } catch {
             return false
         }
+    }
+
+    /// Writes the picture of a scan's plan into its folder.
+    ///
+    /// Not backed up and not worth backing up: it is derived from the room, and
+    /// any device holding the room can draw it again in a few hundred
+    /// milliseconds. Sending it to iCloud would be spending somebody's storage
+    /// on something regenerable.
+    func writeThumbnail(_ png: Data, into folder: URL) {
+        try? png.write(to: folder.appendingPathComponent(Self.thumbnailFile), options: .atomic)
+        refresh()
     }
 
     /// The names of every scan on this phone, for working out what iCloud has
