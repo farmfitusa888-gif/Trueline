@@ -5,6 +5,7 @@ import { scanned, verified } from '../measurement.ts';
 import { type Heading, type Room, type Wall } from '../room.ts';
 import { shows, unphotographedWalls, wallsInFrame } from '../photo.ts';
 import {
+  type CapturedNorth,
   type CapturedPhoto,
   type PhotoManifest,
   type RoomFrame,
@@ -13,6 +14,7 @@ import {
   PLAUSIBLE_CAMERA_HEIGHT,
   heightsAboveFloor,
   importPhotos,
+  northOnPlan,
   toPhoto,
 } from '../capture.ts';
 
@@ -364,4 +366,42 @@ test('a photo of the floor is refused rather than pointed somewhere', () => {
     cameraPoseARFrame: [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 3, 1.6, 2, 1],
   };
   assert.throws(() => toPhoto(down, PLAIN), /too steeply|half the compass/);
+});
+
+/* -------------------------------------------------------------- the compass */
+
+/** A heading reading taken beside a camera pose, as the app records it. */
+function heading(trueHeading: number, turn: number, accuracy = 8): CapturedNorth {
+  return { trueHeading, accuracy, atPose: camera([0, 1.6, 0], turn).cameraPoseARFrame };
+}
+
+test('a phone facing north puts north up the plan', () => {
+  // camera(_, 0) looks along the world's -z, and with an identity datum the
+  // plan's -y. If the compass says that direction is due north, then north on
+  // the plan is -y.
+  const north = northOnPlan(heading(0, 0), PLAIN.datum);
+  assert.ok(north);
+  assert.ok(Math.abs(north.x - 0) < 1e-6, `x was ${north.x}`);
+  assert.ok(Math.abs(north.y - -1) < 1e-6, `y was ${north.y}`);
+  assert.equal(north.accuracy, 8);
+});
+
+test('a quarter turn of the phone turns the arrow a quarter turn', () => {
+  const facingNorth = northOnPlan(heading(0, 0), PLAIN.datum)!;
+  // Same room, but the reading was taken while facing east. North on the plan
+  // has to come out in the same place either way — that is the whole point.
+  const facingEast = northOnPlan(heading(90, Math.PI / 2), PLAIN.datum)!;
+  assert.ok(Math.abs(facingEast.x - facingNorth.x) < 1e-6, `${facingEast.x} vs ${facingNorth.x}`);
+  assert.ok(Math.abs(facingEast.y - facingNorth.y) < 1e-6, `${facingEast.y} vs ${facingNorth.y}`);
+});
+
+test('a heading the phone does not trust draws no arrow at all', () => {
+  // Core Location reports a negative accuracy for a reading it will not stand
+  // behind. An arrow drawn off that is worse than no arrow.
+  assert.equal(northOnPlan({ ...heading(0, 0), accuracy: -1 }, PLAIN.datum), null);
+});
+
+test('a heading taken pointing at the floor draws no arrow', () => {
+  const down = { ...heading(0, 0), atPose: [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1.6, 0, 1] };
+  assert.equal(northOnPlan(down, PLAIN.datum), null);
 });

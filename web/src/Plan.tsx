@@ -2,6 +2,7 @@ import { NM_PER_FOOT, formatFeetInches } from '../../core/src/length.ts';
 import { type Room, isDiagonal, runLength } from '../../core/src/room.ts';
 import { toRenderModel } from '../../core/src/render.ts';
 import type { Footprint, WallObstruction } from '../../core/src/obstruction.ts';
+import type { NorthOnPlan } from '../../core/src/capture.ts';
 
 /**
  * The plan, drawn from the render model and nothing else.
@@ -16,10 +17,19 @@ import type { Footprint, WallObstruction } from '../../core/src/obstruction.ts';
  * dashed, because there is nothing there. That distinction is the product.
  */
 
-const PAD = 56;
+// The drawing is scaled to about half size on a phone, so every user unit here
+// paints at roughly half a CSS pixel. The dimensions are the whole product and
+// they were landing at about 7 px — unreadable at arm's length in daylight, so
+// the type doubled. The margin has to hold them: a label like 19' 3 3/4" at
+// this size is about 170 units wide, and half of it hangs off the wall it
+// names. Cut the padding without growing it and the numbers run off the sheet,
+// which is what happened the first time.
+const PAD = 96;
 
 export interface PlanProps {
   readonly room: Room;
+  /** Which way north points, when the phone's compass was worth believing. */
+  readonly north?: NorthOnPlan | null;
   readonly selected: string | null;
   readonly obstructions: readonly WallObstruction[];
   /** What the scan found standing in the room. Drawn so "could not see it" has a picture. */
@@ -34,7 +44,7 @@ function feet(nm: bigint): number {
   return Number(whole) + Number(rest) / Number(NM_PER_FOOT);
 }
 
-export function Plan({ room, selected, obstructions, footprints, onSelect }: PlanProps) {
+export function Plan({ room, north, selected, obstructions, footprints, onSelect }: PlanProps) {
   const model = toRenderModel(room, [], { unit: 'ft' });
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
 
@@ -63,12 +73,51 @@ export function Plan({ room, selected, obstructions, footprints, onSelect }: Pla
   return (
     <svg
       viewBox={`0 0 ${viewWidth} ${viewHeight}`}
-      className="w-full h-auto touch-none select-none"
+      // No gestures here — only a tap — so `touch-action: none` bought nothing and
+      // cost the page its scrolling: a thumb starting anywhere on the drawing,
+      // which is most of the screen, could not scroll down to the corrections.
+      className="w-full h-auto select-none"
       role="img"
       aria-label={`Plan of ${room.name}`}
       onClick={() => onSelect(null)}
     >
       <rect x="0" y="0" width={viewWidth} height={viewHeight} className="fill-white" />
+
+      {/*
+        North, when the phone knew it — and its doubt beside it, always.
+        Indoors a magnetometer sits in a steel-framed building full of
+        appliances, so the arrow is drawn with the accuracy Core Location
+        reported rather than as a fact. Nothing measured depends on it.
+      */}
+      {north && (
+        <g
+          transform={`translate(${viewWidth - PAD - 8} ${PAD + 12})`}
+          aria-label={`North, give or take ${Math.round(north.accuracy)} degrees`}
+        >
+          <line
+            x1={0}
+            y1={0}
+            x2={north.x * 34}
+            y2={-north.y * 34}
+            stroke="#0f172a"
+            strokeWidth={5}
+            strokeLinecap="round"
+          />
+          <circle cx={north.x * 34} cy={-north.y * 34} r={7} fill="#0f172a" />
+          <text
+            x={0}
+            y={54}
+            textAnchor="middle"
+            className="text-[22px] font-semibold"
+            fill="#0f172a"
+          >
+            N
+          </text>
+          <text x={0} y={76} textAnchor="middle" className="text-[17px]" fill="#64748b">
+            ±{Math.round(north.accuracy)}°
+          </text>
+        </g>
+      )}
 
       {/* The floor, so the inside of the room reads as inside. */}
       <polygon
@@ -152,17 +201,17 @@ export function Plan({ room, selected, obstructions, footprints, onSelect }: Pla
             <text
               x={mx}
               y={my}
-              dy={-11}
+              dy={-14}
               textAnchor="middle"
-              className="text-[15px] font-medium"
+              className="text-[30px] font-semibold"
               fill={stroke}
-              style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: 5 }}
+              style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: 10 }}
             >
               {formatFeetInches(runLength(wall))}
             </text>
             {isDiagonal(wall.heading) && (
-              <text x={mx} y={my} dy={16} textAnchor="middle" className="text-[11px]" fill="#64748b"
-                style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: 4 }}>
+              <text x={mx} y={my} dy={28} textAnchor="middle" className="text-[22px]" fill="#64748b"
+                style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: 8 }}>
                 angled
               </text>
             )}

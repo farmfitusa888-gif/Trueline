@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { formatFeetInches, parseLength } from '../../core/src/length.ts';
 import { area, formatSquareFeet, isDiagonal, runLength } from '../../core/src/room.ts';
 import { readiness } from '../../core/src/issue.ts';
+import { extent } from '../../core/src/health.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
 import { EMPTY, persist, reduce } from './state.ts';
 import { installBridge } from './bridge.ts';
@@ -201,6 +202,10 @@ export function App() {
       obstructions: blocking,
       punchList: punchList(loaded.room, loaded.footprints, DEFAULT_REACH, 8),
       area: area(loaded.room),
+      // How far the room reaches each way — the first thing anybody in the
+      // trade says about a room, computed since the day the health checks were
+      // written and never once put on a screen.
+      extent: extent(loaded.room),
     };
   }, [loaded]);
 
@@ -258,6 +263,7 @@ export function App() {
               <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
                 <h2 className="text-base font-semibold text-slate-900">{loaded.room.name}</h2>
                 <p className="text-sm tabular-nums text-slate-600">
+                  {formatFeetInches(derived.extent.x)} × {formatFeetInches(derived.extent.y)} ·{' '}
                   {formatSquareFeet(derived.area.value)}
                 </p>
               </div>
@@ -289,6 +295,7 @@ export function App() {
                 <>
                   <Plan
                     room={loaded.room}
+                    north={loaded.north}
                     selected={state.selected}
                     obstructions={derived.obstructions}
                     footprints={loaded.footprints}

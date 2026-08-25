@@ -1,6 +1,8 @@
+import Combine
 import Foundation
 import SwiftUI
 import UIKit
+import simd
 
 /// Owns an AR measure from the first tap to the folder on disk.
 @MainActor
@@ -12,13 +14,35 @@ final class ARMeasureModel: ObservableObject {
     let session = ARMeasureSession()
     private let store: ProjectStore
     private let startedAt = Date()
+    private var relay: AnyCancellable?
+    private var begun = false
 
+    /// Passes the session's changes on as our own.
+    ///
+    /// This is the bug that made "Measure a room" look broken. SwiftUI watches
+    /// exactly one publisher per `@StateObject` — this model's. `session` is a
+    /// separate `ObservableObject`, so every `@Published` on it changed in
+    /// silence: the reticle stayed hollow, the instruction stayed on its first
+    /// sentence, the wall lengths never appeared, and **Done stayed disabled
+    /// forever**, because `.disabled(!session.canClose)` was evaluated once at
+    /// first render and never again. The camera feed was live because UIKit
+    /// draws itself, so it looked like an app that had simply given up.
+    ///
+    /// One subscription fixes all of it.
     init(store: ProjectStore) {
         self.store = store
+        relay = session.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     var showingFailure: Binding<Bool> {
-        Binding(get: { self.session.failure != nil }, set: { _ in })
+        Binding(
+            get: { self.session.failure != nil },
+            // A refusal that cannot be dismissed is a refusal that ends the
+            // session, so the setter clears it rather than doing nothing.
+            set: { if !$0 { self.session.dismissFailure() } }
+        )
     }
 
     /// What to do next, in one sentence.
@@ -38,6 +62,11 @@ final class ARMeasureModel: ObservableObject {
     }
 
     func begin() {
+        // `onAppear` fires again when somebody comes back from the review
+        // screen, and starting again resets the world origin underneath corners
+        // that are already placed — every one of them silently moves.
+        guard !begun else { return }
+        begun = true
         session.start()
     }
 
@@ -56,8 +85,22 @@ final class ARMeasureModel: ObservableObject {
             // A closing tap only counts if they really came back to the corner
             // they started at. Half a metre is the width of a doorway, and it is
             // the app's judgement rather than the person's word for it.
-            let closed = (session.distanceToStart ?? .greatestFiniteMagnitude) < 0.6
-                && session.corners.count >= 4
+            // Measured between the first corner and the last one *tapped*, not
+            // from the live reticle. The reticle is wherever the phone happens
+            // to be pointing when Done is pressed — usually at the floor by the
+            // person's feet, and `stop()` has already been called, so it is
+            // often nothing at all. The tolerance on every wall in the room
+            // came off that number.
+            let closed: Bool = {
+                guard session.corners.count >= 4,
+                      let first = session.corners.first,
+                      let last = session.corners.last
+                else { return false }
+                return simd_distance(
+                    SIMD2(first.position.x, first.position.z),
+                    SIMD2(last.position.x, last.position.z)
+                ) < 0.6
+            }()
 
             let trace: [String: Any] = [
                 "schema": "trueline.trace.v1",

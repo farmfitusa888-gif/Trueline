@@ -37,6 +37,11 @@ export function Room3D({
   // A drag is a turn, not a tap. Held in a ref so a re-render mid-drag cannot
   // lose where the finger started.
   const drag = useRef<{ x: number; y: number; from: Camera; moved: boolean } | null>(null);
+  // `click` fires after `pointerup`, by which time the drag is already cleared,
+  // so asking `drag.current?.moved` inside the click handler always read
+  // undefined and every drag that ended over a wall selected it. The answer has
+  // to outlive the gesture.
+  const wasDrag = useRef(false);
 
   const view = useMemo(() => {
     try {
@@ -52,7 +57,7 @@ export function Room3D({
   if (!view.projection) {
     return (
       <p role="alert" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
-        {view.trouble}
+        {view.trouble} Switch to Blueprint above — the plan does not need a camera.
       </p>
     );
   }
@@ -74,6 +79,7 @@ export function Room3D({
   };
 
   const end = () => {
+    wasDrag.current = drag.current?.moved ?? false;
     drag.current = null;
   };
 
@@ -85,7 +91,11 @@ export function Room3D({
         role="img"
         aria-label={`${room.name} in three dimensions`}
         onPointerDown={(event) => {
-          (event.target as Element).setPointerCapture?.(event.pointerId);
+          // Captured on the svg, not on the polygon under the finger: the
+          // polygons are re-keyed as the depth order changes while turning, so
+          // React unmounts the captured element mid-drag and the rotation
+          // sticks halfway through the gesture.
+          event.currentTarget.setPointerCapture?.(event.pointerId);
           start(event.clientX, event.clientY);
         }}
         onPointerMove={(event) => move(event.clientX, event.clientY)}
@@ -97,7 +107,7 @@ export function Room3D({
           const isSelected = isWall && facet.wallId === selected;
           return (
             <polygon
-              key={`${facet.wallId}-${facet.kind}-${i}`}
+              key={`${facet.wallId}-${facet.kind}-${facet.openingKind ?? ''}-${i}`}
               points={facet.points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
               fill={
                 facet.kind === 'floor'
@@ -115,7 +125,7 @@ export function Room3D({
               onClick={(event) => {
                 event.stopPropagation();
                 // A drag that ended on a wall is not a tap on it.
-                if (drag.current?.moved) return;
+                if (wasDrag.current) return;
                 if (isWall) onSelect(isSelected ? null : facet.wallId);
               }}
             />
@@ -125,6 +135,13 @@ export function Room3D({
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
         <p>Drag to walk around it. Tap a wall to measure it.</p>
+        <button
+          type="button"
+          onClick={() => setCamera(DEFAULT_CAMERA)}
+          className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700 active:bg-slate-100"
+        >
+          Straighten up
+        </button>
         {view.projection.hidden.length > 0 && (
           <p>
             {view.projection.hidden.length} wall

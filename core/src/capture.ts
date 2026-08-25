@@ -40,11 +40,79 @@ export interface CapturedPhoto {
   readonly trackingQuality?: string;
 }
 
+/** Where north was, and how well the phone knew, at one instant of the walk. */
+export interface CapturedNorth {
+  /** Degrees clockwise from true north, as Core Location reported it. */
+  readonly trueHeading: number;
+  /** Core Location's own estimate of how wrong that is, in degrees. */
+  readonly accuracy: number;
+  /** The camera transform at the same moment, column-major sixteen. */
+  readonly atPose: readonly number[];
+}
+
 export interface PhotoManifest {
   readonly schema: string;
   readonly capturedAt: string;
   readonly device: string;
   readonly photos: readonly CapturedPhoto[];
+  /** Absent on a phone with no compass, or one that did not trust its own. */
+  readonly north?: CapturedNorth;
+}
+
+/** Which way north points on the plan, and how much to doubt it. */
+export interface NorthOnPlan {
+  /** A unit vector in plan coordinates. */
+  readonly x: number;
+  readonly y: number;
+  /** Degrees of doubt, straight from Core Location. Never hidden. */
+  readonly accuracy: number;
+}
+
+/**
+ * Turns a heading and the pose taken beside it into north on the plan.
+ *
+ * A compass reading alone says nothing about a room: it says where north is
+ * relative to a phone, and the phone was pointing somewhere. Pairing it with
+ * the camera pose from the same instant is what ties the two together — the
+ * pose says which way the phone faced in the room, the heading says what
+ * bearing that was, and the difference is the room's own orientation.
+ *
+ * **One assumption, stated because it is not verified on hardware yet.** Core
+ * Location reports a heading for the direction the device points, and this
+ * treats that as the direction the camera looks. If the two are a quarter turn
+ * apart on a real phone, every arrow this draws is a quarter turn out — which
+ * is exactly the kind of wrong that is obvious the first time somebody holds a
+ * real compass next to it, and a single constant to correct. Nothing measured
+ * depends on it: not a length, not an area, not a quantity.
+ */
+export function northOnPlan(
+  north: CapturedNorth,
+  datum: RoomFrame['datum']
+): NorthOnPlan | null {
+  if (north.accuracy < 0 || !Number.isFinite(north.accuracy)) return null;
+  const m = north.atPose;
+  if (m.length !== 16) return null;
+
+  // Where the camera looked, on the plan.
+  const forward = [-at(m, 2, 0), -at(m, 2, 2)];
+  const fx = forward[0]! * datum.x + forward[1]! * datum.y;
+  const fy = -forward[0]! * datum.y + forward[1]! * datum.x;
+  const length = Math.hypot(fx, fy);
+  // Pointing straight up or down: the phone had no bearing worth the name.
+  if (length < 0.15) return null;
+
+  // That direction sits `trueHeading` degrees clockwise of north, so north is
+  // the same direction turned back anticlockwise by the same amount.
+  const turn = (north.trueHeading * Math.PI) / 180;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
+  const ux = fx / length;
+  const uy = fy / length;
+  return {
+    x: ux * cos - uy * sin,
+    y: ux * sin + uy * cos,
+    accuracy: north.accuracy,
+  };
 }
 
 export const PHOTO_MANIFEST_SCHEMA = 'trueline.photos.v1';

@@ -51,8 +51,10 @@ final class ARMeasureSession: NSObject, ObservableObject {
     /// which devices it supports and a hard-coded list goes stale every autumn.
     static var hasLiDAR: Bool { RoomCaptureSession.isSupported }
 
-    /// A room needs three corners, and a closing tap makes four taps.
-    var canClose: Bool { corners.count >= 3 }
+    /// A room needs three corners, and the fourth tap is the one that closes
+    /// it. Enabling Done at three let somebody record a triangle they did not
+    /// mean, with no closing gap and so no tolerance on anything in it.
+    var canClose: Bool { corners.count >= 4 }
 
     func start() {
         guard ARWorldTrackingConfiguration.isSupported else {
@@ -62,6 +64,14 @@ final class ARMeasureSession: NSObject, ObservableObject {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
         configuration.environmentTexturing = .none
+        // North, for free and without a convention to get wrong: with this
+        // alignment ARKit defines the world's -Z as true north itself, so a
+        // room walked here arrives already oriented. It costs a location
+        // authorisation — heading needs one on iOS even though no position is
+        // wanted — and it falls back cleanly if the magnetometer is unusable,
+        // because ARKit simply aligns to gravity alone and the room is no worse
+        // off than it was yesterday.
+        configuration.worldAlignment = .gravityAndHeading
         session.delegate = self
         session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
     }
@@ -128,7 +138,9 @@ final class ARMeasureSession: NSObject, ObservableObject {
 
     func updateAim(using view: ARSCNViewProviding) {
         aimingAt = raycast(from: view)
-        if let first = corners.first, let aim = aimingAt, canClose {
+        // Three corners is enough to be walking back to the first one, so the
+        // live distance appears then — a tap earlier than `canClose` allows.
+        if let first = corners.first, let aim = aimingAt, corners.count >= 3 {
             distanceToStart = simd_distance(SIMD2(first.position.x, first.position.z),
                                             SIMD2(aim.x, aim.z))
         } else {
@@ -139,9 +151,14 @@ final class ARMeasureSession: NSObject, ObservableObject {
     /// The lengths of the walls placed so far, for the live readout.
     var edgeLengths: [Float] {
         guard corners.count >= 2 else { return [] }
-        return (1..<corners.count).map { i in
-            simd_distance(SIMD2(corners[i - 1].position.x, corners[i - 1].position.z),
-                          SIMD2(corners[i].position.x, corners[i].position.z))
+        // Once there are three, the run from the last corner back to the first
+        // is a wall of the room like any other. Leaving it out made a
+        // rectangular room read as three walls.
+        let closing = corners.count >= 3 ? 1 : 0
+        return (0..<(corners.count - 1 + closing)).map { i in
+            let a = corners[i].position
+            let b = corners[(i + 1) % corners.count].position
+            return simd_distance(SIMD2(a.x, a.z), SIMD2(b.x, b.z))
         }
     }
 

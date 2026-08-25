@@ -56,11 +56,29 @@ final class PhotoRecorder {
         let trackingQuality: String
     }
 
+    /// Where north was, and how well the phone knew.
+    ///
+    /// Recorded raw and paired with the camera pose taken at the same instant,
+    /// because the two together are what fixes the room's bearing and either one
+    /// alone fixes nothing. No interpretation happens here — turning a heading
+    /// and a pose into "north is that way on the plan" is arithmetic, and
+    /// arithmetic belongs in `core` where it can be tested.
+    struct North: Encodable {
+        /// Degrees clockwise from true north, as Core Location reported it.
+        let trueHeading: Double
+        /// Core Location's own estimate of how wrong that is, in degrees.
+        let accuracy: Double
+        /// The camera transform at the same moment, column-major sixteen.
+        let atPose: [Float]
+    }
+
     struct Manifest: Encodable {
         let schema = "trueline.photos.v1"
         let capturedAt: String
         let device: String
         let photos: [Record]
+        /// Absent on a phone with no compass, or one that could not trust it.
+        let north: North?
     }
 
     private(set) var records: [Record] = []
@@ -131,8 +149,28 @@ final class PhotoRecorder {
         )
     }
 
+    /// Set once, the first time a usable heading and a pose land together.
+    private(set) var north: North?
+
+    /// Offered every heading update; keeps the first one it can trust.
+    ///
+    /// The first, not the best: a heading taken at the start of the walk is
+    /// paired with a pose from the same instant, and both are then fixed. Taking
+    /// a later one would mean re-pairing, and a compass that changes its mind
+    /// halfway through a room is not a better compass.
+    func offer(heading: Double, accuracy: Double, pose: simd_float4x4) {
+        guard north == nil, accuracy >= 0, accuracy <= 40 else { return }
+        guard let flat = try? flatten(pose, "north pose") else { return }
+        north = North(trueHeading: heading, accuracy: accuracy, atPose: flat)
+    }
+
     func manifest(device: String) -> Manifest {
-        Manifest(capturedAt: Self.stamp.string(from: started), device: device, photos: records)
+        Manifest(
+            capturedAt: Self.stamp.string(from: started),
+            device: device,
+            photos: records,
+            north: north
+        )
     }
 
     // MARK: - Flattening

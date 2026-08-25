@@ -7,7 +7,14 @@ import { importRoomPlan } from '../../core/src/import-roomplan.ts';
 import type { Footprint } from '../../core/src/obstruction.ts';
 import { makeCased, makeOpen, makeWall, verifyWall } from '../../core/src/edit.ts';
 import { loadProject, saveProject } from '../../core/src/persist.ts';
-import { type PhotoImport, type PhotoManifest, type RoomFrame, importPhotos } from '../../core/src/capture.ts';
+import {
+  type NorthOnPlan,
+  type PhotoImport,
+  type PhotoManifest,
+  type RoomFrame,
+  importPhotos,
+  northOnPlan,
+} from '../../core/src/capture.ts';
 import type { Photo } from '../../core/src/photo.ts';
 
 /**
@@ -32,7 +39,20 @@ import type { Photo } from '../../core/src/photo.ts';
  * otherwise.
  */
 
-export const STORAGE_KEY = 'trueline.room.v1';
+/**
+ * One saved room per capture, not one for the whole app.
+ *
+ * There was a single key. The native shell hands a capture over every time its
+ * screen opens, so opening the kitchen wrote the kitchen over whatever was
+ * saved, and opening the bathroom afterwards wrote the bathroom over the
+ * kitchen's corrections. Somebody could lose ten minutes of typed tape readings
+ * by navigating back and forward, and nothing said so.
+ */
+export const STORAGE_PREFIX = 'trueline.room.v1:';
+
+export function keyFor(fileName: string): string {
+  return STORAGE_PREFIX + fileName;
+}
 
 export interface Loaded {
   readonly room: Room;
@@ -46,6 +66,8 @@ export interface Loaded {
   readonly photos: readonly Photo[];
   /** Photographs the import would not place, so the screen can say which and why. */
   readonly rejectedPhotos: PhotoImport['rejected'];
+  /** Which way north points, when the phone's compass was worth believing. */
+  readonly north: NorthOnPlan | null;
   /** The coordinate frame the room came in on, so more photos can be placed later. */
   readonly frame: RoomFrame;
   /** Rooms as they were before each edit, most recent last. */
@@ -66,7 +88,7 @@ export const EMPTY: State = { loaded: null, error: null, selected: null };
 
 export type Action =
   | { type: 'open'; json: unknown; fileName: string; at: string; photos?: unknown }
-  | { type: 'restore' }
+  | { type: 'restore'; fileName?: string }
   | { type: 'openTrace'; trace: unknown; fileName: string; at: string }
   | { type: 'select'; wallId: string | null }
   | { type: 'make'; wallId: string; as: 'wall' | 'open' | 'cased' }
@@ -97,6 +119,11 @@ function edited(state: State, loaded: Loaded, next: Room, what: string): State {
 export function reduce(state: State, action: Action): State {
   switch (action.type) {
     case 'open': {
+      // A capture the native app re-hands us may already have been corrected.
+      // Those corrections outrank a pristine re-import of the same scan.
+      const kept = reduce(state, { type: 'restore', fileName: action.fileName });
+      if (kept.loaded) return kept;
+
       try {
         const { room, report, footprints, frame } = importRoomPlan(action.json as never, {
           at: action.at,
@@ -115,15 +142,21 @@ export function reduce(state: State, action: Action): State {
         // alarms. Only a manifest that will not read at all is an error.
         let photos: readonly Photo[] = [];
         let rejectedPhotos: PhotoImport['rejected'] = [];
+        let north: NorthOnPlan | null = null;
         let photoTrouble: string | null = null;
         if (action.photos) {
+          const manifest = action.photos as PhotoManifest;
           try {
-            const imported = importPhotos(action.photos as PhotoManifest, frame);
+            const imported = importPhotos(manifest, frame);
             photos = imported.photos;
             rejectedPhotos = imported.rejected;
           } catch (error) {
             photoTrouble = message(error);
           }
+          // The compass is separate from the photographs on purpose: a manifest
+          // that will not place a single picture can still know which way the
+          // room faces, and losing the arrow with them would be a shame.
+          if (manifest.north) north = northOnPlan(manifest.north, frame.datum);
         }
 
         return {
@@ -135,6 +168,7 @@ export function reduce(state: State, action: Action): State {
             footprints,
             photos,
             rejectedPhotos,
+            north,
             frame,
             undo: [],
             lastEdit: null,
@@ -142,7 +176,17 @@ export function reduce(state: State, action: Action): State {
           },
         };
       } catch (error) {
-        return { ...state, error: message(error) };
+        // Whatever was on screen stays on screen, so say which room the person
+        // is actually looking at. Silently leaving yesterday's kitchen up under
+        // a red banner means measuring the wrong room.
+        return {
+          ...state,
+          error: state.loaded
+            ? `"${action.fileName}" could not be opened: ${message(error)}\n\n` +
+              `You are still looking at "${state.loaded.fileName}". Nothing from the new ` +
+              `capture was used.`
+            : message(error),
+        };
       }
     }
 
@@ -192,6 +236,7 @@ export function reduce(state: State, action: Action): State {
             footprints: [],
             photos: [],
             rejectedPhotos: [],
+            north: null,
             frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
             undo: [],
             lastEdit: null,
@@ -204,11 +249,18 @@ export function reduce(state: State, action: Action): State {
     }
 
     case 'restore': {
+      // A room already on screen always outranks storage. Without this, the
+      // restore dispatched at mount could land after a capture handed over by
+      // the app and quietly replace it with yesterday's room.
+      if (state.loaded) return state;
+
       // Storage can be unavailable outright — a private window, a browser with
       // site data switched off — so reading it is as fallible as parsing it.
       let text: string | null = null;
       try {
-        text = window.localStorage.getItem(STORAGE_KEY);
+        text = window.localStorage.getItem(
+          action.fileName === undefined ? STORAGE_PREFIX : keyFor(action.fileName)
+        );
       } catch {
         return state;
       }
@@ -220,6 +272,7 @@ export function reduce(state: State, action: Action): State {
           footprints?: readonly Footprint[];
           photos?: readonly Photo[];
           frame?: RoomFrame;
+          north?: NorthOnPlan;
         };
         if (!extras.report) throw new Error('That saved room has no import report with it.');
         return {
@@ -231,6 +284,7 @@ export function reduce(state: State, action: Action): State {
             footprints: extras.footprints ?? [],
             photos: extras.photos ?? [],
             rejectedPhotos: [],
+            north: (extras.north as NorthOnPlan | undefined) ?? null,
             frame: extras.frame ?? { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
             undo: [],
             lastEdit: `Picked up where you left off — saved ${when(saved.savedAt)}.`,
@@ -241,7 +295,7 @@ export function reduce(state: State, action: Action): State {
         // A saved room that will not load is cleared rather than left to fail on
         // every visit, and the reason is shown once.
         try {
-          window.localStorage.removeItem(STORAGE_KEY);
+          if (action.fileName !== undefined) window.localStorage.removeItem(keyFor(action.fileName));
         } catch {
           // Nothing more to do; the message below is still worth showing.
         }
@@ -320,6 +374,8 @@ export function reduce(state: State, action: Action): State {
       return {
         ...state,
         error: null,
+        // The wall that was selected may not exist in the room being restored.
+        selected: previous.walls.some((w) => w.id === state.selected) ? state.selected : null,
         loaded: { ...loaded, room: previous, undo: loaded.undo.slice(0, -1), lastEdit: 'Undone.' },
       };
     }
@@ -329,7 +385,7 @@ export function reduce(state: State, action: Action): State {
 
     case 'close': {
       try {
-        window.localStorage.removeItem(STORAGE_KEY);
+        if (state.loaded) window.localStorage.removeItem(keyFor(state.loaded.fileName));
       } catch {
         // If it cannot be cleared it was never written; closing still works.
       }
@@ -348,7 +404,7 @@ export function reduce(state: State, action: Action): State {
 export function persist(loaded: Loaded, at: string): string | null {
   try {
     window.localStorage.setItem(
-      STORAGE_KEY,
+      keyFor(loaded.fileName),
       saveProject({
         savedAt: at,
         fileName: loaded.fileName,
@@ -358,6 +414,7 @@ export function persist(loaded: Loaded, at: string): string | null {
           footprints: loaded.footprints,
           photos: loaded.photos,
           frame: loaded.frame,
+          north: loaded.north,
         },
       })
     );

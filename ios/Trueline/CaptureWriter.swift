@@ -25,12 +25,18 @@ enum CaptureWriter {
 
     enum WriterError: Error, LocalizedError {
         case noRoom
+        case noWalls
 
         var errorDescription: String? {
             switch self {
             case .noRoom:
                 return "The scan did not produce a room. Nothing has been saved, because a "
                      + "half-saved scan is worse than none."
+            case .noWalls:
+                return "The scan finished without finding a single wall, so there is nothing to "
+                     + "measure. Nothing has been saved. Walk the room again slowly with the "
+                     + "lights on, standing back from each wall and keeping the phone pointed "
+                     + "where the wall meets the floor."
             }
         }
     }
@@ -49,6 +55,11 @@ enum CaptureWriter {
         to folder: URL
     ) throws -> Written {
         guard let room else { throw WriterError.noRoom }
+        // A room with no walls in it was being written, listed as "scanned",
+        // and then refused by the importer one screen later — so the app told
+        // somebody their scan was saved and then would not open it. Refused
+        // here instead, before the folder is created, so nothing is left behind.
+        guard !room.walls.isEmpty else { throw WriterError.noWalls }
 
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 

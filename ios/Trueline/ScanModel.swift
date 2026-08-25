@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import RoomPlan
 import SwiftUI
@@ -20,24 +21,46 @@ final class ScanModel: ObservableObject {
     private let recorder: PhotoRecorder
     private let startedAt = Date()
     private let scratch: URL
+    private var relay: AnyCancellable?
+    private var begun = false
 
+    /// Passes the session's changes on as our own.
+    ///
+    /// This is the bug that made both capture screens look broken. SwiftUI watches
+    /// exactly one publisher per `@StateObject` — this model's. `session` is a
+    /// separate `ObservableObject`, so every `@Published` on it changed in
+    /// silence: the reticle stayed hollow, the instruction stayed on its first
+    /// sentence, the wall lengths never appeared, and **the shutter stayed disabled and the
+    /// trailing button still read "Close"**, because `.disabled(!session.canClose)` was evaluated once at
+    /// first render and never again. The camera feed was live because UIKit
+    /// draws itself, so it looked like an app that had simply given up.
+    ///
+    /// One subscription fixes all of it.
     init(store: ProjectStore) {
         self.store = store
         self.scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("scan-\(UUID().uuidString)", isDirectory: true)
         self.recorder = PhotoRecorder(directory: scratch.appendingPathComponent("photos"))
         self.session = ScanSession(recorder: recorder)
+        relay = session.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     var showingFailure: Binding<Bool> {
         Binding(
             get: { self.session.failure != nil },
-            set: { _ in }
+            set: { if !$0 { self.session.dismissFailure() } }
         )
     }
 
     func begin() {
-        guard !session.isRunning else { return }
+        // Coming back from the review screen fires `onAppear` again, and
+        // starting again reuses the same scratch folder and the same started-at
+        // stamp — which means the same folder name, written over the scan that
+        // was just saved.
+        guard !begun else { return }
+        begun = true
         session.start()
     }
 

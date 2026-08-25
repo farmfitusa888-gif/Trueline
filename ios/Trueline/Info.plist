@@ -20,6 +20,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Trueline uses the camera to measure the room and to photograph it while you walk, so every dimension has a picture behind it. Nothing leaves this device.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Trueline reads the compass so it can put north on your drawing. Your position is never used, never stored and never sent anywhere.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

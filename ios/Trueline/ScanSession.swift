@@ -53,6 +53,9 @@ final class ScanSession: NSObject, ObservableObject {
     let captureView: RoomCaptureView
     private var captureSession: RoomCaptureSession { captureView.captureSession }
     private let recorder: PhotoRecorder
+    /// Reads the magnetometer alongside the scan, so the finished plan can carry
+    /// a north arrow. Nothing measured depends on it — see `Compass`.
+    private let compass = Compass()
     private var timer: Timer?
     private var finished: CapturedRoom?
 
@@ -73,6 +76,7 @@ final class ScanSession: NSObject, ObservableObject {
         configuration.isCoachingEnabled = true
         captureSession.run(configuration: configuration)
         isRunning = true
+        compass.start()
 
         timer = Timer.scheduledTimer(withTimeInterval: Self.automaticInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.takePhoto(trigger: .automatic) }
@@ -83,13 +87,33 @@ final class ScanSession: NSObject, ObservableObject {
         timer?.invalidate()
         timer = nil
         captureSession.stop()
+        compass.stop()
         isRunning = false
     }
+
+    /// Clears a refusal once it has been read.
+    ///
+    /// Without this the alert could not be dismissed: its binding asked whether
+    /// `failure` was set and had no way to unset it, so one dropped photograph
+    /// pinned the alert on screen for the rest of the scan.
+    func dismissFailure() { failure = nil }
 
     /// The shutter. Same machinery as the automatic one; only the label differs,
     /// and the label is what tells somebody later that a person meant this shot.
     func takePhoto(trigger: PhotoRecorder.Trigger) {
         guard let frame = captureSession.arSession.currentFrame else { return }
+
+        // A heading is only worth anything paired with the pose taken at the
+        // same instant, and here is the one place both are in hand at once.
+        // `offer` keeps the first it can trust and ignores the rest.
+        if let heading = compass.latest, heading.usable {
+            recorder.offer(
+                heading: heading.trueNorth,
+                accuracy: heading.accuracy,
+                pose: frame.camera.transform
+            )
+        }
+
         do {
             try recorder.record(frame: frame, trigger: trigger)
             photoCount = recorder.count
