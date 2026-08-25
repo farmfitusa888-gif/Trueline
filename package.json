@@ -15,6 +15,8 @@
     "typecheck": "npm run typecheck -w core && npm run typecheck -w web",
     "dev": "npm run dev -w web",
     "build": "npm run build -w web",
-    "audit": "npm run build --workspace=@trueline/web && node web/audit/run.mjs"
+    "audit": "npm run build --workspace=@trueline/web && node web/audit/run.mjs",
+    "verify": "npm test && npm run typecheck && npm run build",
+    "ship-web": "npm run build && rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/"
   }
 }

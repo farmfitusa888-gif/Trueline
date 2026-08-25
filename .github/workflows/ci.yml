@@ -1,74 +1,63 @@
 name: CI
 
+# Private repositories are free and unlimited on GitHub. **Actions compute is
+# not** — a free account gets 2,000 minutes a month, and this workflow was
+# spending them three times over on every push: three jobs, each doing its own
+# checkout, its own Node install and its own uncached `npm install`, for a
+# repository whose entire test suite takes four seconds.
+#
+# So it is one job now, cached, and it does not run twice for the same work.
+# Everything it does can also be run locally for nothing — `npm run verify`,
+# which is what the pre-push hook in `core/tools/install-hooks.sh` calls. The
+# minutes are for proving what landed on main, not for finding out whether the
+# thing you are about to push compiles.
+
 on:
   push:
     branches: [main]
   pull_request:
 
+# A push that supersedes another cancels it rather than paying for both. The
+# common case is three commits in a minute while somebody is iterating.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  core:
-    name: Core — tests and typecheck
+  verify:
+    name: Tests, typecheck, build, and the shipped bundle
     runs-on: ubuntu-latest
+    # The suite is seconds. A stuck runner should not quietly bill an hour.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install
+          # Caches ~/.npm keyed on the lockfile, which is the difference
+          # between a fresh download of every dependency and a few seconds.
+          cache: npm
+
+      # `ci` rather than `install`: it installs exactly the lockfile and does
+      # not spend time resolving a tree that is already decided.
+      - run: npm ci
+
       - run: npm test
       - run: npm run typecheck
+      - run: npm run build
 
-  web:
-    name: Web — typecheck and build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: npm install
-      # The web app imports core straight from source, so a change to a
-      # measurement type that breaks a screen fails here rather than in a browser.
-      - run: npm run typecheck -w web
-      - run: npm run build -w web
-
-      # The built web app is committed under ios/Trueline/Web so that a Mac with
-      # no Node on it still produces a working app — the correction screens are
-      # inside the phone app, and a missing bundle is a blank screen. A
-      # committed artefact goes stale silently, so this proves it has not: the
-      # build is byte-identical across runs, and any difference here means
-      # somebody changed a screen and did not ship it.
+      # The built web app is committed under ios/Trueline/Web so that a Mac
+      # with no Node on it still produces a working app — the correction
+      # screens are inside the phone app, and a missing bundle is a blank
+      # screen. A committed artefact goes stale silently, so this proves it has
+      # not: any difference means somebody changed a screen and did not ship it.
       - name: The bundle in the iOS app is the current build
         run: |
           if ! diff -r web/dist ios/Trueline/Web; then
             echo "::error::ios/Trueline/Web is not the current web build."
-            echo "Run: rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/"
+            echo "Run: npm run ship-web"
             exit 1
           fi
-
-  # LibreCAD's printer will not draw our file even with layouts, while Autodesk
-  # draws the same bytes correctly. That makes it a harness limitation rather
-  # than a product defect, so this job reports and does not gate.
-  cad:
-    name: DXF render (advisory)
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      # A parser is not a renderer and a renderer library is not CAD. Two
-      # confident wrong findings came from forgetting that, so this job runs a
-      # real CAD engine and fails if the drawing does not draw.
-      - name: Install LibreCAD
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends librecad xvfb
-
-      - name: Install verification tools
-        run: pip install --quiet ezdxf pypdfium2 pillow
-
-      - name: Render the DXF through LibreCAD
-        run: ./core/tools/verify-in-cad.sh || echo "advisory: see core/tools/README.md"

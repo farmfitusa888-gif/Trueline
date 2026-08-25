@@ -331,3 +331,84 @@ test('a file with only a code column still finds it rather than giving up', () =
   const list = parseList('Item Number,UOM,Price\n1950128,EA,14.29\n');
   assert.equal(list.headers[list.guess.item!], 'Item Number');
 });
+
+/* ------------------------------------------------- what real price bases look like */
+
+/**
+ * The three shapes found by running four published price bases through this.
+ *
+ * SINAPI (CAIXA/IBGE, Brazil), PMSP (São Paulo), SEINFRA (Ceará) and the DDC
+ * CWICR USD catalogue — 21,251 real rows. Before these fixes, three of the four
+ * imported **nothing at all** and the fourth imported 612 of 5,605 rows.
+ * `core/tools/verify-price-lists.sh` fetches them and re-runs the count.
+ */
+
+test('a file with no heading row keeps every row, and does not eat the first item', () => {
+  // SINAPI, PMSP and SEINFRA all begin on row one with the first item. Taking
+  // that row as headings lost the item AND left nothing for the guess to match,
+  // so the file imported nothing.
+  const list = parseList('73887/001,"ASSENTAMENTO SIMPLES DE TUBOS",3.79,M\n73887/002,"ASSENTAMENTO DN 100",4.49,M\n');
+  assert.equal(list.headless, true);
+  assert.equal(list.rows.length, 2, 'both rows are data');
+  assert.deepEqual(list.headers, ['column 1', 'column 2', 'column 3', 'column 4']);
+});
+
+test('a headless file has its columns read off the cells', () => {
+  // Nothing to match a word against, and leaving somebody to count across
+  // nineteen columns of a published base is how a feature goes unused.
+  const list = parseList(
+    ['73887/001,"ASSENTAMENTO SIMPLES DE TUBOS DE FERRO",3.79,M',
+     '73887/002,"ASSENTAMENTO SIMPLES DN 100 INCLUSIVE",4.49,M',
+     '74166/001,"ALVENARIA DE VEDACAO DE BLOCOS CERAMICOS",48.20,M2'].join('\n')
+  );
+  assert.equal(list.guess.unit, 3, 'the column that is nearly all units');
+  assert.equal(list.guess.price, 2, 'the column that is nearly all money');
+  assert.equal(list.guess.item, 1, 'the longest text left');
+  assert.equal(list.guess.code, 0, 'the shortest left');
+});
+
+test('a heading row is still recognised as one', () => {
+  // Wrong in the safe direction, but it must not be wrong in the common one.
+  const list = parseList('SKU,Description,UOM,Price\nA1,"drywall",SF,0.42\n');
+  assert.equal(list.headless, false);
+  assert.equal(list.rows.length, 1);
+});
+
+test('"UN" is each — the commonest unit in every published price base', () => {
+  // 17,511 rows out of 35,000 across the four bases, and every one of them was
+  // being refused.
+  for (const said of ['UN', 'un', 'UND', 'Unid']) {
+    assert.deepEqual(readUnit(said), { kind: 'direct', unit: 'ea' }, said);
+  }
+});
+
+test('a metric price converts by a fraction that is exact, not a rounded constant', () => {
+  // The international foot has been exactly 0.3048 m since 1959, so a square
+  // metre is exactly 1/0.09290304 square feet. The metric toggle was a lie
+  // about half the app until this: a contractor reading in millimetres could
+  // import nothing, because every published metric base is in M and M2.
+  const list = parseList('Item,Unit,Price\n"ASSENTAMENTO DN 75",M,3.79\n"ALVENARIA DE VEDACAO",M2,1.01\n');
+  const { rates, converted } = importList(list, list.guess as never, 'sam', AT, 'SINAPI');
+
+  // 3.79 x 0.3048 = 1.1552, which rounds to $1.16 a foot.
+  const run = rates.find((r) => r.item.startsWith('ASSENTAMENTO'))!;
+  assert.equal(run.unit, 'lf');
+  assert.equal(money(run.cents), '$1.16');
+
+  // 1.01 x 0.09290304 = 0.09383, which rounds to $0.09 a square foot.
+  const area = rates.find((r) => r.item.startsWith('ALVENARIA'))!;
+  assert.equal(area.unit, 'sq ft');
+  assert.equal(money(area.cents), '$0.09');
+
+  assert.equal(converted.length, 2);
+  assert.match(converted[0]!.workings, /× 3048\/10000/);
+  assert.match(converted[1]!.workings, /× 9290304\/100000000/);
+});
+
+test('a cubic metre, an hour and a kilogram stay refused', () => {
+  // A volume, a time and a mass. None of them becomes an area, and the four
+  // real bases are full of them — 6,000 rows of M3, H, KG, L, T and MES.
+  for (const said of ['M3', 'H', 'KG', 'L', 'T', 'MES', 'KM', 'CY', 'TON', 'GAL']) {
+    assert.equal(readUnit(said).kind, 'unknown', said);
+  }
+});

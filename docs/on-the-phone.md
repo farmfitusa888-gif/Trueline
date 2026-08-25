@@ -8,19 +8,35 @@ is the first compiler the iOS half will meet. That is what this page is for.
 
 ---
 
-## Part 1 — Terminal, four commands
+## Part 1 — Terminal, one command
 
-Open **Terminal** (⌘-space, type `terminal`, Return) and paste these one at a
-time. `~` means your home folder; you do not type your username.
+Open **Terminal** (⌘-space, type `terminal`, Return) and paste this. `~` means
+your home folder; you do not type your username.
+
+```bash
+cd ~/trueline && bash setup-mac.sh
+```
+
+That pulls, checks the four things that have gone wrong before, tells you what
+it found, and opens Xcode. It installs nothing and changes none of your code.
+
+One of those four checks is worth knowing about, because it is why your phone
+looked a week out of date even after pulling: **the correction screens live in
+a web bundle committed into the iOS project**, so a Mac with no Node still
+builds a working app. When that bundle goes stale the phone shows screens from
+weeks ago and nothing says so. The script checks it and rebuilds it if it can.
+
+<details>
+<summary>If you would rather do it by hand</summary>
 
 ```bash
 cd ~/trueline
 git pull
 open ios/Trueline.xcodeproj
 ```
+</details>
 
-**If the first line says `no such file or directory`**, the repo is somewhere
-else. Find it:
+**If it says `no such file or directory`**, the repo is somewhere else. Find it:
 
 ```bash
 find ~ -maxdepth 5 -type d -name trueline 2>/dev/null

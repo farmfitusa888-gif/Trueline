@@ -57,6 +57,20 @@ export interface ParsedList {
   readonly rows: readonly (readonly string[])[];
   /** The best guess at which column is which, for the person to correct. */
   readonly guess: Partial<Mapping>;
+  /**
+   * True when the file had no heading row and one was made up for the screen.
+   *
+   * **Three of the four real price bases tested had no headings at all.** They
+   * begin on the first row with the first item, which is normal for a published
+   * price base — SINAPI, PMSP and SEINFRA all do it — and it made the first
+   * item's price disappear into a heading row and the whole file unimportable,
+   * because there was nothing called "price" to find.
+   *
+   * So a file whose first row does not look like headings keeps every row as
+   * data, and the columns are named "column 1", "column 2" for the screen. The
+   * guess cannot help there, and it does not pretend to: the person picks.
+   */
+  readonly headless: boolean;
 }
 
 /**
@@ -160,16 +174,137 @@ function guessColumn(
  * highlighted and the person can say "no, price is that one" before a single
  * number reaches the book.
  */
+/**
+ * Whether the first row is headings or the first thing on the list.
+ *
+ * The test is what a person's eye does: headings are words, and a row with a
+ * price in it has a number where the price goes. So a first row containing a
+ * cell that reads as money, next to a cell that reads as a unit, is data.
+ *
+ * Wrong in the safe direction. Calling a heading row data costs one junk row
+ * that gets refused by name; calling a data row headings loses that item AND
+ * leaves nothing for the guess to match, which is what made three real files
+ * import nothing at all.
+ */
+function looksLikeData(row: readonly string[]): boolean {
+  let money = false;
+  let unit = false;
+  for (const cell of row) {
+    const t = cell.trim();
+    if (t === '') continue;
+    if (/^[$€£]?\s*\d[\d,]*(\.\d+)?$/.test(t)) money = true;
+    else if (readUnit(t).kind !== 'unknown') unit = true;
+  }
+  return money && unit;
+}
+
+/**
+ * Which column is which, worked out from the cells rather than the headings.
+ *
+ * For a file with no headings there is nothing to match a word against, and
+ * leaving the person to count across nineteen columns of a published price base
+ * is how a feature goes unused. But the columns still announce themselves: one
+ * of them is nearly all money, one is nearly all units, and of what is left the
+ * descriptions are the long text and the codes are the short ones.
+ *
+ * Still a guess, and still shown for confirmation before anything is imported —
+ * the same two steps, just with the first one done from the data.
+ */
+function guessFromRows(rows: readonly (readonly string[])[]): Partial<Mapping> {
+  const width = Math.max(0, ...rows.map((r) => r.length));
+  if (width === 0) return {};
+  // A sample rather than the whole file: a published base runs to tens of
+  // thousands of rows and the first few hundred say the same thing.
+  const sample = rows.slice(0, 400);
+
+  const moneyLike: number[] = [];
+  const unitLike: number[] = [];
+  const length: number[] = [];
+  const filled: number[] = [];
+  for (let c = 0; c < width; c += 1) {
+    let money = 0;
+    let unit = 0;
+    let chars = 0;
+    let seen = 0;
+    for (const row of sample) {
+      const cell = (row[c] ?? '').trim();
+      if (cell === '') continue;
+      seen += 1;
+      chars += cell.length;
+      if (/^[$€£]?\s*\d[\d,]*(\.\d+)?$/.test(cell)) money += 1;
+      else if (readUnit(cell).kind !== 'unknown') unit += 1;
+    }
+    moneyLike.push(seen === 0 ? 0 : money / seen);
+    unitLike.push(seen === 0 ? 0 : unit / seen);
+    length.push(seen === 0 ? 0 : chars / seen);
+    filled.push(seen);
+  }
+
+  const best = (score: readonly number[], floor: number, taken: readonly number[]) => {
+    let at: number | undefined;
+    let top = floor;
+    for (let c = 0; c < width; c += 1) {
+      if (taken.includes(c) || filled[c] === 0) continue;
+      if (score[c]! > top) {
+        top = score[c]!;
+        at = c;
+      }
+    }
+    return at;
+  };
+
+  const guess: Partial<Mapping> = {};
+  // Two thirds, so a column of mostly-numbers is the price and a stray numeric
+  // description does not win.
+  const unit = best(unitLike, 0.66, []);
+  if (unit !== undefined) (guess as { unit?: number }).unit = unit;
+  const price = best(moneyLike, 0.66, unit === undefined ? [] : [unit]);
+  if (price !== undefined) (guess as { price?: number }).price = price;
+
+  const spoken = [unit, price].filter((c): c is number => c !== undefined);
+  // The longest text left is the description; the shortest is the code.
+  const item = best(length, 0, spoken);
+  if (item !== undefined) (guess as { item?: number }).item = item;
+  if (item !== undefined) {
+    const rest = [...spoken, item];
+    let code: number | undefined;
+    let shortest = Infinity;
+    for (let c = 0; c < width; c += 1) {
+      if (rest.includes(c) || filled[c] === 0) continue;
+      if (length[c]! < shortest) {
+        shortest = length[c]!;
+        code = c;
+      }
+    }
+    if (code !== undefined) (guess as { code?: number }).code = code;
+  }
+  return guess;
+}
+
 export function parseList(text: string): ParsedList {
   const rows = splitCsv(text);
-  if (rows.length < 2) {
+  if (rows.length === 0) {
+    throw new PriceListError('That file is empty.');
+  }
+
+  const headless = looksLikeData(rows[0]!);
+  if (!headless && rows.length < 2) {
     throw new PriceListError(
-      'That file has no rows in it under its headings. A price list is a heading row and then ' +
-        'one row per thing.'
+      'That file has one row in it and it looks like headings. A price list is a heading row ' +
+        'and then one row per thing.'
     );
   }
-  const headers = rows[0]!.map((h) => h.trim());
-  const body = rows.slice(1);
+
+  // Named rather than left blank, so the dropdowns on the screen have something
+  // to say and the person can count across to the column they mean.
+  const headers = headless
+    ? rows[0]!.map((_, i) => `column ${i + 1}`)
+    : rows[0]!.map((h) => h.trim());
+  const body = headless ? rows : rows.slice(1);
+
+  // With no headings there are no words to match, so the columns are read off
+  // the cells instead. Either way the person confirms before anything imports.
+  if (headless) return { headers, rows: body, guess: guessFromRows(body), headless };
 
   const guess: Partial<Mapping> = {};
   const item = guessColumn(headers, ITEM_WORDS, CODE_WORDS);
@@ -183,7 +318,7 @@ export function parseList(text: string): ParsedList {
   if (code !== undefined) (guess as { code?: number }).code = code;
   if (coverage !== undefined) (guess as { coverage?: number }).coverage = coverage;
 
-  return { headers, rows: body, guess };
+  return { headers, rows: body, guess, headless };
 }
 
 /**
@@ -218,6 +353,22 @@ export type UnitReading =
    * `per` is how many of `unit` one of these is, so the price divides by it.
    */
   | { readonly kind: 'definitional'; readonly unit: PriceUnit; readonly per: bigint; readonly said: string }
+  /**
+   * A metric unit, converted by a factor that is exact as a fraction.
+   *
+   * A metre is 1/0.3048 feet *by definition* — the international foot has been
+   * exactly 0.3048 m since 1959 — so a square metre is exactly 1/0.09290304
+   * square feet. That is a ratio of two integers, not a rounded constant, and
+   * the price divides by `per` and multiplies by `of` in one step so it is
+   * rounded once at the end rather than twice on the way.
+   */
+  | {
+      readonly kind: 'metric';
+      readonly unit: PriceUnit;
+      readonly per: bigint;
+      readonly of: bigint;
+      readonly said: string;
+    }
   /** Priced by something that covers an area the file has to state. */
   | { readonly kind: 'coverage'; readonly unit: PriceUnit; readonly said: string }
   /** Nothing here can turn it into an area or a length. */
@@ -241,6 +392,57 @@ const DEFINITIONAL: readonly {
   { words: ['dz', 'doz', 'dozen'], unit: 'ea', per: 12n, said: 'a dozen is 12' },
 ];
 
+/**
+ * Metric units, with the exact fractions that convert them.
+ *
+ * A price per square metre becomes a price per square foot by multiplying by
+ * 0.09290304 — which is 9,290,304 over 100,000,000 exactly, because the foot
+ * has been exactly 0.3048 m since 1959. Nothing here is a rounded constant.
+ *
+ * These exist because the metric toggle was a lie about half the app: a
+ * contractor reading in millimetres could import nothing, since every published
+ * metric price base is in M and M2 and the book prices in feet. Now the price
+ * converts on the way in and reads back out in whatever he set.
+ */
+const METRIC: readonly {
+  readonly words: readonly string[];
+  readonly unit: PriceUnit;
+  /** Divide by this... */
+  readonly per: bigint;
+  /** ...then multiply by this. One rounding, at the end. */
+  readonly of: bigint;
+  readonly said: string;
+}[] = [
+  {
+    words: ['m2', 'sqm', 'm²', 'squaremetre', 'squaremeter'],
+    unit: 'sq ft',
+    per: 100_000_000n,
+    of: 9_290_304n,
+    said: 'a square metre is 10.7639… sq ft, exactly',
+  },
+  {
+    words: ['m', 'lm', 'lin m', 'metre', 'meter', 'linealmetre', 'linearmeter'],
+    unit: 'lf',
+    per: 10_000n,
+    of: 3_048n,
+    said: 'a metre is 3.2808… ft, exactly',
+  },
+  {
+    words: ['cm', 'centimetre', 'centimeter'],
+    unit: 'lf',
+    per: 1_000_000n,
+    of: 3_048n,
+    said: 'a centimetre is a hundredth of a metre',
+  },
+  {
+    words: ['mm', 'millimetre', 'millimeter'],
+    unit: 'lf',
+    per: 10_000_000n,
+    of: 3_048n,
+    said: 'a millimetre is a thousandth of a metre',
+  },
+];
+
 /** Priced by a thing that covers an area: how much is on the file, not in here. */
 const COVERS_AREA = [
   'box', 'bx', 'carton', 'ctn', 'case', 'sheet', 'sht', 'panel', 'pallet', 'plt',
@@ -259,13 +461,22 @@ export function readUnit(text: string): UnitReading {
     .includes(t)) {
     return { kind: 'direct', unit: 'lf' };
   }
-  if (['ea', 'each', 'unit', 'pc', 'pce', 'piece', 'pieces', 'pcs'].includes(t)) {
+  // `un` is unidade and it is the commonest unit in every published price base
+  // tested — 17,511 rows of 35,000. It was not recognised, and every one of
+  // them was refused.
+  if (['ea', 'each', 'unit', 'un', 'und', 'unid', 'pc', 'pce', 'piece', 'pieces', 'pcs']
+    .includes(t)) {
     return { kind: 'direct', unit: 'ea' };
   }
 
   for (const one of DEFINITIONAL) {
     if (one.words.includes(t)) {
       return { kind: 'definitional', unit: one.unit, per: one.per, said: one.said };
+    }
+  }
+  for (const one of METRIC) {
+    if (one.words.includes(t)) {
+      return { kind: 'metric', unit: one.unit, per: one.per, of: one.of, said: one.said };
     }
   }
   if (COVERS_AREA.includes(t)) return { kind: 'coverage', unit: 'sq ft', said };
@@ -383,6 +594,12 @@ export function importList(
     if (reading.kind === 'definitional') {
       per = reading.per * 100n;
       workings = `${money(cents)} per ${rawUnit} ÷ ${reading.per} (${reading.said})`;
+    } else if (reading.kind === 'metric') {
+      // Divide by `per` and multiply by `of` in one step, so the rounding
+      // happens once at the end rather than twice on the way through.
+      per = reading.per;
+      hundredths = reading.of;
+      workings = `${money(cents)} per ${rawUnit} × ${reading.of}/${reading.per} (${reading.said})`;
     } else if (reading.kind === 'coverage') {
       if (rawCoverage === '') {
         refused.push({
