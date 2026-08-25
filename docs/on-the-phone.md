@@ -1,6 +1,6 @@
 # Getting the current build onto your phone, and what to test on it
 
-Everything below has been run and passes on this machine: 361 tests, both
+Everything below has been run and passes on this machine: 374 tests, both
 typechecks, the web build, and the app driven end to end in a browser against
 your own garage scan. **None of it has been run on a phone since the plan was
 un-mirrored.** That is what this page is for.
@@ -59,7 +59,7 @@ signing** and pick your team. Bundle ID stays `com.sunnyacres.trueline`.
 
 ## Part 3 — what to test, in this order
 
-Fifteen minutes, in a real room with a tape in your pocket. Ordered so the ones
+Twenty minutes, in a real room with a tape in your pocket. Ordered so the ones
 that matter most come first, and so a failure early tells you the most.
 
 ### 1. Is the plan the right way round? — **the one that matters**
@@ -116,7 +116,26 @@ has never been run on a device.**
 - Select one wall on the plan first and the card retargets to that wall, so the
   outside walls can be 2x6 while the partitions are 2x4.
 
-### 5. The takeoff, off the phone
+### 5. Door and window sizes
+
+The measurement a scan is worst at. RoomPlan called a 16 ft 11 in span a window
+in your garage, and a kitchen door came back 2 ft 7 in wide — nobody carries a
+sheet of plywood through that.
+
+- Tap a wall that has something in it. Under the length box there is now **In
+  this wall**, listing every door and window with its size and its band.
+- Tap **Measure** on one. Four fields open: width, height, sill off the floor
+  (windows only), and how far it is from the corner.
+- Type a real width.
+- **Pass:** that number goes exact, the takeoff's baseboard and paint move to
+  match, and **no wall moves** — an opening is a hole in a wall, not a side of
+  the building.
+- Now try to break it: type a distance from the corner that would push the
+  opening past the end of the wall. **Pass:** it is refused, and the refusal
+  says by how much and what the wall measures, so you know which of the two to
+  go and measure.
+
+### 6. The takeoff, off the phone
 
 - **Send it** should open the iPhone share sheet — text it to yourself.
 - **Pass:** what arrives says *"THESE ARE THE SCANNER'S NUMBERS"* until a wall
@@ -124,7 +143,7 @@ has never been run on a device.**
 - **Spreadsheet** saves a CSV. Every row carries its own unit and its own
   provenance in their own columns.
 
-### 6. Typing a tape reading
+### 7. Typing a tape reading
 
 - Tap a wall. Put a real tape on it. Type what the tape says.
 - **Pass:** that wall is now marked measured and never moves again; the other
@@ -132,13 +151,13 @@ has never been run on a device.**
   and whether any moved further than the scanner's own tolerance.
 - **This is the whole product.** No other scanning app re-solves the room.
 
-### 7. Compass
+### 8. Compass
 
 - Scan with the phone away from a truck, a panel or a fridge.
 - **Pass:** the N arrow on the plan points the same way your phone's Compass
   app does, and the drawing says **±N°** — how much the phone itself doubted it.
 
-### 8. Two scans, two sets of corrections
+### 9. Two scans, two sets of corrections
 
 - Scan the kitchen, correct a wall. Go back. Scan the garage. Go back. Open the
   kitchen again.

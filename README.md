@@ -53,7 +53,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **361 passing, 0 failing** (`npm test`) |
+| Tests | **374 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 

@@ -1,5 +1,5 @@
 import { type Nanometres, formatFeetInches } from './length.ts';
-import { type Measurement, type VerificationMethod, verify } from './measurement.ts';
+import { type Measurement, type VerificationMethod, verified, verify } from './measurement.ts';
 import {
   type Opening,
   type Room,
@@ -338,4 +338,141 @@ export function setWallThickness(
   const next: Room = { ...room, walls };
   validate(next);
   return next;
+}
+
+/* ---------------------------------------------------------- opening sizes */
+
+/**
+ * What somebody wants to change about an opening. Anything left out stays.
+ *
+ * Four separate numbers because they are four separate readings, and somebody
+ * measuring a window in a half-built room will have the width before they have
+ * the sill.
+ */
+export interface OpeningEdit {
+  readonly width?: Nanometres;
+  readonly height?: Nanometres;
+  /** How far the bottom sits above the floor. Windows only; a door starts at it. */
+  readonly sillHeight?: Nanometres;
+  /** How far along the wall it starts, from the wall's first corner. */
+  readonly offsetFromStart?: Nanometres;
+}
+
+/**
+ * Somebody put a tape on a door or a window and typed what it really is.
+ *
+ * The one measurement in a scan most likely to be badly wrong. RoomPlan calls a
+ * 16 ft 11 in span a window in the garage, and a 2 ft 7 in door in the kitchen
+ * is a door nobody could carry a sheet of plywood through. Openings are fitted
+ * to whatever was reflective enough to see, and the sizes come out anywhere from
+ * an inch to a foot off — which is exactly the range that never looks wrong on
+ * screen and is wrong on the order.
+ *
+ * Unlike a wall, this does not re-solve the room. An opening is a hole in a
+ * wall, not a side of the building: the closure sum does not know it exists.
+ * What it does do is refuse an opening that will not fit where it is being put,
+ * because an opening hanging off the end of its wall is not a small error — it
+ * silently comes off a wall it is not in.
+ */
+export function verifyOpening(
+  room: Room,
+  wallId: string,
+  openingId: string,
+  edit: OpeningEdit,
+  by: string,
+  at: string,
+  method: VerificationMethod
+): Room {
+  const { wall, index } = find(room, wallId);
+  const openings = wall.openings ?? [];
+  const position = openings.findIndex((o) => o.id === openingId);
+  if (position === -1) {
+    throw new EditError(`Wall "${wallId}" has nothing in it called "${openingId}".`);
+  }
+  const was = openings[position]!;
+
+  const next: Opening = {
+    ...was,
+    ...(edit.width === undefined ? {} : { width: verify(was.width, edit.width, by, at, method) }),
+    ...(edit.height === undefined
+      ? {}
+      : { height: verify(was.height, edit.height, by, at, method) }),
+    ...(edit.offsetFromStart === undefined
+      ? {}
+      : {
+          offsetFromStart: verify(was.offsetFromStart, edit.offsetFromStart, by, at, method),
+        }),
+    ...(edit.sillHeight === undefined
+      ? {}
+      : {
+          sillHeight:
+            was.sillHeight === undefined
+              ? verified(edit.sillHeight, by, at, method)
+              : verify(was.sillHeight, edit.sillHeight, by, at, method),
+        }),
+  };
+
+  if (next.width.value <= 0n) {
+    throw new EditError(`An opening ${formatFeetInches(next.width.value)} wide is not an opening.`);
+  }
+  if (next.height.value <= 0n) {
+    throw new EditError(`An opening ${formatFeetInches(next.height.value)} high is not an opening.`);
+  }
+  if (next.offsetFromStart.value < 0n) {
+    throw new EditError(
+      `That would start the ${next.kind} ${formatFeetInches(-next.offsetFromStart.value)} before ` +
+        `the beginning of "${wallId}".`
+    );
+  }
+
+  // It has to fit in the wall it is in. An opening that overhangs is not a
+  // rounding: every quantity clips it at the wall's end, so a door that hangs
+  // two feet past the corner quietly takes two feet of trim off a wall it is
+  // not in, and the room still adds up.
+  const run = runLength(wall);
+  const end = next.offsetFromStart.value + next.width.value;
+  if (end > run) {
+    throw new EditError(
+      `A ${formatFeetInches(next.width.value)} ${next.kind} starting ` +
+        `${formatFeetInches(next.offsetFromStart.value)} along "${wallId}" ends ` +
+        `${formatFeetInches(end - run)} past the end of it — the wall is ` +
+        `${formatFeetInches(run)}. Either it starts somewhere else, or the wall is longer than ` +
+        `the scan thinks. Measure whichever one you are less sure of.`
+    );
+  }
+
+  // And it has to fit under the ceiling, sill included.
+  const standing = (wall.height ?? room.ceilingHeight).value;
+  const top = (next.sillHeight?.value ?? 0n) + next.height.value;
+  if (top > standing) {
+    throw new EditError(
+      `That puts the top of the ${next.kind} ${formatFeetInches(top)} above the floor, and ` +
+        `"${wallId}" is ${formatFeetInches(standing)} high. Check the sill and the height ` +
+        `together — one of them is out.`
+    );
+  }
+
+  // Two openings in the same wall cannot occupy the same stretch of it.
+  for (const other of openings) {
+    if (other.id === openingId) continue;
+    const otherEnd = other.offsetFromStart.value + other.width.value;
+    if (next.offsetFromStart.value < otherEnd && other.offsetFromStart.value < end) {
+      throw new EditError(
+        `That would run the ${next.kind} through "${other.id}", which is already in "${wallId}" ` +
+          `from ${formatFeetInches(other.offsetFromStart.value)} to ` +
+          `${formatFeetInches(otherEnd)}.`
+      );
+    }
+  }
+
+  const walls = [...room.walls];
+  const rest = [...openings];
+  rest[position] = next;
+  walls[index] = { ...wall, openings: rest };
+
+  // No solve. An opening is a hole in a wall, not a side of the building: the
+  // closure sum has never known it was there and does not now.
+  const changed: Room = { ...room, walls };
+  validate(changed);
+  return changed;
 }

@@ -181,6 +181,35 @@ export function checkCapture(input: HealthInput): Finding[] {
     });
   }
 
+  // An opening that runs past the end of the wall it is in. It does not arrive
+  // that way — every opening in both real scans fits — but a wall gets shorter
+  // when somebody measures it, and a door that was near the corner can end up
+  // hanging past it. Every quantity clips at the wall's end, so the room still
+  // adds up while a foot of trim comes off a wall the door is not in.
+  const overhanging = openings
+    .map(({ wall, opening }) => ({
+      wall,
+      opening,
+      past: opening.offsetFromStart.value + opening.width.value - runLength(wall),
+    }))
+    .filter((x) => x.past > 0n);
+  if (overhanging.length > 0) {
+    findings.push({
+      severity: 'stop',
+      what: `${overhanging.length} opening${overhanging.length === 1 ? '' : 's'} running past the end of ${overhanging.length === 1 ? 'its' : 'their'} wall`,
+      detail:
+        overhanging
+          .map(
+            (x) =>
+              `the ${x.opening.kind} in ${x.wall.id} ends ${formatFeetInches(x.past)} past it`
+          )
+          .join('; ') +
+        '. This happens when a wall is measured shorter than the scan had it. Every quantity ' +
+        'clips the opening at the wall\'s end, so the room still adds up while the trim and ' +
+        'paint come off a wall it is not in. Measure where it starts, or measure the wall again.',
+    });
+  }
+
   if (report.recoveredSills.length > 0) {
     findings.push({
       severity: 'note',

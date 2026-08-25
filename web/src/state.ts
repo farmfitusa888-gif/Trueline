@@ -11,6 +11,7 @@ import {
   makeWall,
   setRoomThickness,
   setWallThickness,
+  verifyOpening,
   verifyWall,
 } from '../../core/src/edit.ts';
 import { loadProject, saveProject } from '../../core/src/persist.ts';
@@ -116,9 +117,30 @@ export type Action =
       by: string;
       at: string;
     }
+  /**
+   * A door or a window somebody measured. One field at a time, because that is
+   * how somebody with a tape works: the width, then the height, then the sill.
+   */
+  | {
+      type: 'opening';
+      wallId: string;
+      openingId: string;
+      field: 'width' | 'height' | 'sillHeight' | 'offsetFromStart';
+      text: string;
+      by: string;
+      at: string;
+    }
   | { type: 'undo' }
   | { type: 'dismissError' }
   | { type: 'close' };
+
+/** What each field is called in the line under the plan. */
+const SAID: Record<'width' | 'height' | 'sillHeight' | 'offsetFromStart', string> = {
+  width: 'width',
+  height: 'height',
+  sillHeight: 'sill height',
+  offsetFromStart: 'distance from the corner',
+};
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -423,6 +445,35 @@ export function reduce(state: State, action: Action): State {
           measure === undefined
             ? `${action.wallId} is back to the room's thickness.`
             : `${action.wallId} is ${formatFeetInches(measure.value)} thick.`
+        );
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    // A door or a window somebody put a tape on. No wall moves: an opening is a
+    // hole in a wall, not a side of the building, and the closure sum has never
+    // known it was there.
+    case 'opening': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const length = parseLength(action.text, { defaultUnit: 'ft' });
+        const next = verifyOpening(
+          loaded.room,
+          action.wallId,
+          action.openingId,
+          { [action.field]: length },
+          action.by,
+          action.at,
+          'tape'
+        );
+        return edited(
+          state,
+          loaded,
+          next,
+          `${action.openingId} in ${action.wallId}: ${SAID[action.field]} is ` +
+            `${formatFeetInches(length)}.`
         );
       } catch (error) {
         return { ...state, error: message(error) };
