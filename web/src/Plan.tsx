@@ -36,8 +36,29 @@ import {
 // numbers run off the sheet, which is what happened the first time.
 const PAD = 190;
 
+/**
+ * Which way an SVG arc goes, from one angle to another, for a quarter turn.
+ *
+ * Returns the sweep flag. Both ends of a door's arc are a right angle apart, so
+ * the only question is which side, and picking wrong draws the other three
+ * quarters of the circle through the middle of the room.
+ */
+function swing(fromAngle: number, toAngle: number): 0 | 1 {
+  let delta = toAngle - fromAngle;
+  while (delta <= -Math.PI) delta += 2 * Math.PI;
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  return delta > 0 ? 1 : 0;
+}
+
 /** How far off its wall a dimension sits. Enough to clear the line and its halo. */
 const LABEL_OFFSET = 22;
+
+/** Where the dimension line runs, off the building. */
+const DIM_OFFSET = 30;
+/** Half the length of the 45-degree slash that terminates it. */
+const DIM_TICK = 5;
+/** Dimension lines are thin and grey: they are notation, not building. */
+const DIM_INK = '#64748b';
 
 export interface PlanProps {
   readonly room: Room;
@@ -301,6 +322,67 @@ export function Plan({
         </rect>
       ))}
 
+      {/*
+        Dimension lines.
+
+        The numbers used to float beside the building with nothing joining them
+        to it — which is fine on a phone, where there are four of them, and
+        falls apart on any sheet a person is handed: nothing says which run a
+        number belongs to, and nothing says where the run starts and stops. A
+        drawing answers both with two extension lines, a line between them, and
+        a tick at each end. This is the difference between a picture of a room
+        and a drawing of one.
+
+        Under the walls, so a tick can never be mistaken for something built.
+      */}
+      {model.walls.map((w) => {
+        const ax = px(w.start.x);
+        const ay = scaleY(w.start.y);
+        const bx = px(w.end.x);
+        const by = scaleY(w.end.y);
+        const run = Math.hypot(bx - ax, by - ay);
+        if (run < 8) return null;
+
+        // The wall's normal, turned to face away from the middle of the room.
+        let nx = -(by - ay) / run;
+        let ny = (bx - ax) / run;
+        const mx = (ax + bx) / 2;
+        const my = (ay + by) / 2;
+        if ((mx - midX) * nx + (my - midY) * ny < 0) { nx = -nx; ny = -ny; }
+
+        const off = DIM_OFFSET;
+        const dax = ax + nx * off;
+        const day = ay + ny * off;
+        const dbx = bx + nx * off;
+        const dby = by + ny * off;
+        // A 45-degree slash, which is how a building drawing terminates a
+        // dimension. Arrowheads are a mechanical-drawing convention.
+        const ux = (bx - ax) / run;
+        const uy = (by - ay) / run;
+        const tick = (tx: number, ty: number) => (
+          <line
+            x1={tx - (ux + nx) * DIM_TICK} y1={ty - (uy + ny) * DIM_TICK}
+            x2={tx + (ux + nx) * DIM_TICK} y2={ty + (uy + ny) * DIM_TICK}
+            stroke={DIM_INK} strokeWidth={2}
+          />
+        );
+
+        return (
+          <g key={`${w.id}-dim`} aria-hidden="true">
+            <line x1={ax + nx * 6} y1={ay + ny * 6}
+                  x2={ax + nx * (off + 9)} y2={ay + ny * (off + 9)}
+                  stroke={DIM_INK} strokeWidth={1} strokeOpacity={0.55} />
+            <line x1={bx + nx * 6} y1={by + ny * 6}
+                  x2={bx + nx * (off + 9)} y2={by + ny * (off + 9)}
+                  stroke={DIM_INK} strokeWidth={1} strokeOpacity={0.55} />
+            <line x1={dax} y1={day} x2={dbx} y2={dby}
+                  stroke={DIM_INK} strokeWidth={1.4} strokeOpacity={0.75} />
+            {tick(dax, day)}
+            {tick(dbx, dby)}
+          </g>
+        );
+      })}
+
       {model.walls.map((w) => {
         const wall = room.walls.find((x) => x.id === w.id)!;
         const isSelected = selected === w.id;
@@ -373,6 +455,90 @@ export function Plan({
               strokeLinecap={w.thicknessAssumed ? 'round' : 'butt'}
               strokeDasharray={w.open ? '2 10' : undefined}
             />
+            {/*
+              The doors and the windows.
+
+              The plan drew none of them: four lines and a dimension on each,
+              with no way to tell a wall you can walk through from a solid one.
+              A floor plan without openings is not a floor plan, and it is the
+              first thing a homeowner looks for on a sheet handed to them.
+
+              Drawn the way a drawing draws them. A door is a gap in the wall,
+              a leaf across it and the quarter-circle it sweeps. A window is a
+              gap with a thin line down the middle of it. A cased opening is a
+              gap and nothing else, because that is what it is.
+            */}
+            {!w.open &&
+              w.openings.map((o) => {
+                const ax = px(o.from.x);
+                const ay = scaleY(o.from.y);
+                const bx = px(o.to.x);
+                const by = scaleY(o.to.y);
+                const wide = Math.hypot(bx - ax, by - ay);
+                if (wide < 2) return null;
+                // Into the room, in screen units. `outward` points out of it,
+                // and screen y runs the other way from plan y.
+                // Into the room. `outward` leads away from it, and screen y
+                // runs the opposite way to plan y, so only x flips twice.
+                const inx = -o.outward.x;
+                const iny = o.outward.y;
+                const band = Math.max(7, w.thicknessAssumed ? 7 : w.thickness * scale);
+
+                return (
+                  <g key={o.id}>
+                    {/* The gap: the wall stops here. */}
+                    <line
+                      x1={ax} y1={ay} x2={bx} y2={by}
+                      stroke="#ffffff" strokeWidth={band + 1} strokeLinecap="butt"
+                    />
+                    {/* The two jambs, so the gap has ends rather than fading out. */}
+                    <line
+                      x1={ax + inx * band / 2} y1={ay + iny * band / 2}
+                      x2={ax - inx * band / 2} y2={ay - iny * band / 2}
+                      stroke={stroke} strokeWidth={2}
+                    />
+                    <line
+                      x1={bx + inx * band / 2} y1={by + iny * band / 2}
+                      x2={bx - inx * band / 2} y2={by - iny * band / 2}
+                      stroke={stroke} strokeWidth={2}
+                    />
+
+                    {o.kind === 'door' && (
+                      <>
+                        {/* The leaf, standing open against the jamb. */}
+                        <line
+                          x1={ax} y1={ay}
+                          x2={ax + inx * wide} y2={ay + iny * wide}
+                          stroke={stroke} strokeWidth={3}
+                        />
+                        {/*
+                          What it sweeps: a quarter circle about the hinge, from
+                          the open leaf round to the far jamb. Which way round
+                          is read off the two angles rather than assumed — the
+                          arc is a quarter turn either way, and the wrong flag
+                          draws the other three quarters, straight through the
+                          room.
+                        */}
+                        <path
+                          d={`M ${ax + inx * wide} ${ay + iny * wide} A ${wide} ${wide} 0 0 ${
+                            swing(Math.atan2(iny, inx), Math.atan2(by - ay, bx - ax))
+                          } ${bx} ${by}`}
+                          fill="none" stroke={stroke} strokeWidth={1.5}
+                          strokeDasharray="5 5" strokeOpacity={0.75}
+                        />
+                      </>
+                    )}
+
+                    {o.kind === 'window' && (
+                      <line
+                        x1={ax} y1={ay} x2={bx} y2={by}
+                        stroke={stroke} strokeWidth={2.5}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+
             {/* Something was standing here, so the scanner could not see it. */}
             {share > 0n && !w.open && (
               <line

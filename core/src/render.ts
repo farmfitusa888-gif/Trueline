@@ -1,6 +1,6 @@
 import { type Nanometres, NM_PER_FOOT, NM_PER_INCH, NM_PER_METRE, NM_PER_MM } from './length.ts';
 import { type Measurement, confidenceLabel, toleranceOf } from './measurement.ts';
-import { type Point, type Room, corners, validate } from './room.ts';
+import { type Opening, type Point, type Room, type Wall, corners, validate } from './room.ts';
 import { type SectionView } from './section.ts';
 import { type Trust, readiness } from './issue.ts';
 import { type Zone } from './zone.ts';
@@ -53,6 +53,36 @@ export interface RenderPoint {
   readonly y: number;
 }
 
+/**
+ * A door or a window, positioned along the wall it is in.
+ *
+ * The single-room plan drew no openings at all: a rectangle of four lines with
+ * dimensions on it, and no way to tell a wall with a doorway in it from a solid
+ * one. A floor plan without openings is not a floor plan, and it is the first
+ * thing a homeowner looks for.
+ *
+ * The two ends are given in the render's own units and frame rather than as an
+ * offset and a width, so a renderer draws a line between two points instead of
+ * repeating this trigonometry -- and gets the same answer the takeoff did.
+ */
+export interface RenderOpening {
+  readonly id: string;
+  readonly kind: Opening['kind'];
+  /** Where the opening begins, walking the wall from its start. */
+  readonly from: RenderPoint;
+  readonly to: RenderPoint;
+  readonly width: number;
+  /**
+   * Which way is out of the room, as a unit vector, so a door can be drawn
+   * swinging into the room rather than through the wall.
+   *
+   * Worked out against the room's own centre rather than from the winding
+   * order. A winding is a convention, and the first door drawn off one swung
+   * out through the front wall and across the garden.
+   */
+  readonly outward: RenderPoint;
+}
+
 export interface RenderWall {
   readonly id: string;
   readonly start: RenderPoint;
@@ -78,6 +108,8 @@ export interface RenderWall {
   readonly open: boolean;
   /** Half-width of the band this wall's length lives in, in the same unit. Zero once verified. */
   readonly tolerance: number;
+  /** Doors and windows in this wall, in the order they sit along it. */
+  readonly openings: readonly RenderOpening[];
 }
 
 export interface RenderZone {
@@ -132,6 +164,82 @@ function wallHeight(wall: { height?: Measurement }, room: Room): Measurement {
  * already computes, so nothing here re-derives geometry that the solver has
  * already closed exactly.
  */
+/**
+ * Turns each opening's offset-and-width into two points on the wall.
+ *
+ * An opening that would run past the end of its wall is clamped rather than
+ * dropped: the wall it is in may have been re-solved shorter since the scan,
+ * and a door drawn at the very end of a wall is a visible, correctable wrong
+ * -- while a door that silently vanishes is not.
+ */
+function placeOpenings(
+  wall: Wall,
+  from: Point,
+  to: Point,
+  /** The middle of the room, which is what "in" means. */
+  centre: { readonly x: number; readonly y: number },
+  unit: RenderOptions['unit'] & string
+): RenderOpening[] {
+  const openings = wall.openings ?? [];
+  if (openings.length === 0) return [];
+
+  const runX = Number(to.x - from.x);
+  const runY = Number(to.y - from.y);
+  const span = Math.hypot(runX, runY);
+  if (span === 0) return [];
+  const ux = runX / span;
+  const uy = runY / span;
+
+  const at = (nx: number, ny: number): RenderPoint => ({
+    x: toUnit(BigInt(Math.round(nx)) as Nanometres, unit),
+    y: toUnit(BigInt(Math.round(ny)) as Nanometres, unit),
+  });
+
+  return [...openings]
+    .sort((a, b) => (a.offsetFromStart.value < b.offsetFromStart.value ? -1 : 1))
+    .map((opening) => {
+      const width = Number(opening.width.value);
+      const start = Math.max(0, Math.min(Number(opening.offsetFromStart.value), span - width));
+      const end = Math.min(span, start + width);
+      return {
+        id: opening.id,
+        kind: opening.kind,
+        from: at(Number(from.x) + ux * start, Number(from.y) + uy * start),
+        to: at(Number(from.x) + ux * end, Number(from.y) + uy * end),
+        width: toUnit(opening.width.value, unit),
+        outward: away(from, ux, uy, start, end, centre),
+      };
+    });
+}
+
+/**
+ * The wall's normal, pointing away from the middle of the room.
+ *
+ * Two normals are perpendicular to a wall and only one of them is "out". Which
+ * is which does not follow from the wall alone, so it is settled by the room:
+ * the one that leads away from the centre is out. That holds for a room walked
+ * either way round, and for a room whose walls were re-ordered by an edit.
+ */
+function away(
+  from: Point,
+  ux: number,
+  uy: number,
+  start: number,
+  end: number,
+  centre: { readonly x: number; readonly y: number }
+): RenderPoint {
+  const nx = -uy;
+  const ny = ux;
+  const midAlong = (start + end) / 2;
+  const mx = Number(from.x) + ux * midAlong;
+  const my = Number(from.y) + uy * midAlong;
+  const outwards = (mx - centre.x) * nx + (my - centre.y) * ny;
+  // A wall through the middle of the room has no outside. It cannot happen in a
+  // closed outline, and if it ever does, one of the two is picked rather than
+  // returning a zero vector that would draw a door of no width.
+  return outwards < 0 ? { x: -nx, y: -ny } : { x: nx, y: ny };
+}
+
 export function toRenderModel(
   room: Room,
   zones: readonly Zone[] = [],
@@ -141,6 +249,10 @@ export function toRenderModel(
   const unit = options.unit ?? 'm';
   const assumed = options.assumedThickness ?? ROOMPLAN_ASSUMED_THICKNESS;
   const points = corners(room);
+  const centre = {
+    x: points.reduce((sum, p) => sum + Number(p.x), 0) / points.length,
+    y: points.reduce((sum, p) => sum + Number(p.y), 0) / points.length,
+  };
   const at = (p: Point): RenderPoint => ({ x: toUnit(p.x, unit), y: toUnit(p.y, unit) });
 
   const walls: RenderWall[] = room.walls.map((wall, i) => {
@@ -159,6 +271,7 @@ export function toRenderModel(
     confidence: confidenceLabel(wall.length),
     tolerance: toUnit(toleranceOf(wall.length), unit),
     open: wall.open === true,
+    openings: placeOpenings(wall, points[i]!, points[(i + 1) % points.length]!, centre, unit),
     };
   });
 

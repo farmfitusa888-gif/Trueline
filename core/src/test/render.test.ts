@@ -171,3 +171,113 @@ test('one wall can differ from the rest of the room', () => {
   assert.ok(Math.abs(model.walls[0]!.thickness - 6.5) < 1e-9);
   assert.ok(Math.abs(model.walls[1]!.thickness - 4.5) < 1e-9);
 });
+
+/* -------------------------------------------------------------- openings */
+
+/**
+ * Doors and windows on the single-room plan.
+ *
+ * The plan drew none: four lines with a dimension on each, and no way to tell a
+ * wall you can walk through from a solid one. The offsets and widths were in
+ * the room the whole time — nothing carried them out to something that draws.
+ *
+ * The renderer is handed two points rather than an offset and a width, so it
+ * draws a line instead of repeating this trigonometry and getting a different
+ * answer from the one the takeoff used.
+ */
+function withDoor(): Room {
+  const base = room();
+  const north = base.walls[0]!;
+  return {
+    ...base,
+    walls: [
+      {
+        ...north,
+        openings: [
+          {
+            id: 'front-door',
+            kind: 'door',
+            width: scanned(parseLength(`3'`), parseLength(`1"`), T0, 'roomplan'),
+            height: scanned(parseLength(`6' 8"`), parseLength(`1"`), T0, 'roomplan'),
+            offsetFromStart: scanned(parseLength(`5'`), parseLength(`1"`), T0, 'roomplan'),
+          },
+        ],
+      },
+      ...base.walls.slice(1),
+    ],
+  };
+}
+
+test('an opening comes out as two points on the wall it is in', () => {
+  const m = toRenderModel(withDoor(), [], { unit: 'ft' });
+  const north = m.walls.find((x) => x.id === 'north')!;
+  assert.equal(north.openings.length, 1);
+
+  const door = north.openings[0]!;
+  assert.equal(door.kind, 'door');
+  assert.ok(Math.abs(door.width - 3) < RENDER_EPSILON, `${door.width}`);
+
+  // Both ends sit on the wall, five and eight feet along a twenty-foot run.
+  const along = (p: { x: number; y: number }) =>
+    Math.hypot(p.x - north.start.x, p.y - north.start.y);
+  assert.ok(Math.abs(along(door.from) - 5) < 1e-6, `${along(door.from)}`);
+  assert.ok(Math.abs(along(door.to) - 8) < 1e-6, `${along(door.to)}`);
+
+  // And the direction it faces is a unit vector, or a door swing drawn from it
+  // is the wrong size.
+  assert.ok(Math.abs(Math.hypot(door.outward.x, door.outward.y) - 1) < 1e-9);
+});
+
+test('a wall with nothing in it reports no openings, not undefined', () => {
+  const m = toRenderModel(room(), [], { unit: 'ft' });
+  for (const wall of m.walls) assert.deepEqual(wall.openings, []);
+});
+
+test('an opening wider than the wall it was scanned in is clamped, never dropped', () => {
+  const base = withDoor();
+  const north = base.walls[0]!;
+  const silly: Room = {
+    ...base,
+    walls: [
+      {
+        ...north,
+        openings: [
+          {
+            ...north.openings![0]!,
+            offsetFromStart: scanned(parseLength(`19'`), parseLength(`1"`), T0, 'roomplan'),
+          },
+        ],
+      },
+      ...base.walls.slice(1),
+    ],
+  };
+  const m = toRenderModel(silly, [], { unit: 'ft' });
+  const door = m.walls.find((x) => x.id === 'north')!.openings[0]!;
+  const along = (p: { x: number; y: number }) => Math.hypot(p.x, p.y);
+  // Pushed back so it ends at the wall's end, rather than vanishing: a door in
+  // the wrong place is a visible, correctable wrong; a door that disappears is
+  // not.
+  assert.ok(along(door.to) <= 20 + 1e-6, `${along(door.to)}`);
+  assert.ok(Math.abs(along(door.to) - along(door.from) - 3) < 1e-6);
+});
+
+test('a door swings into the room, not out through the wall', () => {
+  const m = toRenderModel(withDoor(), [], { unit: 'ft' });
+  const north = m.walls.find((x) => x.id === 'north')!;
+  const door = north.openings[0]!;
+
+  const centre = {
+    x: m.walls.reduce((sum, x) => sum + x.start.x, 0) / m.walls.length,
+    y: m.walls.reduce((sum, x) => sum + x.start.y, 0) / m.walls.length,
+  };
+  const mid = { x: (door.from.x + door.to.x) / 2, y: (door.from.y + door.to.y) / 2 };
+
+  // Stepping one foot along `outward` from the middle of the doorway has to end
+  // up further from the middle of the room, or the door opens into the garden.
+  const before = Math.hypot(mid.x - centre.x, mid.y - centre.y);
+  const after = Math.hypot(
+    mid.x + door.outward.x - centre.x,
+    mid.y + door.outward.y - centre.y
+  );
+  assert.ok(after > before, `outward led inward: ${before} -> ${after}`);
+});
