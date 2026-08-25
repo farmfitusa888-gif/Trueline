@@ -90,20 +90,32 @@ say "Files Xcode rewrites on its own"
 # edited. Handled like the signing team: if the only difference is Xcode's own
 # bookkeeping, it goes; if there is anything else in it, this stops and says so,
 # because a scheme can carry real settings.
+# Never fatal. The first version of this exited here, which turned a file Xcode
+# rewrites by itself into a wall in front of the compiler -- the pull had already
+# worked and the build was stopped anyway. A scheme has nothing to do with
+# whether the code compiles; it only ever gets in the way of a *pull*, and the
+# pull section below reports that on its own.
 scheme="$(git ls-files 'ios/**/*.xcscheme' | head -1)"
 if [ -n "$scheme" ] && ! git diff --quiet -- "$scheme"; then
-  other="$(git diff -U0 -- "$scheme" | grep -E '^[+-][^+-]' \
-    | grep -vcE 'LastUpgradeVersion|version = |buildArchitectures')"
+  # Everything Xcode is known to rewrite on its own. Widened from the first
+  # version, which knew only three of these and stopped on the rest.
+  keys='LastUpgradeVersion|version = |buildArchitectures|shouldAutocreateTestPlan'
+  keys="$keys"'|buildForAnalyzing|buildForArchiving|buildForProfiling|buildForRunning'
+  keys="$keys"'|buildForTesting|parallelizeBuildables|buildImplicitDependencies'
+  keys="$keys"'|<TestPlans>|</TestPlans>|<TestPlanReference|selectedDebuggerIdentifier'
+  keys="$keys"'|selectedLauncherIdentifier|shouldUseLaunchSchemeArgsEnv|<Testables>|</Testables>'
+  other="$(git diff -U0 -- "$scheme" | grep -E '^[+-][^+-]' | grep -vcE "$keys")"
   if [ "${other:-0}" -gt 0 ]; then
-    bad "$(basename "$scheme") has changes that are not Xcode's own bookkeeping."
-    echo "     A scheme can carry real settings, so this will not throw it away."
-    echo "     Look:   git diff -- $scheme"
-    echo "     Keep:   git stash push -- $scheme"
-    echo "     Drop:   git checkout -- $scheme"
-    exit 1
+    warn "$(basename "$scheme") has changes beyond Xcode's usual bookkeeping."
+    echo "     Not stopping for it -- a scheme has nothing to do with whether the"
+    echo "     code compiles. It only ever blocks a pull. What differs:"
+    git diff --stat -- "$scheme" | sed 's/^/       /'
+    git diff -U0 -- "$scheme" | grep -E '^[+-][^+-]' | head -8 | sed 's/^/       /'
+    echo "     Drop it:  git checkout -- $scheme"
+  else
+    git checkout -- "$scheme"
+    ok "$(basename "$scheme") put back — Xcode noting its own version, nothing of yours"
   fi
-  git checkout -- "$scheme"
-  ok "$(basename "$scheme") put back — that was Xcode noting its own version, nothing of yours"
 else
   ok "nothing of Xcode's own in the way"
 fi
