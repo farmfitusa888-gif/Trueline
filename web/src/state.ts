@@ -15,7 +15,7 @@ import {
   verifyOpening,
   verifyWall,
 } from '../../core/src/edit.ts';
-import { loadProject, saveProject } from '../../core/src/persist.ts';
+import { type SavedProject, loadProject, saveProject } from '../../core/src/persist.ts';
 import {
   type NorthOnPlan,
   type PhotoImport,
@@ -25,6 +25,7 @@ import {
   northOnPlan,
 } from '../../core/src/capture.ts';
 import type { Photo } from '../../core/src/photo.ts';
+import { handBack } from './bridge.ts';
 
 /**
  * All the state this screen has, and every way it can change.
@@ -101,6 +102,15 @@ export type Action =
   | { type: 'openTrace'; trace: unknown; fileName: string; at: string }
   /** A room typed in wall by wall, with no scan behind it at all. */
   | { type: 'openDrawn'; room: Room; fileName: string }
+  /**
+   * A corrected room the app kept, handed straight over.
+   *
+   * The app writes every save into the scan's own folder, so on a second
+   * device — or after this web view's storage has been cleared — the
+   * corrections come back from there rather than from a browser cache that may
+   * no longer exist.
+   */
+  | { type: 'openSaved'; project: string }
   | { type: 'select'; wallId: string | null }
   | { type: 'make'; wallId: string; as: 'wall' | 'open' | 'cased' }
   | { type: 'verify'; wallId: string; text: string; by: string; at: string }
@@ -155,6 +165,41 @@ function message(error: unknown): string {
 function when(iso: string): string {
   const at = new Date(iso);
   return Number.isNaN(at.getTime()) ? 'earlier' : at.toLocaleString();
+}
+
+/**
+ * A saved project turned back into what the screen holds.
+ *
+ * Shared by the two ways one arrives — read out of this browser's storage, or
+ * handed over by the app that kept it — because a room that came back from the
+ * app must be exactly the room that came back from storage. Two readers of one
+ * format is two readers that will eventually disagree.
+ */
+function restored(saved: SavedProject, note: string): State {
+  const extras = saved.extras as {
+    report?: ImportReport;
+    footprints?: readonly Footprint[];
+    photos?: readonly Photo[];
+    frame?: RoomFrame;
+    north?: NorthOnPlan;
+  };
+  if (!extras.report) throw new Error('That saved room has no import report with it.');
+  return {
+    selected: null,
+    error: null,
+    loaded: {
+      room: saved.room,
+      report: extras.report,
+      footprints: extras.footprints ?? [],
+      photos: extras.photos ?? [],
+      rejectedPhotos: [],
+      north: (extras.north as NorthOnPlan | undefined) ?? null,
+      frame: extras.frame ?? { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
+      undo: [],
+      lastEdit: note,
+      fileName: saved.fileName,
+    },
+  };
 }
 
 /** Applies an edit, keeping the room it started from so undo is exact. */
@@ -336,6 +381,14 @@ export function reduce(state: State, action: Action): State {
       };
     }
 
+    case 'openSaved': {
+      try {
+        return restored(loadProject(action.project), 'Picked up from this device.');
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
     case 'restore': {
       // A room already on screen always outranks storage. Without this, the
       // restore dispatched at mount could land after a capture handed over by
@@ -355,30 +408,7 @@ export function reduce(state: State, action: Action): State {
       if (text === null) return state;
       try {
         const saved = loadProject(text);
-        const extras = saved.extras as {
-          report?: ImportReport;
-          footprints?: readonly Footprint[];
-          photos?: readonly Photo[];
-          frame?: RoomFrame;
-          north?: NorthOnPlan;
-        };
-        if (!extras.report) throw new Error('That saved room has no import report with it.');
-        return {
-          selected: null,
-          error: null,
-          loaded: {
-            room: saved.room,
-            report: extras.report,
-            footprints: extras.footprints ?? [],
-            photos: extras.photos ?? [],
-            rejectedPhotos: [],
-            north: (extras.north as NorthOnPlan | undefined) ?? null,
-            frame: extras.frame ?? { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
-            undo: [],
-            lastEdit: `Picked up where you left off — saved ${when(saved.savedAt)}.`,
-            fileName: saved.fileName,
-          },
-        };
+        return restored(saved, `Picked up where you left off — saved ${when(saved.savedAt)}.`);
       } catch (error) {
         // A saved room that will not load is cleared rather than left to fail on
         // every visit, and the reason is shown once.
@@ -575,21 +605,26 @@ export function reduce(state: State, action: Action): State {
  */
 export function persist(loaded: Loaded, at: string): string | null {
   try {
-    window.localStorage.setItem(
-      keyFor(loaded.fileName),
-      saveProject({
-        savedAt: at,
-        fileName: loaded.fileName,
-        room: loaded.room,
-        extras: {
-          report: loaded.report,
-          footprints: loaded.footprints,
-          photos: loaded.photos,
-          frame: loaded.frame,
-          north: loaded.north,
-        },
-      })
-    );
+    const project = saveProject({
+      savedAt: at,
+      fileName: loaded.fileName,
+      room: loaded.room,
+      extras: {
+        report: loaded.report,
+        footprints: loaded.footprints,
+        photos: loaded.photos,
+        frame: loaded.frame,
+        north: loaded.north,
+      },
+    });
+    // The app first, and in its own right. It writes the room into the scan's
+    // own folder and into the owner's iCloud, and it is the copy that survives
+    // this web view being cleared. Doing it after `localStorage` would mean a
+    // full browser store — the one failure this whole function exists to report
+    // — also silently skipped the durable copy.
+    handBack(loaded.fileName, project);
+
+    window.localStorage.setItem(keyFor(loaded.fileName), project);
     return null;
   } catch (error) {
     return (

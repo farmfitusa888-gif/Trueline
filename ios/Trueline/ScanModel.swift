@@ -124,13 +124,28 @@ struct SavedScan: Identifiable, Hashable {
     let photosJSON: Data
     /// The corners somebody tapped. Empty for a LiDAR scan.
     let traceJSON: Data
+    /// The room as somebody corrected it, if they have.
+    ///
+    /// Kept beside the capture rather than instead of it. The capture is what
+    /// the sensor said and never changes; this is what a person said afterwards,
+    /// and it outranks the capture everywhere it exists. Empty until somebody
+    /// has typed something.
+    let correctedJSON: Data
 
-    init(folder: URL, title: String, roomJSON: Data, photosJSON: Data, traceJSON: Data = Data()) {
+    init(
+        folder: URL,
+        title: String,
+        roomJSON: Data,
+        photosJSON: Data,
+        traceJSON: Data = Data(),
+        correctedJSON: Data = Data()
+    ) {
         self.folder = folder
         self.title = title
         self.roomJSON = roomJSON
         self.photosJSON = photosJSON
         self.traceJSON = traceJSON
+        self.correctedJSON = correctedJSON
     }
 
     var id: URL { folder }

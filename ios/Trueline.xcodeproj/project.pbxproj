@@ -23,6 +23,7 @@
 		2B2C86015441414F9BB466BA /* ARMeasureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5C4BF998E1E466D06BC498 /* ARMeasureSession.swift */; };
 		B46E3F93D22737C0C82E1FE9 /* ARMeasureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223C314C178BBF05B8D8EC70 /* ARMeasureScreen.swift */; };
 		EB11C2DB17EE95B2B3345113 /* ARMeasureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE28D0C5C19BF5AD12E5F77E /* ARMeasureModel.swift */; };
+		5C41B0D2A7E34F118D2E6B01 /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A72E1F4C0B846D3A5170E2B /* Backup.swift */; };
 		037B80EBAC15037FEE5F7325 /* Web in Resources */ = {isa = PBXBuildFile; fileRef = DA1B9D64EFC2ED4C64672F34 /* Web */; };
 		B1202C7A8238826DC782F5A0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 28AAD1477D5182D66D4B03B3 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -44,6 +45,8 @@
 		0F5C4BF998E1E466D06BC498 /* ARMeasureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeasureSession.swift; sourceTree = "<group>"; };
 		223C314C178BBF05B8D8EC70 /* ARMeasureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeasureScreen.swift; sourceTree = "<group>"; };
 		AE28D0C5C19BF5AD12E5F77E /* ARMeasureModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeasureModel.swift; sourceTree = "<group>"; };
+		9A72E1F4C0B846D3A5170E2B /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
+		6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Trueline.entitlements; sourceTree = "<group>"; };
 		E4E6D7EFB44C842A7A9609C6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DA1B9D64EFC2ED4C64672F34 /* Web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Web; sourceTree = "<group>"; };
 		28AAD1477D5182D66D4B03B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -88,7 +91,9 @@
 				0F5C4BF998E1E466D06BC498 /* ARMeasureSession.swift */,
 				223C314C178BBF05B8D8EC70 /* ARMeasureScreen.swift */,
 				AE28D0C5C19BF5AD12E5F77E /* ARMeasureModel.swift */,
+				9A72E1F4C0B846D3A5170E2B /* Backup.swift */,
 				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
+				6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */,
 				DA1B9D64EFC2ED4C64672F34 /* Web */,
 				28AAD1477D5182D66D4B03B3 /* Assets.xcassets */,
 			);
@@ -212,6 +217,7 @@
 				2B2C86015441414F9BB466BA /* ARMeasureSession.swift in Sources */,
 				B46E3F93D22737C0C82E1FE9 /* ARMeasureScreen.swift in Sources */,
 				EB11C2DB17EE95B2B3345113 /* ARMeasureModel.swift in Sources */,
+				5C41B0D2A7E34F118D2E6B01 /* Backup.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +273,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Trueline/Trueline.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -288,6 +295,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Trueline/Trueline.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";

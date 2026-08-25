@@ -11,6 +11,7 @@ import SwiftUI
 /// than letting somebody find out.
 struct ProjectsScreen: View {
     @ObservedObject var store: ProjectStore
+    @ObservedObject var backup: Backup
     @State private var scanning = false
 
     var body: some View {
@@ -66,15 +67,54 @@ struct ProjectsScreen: View {
                         }
                     }
                     .onDelete { indexes in
-                        indexes.map { store.scans[$0] }.forEach(store.delete)
+                        let going = indexes.map { store.scans[$0] }
+                        going.forEach(store.delete)
+                        // And the copy. Leaving it would mean the next device
+                        // to look puts the scan back, and somebody has to
+                        // delete the same room twice.
+                        Task {
+                            for entry in going { await backup.forget(scan: entry.name) }
+                        }
                     }
                 }
             }
 
             Section {
+                // What is true about the copy, said plainly, whichever way it
+                // is. An app that quietly fails to back up is worse than one
+                // that never claimed to, so "unavailable" gets as many words as
+                // "up to date" and neither gets a tick it has not earned.
+                switch backup.state {
+                case .upToDate(let count, _):
+                    Label(
+                        (count.map { "\($0) scan\($0 == 1 ? "" : "s") copied" } ?? "Copied")
+                        + " to your own iCloud. Not ours — yours. "
+                        + "The drawings, not the photographs.",
+                        systemImage: "checkmark.icloud"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                case .working:
+                    Label("Copying to your iCloud…", systemImage: "arrow.clockwise.icloud")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                case .unavailable(let why):
+                    Label(why, systemImage: "exclamationmark.icloud")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                case .failed(let why):
+                    Label(why, systemImage: "exclamationmark.icloud")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                case .unknown:
+                    EmptyView()
+                }
+
                 Text(
-                    "Scans are kept on this phone only. They are in the Files app under "
-                    + "Trueline if you want to copy one off — nothing is uploaded anywhere."
+                    "Photographs stay on this phone. A scan's pictures are about 26 MB and a "
+                    + "free iCloud account is 5 GB, so sending them up would fill somebody's "
+                    + "iCloud with your job — that is a decision per job, not a default. "
+                    + "Every scan is in the Files app under Trueline if you want to copy one off."
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -89,7 +129,7 @@ struct ProjectsScreen: View {
                 ARMeasureScreen(store: store)
             case .open(let entry):
                 if let scan = store.load(entry) {
-                    ReviewScreen(scan: scan)
+                    ReviewScreen(scan: scan, store: store, backup: backup)
                 } else {
                     Text("That capture could not be read. Its room.json or trace.json is missing.")
                         .padding()

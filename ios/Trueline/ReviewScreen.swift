@@ -7,6 +7,8 @@ import SwiftUI
 /// the tests run against, none of it written twice.
 struct ReviewScreen: View {
     let scan: SavedScan
+    @ObservedObject var store: ProjectStore
+    @ObservedObject var backup: Backup
     @State private var sharing = false
 
     var body: some View {
@@ -14,7 +16,22 @@ struct ReviewScreen: View {
             roomJSON: scan.roomJSON,
             photosJSON: scan.photosJSON,
             traceJSON: scan.traceJSON,
-            title: scan.title
+            correctedJSON: scan.correctedJSON,
+            title: scan.title,
+            folder: scan.folder,
+            onSave: { project in
+                // Disk first. It is the copy that is true whether or not there
+                // is a signal, an iCloud account, or a second device — and it
+                // is the one already visible in the Files app.
+                store.writeCorrected(project, into: scan.folder)
+                Task {
+                    await backup.push(
+                        scan: scan.title,
+                        capture: scan.isTrace ? scan.traceJSON : scan.roomJSON,
+                        corrected: project
+                    )
+                }
+            }
         )
             .ignoresSafeArea(.container, edges: .bottom)
             .navigationTitle(scan.title)

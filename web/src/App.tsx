@@ -109,6 +109,12 @@ export function App() {
   // walking a room wants that room, not the one they were looking at yesterday.
   useEffect(() => {
     const waiting = installBridge(dispatch);
+    // A room the app kept outranks the capture it was made from: it is the same
+    // room with somebody's tape readings already in it.
+    if (waiting?.saved) {
+      dispatch({ type: 'openSaved', project: waiting.saved });
+      return;
+    }
     if (waiting?.trace) {
       dispatch({
         type: 'openTrace',

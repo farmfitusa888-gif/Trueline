@@ -23,12 +23,23 @@ struct CorrectView: UIViewRepresentable {
     let photosJSON: Data
     /// The corners somebody tapped, when the room was walked rather than scanned.
     let traceJSON: Data
+    /// The room as somebody already corrected it, if they have. Outranks the
+    /// capture: it is the same room with tape readings in it.
+    let correctedJSON: Data
     let title: String
+    /// Where this scan lives, so a save can land beside the capture it came from.
+    let folder: URL
+    /// Called on every save, with the whole saved project.
+    let onSave: (Data) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        // The channel the correction screens save through. Without it a room
+        // somebody corrected exists only in this web view's `localStorage`,
+        // which is a cache the operating system is allowed to reclaim.
+        configuration.userContentController.add(context.coordinator, name: "saved")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -71,13 +82,37 @@ struct CorrectView: UIViewRepresentable {
         """
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: CorrectView
         /// Held here because the configuration does not retain it.
         let bundle = WebBundle()
 
         init(_ parent: CorrectView) {
             self.parent = parent
+        }
+
+        /// A save coming back out of the correction screens.
+        ///
+        /// The payload is the whole saved project as `persist.ts` writes it —
+        /// exact integers tagged as strings, so nothing has been through a
+        /// float on the way here. It is handed straight to the caller, which
+        /// writes it into the scan's folder and puts a copy in iCloud.
+        ///
+        /// Everything about the message is checked before anything is written.
+        /// A web view is a program, and this is the one place it can hand this
+        /// app bytes to keep.
+        func userContentController(
+            _ controller: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard
+                message.name == "saved",
+                let body = message.body as? [String: Any],
+                let project = body["project"] as? String,
+                !project.isEmpty,
+                let data = project.data(using: .utf8)
+            else { return }
+            parent.onSave(data)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -94,6 +129,27 @@ struct CorrectView: UIViewRepresentable {
             // A walked room and a scanned room go across the same hook and come
             // out the same on the other side. Which one this is, is the only
             // difference, and it stops here.
+            // A corrected room outranks the capture it was made from: it is the
+            // same room with somebody's tape readings already in it, and opening
+            // the capture instead would silently throw them away.
+            if !parent.correctedJSON.isEmpty,
+               let saved = String(data: parent.correctedJSON, encoding: .utf8) {
+                run(
+                    on: webView,
+                    """
+                    (function () {
+                      var saved = \(quoted(saved));
+                      if (window.trueline && window.trueline.openSaved) {
+                        window.trueline.openSaved(saved);
+                      } else {
+                        window.truelinePayload = { saved: saved };
+                      }
+                    })();
+                    """
+                )
+                return
+            }
+
             if !parent.traceJSON.isEmpty {
                 guard let trace = String(data: parent.traceJSON, encoding: .utf8) else { return }
                 run(

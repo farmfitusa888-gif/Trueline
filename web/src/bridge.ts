@@ -31,8 +31,51 @@ export interface TruelineBridge {
    * scanned. Different capture, same everything afterwards.
    */
   openTrace(trace: unknown, fileName?: string): void;
+  /**
+   * Called with a corrected room the app kept from last time.
+   *
+   * Corrections used to live only in this page's `localStorage`, which is a web
+   * view's cache: the operating system may take it back, and it does not travel
+   * to a second device. The app now keeps a copy in the scan's own folder and in
+   * the owner's iCloud, and hands it straight back here.
+   */
+  openSaved(project: string): void;
   /** Version of this contract, so a mismatched app build can say so. */
   readonly version: 1;
+}
+
+/**
+ * Handing a corrected room back to the app that scanned it.
+ *
+ * Corrections live in this page's `localStorage`, which is a web view's data
+ * store — the operating system may evict it when the device is short of space,
+ * and it goes nowhere near the scan's own folder. So somebody could type twenty
+ * tape readings into a room and have the only copy of them be a browser cache
+ * inside an app. That is not a place to keep work somebody did standing up with
+ * a tape in their hand.
+ *
+ * So every save is also posted back to the app, which writes it into the scan's
+ * folder next to the capture it came from and backs it up. It is a few kilobytes
+ * — a corrected garage is about 5.5 kB and a kitchen 8.4 kB, measured — so this
+ * costs nothing to do on every keystroke's worth of change.
+ *
+ * A browser with no app around it has no message handler, and nothing here
+ * fails when there is none. The page is the same page either way.
+ */
+export function handBack(fileName: string, project: string): void {
+  const handlers = (
+    window as unknown as {
+      webkit?: { messageHandlers?: Record<string, { postMessage(body: unknown): void }> };
+    }
+  ).webkit?.messageHandlers;
+  const saved = handlers?.saved;
+  if (!saved) return;
+  try {
+    saved.postMessage({ fileName, project, version: BRIDGE_VERSION });
+  } catch {
+    // A web view that will not take the message is one more reason the copy in
+    // localStorage still exists. Nothing here is the only copy.
+  }
 }
 
 declare global {
@@ -47,6 +90,8 @@ declare global {
       photos?: unknown;
       trace?: unknown;
       fileName?: string;
+      /** A corrected room the app kept. Outranks the capture it came from. */
+      saved?: string;
     };
   }
 }
@@ -71,6 +116,10 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     });
   };
 
+  const openSaved = (project: string) => {
+    dispatch({ type: 'openSaved', project });
+  };
+
   const openTrace = (trace: unknown, fileName?: string) => {
     dispatch({
       type: 'openTrace',
@@ -80,7 +129,7 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     });
   };
 
-  window.trueline = { open, openTrace, version: BRIDGE_VERSION };
+  window.trueline = { open, openTrace, openSaved, version: BRIDGE_VERSION };
 
   const waiting = window.truelinePayload;
   delete window.truelinePayload;
