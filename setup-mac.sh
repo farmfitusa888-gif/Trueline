@@ -18,6 +18,13 @@
 #
 # It does not install anything and it does not change any of your code. It
 # pulls, checks the things that have gone wrong before, and opens the project.
+#
+# Once you have picked your signing team in Xcode the once, you do not need
+# this script again for the ordinary loop:
+#
+#   cd ~/trueline && bash build.sh
+#
+# builds and puts the app on the phone in one command, without opening Xcode.
 
 set -uo pipefail
 
@@ -28,6 +35,13 @@ bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; }
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 root="$(pwd)"
+
+# `--checks-only` does everything up to and including the project-file check and
+# then stops: no device listing, no instructions, and Xcode is not opened.
+# build.sh runs this so the pull, the signing team and the web bundle are all
+# handled in one place rather than in two that drift apart.
+checks_only=no
+[ "${1:-}" = "--checks-only" ] && checks_only=yes
 
 say "Where you are"
 ok "$root"
@@ -70,10 +84,20 @@ else
 fi
 
 say "Getting the latest code"
+# It used to stash whatever it found and pull over the top. That is a script
+# quietly moving somebody's unfinished work somewhere they did not ask for and
+# may not think to look -- it swallowed two files during this project's own
+# development, and it would do the same to yours the first time you edited
+# something and ran the wrong command. Nothing here moves your work now: if
+# there is any, the pull is skipped and you are told what to do about it.
+skipped_pull=no
 if ! git diff --quiet || ! git diff --cached --quiet; then
-  warn "You have other local changes. They are being put aside so the pull is clean."
-  git stash push -u -m "setup-mac $(date +%Y-%m-%d-%H%M)" >/dev/null
-  warn "Get them back later with:  git stash pop"
+  warn "You have local changes, so nothing is being pulled over the top of them."
+  git status --short | sed 's/^/       /'
+  echo "     Keep them:  git stash push -u   (then re-run this)"
+  echo "     Commit:     git add -A && git commit -m \"...\""
+  echo "     Drop them:  git checkout -- .   (this cannot be undone)"
+  skipped_pull=yes
 fi
 branch="$(git rev-parse --abbrev-ref HEAD)"
 if [ "$branch" != "main" ]; then
@@ -81,6 +105,9 @@ if [ "$branch" != "main" ]; then
   git checkout main >/dev/null 2>&1 || { bad "Could not switch to main."; exit 1; }
 fi
 before="$(git rev-parse --short HEAD)"
+if [ "$skipped_pull" = yes ]; then
+  ok "staying on $before, with your changes untouched"
+else
 # Only a network failure is worth waiting out. Anything the pull refuses on
 # grounds of the working tree will refuse again in four seconds, and in
 # sixteen, so it is reported at once with what to do about it.
@@ -98,8 +125,10 @@ for try in 1 2 3 4; do
   echo "     Read the lines above — they name the file and the reason."
   break
 done
+fi
 after="$(git rev-parse --short HEAD)"
-if [ "$before" = "$after" ]; then ok "Already up to date at $after"; else ok "$before → $after"; fi
+if [ "$skipped_pull" = yes ]; then :
+elif [ "$before" = "$after" ]; then ok "Already up to date at $after"; else ok "$before → $after"; fi
 echo "     $(git log -1 --format='%s')"
 
 say "Your signing team, off the tracked file for good"
@@ -169,6 +198,12 @@ if command -v node >/dev/null 2>&1; then
 else
   warn "No Node on this Mac, so the bundle cannot be checked here."
   echo "     That is fine — the committed one is what Xcode ships."
+fi
+
+if [ "$checks_only" = yes ]; then
+  say "Checked"
+  ok "up to date, signing held, bundle current, project file parses"
+  exit 0
 fi
 
 say "Xcode"
