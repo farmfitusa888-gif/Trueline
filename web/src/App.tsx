@@ -7,6 +7,7 @@ import { readiness } from '../../core/src/issue.ts';
 import { extent } from '../../core/src/health.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
 import { missingFromClaim } from '../../core/src/claim.ts';
+import { missingFromProposal } from '../../core/src/proposal.ts';
 import { EMPTY, persist, reduce } from './state.ts';
 import { installBridge } from './bridge.ts';
 import { Plan, legendFor } from './Plan.tsx';
@@ -18,6 +19,7 @@ import { Takeoff } from './Takeoff.tsx';
 import { Thickness } from './Thickness.tsx';
 import { Measure } from './Measure.tsx';
 import { planThumbnail } from './sheet.ts';
+import { Agree } from './Agree.tsx';
 import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Sections.tsx';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
@@ -257,6 +259,9 @@ export function App() {
     return {
       room: derived.state.blocking.length + derived.punchList.length,
       claim: loaded.claim.on ? missingFromClaim(loaded.claim).length : 0,
+      // What is still missing from a proposal that exists, and nothing at all
+      // before one does: a badge on a tab nobody has been to yet is noise.
+      agree: loaded.proposal ? missingFromProposal(loaded.proposal).length : 0,
     };
   }, [loaded, derived]);
 
@@ -708,6 +713,17 @@ export function App() {
               <div data-sheet="yes">
                 <Takeoff room={loaded.room} readiness={derived.state} />
               </div>
+            </Panel>
+
+            <Panel section="agree" active={section}>
+              <Agree
+                room={loaded.room}
+                overrides={loaded.overrides}
+                proposal={loaded.proposal}
+                baseline={loaded.baseline}
+                onProposal={(proposal) => dispatch({ type: 'proposal', proposal })}
+                onBaseline={(baseline) => dispatch({ type: 'baseline', baseline })}
+              />
             </Panel>
 
             <Panel section="price" active={section}>

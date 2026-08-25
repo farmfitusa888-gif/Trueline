@@ -38,6 +38,8 @@ import type { Damage, Reading } from '../../core/src/damage.ts';
 import { validateDamage } from '../../core/src/damage.ts';
 import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
 import { type Override, validateOverride } from '../../core/src/override.ts';
+import { type Baseline } from '../../core/src/baseline.ts';
+import { type Proposal } from '../../core/src/proposal.ts';
 import { handBack } from './bridge.ts';
 
 /**
@@ -112,6 +114,21 @@ export interface Loaded {
    */
   readonly overrides: readonly Override[];
   readonly claim: Claim;
+  /**
+   * The document a client says yes to, once one has been written.
+   *
+   * Beside the room, like the claim and the overrides, and for the same
+   * reason: a proposal is an offer about a building, not a property of one.
+   * Re-measuring a wall must not silently rewrite an offer somebody is holding.
+   */
+  readonly proposal: Proposal | null;
+  /**
+   * What was signed, frozen.
+   *
+   * Never edited by anything. Every later difference between the room and this
+   * is a change order, which is the entire point of keeping it.
+   */
+  readonly baseline: Baseline | null;
   /** Rooms as they were before each edit, most recent last. */
   readonly undo: readonly Room[];
   /** What the last edit did, for the line under the plan. */
@@ -235,6 +252,8 @@ export type Action =
       at: string;
     }
   | { type: 'claim'; claim: Claim }
+  | { type: 'proposal'; proposal: Proposal | null }
+  | { type: 'baseline'; baseline: Baseline }
   | { type: 'undo' }
   | { type: 'dismissError' }
   | { type: 'close' };
@@ -275,6 +294,8 @@ function restored(saved: SavedProject, note: string): State {
     damages?: readonly Damage[];
     overrides?: readonly Override[];
     claim?: Claim;
+    proposal?: Proposal;
+    baseline?: Baseline;
   };
   if (!extras.report) throw new Error('That saved room has no import report with it.');
   return {
@@ -291,6 +312,8 @@ function restored(saved: SavedProject, note: string): State {
       damages: extras.damages ?? [],
       overrides: extras.overrides ?? [],
       claim: extras.claim ?? NO_CLAIM,
+      proposal: extras.proposal ?? null,
+      baseline: extras.baseline ?? null,
       undo: [],
       lastEdit: note,
       fileName: saved.fileName,
@@ -364,6 +387,8 @@ export function reduce(state: State, action: Action): State {
             damages: [],
             overrides: [],
             claim: NO_CLAIM,
+            proposal: null,
+            baseline: null,
             undo: [],
             lastEdit: null,
             fileName: action.fileName,
@@ -435,6 +460,8 @@ export function reduce(state: State, action: Action): State {
             damages: [],
             overrides: [],
             claim: NO_CLAIM,
+            proposal: null,
+            baseline: null,
             undo: [],
             lastEdit: null,
             fileName: action.fileName,
@@ -479,6 +506,8 @@ export function reduce(state: State, action: Action): State {
           damages: [],
           overrides: [],
           claim: NO_CLAIM,
+          proposal: null,
+          baseline: null,
           undo: [],
           lastEdit: null,
           fileName: action.fileName,
@@ -1067,6 +1096,19 @@ export function reduce(state: State, action: Action): State {
         ? { ...state, loaded: { ...state.loaded, claim: action.claim } }
         : state;
 
+    case 'proposal':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, proposal: action.proposal } }
+        : state;
+
+    // A baseline is written once and never edited, so there is no action that
+    // changes one. Re-signing produces a new baseline; the old one is replaced
+    // wholesale rather than amended, and what it agreed to stays inside it.
+    case 'baseline':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, baseline: action.baseline } }
+        : state;
+
     case 'undo': {
       const loaded = state.loaded;
       if (!loaded || loaded.undo.length === 0) return state;
@@ -1120,6 +1162,8 @@ export function persist(loaded: Loaded, at: string): string | null {
         north: loaded.north,
         damages: loaded.damages,
         claim: loaded.claim,
+        proposal: loaded.proposal,
+        baseline: loaded.baseline,
         overrides: loaded.overrides,
       },
     });

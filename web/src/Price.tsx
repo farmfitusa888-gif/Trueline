@@ -1,23 +1,19 @@
 import { useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
-import { pricing } from '../../core/src/company.ts';
-import { takeoff } from '../../core/src/takeoff.ts';
 import {
   type PriceUnit,
   type Rate,
   money,
   parseMoney,
-  quote,
   rateLabel,
 } from '../../core/src/price.ts';
 import {
   type Override,
   type OverriddenLine,
-  applyOverrides,
   describeOverride,
-  provenanceOf,
 } from '../../core/src/override.ts';
 import { useUnits } from './units.tsx';
+import { useQuote } from './quoteOf.ts';
 
 /**
  * The takeoff, priced — and the rule that makes it worth trusting.
@@ -68,22 +64,11 @@ export function Price({
   const [amount, setAmount] = useState('');
   const [why, setWhy] = useState('');
 
-  const { book, suggestions } = useMemo(() => pricing(company), [company]);
-  const sheet = useMemo(
-    () => takeoff(room, new Date().toLocaleString(), { company: company.name }),
-    [room, company.name]
-  );
-  // The quantities, with whatever somebody typed over. What the room measured
-  // is still on every line that was changed — nothing here overwrites it.
-  const applied = useMemo(() => applyOverrides(sheet.lines, overrides), [sheet, overrides]);
-  const priced = useMemo(
-    () =>
-      quote(
-        applied.lines.map((line) => ({ ...line, provenance: provenanceOf(line) })),
-        book
-      ),
-    [applied, book]
-  );
+  // The quantities, with whatever somebody typed over, and the money that comes
+  // out of them. Shared with the proposal rather than worked out twice: two
+  // screens that add the same column up are two screens that can disagree, and
+  // the one that disagrees is the one in front of the client.
+  const { applied, quote: priced, book, suggestions } = useQuote(room, overrides, company);
   const byItem = useMemo(
     () => new Map(applied.lines.map((line) => [`${line.what}|${line.unit}`, line])),
     [applied]

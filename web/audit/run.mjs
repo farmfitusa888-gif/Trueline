@@ -42,6 +42,7 @@ const parts = [
   'a5-claim.mjs',
   'a6-persist.mjs',
   'a7-client.mjs',
+  'a8-agree.mjs',
 ];
 
 function run(part) {

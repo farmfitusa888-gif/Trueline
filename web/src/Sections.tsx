@@ -16,7 +16,7 @@
  */
 import type { ReactNode } from 'react';
 
-export type SectionKey = 'plan' | 'room' | 'takeoff' | 'price' | 'claim' | 'files';
+export type SectionKey = 'plan' | 'room' | 'takeoff' | 'price' | 'agree' | 'claim' | 'files';
 
 interface Section {
   readonly key: SectionKey;
@@ -32,6 +32,7 @@ export const SECTIONS: readonly Section[] = [
   { key: 'room', short: 'Room', title: 'Room', what: 'ceiling, wall thickness, and what still needs checking' },
   { key: 'takeoff', short: 'Takeoff', title: 'Takeoff', what: 'how much of everything is in this room' },
   { key: 'price', short: 'Price', title: 'Price', what: 'what it comes to, and where the job stands' },
+  { key: 'agree', short: 'Agree', title: 'Agreement', what: 'the proposal, the signature on it, and what has changed since' },
   { key: 'claim', short: 'Claim', title: 'Insurance', what: 'the claim, the damage, and the adjuster’s paperwork' },
   { key: 'files', short: 'Files', title: 'Files', what: 'the client file, the field sheet, and what leaves this phone' },
 ];
@@ -61,6 +62,8 @@ function Glyph({ of }: { readonly of: SectionKey }) {
     price: <><path d="M3 12V4h8l9 9-8 8z" /><circle cx="7.5" cy="7.5" r="1.4" /></>,
     // A shield: the claim.
     claim: <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />,
+    // A pen over a line: the signature.
+    agree: <><path d="M4 19h16" /><path d="M6 15.5L15.6 5.9a2 2 0 112.8 2.8L8.8 18.3l-3.6.8z" /></>,
     // A folder.
     files: <path d="M3 7a1 1 0 011-1h5l2 2h9a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1z" />,
   }[of];
