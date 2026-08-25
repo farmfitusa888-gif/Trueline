@@ -3,6 +3,8 @@ import type { Room } from '../../core/src/room.ts';
 import type { Damage } from '../../core/src/damage.ts';
 import type { Claim } from '../../core/src/claim.ts';
 import { type ClaimRoom, claimFile } from '../../core/src/claim-file.ts';
+import { claimReport } from '../../core/src/claim.ts';
+import { showArea, showLength } from '../../core/src/company.ts';
 import { planSvgFor } from './renderPlan.tsx';
 import { savedRooms } from './floorStore.ts';
 import { asDataUrl, fetchPhoto } from './photoStore.ts';
@@ -57,7 +59,7 @@ export function ClaimSend({
   readonly claim: Claim;
 }) {
   const { company } = useUnits();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'html' | 'pdf' | null>(null);
   const [told, setTold] = useState<string | null>(null);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
 
@@ -78,31 +80,95 @@ export function ClaimSend({
 
   const chosen = others.filter((o) => ticked.has(o.fileName));
 
-  async function send() {
-    setBusy(true);
+  /** Every room's parts, gathered once and used by both documents. */
+  async function gatherRooms(): Promise<ClaimRoom[]> {
+    const parts: ClaimRoom[] = [
+      {
+        room,
+        damages,
+        plan: planSvgFor(room, damages),
+        photos: await gather(damages),
+      },
+    ];
+    for (const saved of chosen) {
+      parts.push({
+        room: saved.room,
+        damages: saved.damages,
+        plan: planSvgFor(saved.room, saved.damages),
+        photos: await gather(saved.damages),
+      });
+    }
+    return parts;
+  }
+
+  /**
+   * The same document, as a PDF.
+   *
+   * Not a print of the HTML: a carrier's claim system takes PDFs, and a browser
+   * print is unavailable inside a web view without a gesture, differs on every
+   * platform and cannot be tested. This is laid out as arithmetic on a page.
+   */
+  async function sendPdf() {
+    setBusy('pdf');
     setTold(null);
     try {
-      const parts: ClaimRoom[] = [
-        {
-          room,
-          damages,
-          // Every room on the document goes through the same renderer,
-          // including the open one. Taking the open room's drawing off the
-          // screen and the rest from a re-render would put two code paths on
-          // one sheet, and the one that would be wrong is whichever nobody is
-          // looking at.
-          plan: planSvgFor(room, damages),
-          photos: await gather(damages),
-        },
-      ];
-      for (const saved of chosen) {
-        parts.push({
-          room: saved.room,
-          damages: saved.damages,
-          plan: planSvgFor(saved.room, saved.damages),
-          photos: await gather(saved.damages),
-        });
+      const parts = await gatherRooms();
+      // One room per PDF. A carrier attaches a document per room, and a
+      // fourteen-page file covering four rooms is a file somebody splits by
+      // hand before they can use it.
+      const first = parts[0]!;
+      const bytes = new Map<string, Uint8Array>();
+      const byDamage = new Map<string, readonly string[]>();
+      for (const damage of first.damages) {
+        byDamage.set(damage.id, damage.photos);
+        for (const name of damage.photos) {
+          const url = first.photos.get(name);
+          if (!url) continue;
+          const comma = url.indexOf(',');
+          if (comma === -1) continue;
+          const binary = atob(url.slice(comma + 1));
+          const out = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
+          bytes.set(name, out);
+        }
       }
+      // pdf-lib is 450 kB and a remodeler never touches this button, so it is
+      // fetched the first time somebody actually asks for a PDF rather than
+      // riding along in the bundle every scan pays to load. Vite splits it out
+      // on the dynamic import.
+      const { claimPdf } = await import('./claimPdf.ts');
+      const pdf = await claimPdf({
+        report: claimReport(first.room, first.damages, claim, new Date().toLocaleDateString(), {
+          len: (v) => showLength(v, company.units),
+          area: (a) => showArea(a, company.units),
+        }),
+        company,
+        photos: byDamage,
+        bytes,
+        at: new Date().toLocaleDateString(),
+      });
+      const said = await sendFile(
+        new Blob([pdf as BlobPart], { type: 'application/pdf' }),
+        fileNameFor(claim.claimNumber?.trim() || room.name, 'pdf', 'claim'),
+        claim.claimNumber ? `Claim ${claim.claimNumber}` : `${room.name} — claim`
+      );
+      if (said) setTold(said);
+    } catch (error) {
+      setTold(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function send() {
+    setBusy('html');
+    setTold(null);
+    try {
+      // Every room on the document goes through the same renderer, including
+      // the open one. Taking the open room's drawing off the screen and the
+      // rest from a re-render would put two code paths on one sheet, and the
+      // one that would be wrong is whichever nobody is looking at.
+      const parts = await gatherRooms();
 
       const html = claimFile({
         rooms: parts,
@@ -119,7 +185,7 @@ export function ClaimSend({
     } catch (error) {
       setTold(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -185,13 +251,29 @@ export function ClaimSend({
 
       <button
         type="button"
-        disabled={busy}
+        disabled={busy !== null}
         onClick={() => void send()}
         className="mt-3 min-h-12 w-full rounded-md bg-slate-900 px-5 font-semibold text-white
                    active:bg-slate-700 disabled:opacity-60"
       >
-        {busy ? 'Putting it together…' : 'Make the claim document'}
+        {busy === 'html' ? 'Putting it together…' : 'Make the claim document'}
       </button>
+
+      <button
+        type="button"
+        disabled={busy !== null}
+        onClick={() => void sendPdf()}
+        className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-4 text-sm
+                   font-medium text-slate-700 active:bg-slate-100 disabled:opacity-60"
+      >
+        {busy === 'pdf' ? 'Drawing it…' : 'As a PDF instead'}
+      </button>
+      <p className="mt-1 text-xs text-slate-500">
+        The file above is the better document — the drawing in it is a real drawing rather than a
+        picture of one, and it opens on anything. Send the PDF when the carrier&rsquo;s system
+        wants one, which most of them do. It is this room only: a claim system takes a document
+        per room, and one file covering four is a file somebody splits by hand.
+      </p>
 
       <p className="mt-2 text-xs text-slate-500">
         {chosen.length + 1} room{chosen.length === 0 ? '' : 's'} · {markCount} mark
