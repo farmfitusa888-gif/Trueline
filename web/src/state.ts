@@ -99,6 +99,8 @@ export type Action =
   | { type: 'open'; json: unknown; fileName: string; at: string; photos?: unknown }
   | { type: 'restore'; fileName?: string }
   | { type: 'openTrace'; trace: unknown; fileName: string; at: string }
+  /** A room typed in wall by wall, with no scan behind it at all. */
+  | { type: 'openDrawn'; room: Room; fileName: string }
   | { type: 'select'; wallId: string | null }
   | { type: 'make'; wallId: string; as: 'wall' | 'open' | 'cased' }
   | { type: 'verify'; wallId: string; text: string; by: string; at: string }
@@ -294,6 +296,44 @@ export function reduce(state: State, action: Action): State {
       } catch (error) {
         return { ...state, error: message(error) };
       }
+    }
+
+    // A room somebody typed. Every wall in it is already measured — there was
+    // never a sensor to disagree with — so it arrives with an empty import
+    // report rather than a fabricated one: nothing was dropped, nothing was
+    // straightened off a polygon, because there was no polygon.
+    case 'openDrawn': {
+      return {
+        selected: null,
+        error: null,
+        loaded: {
+          room: action.room,
+          report: {
+            sourceVersion: undefined,
+            walls: action.room.walls.map((w) => w.id),
+            openSpans: [],
+            dropped: [],
+            snapped: [],
+            diagonals: [],
+            closureBeforeSolving: { x: 0n, y: 0n },
+            openings: [],
+            recoveredSills: [],
+            sourceIds: [],
+            notes: [
+              'Typed by hand rather than scanned. Every length here was measured by a person, ' +
+                'and the last wall was worked out from the others rather than measured.',
+            ],
+          },
+          footprints: [],
+          photos: [],
+          rejectedPhotos: [],
+          north: null,
+          frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
+          undo: [],
+          lastEdit: null,
+          fileName: action.fileName,
+        },
+      };
     }
 
     case 'restore': {

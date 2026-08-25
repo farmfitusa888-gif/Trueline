@@ -17,6 +17,7 @@ import { Measure } from './Measure.tsx';
 import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
 import { Sheet } from './Sheet.tsx';
+import { Draw } from './Draw.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -32,7 +33,13 @@ import { Sheet } from './Sheet.tsx';
  * phone, on a real scan, before an API exists.
  */
 
-function Opener({ onOpen }: { onOpen: (json: unknown, fileName: string) => void }) {
+function Opener({
+  onOpen,
+  onDraw,
+}: {
+  onOpen: (json: unknown, fileName: string) => void;
+  onDraw: () => void;
+}) {
   const [busy, setBusy] = useState(false);
 
   async function take(file: File | undefined) {
@@ -72,6 +79,18 @@ function Opener({ onOpen }: { onOpen: (json: unknown, fileName: string) => void 
           {busy ? 'Reading…' : 'Choose a file'}
         </span>
       </label>
+
+      <p className="mt-6 text-sm text-slate-600">
+        No scan?{' '}
+        <button
+          type="button"
+          onClick={onDraw}
+          className="min-h-11 font-semibold text-slate-900 underline underline-offset-4"
+        >
+          Draw it by hand
+        </button>{' '}
+        — a tape and this phone, or an old drawing.
+      </p>
     </div>
   );
 }
@@ -82,6 +101,7 @@ export function App() {
   // Plan or room. The same model, the same selection, the same tape box under
   // both — switching view never changes what is being measured.
   const [look, setLook] = useState<'plan' | 'room'>('plan');
+  const [drawing, setDrawing] = useState(false);
   const loaded = state.loaded;
 
   // Let the scanner in — and pick up whatever was being corrected last time.
@@ -175,11 +195,22 @@ export function App() {
       )}
 
       {!loaded ? (
-        <Opener
-          onOpen={(json, fileName) =>
-            dispatch({ type: 'open', json, fileName, at: new Date().toISOString() })
-          }
-        />
+        drawing ? (
+          <Draw
+            onDone={(room, name) => {
+              dispatch({ type: 'openDrawn', room, fileName: name });
+              setDrawing(false);
+            }}
+            onCancel={() => setDrawing(false)}
+          />
+        ) : (
+          <Opener
+            onOpen={(json, fileName) =>
+              dispatch({ type: 'open', json, fileName, at: new Date().toISOString() })
+            }
+            onDraw={() => setDrawing(true)}
+          />
+        )
       ) : (
         derived && (
           <div className="space-y-5 sheet-root">

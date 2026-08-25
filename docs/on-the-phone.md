@@ -59,7 +59,7 @@ signing** and pick your team. Bundle ID stays `com.sunnyacres.trueline`.
 
 ## Part 3 — what to test, in this order
 
-Twenty minutes, in a real room with a tape in your pocket. Ordered so the ones
+Twenty-five minutes, in a real room with a tape in your pocket. Ordered so the ones
 that matter most come first, and so a failure early tells you the most.
 
 ### 1. Is the plan the right way round? — **the one that matters**
@@ -199,10 +199,31 @@ sheet of plywood through that.
   room for the whole app, so opening a second scan overwrote the first one's
   work with nothing said.
 
+### 12. Draw a room with no scan at all
+
+The mode that needs no LiDAR, no camera and no hardware — a tape and the
+phone, or an old drawing for a building you cannot get into.
+
+- On the opening screen: **Draw it by hand**.
+- Name the room, set the ceiling, then walk it: pick which way the next wall
+  runs and type its length. Only the headings that turn a corner are offered.
+- After three walls of a four-wall room, it says: *"The last wall has to run
+  south for 11' 6". The other walls decide it, so there is nothing to
+  measure."* Tap **Add it**.
+- **Pass:** **Finish the room** gives you a normal plan that reads
+  **"Measured — every dimension checked"** rather than the scanner's caveat,
+  because every number in it was typed by a person.
+- Try breaking it: type lengths that cannot close and finish anyway.
+  **Pass:** it refuses, says by how much and in which direction, and says that
+  since every length was typed by a person the app cannot choose which one is
+  wrong.
+
 ### Not built yet, so do not test for them
 
 Thumbnails on the scan list, multiple rooms stitched into a floor, ESX export,
-and accounts or sharing between phones. They are next, in that order.
+and accounts or sharing between phones. They are next, in that order — and the
+last of those is waiting on one decision from you (see the recommendation I
+sent about local-first vs never-leaves-the-phone).
 
 ---
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatFeetInches, parseLength } from '../../core/src/length.ts';
+import { isVerified } from '../../core/src/measurement.ts';
 import type { Room } from '../../core/src/room.ts';
 import {
   ASSEMBLIES,
@@ -44,6 +45,9 @@ export function Thickness({
 
   const current = target ? thicknessOf(target, room) : room.wallThickness;
   const bare = withoutThickness(room);
+  // A room somebody typed by hand never had a scanner in it, and telling them
+  // what the scan could not see would be describing a scan that never happened.
+  const scanned = room.walls.some((w) => !isVerified(w.length));
   const groups = thicknessGroups(room);
 
   let reads: string | null = null;
@@ -69,8 +73,10 @@ export function Thickness({
       </div>
 
       <p className="mt-1 text-sm text-slate-600">
-        The scan cannot see this — a phone inside a room only ever sees one face of a wall. Say
-        what it is and you get the jamb to order, the wrap round each opening, and the framing.
+        {scanned
+          ? 'The scan cannot see this — a phone inside a room only ever sees one face of a wall.'
+          : 'Nothing has said yet how thick these walls are.'}{' '}
+        Say what it is and you get the jamb to order, the wrap round each opening, and the framing.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2 print:hidden">

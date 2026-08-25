@@ -105,7 +105,16 @@ function Label({
   const common = { x, y, dy, textAnchor: anchor, fontSize: size, fontWeight: weight };
   return (
     <>
-      <text {...common} fill="none" stroke="#ffffff" strokeWidth={halo} strokeLinejoin="round">
+      {/* The outline is the same string twice, so a screen reader would read
+          every dimension on the drawing out loud twice over. */}
+      <text
+        {...common}
+        aria-hidden="true"
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth={halo}
+        strokeLinejoin="round"
+      >
         {children}
       </text>
       <text {...common} fill={fill}>
