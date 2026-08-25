@@ -263,13 +263,37 @@ export function App() {
   const selectedWall = loaded && state.selected ? loaded.room.walls.find((w) => w.id === state.selected) : undefined;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-24 pt-6">
+    <main className="mx-auto max-w-3xl px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
       <header className="mb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900">
-          <Mark className="h-7 w-auto text-slate-900" />
-          <span>
-            True<span className="text-[#B8590A]">line</span>
-          </span>
+        {/* The wordmark is the way home once a room is open, because that is
+            where every app on this phone puts it. Not a link when there is
+            nothing to go back from: a control that does nothing is worse than
+            no control. */}
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">
+          {loaded ? (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'close' })}
+              // Just "Home". A longer label read well and collided with the
+              // "Open another" link beside it -- two controls whose accessible
+              // names share a phrase are two controls a screen reader user, and
+              // anything driving this app by name, cannot tell apart.
+              aria-label="Home"
+              className="flex items-center gap-2"
+            >
+              <Mark className="h-7 w-auto text-slate-900" />
+              <span>
+                True<span className="text-[#B8590A]">line</span>
+              </span>
+            </button>
+          ) : (
+            <span className="flex items-center gap-2">
+              <Mark className="h-7 w-auto text-slate-900" />
+              <span>
+                True<span className="text-[#B8590A]">line</span>
+              </span>
+            </span>
+          )}
         </h1>
         <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           {loaded && (
@@ -458,11 +482,36 @@ export function App() {
                     </ul>
                   </>
                 ) : (
-                  <Room3D
-                    room={loaded.room}
-                    selected={state.selected}
-                    onSelect={(wallId) => dispatch({ type: 'select', wallId })}
-                  />
+                  <>
+                    <Room3D
+                      room={loaded.room}
+                      selected={state.selected}
+                      footprints={loaded.footprints}
+                      furniture={furniture}
+                      onSelect={(wallId) => dispatch({ type: 'select', wallId })}
+                    />
+                    {loaded.footprints.length > 0 && (
+                      <div data-sheet="no" className="mt-2 px-1">
+                        <button
+                          type="button"
+                          onClick={() => setFurniture((on) => !on)}
+                          aria-pressed={furniture}
+                          className="min-h-11 rounded-md border border-slate-300 px-3 text-sm
+                                     font-medium text-slate-700 active:bg-slate-100"
+                        >
+                          {furniture
+                            ? `Hide what was in the room (${loaded.footprints.length})`
+                            : `Show what was in the room (${loaded.footprints.length})`}
+                        </button>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Boxes, not models: a scan records where something stands and how much
+                          floor it covers, and this app does not carry how tall it was — so every
+                          one is drawn to the same waist height. Nothing here is measured, and
+                          nothing here moves a number.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

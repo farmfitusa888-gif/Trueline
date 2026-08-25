@@ -21,17 +21,19 @@ export type SectionKey = 'plan' | 'room' | 'takeoff' | 'price' | 'claim' | 'file
 interface Section {
   readonly key: SectionKey;
   readonly title: string;
+  /** What fits under an icon at a sixth of a phone's width. */
+  readonly short: string;
   /** What a contractor would call it, for the empty state and the heading. */
   readonly what: string;
 }
 
 export const SECTIONS: readonly Section[] = [
-  { key: 'plan', title: 'Plan', what: 'the drawing, and everything you change on it' },
-  { key: 'room', title: 'Room', what: 'ceiling, wall thickness, and what still needs checking' },
-  { key: 'takeoff', title: 'Takeoff', what: 'how much of everything is in this room' },
-  { key: 'price', title: 'Price', what: 'what it comes to, and where the job stands' },
-  { key: 'claim', title: 'Insurance', what: 'the claim, the damage, and the adjuster’s paperwork' },
-  { key: 'files', title: 'Files', what: 'the client file, the field sheet, and what leaves this phone' },
+  { key: 'plan', short: 'Plan', title: 'Plan', what: 'the drawing, and everything you change on it' },
+  { key: 'room', short: 'Room', title: 'Room', what: 'ceiling, wall thickness, and what still needs checking' },
+  { key: 'takeoff', short: 'Takeoff', title: 'Takeoff', what: 'how much of everything is in this room' },
+  { key: 'price', short: 'Price', title: 'Price', what: 'what it comes to, and where the job stands' },
+  { key: 'claim', short: 'Claim', title: 'Insurance', what: 'the claim, the damage, and the adjuster’s paperwork' },
+  { key: 'files', short: 'Files', title: 'Files', what: 'the client file, the field sheet, and what leaves this phone' },
 ];
 
 /**
@@ -43,6 +45,43 @@ export const SECTIONS: readonly Section[] = [
  */
 export type SectionFlags = Partial<Record<SectionKey, number>>;
 
+/**
+ * A mark for each section, so the bar reads at a glance and fits six across a
+ * phone. Stroked rather than filled, one weight, drawn on a 24 grid.
+ */
+function Glyph({ of }: { readonly of: SectionKey }) {
+  const path = {
+    // A rectangle with a dimension line under it: the drawing.
+    plan: <><rect x="3" y="4" width="18" height="12" rx="1" /><path d="M3 20h18M3 18.5v3M21 18.5v3" /></>,
+    // A folding rule.
+    room: <><path d="M3 14l6-6 6 6-6 6z" /><path d="M15 8l6-6" /><path d="M11 6l2 2M13 4l2 2" /></>,
+    // A list of quantities.
+    takeoff: <><path d="M4 6h16M4 12h16M4 18h10" /></>,
+    // A price tag.
+    price: <><path d="M3 12V4h8l9 9-8 8z" /><circle cx="7.5" cy="7.5" r="1.4" /></>,
+    // A shield: the claim.
+    claim: <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />,
+    // A folder.
+    files: <path d="M3 7a1 1 0 011-1h5l2 2h9a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1z" />,
+  }[of];
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
+         strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden="true">
+      {path}
+    </svg>
+  );
+}
+
+/**
+ * The bar, along the bottom.
+ *
+ * At the bottom because that is where a thumb is. It used to be a strip under
+ * the header, which on a phone is the one part of the screen a hand holding the
+ * phone cannot reach, and which scrolls away the moment you look at anything.
+ * Fixed, so every section is one thumb away from every other section at every
+ * point in the app — including from the far end of a long list, which is where
+ * somebody actually decides they want to be somewhere else.
+ */
 export function SectionBar({
   active,
   flags,
@@ -56,43 +95,50 @@ export function SectionBar({
     <nav
       aria-label="Parts of this room"
       data-sheet="no"
-      // Scrolls sideways rather than wrapping to two rows: a bar that changes
-      // height when a badge appears moves everything under it.
-      className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1
-                 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95
+                 backdrop-blur print:hidden
+                 pb-[env(safe-area-inset-bottom)]"
     >
-      {SECTIONS.map((section) => {
-        const on = section.key === active;
-        const count = flags[section.key] ?? 0;
-        return (
-          <button
-            key={section.key}
-            type="button"
-            onClick={() => onPick(section.key)}
-            aria-current={on ? 'page' : undefined}
-            className={[
-              'relative min-h-11 shrink-0 rounded-lg px-4 text-sm font-semibold',
-              'transition-colors',
-              on
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 active:bg-slate-200',
-            ].join(' ')}
-          >
-            {section.title}
-            {count > 0 && (
-              <span
-                className={[
-                  'ml-2 inline-flex min-w-5 items-center justify-center rounded-full',
-                  'px-1.5 text-xs font-bold tabular-nums',
-                  on ? 'bg-white/25 text-white' : 'bg-amber-500 text-white',
-                ].join(' ')}
+      <ul className="mx-auto flex max-w-3xl">
+        {SECTIONS.map((s) => {
+          const on = s.key === active;
+          const count = flags[s.key] ?? 0;
+          return (
+            <li key={s.key} className="flex-1">
+              <button
+                type="button"
+                onClick={() => onPick(s.key)}
+                aria-current={on ? 'page' : undefined}
+                // The visible label is short enough to fit a sixth of a phone
+                // ("Claim"); the accessible name is the one a person would say
+                // out loud, and it is what a screen reader announces.
+                aria-label={s.title}
+                title={s.what}
+                className={`relative flex min-h-14 w-full flex-col items-center justify-center
+                            gap-0.5 px-0.5 ${on ? 'text-slate-900' : 'text-slate-400'}`}
               >
-                {count}
-              </span>
-            )}
-          </button>
-        );
-      })}
+                <Glyph of={s.key} />
+                <span className={`text-[10px] leading-none ${on ? 'font-bold' : 'font-medium'}`}>
+                  {s.short}
+                </span>
+                {count > 0 && (
+                  <span
+                    aria-label={`${count} to do`}
+                    className="absolute right-[18%] top-1.5 flex h-4 min-w-4 items-center
+                               justify-center rounded-full bg-amber-500 px-1 text-[10px]
+                               font-bold tabular-nums text-white"
+                  >
+                    {count}
+                  </span>
+                )}
+                {on && (
+                  <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-slate-900" />
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

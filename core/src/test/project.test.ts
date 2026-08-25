@@ -155,3 +155,46 @@ test('an opening is drawn after the wall it is a hole in', () => {
   assert.ok(doorAt > wallAt, 'the door is painted under its own wall');
   assert.equal(doorAt, wallAt + 1, 'the door should follow its wall immediately');
 });
+
+/* ---------------------------------------------------------------- objects */
+
+/**
+ * Furniture in the 3D view.
+ *
+ * The 3D view drew the empty shell and nothing else, so a room somebody had
+ * just walked came back looking like a room they had never been in. Objects are
+ * drawn as boxes, and the properties that matter are: they are their own kind,
+ * so nothing tries to select a wall by tapping a fridge; they carry an id that
+ * is not any wall's; and asking for them changes not one face of the building.
+ */
+const bench = {
+  id: 'bench',
+  category: 'storage',
+  min: { x: parseLength(`2'`), y: parseLength(`1'`) },
+  max: { x: parseLength(`6'`), y: parseLength(`3'`) },
+};
+
+test('an object is drawn as a box, and never as part of the building', () => {
+  const bare = project(room, DEFAULT_CAMERA);
+  const furnished = project(room, DEFAULT_CAMERA, 1000, [bench]);
+
+  const boxes = furnished.facets.filter((f) => f.kind === 'object');
+  assert.equal(boxes.length, 5, 'four sides and a top');
+
+  // Not a wall id, so a tap on one can never be read as a tap on a wall.
+  for (const box of boxes) {
+    assert.ok(box.wallId.startsWith('object:'), box.wallId);
+    assert.ok(!room.walls.some((wall) => wall.id === box.wallId));
+  }
+
+  // Every face of the building is exactly where it was.
+  const building = (p: typeof bare) => JSON.stringify(p.facets.filter((f) => f.kind !== 'object'));
+  assert.equal(building(furnished), building(bare), 'the building moved');
+  assert.equal(furnished.hidden.join(), bare.hidden.join());
+});
+
+test('an object the scan saw edge-on is not drawn as a stray line', () => {
+  const flat = { ...bench, max: { x: parseLength(`2'`), y: parseLength(`3'`) } };
+  const { facets } = project(room, DEFAULT_CAMERA, 1000, [flat]);
+  assert.equal(facets.filter((f) => f.kind === 'object').length, 0);
+});

@@ -1,5 +1,6 @@
 import { type Nanometres, NM_PER_FOOT } from './length.ts';
 import { type Opening, type Point, type Room, corners, runLength, validate } from './room.ts';
+import { type Footprint } from './obstruction.ts';
 import { outwardNormals } from './section.ts';
 
 /**
@@ -39,7 +40,7 @@ export interface Camera {
 export interface Facet {
   /** The wall this face belongs to, so tapping it selects that wall. */
   readonly wallId: string;
-  readonly kind: 'wall' | 'floor' | 'opening';
+  readonly kind: 'wall' | 'floor' | 'opening' | 'object';
   /** For an opening, which one — so a door can be told from a window. */
   readonly openingKind?: Opening['kind'];
   /** Screen coordinates, in the box the projection was asked for. */
@@ -95,7 +96,25 @@ function facing(normal: { x: bigint; y: bigint }, turn: number): number {
  * that somebody is about to take measurements off should not have perspective
  * making the far end of a wall shorter than the near end.
  */
-export function project(room: Room, camera: Camera, size = 1000): Projection {
+export function project(
+  room: Room,
+  camera: Camera,
+  size = 1000,
+  /**
+   * What the scan found standing in the room, drawn as boxes.
+   *
+   * The 3D view showed the empty shell and nothing else, so a room somebody
+   * had just walked came back looking like a room they had never been in. A
+   * footprint is a plan rectangle with no height in it -- RoomPlan's height is
+   * not carried through the importer -- so every box is drawn to one waist
+   * height and says so. It is a marker for where something stands, not a model
+   * of the thing.
+   *
+   * None of this touches a measurement: an object contributes no facet the
+   * takeoff reads and no wall the solver sees.
+   */
+  footprints: readonly Footprint[] = []
+): Projection {
   validate(room);
   if (!Number.isFinite(camera.turn) || !Number.isFinite(camera.tilt)) {
     throw new ProjectionError('A camera needs a turn and a tilt, in degrees.');
@@ -212,6 +231,52 @@ export function project(room: Room, camera: Camera, size = 1000): Projection {
 
   // An opening lies in the plane of the wall it is a hole in, so no depth
   // comparison can separate the two honestly: they are the same distance away.
+  /* -------------------------------------------------------------- objects */
+
+  // A footprint is a plan rectangle. RoomPlan knows how tall a fridge is and
+  // the importer does not carry it, so every box is drawn to one waist height:
+  // enough to read as a thing standing on the floor, and never mistakable for a
+  // measurement of the thing. The legend and the toggle both say what it is.
+  const OBJECT_HEIGHT_FEET = 2.5;
+  for (const item of footprints) {
+    const x0 = feet(item.min.x);
+    const x1 = feet(item.max.x);
+    const y0 = feet(item.min.y);
+    const y1 = feet(item.max.y);
+    const base: Point[] = [
+      { x: item.min.x, y: item.min.y },
+      { x: item.max.x, y: item.min.y },
+      { x: item.max.x, y: item.max.y },
+      { x: item.min.x, y: item.max.y },
+    ];
+    // Degenerate boxes come out of a scan that saw something edge-on. A face
+    // with no width is a line, and a line drawn as a polygon is a stray mark.
+    if (Math.abs(x1 - x0) < 0.02 || Math.abs(y1 - y0) < 0.02) continue;
+
+    const top = base.map((p) => view(p, OBJECT_HEIGHT_FEET));
+    raw.push({
+      wallId: `object:${item.id}`,
+      kind: 'object',
+      points: top.map((v) => ({ x: v.x, y: v.y })),
+      depth: top.reduce((sum, v) => sum + v.depth, 0) / 4,
+      shade: 0.88,
+    });
+
+    for (let i = 0; i < base.length; i += 1) {
+      const a = base[i]!;
+      const b = base[(i + 1) % base.length]!;
+      const quad = [view(a, 0), view(b, 0), view(b, OBJECT_HEIGHT_FEET), view(a, OBJECT_HEIGHT_FEET)];
+      raw.push({
+        wallId: `object:${item.id}`,
+        kind: 'object',
+        points: quad.map((v) => ({ x: v.x, y: v.y })),
+        depth: quad.reduce((sum, v) => sum + v.depth, 0) / 4,
+        // Alternating faces so a box reads as a box rather than a flat blob.
+        shade: i % 2 === 0 ? 0.74 : 0.66,
+      });
+    }
+  }
+
   // Sorting by depth alone got it backwards on Sam's own garage — the window on
   // wall-4 averaged 7.15 to the wall's 6.46, because it covers a different part
   // of the wall, so it was drawn first and the wall painted over it.

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { type Footprint } from '../../core/src/obstruction.ts';
 import { type Camera, DEFAULT_CAMERA, project } from '../../core/src/project.ts';
 import type { Room } from '../../core/src/room.ts';
 
@@ -28,10 +29,16 @@ export function Room3D({
   room,
   selected,
   onSelect,
+  footprints = [],
+  furniture = true,
 }: {
   readonly room: Room;
   readonly selected: string | null;
   readonly onSelect: (wallId: string | null) => void;
+  /** What the scan found standing in the room. */
+  readonly footprints?: readonly Footprint[];
+  /** Whether to draw it. The same switch as the blueprint's. */
+  readonly furniture?: boolean;
 }) {
   const [camera, setCamera] = useState<Camera>(DEFAULT_CAMERA);
   // A drag is a turn, not a tap. Held in a ref so a re-render mid-drag cannot
@@ -45,14 +52,17 @@ export function Room3D({
 
   const view = useMemo(() => {
     try {
-      return { projection: project(room, camera, SIZE), trouble: null as string | null };
+      return {
+        projection: project(room, camera, SIZE, furniture ? footprints : []),
+        trouble: null as string | null,
+      };
     } catch (error) {
       return {
         projection: null,
         trouble: error instanceof Error ? error.message : String(error),
       };
     }
-  }, [room, camera]);
+  }, [room, camera, footprints, furniture]);
 
   if (!view.projection) {
     return (
@@ -103,7 +113,7 @@ export function Room3D({
         onPointerCancel={end}
       >
         {view.projection.facets.map((facet, i) => {
-          const isWall = facet.kind !== 'floor';
+          const isWall = facet.kind !== 'floor' && facet.kind !== 'object';
           const isSelected = isWall && facet.wallId === selected;
           return (
             <polygon
@@ -112,14 +122,21 @@ export function Room3D({
               fill={
                 facet.kind === 'floor'
                   ? '#E8EDEF'
-                  : facet.kind === 'opening'
-                    ? facet.openingKind === 'window'
-                      ? '#7FB2DA'
-                      : '#F4F6F7'
-                    : ink(facet.shade, isSelected)
+                  : facet.kind === 'object'
+                    // Warm and pale against the room's cool slate, so a box
+                    // reads as something standing in the room rather than as
+                    // part of the building.
+                    ? `hsl(28 24% ${Math.round(52 + facet.shade * 34)}%)`
+                    : facet.kind === 'opening'
+                      ? facet.openingKind === 'window'
+                        ? '#7FB2DA'
+                        : '#F4F6F7'
+                      : ink(facet.shade, isSelected)
               }
-              stroke={isSelected ? '#B8590A' : '#0F172A'}
-              strokeWidth={isSelected ? 6 : 1.5}
+              stroke={
+                isSelected ? '#B8590A' : facet.kind === 'object' ? '#8A6A4A' : '#0F172A'
+              }
+              strokeWidth={isSelected ? 6 : facet.kind === 'object' ? 1 : 1.5}
               strokeLinejoin="round"
               className={isWall ? 'cursor-pointer' : undefined}
               onClick={(event) => {
