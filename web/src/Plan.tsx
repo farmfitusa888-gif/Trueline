@@ -48,6 +48,18 @@ export interface PlanProps {
   /** What the scan found standing in the room. Drawn so "could not see it" has a picture. */
   readonly footprints: readonly Footprint[];
   /**
+   * Whether to draw it.
+   *
+   * Off, the drawing is the building on its own -- which is what goes to a
+   * client, an adjuster or a supplier. **No number moves either way.** A
+   * scan reports the walls and the objects separately, and nothing in the
+   * geometry, the takeoff or the readiness has ever read a footprint: they
+   * are used for what is in the way of a tape, and for the field sheet. So
+   * this hides clutter, and it is not a correction -- the measurements were
+   * already the room's own.
+   */
+  readonly furniture?: boolean;
+  /**
    * What is wrong with this building, drawn on it.
    *
    * Empty on every job that is not a claim. A remodeler correcting a kitchen
@@ -157,6 +169,7 @@ export function Plan({
   selected,
   obstructions,
   footprints,
+  furniture = true,
   damages = [],
   onSelect,
 }: PlanProps) {
@@ -273,7 +286,7 @@ export function Plan({
       {/* Whatever was standing in the room when it was scanned. Faint, because it
           is not part of the building — but it is why some of these walls are
           worth a tape. */}
-      {footprints.map((f) => (
+      {(furniture ? footprints : []).map((f) => (
         <rect
           key={f.id}
           x={px(feet(f.min.x))}
@@ -537,7 +550,8 @@ export function Plan({
  */
 export function legendFor(
   anyDamage: boolean,
-  anyAdjusted = false
+  anyAdjusted = false,
+  furniture = true
 ): readonly { label: string; className: string }[] {
   return [
     { label: 'Measured', className: 'bg-slate-900' },
@@ -545,7 +559,8 @@ export function legendFor(
     ...(anyAdjusted ? [{ label: 'Moved by hand', className: 'bg-violet-600' }] : []),
     { label: 'No wall here', className: 'bg-slate-400' },
     { label: 'Something in the way', className: 'bg-red-600' },
-    { label: 'What was in the room', className: 'bg-slate-300' },
+    // A key entry for something that is not on the drawing is a key that lies.
+    ...(furniture ? [{ label: 'What was in the room', className: 'bg-slate-300' }] : []),
     ...(anyDamage ? [{ label: 'Damaged', className: 'bg-red-600/60' }] : []),
   ];
 }

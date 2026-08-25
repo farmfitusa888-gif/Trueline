@@ -625,3 +625,51 @@ test('the report says which walls stop short and what that means', () => {
   assert.match(note, /wall-3 at/);
   assert.match(note, /measuring the ceiling\s+moves them all/);
 });
+
+/* ------------------------------------------- furniture and the measurements */
+
+/**
+ * Taking the furniture off the drawing cannot move a number, because no number
+ * ever came from it.
+ *
+ * The ask was for a toggle that makes the furniture disappear "and the entire
+ * room measurements would be correct" — which reads as a worry that a scan with
+ * a freezer against a wall measures the freezer instead of the wall. It does
+ * not: RoomPlan reports surfaces and objects separately, the room is built from
+ * the surfaces, and nothing in the geometry, the takeoff or the readiness has
+ * ever read a footprint. Objects are used for what is in the way of a tape and
+ * for the field sheet, and nowhere else.
+ *
+ * So the toggle is a view control, and this is what says so. It compares the
+ * same room imported with and without two detected objects standing in it, and
+ * every derived value has to come out the same. If somebody ever wires a
+ * footprint into the geometry, this fails — which is the point of writing it
+ * down rather than saying it in a comment.
+ */
+test('furniture in a scan changes no measurement, only what is drawn', () => {
+  // The base fixture already has a bench in it, so "bare" is asked for
+  // explicitly. Comparing one piece of furniture against three would still
+  // pass and would prove much less.
+  const bare = importRoomPlan(scan({ objects: [] }), { at: AT });
+  const furnished = importRoomPlan(withCounter(), { at: AT });
+
+  // The two have to actually differ, or this test proves nothing at all.
+  assert.equal(bare.footprints.length, 0);
+  assert.equal(furnished.footprints.length, 3);
+
+  const same = (value: unknown) =>
+    JSON.stringify(value, (_key, x) => (typeof x === 'bigint' ? x.toString() : x));
+
+  assert.equal(same(furnished.room.walls), same(bare.room.walls), 'the walls moved');
+  assert.equal(same(area(furnished.room)), same(area(bare.room)), 'the floor area moved');
+  assert.equal(
+    same(roomQuantities(furnished.room)),
+    same(roomQuantities(bare.room)),
+    'the takeoff moved'
+  );
+  assert.equal(
+    same(readiness(furnished.room)),
+    same(readiness(bare.room)),
+    'what the room says about itself moved'
+  );
+});

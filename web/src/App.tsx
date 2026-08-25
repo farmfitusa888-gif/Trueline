@@ -155,6 +155,10 @@ export function App() {
   // both — switching view never changes what is being measured.
   const [look, setLook] = useState<'plan' | 'room'>('plan');
   const [section, setSection] = useState<SectionKey>('plan');
+  // Furniture is drawn faintly because it is why some walls are worth a tape.
+  // On a sheet going to a client it is clutter, so it comes off -- and taking
+  // it off moves nothing, because no number ever came from it.
+  const [furniture, setFurniture] = useState(true);
   const [drawing, setDrawing] = useState(false);
   const [settings, setSettings] = useState(false);
   // One room, or all of them. The floor is a view over the rooms already saved
@@ -413,13 +417,38 @@ export function App() {
                       selected={state.selected}
                       obstructions={derived.obstructions}
                       footprints={loaded.footprints}
+                      furniture={furniture}
                       damages={loaded.claim.on ? loaded.damages : []}
                       onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                     />
+                    {loaded.footprints.length > 0 && (
+                      <div data-sheet="no" className="mt-2 px-1">
+                        <button
+                          type="button"
+                          onClick={() => setFurniture((on) => !on)}
+                          aria-pressed={furniture}
+                          className="min-h-11 rounded-md border border-slate-300 px-3 text-sm
+                                     font-medium text-slate-700 active:bg-slate-100"
+                        >
+                          {furniture
+                            ? `Hide what was in the room (${loaded.footprints.length})`
+                            : `Show what was in the room (${loaded.footprints.length})`}
+                        </button>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {furniture
+                            ? 'The furniture the scan saw, drawn faintly. It is why some of these ' +
+                              'walls are worth a tape.'
+                            : 'The building on its own — what goes to a client or an adjuster. ' +
+                              'Not one number changed: a scan reports the walls and the objects ' +
+                              'separately, and no measurement here has ever read a piece of furniture.'}
+                        </p>
+                      </div>
+                    )}
                     <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-slate-500">
                       {legendFor(
                         loaded.claim.on && loaded.damages.length > 0,
-                        loaded.room.walls.some((wall) => isAdjusted(wall.length))
+                        loaded.room.walls.some((wall) => isAdjusted(wall.length)),
+                        furniture && loaded.footprints.length > 0
                       ).map((item) => (
                         <li key={item.label} className="flex items-center gap-1.5">
                           <span className={`inline-block h-2 w-4 rounded-sm ${item.className}`} />

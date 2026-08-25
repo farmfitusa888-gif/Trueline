@@ -46,6 +46,38 @@ if (await undo.count()) {
   await page.waitForTimeout(400);
 }
 
+/* ------------------------------------------------- furniture comes off the sheet */
+
+// A drawing going to a client or an adjuster is the building, not the client's
+// freezer. The toggle is a view control and this is what proves it: the takeoff
+// is read on both sides of it and has to be the same both times.
+{
+  const shots = await open();
+  const p2 = shots.page;
+  await p2.setInputFiles('input[type=file][accept="application/json,.json"]', `${SP}/garage-furnished.json`);
+  await p2.waitForTimeout(600);
+
+  const boxes = () => p2.locator('svg[aria-label^="Plan of"] rect[stroke-dasharray="3 3"]').count();
+  check('what was in the room is drawn on the plan', (await boxes()) === 3, `${await boxes()} drawn`);
+  check('the key says so', (await p2.locator('ul.flex-wrap').first().innerText()).includes('What was in the room'));
+
+  await section(p2, 'Takeoff');
+  const withIt = await p2.locator('body').innerText();
+
+  await section(p2, 'Plan');
+  await p2.getByRole('button', { name: /^Hide what was in the room/ }).click();
+  await p2.waitForTimeout(300);
+  check('hiding it takes it off the drawing', (await boxes()) === 0, `${await boxes()} still drawn`);
+  check('and out of the key, which would otherwise name something absent',
+    !(await p2.locator('ul.flex-wrap').first().innerText()).includes('What was in the room'));
+
+  await section(p2, 'Takeoff');
+  check('and moves not one number, because none of them ever came from it',
+    (await p2.locator('body').innerText()) === withIt);
+
+  await shots.browser.close();
+}
+
 /* --------------------------------------------------------------- exports */
 
 await section(page, 'Files');
