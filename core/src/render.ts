@@ -58,6 +58,15 @@ export interface RenderWall {
   readonly start: RenderPoint;
   readonly end: RenderPoint;
   readonly thickness: number;
+  /**
+   * True when `thickness` is the fallback rather than something somebody said.
+   *
+   * RoomPlan reports a thickness for every wall and it is zero, so a drawing has
+   * to fall back to a figure to have any width at all. A renderer that hatches
+   * an assumed wall differently from a stated one is telling the truth; one that
+   * draws them identically is presenting a guess as a fact.
+   */
+  readonly thicknessAssumed: boolean;
   readonly height: number;
   /** Ours, and the reason this adapter exists rather than a straight port. */
   readonly confidence: 'scanned' | 'verified' | 'derived';
@@ -134,16 +143,24 @@ export function toRenderModel(
   const points = corners(room);
   const at = (p: Point): RenderPoint => ({ x: toUnit(p.x, unit), y: toUnit(p.y, unit) });
 
-  const walls: RenderWall[] = room.walls.map((wall, i) => ({
+  const walls: RenderWall[] = room.walls.map((wall, i) => {
+    // A thickness somebody actually said beats the fallback. Until `thickness.ts`
+    // existed there was nothing to say it, so every wall in every drawing was
+    // 160 mm — which is what the market research file lists as complaint number
+    // nine about the tools already on sale.
+    const stated = wall.open ? undefined : (wall.thickness ?? room.wallThickness);
+    return {
     id: wall.id,
     start: at(points[i]!),
     end: at(points[(i + 1) % points.length]!),
-    thickness: toUnit(assumed, unit),
+    thickness: toUnit(stated?.value ?? assumed, unit),
+    thicknessAssumed: stated === undefined,
     height: toUnit(wallHeight(wall, room).value, unit),
     confidence: confidenceLabel(wall.length),
     tolerance: toUnit(toleranceOf(wall.length), unit),
     open: wall.open === true,
-  }));
+    };
+  });
 
   const renderZones: RenderZone[] = zones.map((zone) => ({
     id: zone.id,

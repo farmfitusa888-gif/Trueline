@@ -138,3 +138,36 @@ test('the rendered ring closes, exactly as the solved room does', () => {
   assert.ok(Math.abs(x) < RENDER_EPSILON, `east-west drift ${x}`);
   assert.ok(Math.abs(y) < RENDER_EPSILON, `north-south drift ${y}`);
 });
+
+test('a wall somebody gave a thickness is drawn at that thickness, and says so', () => {
+  // Every wall in every drawing was 160 mm, because RoomPlan reports a thickness
+  // for each one and it is zero. That is complaint number nine on the gap list:
+  // "wall thickness that is real, not RoomPlan's uniform 16 cm".
+  const stated = verified(parseLength(`6 1/2"`), 'sam', T1, 'stated');
+  const model = toRenderModel({ ...room(), wallThickness: stated }, [], { unit: 'm' });
+  for (const wall of model.walls) {
+    assert.equal(wall.thicknessAssumed, false, wall.id);
+    assert.ok(Math.abs(wall.thickness - 0.1651) < 1e-6, `${wall.id}: ${wall.thickness}`);
+  }
+
+  // And with nobody having said anything, the fallback is used and admits it.
+  const guessed = toRenderModel(room(), [], { unit: 'm' });
+  for (const wall of guessed.walls) {
+    assert.equal(wall.thicknessAssumed, true, wall.id);
+    assert.ok(Math.abs(wall.thickness - 0.16) < 1e-9);
+  }
+});
+
+test('one wall can differ from the rest of the room', () => {
+  const base = room();
+  const mixed: Room = {
+    ...base,
+    wallThickness: verified(parseLength(`4 1/2"`), 'sam', T1, 'stated'),
+    walls: base.walls.map((wall, i) =>
+      i === 0 ? { ...wall, thickness: verified(parseLength(`6 1/2"`), 'sam', T1, 'tape') } : wall
+    ),
+  };
+  const model = toRenderModel(mixed, [], { unit: 'in' });
+  assert.ok(Math.abs(model.walls[0]!.thickness - 6.5) < 1e-9);
+  assert.ok(Math.abs(model.walls[1]!.thickness - 4.5) < 1e-9);
+});

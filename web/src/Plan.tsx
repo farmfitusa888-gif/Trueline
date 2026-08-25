@@ -287,14 +287,22 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
             {isSelected && (
               <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#0ea5e9" strokeWidth={16} strokeOpacity={0.28} />
             )}
+            {/*
+              A wall somebody has given a thickness is drawn at that thickness,
+              to the same scale as everything else on the sheet — so a 2x6 wall
+              looks like a 2x6 wall beside a 2x4 partition. A wall nobody has
+              said anything about stays a thin line rather than being fattened
+              to a guess, which is the difference between a drawing and a
+              picture of one.
+            */}
             <line
               x1={x1}
               y1={y1}
               x2={x2}
               y2={y2}
               stroke={stroke}
-              strokeWidth={w.open ? 3 : 7}
-              strokeLinecap="round"
+              strokeWidth={w.open ? 3 : w.thicknessAssumed ? 7 : Math.max(7, w.thickness * scale)}
+              strokeLinecap={w.thicknessAssumed ? 'round' : 'butt'}
               strokeDasharray={w.open ? '2 10' : undefined}
             />
             {/* Something was standing here, so the scanner could not see it. */}
