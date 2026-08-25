@@ -12,6 +12,8 @@ import {
   setRoomThickness,
   setWallThickness,
   verifyCeiling,
+  addOpening,
+  removeOpening,
   verifyOpening,
   verifyWall,
 } from '../../core/src/edit.ts';
@@ -98,7 +100,14 @@ export const EMPTY: State = { loaded: null, error: null, selected: null };
 
 export type Action =
   | { type: 'open'; json: unknown; fileName: string; at: string; photos?: unknown }
-  | { type: 'restore'; fileName?: string }
+  /**
+   * Bring a saved room back.
+   *
+   * `force` is for somebody choosing a different room from the floor screen —
+   * an explicit "open that one" rather than the automatic restore at start-up,
+   * which must never replace a capture the app has just handed over.
+   */
+  | { type: 'restore'; fileName?: string; force?: boolean }
   | { type: 'openTrace'; trace: unknown; fileName: string; at: string }
   /** A room typed in wall by wall, with no scan behind it at all. */
   | { type: 'openDrawn'; room: Room; fileName: string }
@@ -145,6 +154,25 @@ export type Action =
     }
   /** Somebody measured the ceiling, or said what it is. */
   | { type: 'ceiling'; text: string; how: 'stated' | 'tape'; by: string; at: string }
+  /**
+   * A door or window put in by hand, or taken out.
+   *
+   * A room drawn by hand has no openings at all, and a scanned room is
+   * routinely missing one — a door standing open against a wall is regularly
+   * not in the capture.
+   */
+  | {
+      type: 'addOpening';
+      wallId: string;
+      kind: 'door' | 'window' | 'cased';
+      width: string;
+      height: string;
+      offsetFromStart: string;
+      sillHeight?: string;
+      by: string;
+      at: string;
+    }
+  | { type: 'removeOpening'; wallId: string; openingId: string }
   | { type: 'undo' }
   | { type: 'dismissError' }
   | { type: 'close' };
@@ -390,10 +418,11 @@ export function reduce(state: State, action: Action): State {
     }
 
     case 'restore': {
-      // A room already on screen always outranks storage. Without this, the
-      // restore dispatched at mount could land after a capture handed over by
-      // the app and quietly replace it with yesterday's room.
-      if (state.loaded) return state;
+      // A room already on screen always outranks storage — unless somebody has
+      // just asked for a different one by name. Without this, the restore
+      // dispatched at mount could land after a capture handed over by the app
+      // and quietly replace it with yesterday's room.
+      if (state.loaded && !action.force) return state;
 
       // Storage can be unavailable outright — a private window, a browser with
       // site data switched off — so reading it is as fallible as parsing it.
@@ -569,6 +598,48 @@ export function reduce(state: State, action: Action): State {
       }
     }
 
+    case 'addOpening': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const feet = (text: string) => parseLength(text, { defaultUnit: 'ft' });
+        const wall = loaded.room.walls.find((w) => w.id === action.wallId);
+        const count = (wall?.openings ?? []).length + 1;
+        const next = addOpening(
+          loaded.room,
+          action.wallId,
+          {
+            id: `${action.wallId}-${action.kind}-${count}`,
+            kind: action.kind,
+            width: feet(action.width),
+            height: feet(action.height),
+            offsetFromStart: feet(action.offsetFromStart),
+            ...(action.sillHeight ? { sillHeight: feet(action.sillHeight) } : {}),
+          },
+          action.by,
+          action.at
+        );
+        return edited(state, loaded, next, `Put a ${action.kind} in ${action.wallId}.`);
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'removeOpening': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        return edited(
+          state,
+          loaded,
+          removeOpening(loaded.room, action.wallId, action.openingId),
+          `Took ${action.openingId} out of ${action.wallId}.`
+        );
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
     case 'undo': {
       const loaded = state.loaded;
       if (!loaded || loaded.undo.length === 0) return state;
@@ -585,14 +656,19 @@ export function reduce(state: State, action: Action): State {
     case 'dismissError':
       return { ...state, error: null };
 
-    case 'close': {
-      try {
-        if (state.loaded) window.localStorage.removeItem(keyFor(state.loaded.fileName));
-      } catch {
-        // If it cannot be cleared it was never written; closing still works.
-      }
+    // Put this room down and pick up another. **It does not delete it.**
+    //
+    // It used to. Closing a room removed it from storage, which made sense for
+    // exactly as long as there was only ever one room: "close" meant "I am done
+    // with this scan". It stopped making sense the moment corrections were
+    // worth keeping, and it became actively wrong when rooms started being the
+    // material a floor is made of — tapping "Open another" threw away every
+    // tape reading somebody had typed, silently, with no way back.
+    //
+    // Deleting a scan is a deliberate act and it belongs where it already is:
+    // swiping it off the list in the app that owns the folder.
+    case 'close':
       return EMPTY;
-    }
   }
 }
 

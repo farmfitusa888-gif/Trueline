@@ -22,6 +22,7 @@ import { Settings } from './Settings.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Price } from './Price.tsx';
 import { JobStatus } from './JobStatus.tsx';
+import { Floor } from './Floor.tsx';
 import { Draw } from './Draw.tsx';
 import { WallPhotos } from './WallPhotos.tsx';
 import { Elevation } from './Elevation.tsx';
@@ -146,6 +147,10 @@ export function App() {
   const [look, setLook] = useState<'plan' | 'room'>('plan');
   const [drawing, setDrawing] = useState(false);
   const [settings, setSettings] = useState(false);
+  // One room, or all of them. The floor is a view over the rooms already saved
+  // on this device plus the joins somebody declared between them, so switching
+  // to it never touches what is being corrected.
+  const [showing, setShowing] = useState<'room' | 'floor'>('room');
   const loaded = state.loaded;
 
   // Let the scanner in — and pick up whatever was being corrected last time.
@@ -252,6 +257,13 @@ export function App() {
           )}
           <button
             type="button"
+            onClick={() => setShowing(showing === 'floor' ? 'room' : 'floor')}
+            className="text-sm text-slate-500 underline underline-offset-4"
+          >
+            {showing === 'floor' ? 'This room' : 'The floor'}
+          </button>
+          <button
+            type="button"
             onClick={() => setSettings(!settings)}
             aria-label="Your business"
             className="text-sm text-slate-500 underline underline-offset-4"
@@ -286,7 +298,14 @@ export function App() {
         </div>
       )}
 
-      {!loaded ? (
+      {showing === 'floor' ? (
+        <Floor
+          onOpenRoom={(fileName) => {
+            dispatch({ type: 'restore', fileName, force: true });
+            setShowing('room');
+          }}
+        />
+      ) : !loaded ? (
         drawing ? (
           <Draw
             onDone={(room, name) => {
@@ -414,6 +433,22 @@ export function App() {
                       by: 'me',
                       at: new Date().toISOString(),
                     })
+                  }
+                  onAdd={(kind, where) =>
+                    dispatch({
+                      type: 'addOpening',
+                      wallId: selectedWall.id,
+                      kind,
+                      width: kind === 'cased' ? `4'` : kind === 'door' ? `3'` : `3'`,
+                      height: kind === 'window' ? `4'` : `6'8"`,
+                      offsetFromStart: where,
+                      ...(kind === 'window' ? { sillHeight: `2'6"` } : {}),
+                      by: 'me',
+                      at: new Date().toISOString(),
+                    })
+                  }
+                  onRemove={(openingId) =>
+                    dispatch({ type: 'removeOpening', wallId: selectedWall.id, openingId })
                   }
                 />
 

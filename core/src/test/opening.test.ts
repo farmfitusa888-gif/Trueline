@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { formatFeetInches, parseLength } from '../length.ts';
 import { isVerified, scanned, verified } from '../measurement.ts';
 import { type Heading, type Opening, type Room, type Wall, runLength } from '../room.ts';
-import { EditError, verifyOpening, verifyWall } from '../edit.ts';
+import { EditError, addOpening, removeOpening, verifyOpening, verifyWall } from '../edit.ts';
 import { roomQuantities } from '../zone.ts';
 import { checkCapture } from '../health.ts';
 
@@ -254,4 +254,93 @@ test('and the fix is to say where it really starts', () => {
     formatFeetInches(door.offsetFromStart.value + door.width.value),
     formatFeetInches(runLength(fixed.walls[0]!) - parseLength(`1'`))
   );
+});
+
+/* --------------------------------------------- putting one in by hand */
+
+test('a door can be put into a wall that has none', () => {
+  // A room drawn by hand has no openings at all, so until this existed a
+  // hand-drawn room could carry no door — no baseboard deduction, no jamb, and
+  // no way to join it to the room next door. A scanned room needs it too: a
+  // door standing open against a wall is regularly not in the capture.
+  const fixed = addOpening(
+    room,
+    'east',
+    {
+      id: 'new-door',
+      kind: 'door',
+      width: parseLength(`2' 8"`),
+      height: parseLength(`6' 8"`),
+      offsetFromStart: parseLength(`3'`),
+    },
+    'sam',
+    T0
+  );
+  const made = openingIn(fixed, 'east', 'new-door');
+  assert.equal(made.width.value, parseLength(`2' 8"`));
+  // Typed by a person, so it is measured — a door somebody put in by hand must
+  // never read like the scanner's guess.
+  assert.equal(isVerified(made.width), true);
+  assert.equal(isVerified(made.offsetFromStart), true);
+
+  // And it comes off the quantities like any other door.
+  assert.equal(
+    roomQuantities(room).baseboardRun - roomQuantities(fixed).baseboardRun,
+    parseLength(`2' 8"`)
+  );
+});
+
+test('a window put in by hand can carry the sill nobody else knows', () => {
+  const fixed = addOpening(
+    room,
+    'east',
+    {
+      id: 'w9',
+      kind: 'window',
+      width: parseLength(`4'`),
+      height: parseLength(`3'`),
+      offsetFromStart: parseLength(`2'`),
+      sillHeight: parseLength(`2' 6"`),
+    },
+    'sam',
+    T0
+  );
+  assert.equal(openingIn(fixed, 'east', 'w9').sillHeight!.value, parseLength(`2' 6"`));
+});
+
+test('a hand-placed opening obeys every rule a corrected one does', () => {
+  // One set of rules about what fits in a wall, not two that can drift apart.
+  const tooWide = () =>
+    addOpening(room, 'east', { id: 'x', kind: 'door', width: parseLength(`14'`), height: parseLength(`7'`), offsetFromStart: 0n }, 'sam', T0);
+  assert.throws(tooWide, EditError);
+
+  const tooTall = () =>
+    addOpening(room, 'east', { id: 'x', kind: 'door', width: parseLength(`3'`), height: parseLength(`9'`), offsetFromStart: 0n }, 'sam', T0);
+  assert.throws(tooTall, EditError);
+
+  const onTopOfTheDoor = () =>
+    addOpening(room, 'south', { id: 'x', kind: 'door', width: parseLength(`3'`), height: parseLength(`7'`), offsetFromStart: parseLength(`6'`) }, 'sam', T0);
+  assert.throws(onTopOfTheDoor, EditError);
+});
+
+test('nothing goes in a side of the room with no wall across it', () => {
+  const garage: Room = {
+    ...room,
+    walls: room.walls.map((x) => (x.id === 'east' ? { ...x, open: true as const } : x)),
+  };
+  assert.throws(
+    () => addOpening(garage, 'east', { id: 'x', kind: 'door', width: parseLength(`3'`), height: parseLength(`7'`), offsetFromStart: 0n }, 'sam', T0),
+    (error: unknown) => {
+      assert.ok(error instanceof EditError);
+      assert.match(error.message, /make it one first/);
+      return true;
+    }
+  );
+});
+
+test('an opening the scanner invented can be taken out again', () => {
+  const gone = removeOpening(room, 'south', 'door');
+  assert.equal(gone.walls[0]!.openings, undefined, 'the last one out takes the key with it');
+  assert.equal(roomQuantities(gone).baseboardRun, roomQuantities(room).baseboardRun + parseLength(`2' 7"`));
+  assert.throws(() => removeOpening(room, 'south', 'nope'), EditError);
 });

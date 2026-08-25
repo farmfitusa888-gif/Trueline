@@ -602,3 +602,84 @@ export function setWallHeight(
   validate(next);
   return next;
 }
+
+/**
+ * Putting a door or a window into a wall by hand.
+ *
+ * Two rooms need this and both of them are ordinary. A room drawn by hand has no
+ * openings at all — `draft.ts` builds walls and nothing else — so until now a
+ * hand-drawn room could not carry a door, which meant no baseboard deduction, no
+ * jamb, and no way to join it to the room next door. And a scanned room is
+ * routinely missing one: RoomPlan finds what it can see, and a door standing
+ * open against a wall, or a cased opening with no frame, is regularly not there.
+ *
+ * It goes in where somebody says, and everything `verifyOpening` refuses is
+ * refused here too — an opening has to fit in its wall, under its ceiling, and
+ * not through something already there. The difference is only that this one is
+ * making a hole rather than correcting one.
+ *
+ * Sizes are `verified`, because a person typed them. A door somebody put in by
+ * hand is not the scanner's guess and must never read like one.
+ */
+export function addOpening(
+  room: Room,
+  wallId: string,
+  opening: {
+    readonly id: string;
+    readonly kind: Opening['kind'];
+    readonly width: Nanometres;
+    readonly height: Nanometres;
+    readonly offsetFromStart: Nanometres;
+    readonly sillHeight?: Nanometres;
+  },
+  by: string,
+  at: string,
+  method: VerificationMethod = 'tape'
+): Room {
+  const { wall, index } = find(room, wallId);
+  if (wall.open) {
+    throw new EditError(
+      `"${wallId}" is an open span — there is no wall there to put a ${opening.kind} in. If ` +
+        `there really is a wall, make it one first.`
+    );
+  }
+  if ((wall.openings ?? []).some((o) => o.id === opening.id)) {
+    throw new EditError(`"${wallId}" already has something in it called "${opening.id}".`);
+  }
+
+  const made: Opening = {
+    id: opening.id,
+    kind: opening.kind,
+    width: verified(opening.width, by, at, method),
+    height: verified(opening.height, by, at, method),
+    offsetFromStart: verified(opening.offsetFromStart, by, at, method),
+    ...(opening.sillHeight === undefined
+      ? {}
+      : { sillHeight: verified(opening.sillHeight, by, at, method) }),
+  };
+
+  const walls = [...room.walls];
+  walls[index] = { ...wall, openings: [...(wall.openings ?? []), made] };
+  const next: Room = { ...room, walls };
+  validate(next);
+
+  // Everything that would refuse a correction refuses a new one, said in the
+  // same words — checked by re-verifying it against itself, so there is one set
+  // of rules about what fits in a wall rather than two that can drift apart.
+  return verifyOpening(next, wallId, opening.id, {}, by, at, method);
+}
+
+/** Takes an opening out of a wall — the scanner found one that is not there. */
+export function removeOpening(room: Room, wallId: string, openingId: string): Room {
+  const { wall, index } = find(room, wallId);
+  const openings = (wall.openings ?? []).filter((o) => o.id !== openingId);
+  if (openings.length === (wall.openings ?? []).length) {
+    throw new EditError(`Wall "${wallId}" has nothing in it called "${openingId}".`);
+  }
+  const walls = [...room.walls];
+  const { openings: _gone, ...bare } = wall;
+  walls[index] = openings.length === 0 ? bare : { ...wall, openings };
+  const next: Room = { ...room, walls };
+  validate(next);
+  return next;
+}

@@ -335,10 +335,15 @@ export function layout(floor: Floor): Layout {
           if (t === undefined) {
             notes.push({
               kind: 'no-thickness',
+              // Named by the rooms, not by the join's own id. That id is built
+              // from two room ids and two opening ids so it is stable across a
+              // re-join, which makes it exactly the wrong thing to show a
+              // person: it is forty characters of machinery in the middle of a
+              // sentence about their kitchen.
               what:
                 `Nobody has said how thick the wall between ${room(floor, from.roomId).name} and ` +
-                `${room(floor, to.roomId).name} is, so they are drawn touching. The floor is ` +
-                `short by that thickness across "${join.id}".`,
+                `${room(floor, to.roomId).name} is, so they are drawn touching — the floor is ` +
+                `short by that thickness. Say what those walls are and they will move apart.`,
               by: 0n,
             });
           }
