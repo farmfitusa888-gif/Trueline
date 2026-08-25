@@ -58,6 +58,17 @@ say "Your signing team"
 # yours and belongs to your Mac, not to the repository, so it is lifted out
 # before the pull and put back after it.
 pbx="ios/Trueline.xcodeproj/project.pbxproj"
+
+# An Apple developer team is ten characters, capitals and digits. Nothing else
+# is one -- and in particular `$(TRUELINE_DEVELOPMENT_TEAM)` is not, which is
+# the exact string that got written into the signing file and then reported as
+# a team by both scripts. xcodebuild then said "Signing requires a development
+# team" and the checks above it all said everything was fine.
+#
+# So a team is validated wherever it is read or written, and never merely
+# checked for being non-empty.
+is_team() { printf '%s' "$1" | grep -qE '^[A-Z0-9]{10}$'; }
+
 team=""
 if ! git diff --quiet -- "$pbx"; then
   team="$(git diff -U0 -- "$pbx" \
@@ -72,6 +83,12 @@ if ! git diff --quiet -- "$pbx"; then
     echo "     Keep it:   git stash push -- $pbx     (then re-run this script)"
     echo "     Drop it:   git checkout -- $pbx       (then re-run this script)"
     exit 1
+  fi
+  if [ -n "$team" ] && ! is_team "$team"; then
+    # What the project file holds now is the placeholder that points AT the
+    # signing file. Copying it into the signing file makes it point at itself.
+    warn "the project file holds \"$team\", which is not a team. Ignoring it."
+    team=""
   fi
   if [ -n "$team" ]; then
     ok "found your team ($team) — holding it while we pull"
@@ -178,6 +195,45 @@ local_cfg="ios/Signing.local.xcconfig"
 have=""
 [ -f "$local_cfg" ] && have="$(sed -n 's/^[[:space:]]*TRUELINE_DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*//p' "$local_cfg" | head -1 | tr -d ' \r')"
 
+if [ -n "$have" ] && ! is_team "$have"; then
+  bad "$local_cfg holds \"$have\", which is not a team."
+  if [ "$have" = '$(TRUELINE_DEVELOPMENT_TEAM)' ]; then
+    echo "     That is the placeholder pointing at itself, which resolves to"
+    echo "     nothing. An earlier version of this script copied it out of the"
+    echo "     project file. Clearing it and looking for the real one."
+  fi
+  rm -f "$local_cfg"
+  have=""
+fi
+
+# Finding it without opening Xcode.
+#
+# Every code-signing certificate on this Mac carries the team it belongs to in
+# its subject, as the **organisational unit**. That is the same ten characters
+# Xcode shows under Settings → Accounts, and reading it here saves a trip
+# through a GUI to copy a string already on the machine.
+#
+# The OU and nothing else. The certificate's common name also ends in ten
+# characters in brackets -- `Apple Development: Sam (XXXXXXXXXX)` -- and it is
+# tempting to read them from there. Tested against a certificate built with the
+# two deliberately different, the bracketed value is a different string, so
+# reading it would write a wrong team confidently. If the OU cannot be read,
+# this says so rather than falling back to a guess.
+#
+# It is also never picked for you when there is more than one: a Mac signed
+# into two developer accounts has two, and choosing is how an app ends up
+# published on the wrong account.
+found=""
+if [ -z "$have" ] && command -v security >/dev/null 2>&1 && command -v openssl >/dev/null 2>&1; then
+  for kind in "Apple Development" "Apple Distribution" "iPhone Developer"; do
+    more="$(security find-certificate -a -c "$kind" -p 2>/dev/null \
+      | openssl storeutl -noout -text -certs /dev/stdin 2>/dev/null \
+      | sed -n 's/.*Subject:.*OU *= *\([A-Z0-9]\{10\}\).*/\1/p')"
+    found="$(printf '%s\n%s' "$found" "$more" | grep -E '^[A-Z0-9]{10}$' | sort -u)"
+  done
+fi
+count="$(printf '%s' "$found" | grep -c . || true)"
+
 if [ -n "$have" ]; then
   ok "$have — in $local_cfg, which git ignores. Nothing to do."
   [ -n "$team" ] && [ "$team" != "$have" ] && \
@@ -186,11 +242,24 @@ elif [ -n "$team" ]; then
   printf 'TRUELINE_DEVELOPMENT_TEAM = %s\n' "$team" > "$local_cfg"
   ok "moved $team out of the project file and into $local_cfg"
   echo "     git ignores that file, so no pull can ever stop on it again."
+elif [ "$count" = "1" ]; then
+  printf 'TRUELINE_DEVELOPMENT_TEAM = %s\n' "$found" > "$local_cfg"
+  ok "found your team on this Mac ($found) and wrote it to $local_cfg"
+  echo "     It came from your Apple Development certificate. Check it against"
+  echo "     Xcode → Settings → Accounts → your team, once, if you want to."
+elif [ "$count" -gt 1 ] 2>/dev/null; then
+  warn "This Mac is signed into more than one developer team:"
+  printf '%s\n' "$found" | sed 's/^/       /'
+  echo "     Picking one for you is how an app ends up on the wrong account, so:"
+  echo "       echo 'TRUELINE_DEVELOPMENT_TEAM = XXXXXXXXXX' > $local_cfg"
+  echo "     with the one you want, then run this again."
 else
-  warn "No team set yet. Pick yours once in Xcode:"
-  echo "     Trueline → Signing & Capabilities → tick Automatically manage"
-  echo "     signing → Team. Run this script again afterwards and it will move"
-  echo "     it out of the tracked file for you."
+  warn "No team set, and none found on this Mac."
+  echo "     Open Xcode once: Trueline → Signing & Capabilities → tick"
+  echo "     Automatically manage signing → Team. That creates the certificate"
+  echo "     this script reads. Run it again afterwards and it will pick the"
+  echo "     team up on its own from then on."
+  echo "     A free Apple ID works — it gives you a personal team."
 fi
 
 if ! git diff --quiet -- "$pbx"; then

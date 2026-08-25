@@ -62,6 +62,44 @@ await page.waitForTimeout(300);
 check('and there is a way back out',
   (await page.getByRole('img', { name: /in three dimensions/ }).count()) === 1);
 
+/* --------------------------------------------------------- the cut plane */
+
+// The last thing in `section.ts` that nothing called. Everything about WHERE
+// the plane falls is tested in section.test.ts; this checks it is reachable
+// and that pressing it changes the drawing.
+const tall = () =>
+  page.evaluate(() => {
+    const walls = [...document.querySelectorAll('svg polygon')].map((p) => {
+      const ys = p.getAttribute('points').split(' ').map((q) => Number(q.split(',')[1]));
+      return Math.max(...ys) - Math.min(...ys);
+    });
+    return Math.max(...walls);
+  });
+
+const whole = await tall();
+const cut = page.getByRole('button', { name: 'Cut it' });
+check('the room can be cut at a height', (await cut.count()) === 1);
+await cut.click();
+await page.waitForTimeout(300);
+
+check('and the walls come down to the plane', (await tall()) < whole,
+  `${whole} whole, ${await tall()} cut`);
+
+let said = await page.locator('body').innerText();
+check('it opens at the conventional four foot', /Cut at 4', looking down/.test(said),
+  said.slice(0, 400));
+check('and says a cut is a way of looking, not a change to the room',
+  /A cut moves no number/.test(said));
+
+// Every stop is a real height in this room rather than an arbitrary slider.
+const stops = await page.getByRole('button', { name: /^Cut at / }).count();
+check('the heights offered are the ones that show something', stops >= 1, `${stops} stops`);
+
+await page.getByRole('button', { name: 'Whole room' }).click();
+await page.waitForTimeout(300);
+check('and the whole room comes back', (await tall()) === whole,
+  `${whole} before, ${await tall()} after`);
+
 /* ------------------------------------------------------- behind the wall */
 
 await section(page, 'Room');

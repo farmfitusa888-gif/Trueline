@@ -30,6 +30,7 @@ import {
   type PhotoImport,
   type PhotoManifest,
   type RoomFrame,
+  heightsAboveFloor,
   importPhotos,
   northOnPlan,
 } from '../../core/src/capture.ts';
@@ -111,6 +112,21 @@ export interface Loaded {
   readonly photos: readonly Photo[];
   /** Photographs the import would not place, so the screen can say which and why. */
   readonly rejectedPhotos: PhotoImport['rejected'];
+  /**
+   * How high above the floor each photograph was taken.
+   *
+   * Not used by any geometry. It is the alarm that catches the worst thing
+   * that can go wrong silently: the photographs and the walls ending up in
+   * different coordinate systems, which draws everything somewhere plausible
+   * and wrong. On both of Sam's real scans every frame lands between 0.8 m and
+   * 2.0 m, which is a person holding a phone; a scan where they do not is a
+   * scan nothing should be drawn from.
+   *
+   * `capture.ts` has been able to work this out since it was written and
+   * nothing ever asked it to, so the alarm and its test both existed and the
+   * alarm could never fire. Found by `core/tools/check-reachable.py`.
+   */
+  readonly cameraHeights: readonly bigint[];
   /**
    * Pins marked during the walk that could not be placed, and why.
    *
@@ -365,6 +381,7 @@ function restored(saved: SavedProject, note: string): State {
       footprints: extras.footprints ?? [],
       photos: extras.photos ?? [],
       rejectedPhotos: [],
+      cameraHeights: [],
       refusedPins: [],
       north: (extras.north as NorthOnPlan | undefined) ?? null,
       frame: extras.frame ?? NO_SCAN_FRAME,
@@ -418,6 +435,7 @@ export function reduce(state: State, action: Action): State {
         // alarms. Only a manifest that will not read at all is an error.
         let photos: readonly Photo[] = [];
         let rejectedPhotos: PhotoImport['rejected'] = [];
+        let cameraHeights: readonly bigint[] = [];
         let north: NorthOnPlan | null = null;
         let photoTrouble: string | null = null;
         if (action.photos) {
@@ -433,6 +451,15 @@ export function reduce(state: State, action: Action): State {
           // that will not place a single picture can still know which way the
           // room faces, and losing the arrow with them would be a shame.
           if (manifest.north) north = northOnPlan(manifest.north, frame.datum);
+          // The frame alarm's evidence. `frame.floor` is what makes it
+          // possible: before it existed there was no floor to measure from.
+          try {
+            cameraHeights = heightsAboveFloor(manifest, frame.floor);
+          } catch {
+            // A manifest too broken to measure heights in is already reported
+            // above; losing the sanity check as well is not worth a second
+            // message about the same file.
+          }
         }
 
         // What somebody pointed at while walking the room. Read the same way
@@ -465,6 +492,7 @@ export function reduce(state: State, action: Action): State {
             footprints,
             photos,
             rejectedPhotos,
+            cameraHeights,
             north,
             frame,
             damages,
@@ -542,6 +570,7 @@ export function reduce(state: State, action: Action): State {
             footprints: [],
             photos: [],
             rejectedPhotos: [],
+            cameraHeights: [],
             refusedPins: [],
             north: null,
             frame: NO_SCAN_FRAME,
@@ -592,6 +621,7 @@ export function reduce(state: State, action: Action): State {
           footprints: [],
           photos: [],
           rejectedPhotos: [],
+          cameraHeights: [],
           refusedPins: [],
           north: null,
           frame: NO_SCAN_FRAME,

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scanned, verified } from '../measurement.ts';
-import { type Heading, type Room, type Wall } from '../room.ts';
+import { type Heading, type Opening, type Room, type Wall } from '../room.ts';
 import { NM_PER_FOOT, parseLength } from '../length.ts';
-import { insidePlan } from '../section.ts';
+import { cutAt, insidePlan } from '../section.ts';
 import {
   DEFAULT_CAMERA,
   ProjectionError,
@@ -315,4 +315,126 @@ test('the default place to stand is inside the room and faces its longest wall',
     Math.abs(eye.turn) < 1 || Math.abs(eye.turn - 180) < 1,
     `faced ${eye.turn} degrees`
   );
+});
+
+/* --------------------------------------------------------- the cut plane */
+
+/**
+ * A horizontal section, drawn.
+ *
+ * `section.ts` has worked out cut planes since early on and nothing drew one.
+ * These check the drawing half only -- which walls are drawn, and how tall --
+ * because everything about *where* the plane falls is decided and tested in
+ * `section.test.ts`, and deciding it twice is two chances to disagree.
+ */
+
+/**
+ * A wall the default camera actually draws.
+ *
+ * Half the walls are dropped from an orbit view for being between the viewer
+ * and the room, and the first version of the opening tests below put their
+ * window on one of them. The test then failed for a reason that had nothing to
+ * do with cut planes, which is exactly the kind of failure that gets a real
+ * finding waved away.
+ */
+function drawnWall(): string {
+  const shown = project(room, DEFAULT_CAMERA).facets
+    .filter((f) => f.kind === 'wall')
+    .map((f) => f.wallId);
+  const first = room.walls.findIndex((w) => shown.includes(w.id));
+  assert.ok(first >= 0, 'the default camera should draw at least one wall');
+  return room.walls[first]!.id;
+}
+
+test('a cut plane shortens the walls it passes through', () => {
+  const whole = project(room, DEFAULT_CAMERA);
+  const sliced = project(room, DEFAULT_CAMERA, 1000, [], cutAt(room, { height: 4n * NM_PER_FOOT }));
+
+  const tallest = (p: typeof whole) => {
+    const walls = p.facets.filter((f) => f.kind === 'wall');
+    return Math.max(...walls.map((f) => {
+      const ys = f.points.map((q) => q.y);
+      return Math.max(...ys) - Math.min(...ys);
+    }));
+  };
+  assert.ok(tallest(sliced) < tallest(whole), 'a cut room should draw shorter walls');
+});
+
+test('a wall that stops below the plane is drawn whole, not cut', () => {
+  // A 7 ft pony wall in an 8 ft room, cut at 7'6". The plane passes over it,
+  // so it is not a cut wall and nothing of it is taken off. `section.ts`
+  // decides that; this checks the drawing believes it.
+  const withPony: Room = {
+    ...room,
+    walls: room.walls.map((wall, i) =>
+      i === 1 ? { ...wall, height: verified(parseLength(`7'`), 'sam', T0, 'tape') } : wall
+    ),
+  };
+  const view = cutAt(withPony, { height: parseLength(`7' 6"`) });
+  const pony = view.walls.find((w) => w.wallId === 'east');
+  assert.equal(pony?.cut, false);
+  assert.equal(pony?.drawnTo, parseLength(`7'`));
+});
+
+test('an opening the plane crosses is drawn up to it and no further', () => {
+  // A window 2'6" to 5'6" in a room cut at 4 ft. Drawn to 4 ft: a window whose
+  // head appears above a plane that went through it makes the section look
+  // like a mistake rather than a drawing.
+  const window: Opening = {
+    id: 'w1',
+    kind: 'window',
+    width: scanned(parseLength(`4'`), parseLength('50mm'), T0, 'roomplan'),
+    height: scanned(parseLength(`3'`), parseLength('50mm'), T0, 'roomplan'),
+    offsetFromStart: scanned(parseLength(`8'`), parseLength('50mm'), T0, 'roomplan'),
+    sillHeight: scanned(parseLength(`2' 6"`), parseLength('50mm'), T0, 'roomplan'),
+  };
+  const on = drawnWall();
+  const glazed: Room = {
+    ...room,
+    walls: room.walls.map((wall) => (wall.id === on ? { ...wall, openings: [window] } : wall)),
+  };
+  const cut = 4n * NM_PER_FOOT;
+  const sliced = project(glazed, DEFAULT_CAMERA, 1000, [], cutAt(glazed, { height: cut }));
+  const whole = project(glazed, DEFAULT_CAMERA);
+
+  const heightOf = (p: typeof whole) => {
+    const hole = p.facets.find((f) => f.kind === 'opening');
+    if (!hole) return 0;
+    const ys = hole.points.map((q) => q.y);
+    return Math.max(...ys) - Math.min(...ys);
+  };
+  assert.ok(heightOf(sliced) > 0, 'the window should still be drawn');
+  assert.ok(heightOf(sliced) < heightOf(whole), 'and drawn shorter than the whole one');
+});
+
+test('an opening entirely above the plane is not drawn at all', () => {
+  // A window sitting at 6 ft in a room cut at 4. Drawing any of it would be
+  // drawing something the plane is underneath.
+  const high: Opening = {
+    id: 'w2',
+    kind: 'window',
+    width: scanned(parseLength(`3'`), parseLength('50mm'), T0, 'roomplan'),
+    height: scanned(parseLength(`2'`), parseLength('50mm'), T0, 'roomplan'),
+    offsetFromStart: scanned(parseLength(`5'`), parseLength('50mm'), T0, 'roomplan'),
+    sillHeight: scanned(parseLength(`6'`), parseLength('50mm'), T0, 'roomplan'),
+  };
+  const on = drawnWall();
+  const glazed: Room = {
+    ...room,
+    walls: room.walls.map((wall) => (wall.id === on ? { ...wall, openings: [high] } : wall)),
+  };
+  // Drawn without a plane, so the test proves the plane removed it rather than
+  // that the camera never showed it.
+  assert.equal(project(glazed, DEFAULT_CAMERA).facets.filter((f) => f.kind === 'opening').length, 1);
+  const sliced = project(glazed, DEFAULT_CAMERA, 1000, [], cutAt(glazed, { height: 4n * NM_PER_FOOT }));
+  assert.equal(sliced.facets.filter((f) => f.kind === 'opening').length, 0);
+});
+
+test('with no plane at all nothing about the drawing changes', () => {
+  // The guard against a section quietly becoming compulsory. Passing nothing
+  // has to draw exactly what it drew before this existed.
+  const before = project(room, DEFAULT_CAMERA);
+  const after = project(room, DEFAULT_CAMERA, 1000, [], undefined);
+  assert.deepEqual(after.facets, before.facets);
+  assert.deepEqual(after.hidden, before.hidden);
 });

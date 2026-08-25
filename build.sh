@@ -95,14 +95,28 @@ ok "${name:-your iPhone} ($udid)"
 say "Signing"
 team=""
 [ -f ios/Signing.local.xcconfig ] && team="$(sed -n 's/^[[:space:]]*TRUELINE_DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*//p' ios/Signing.local.xcconfig | head -1 | tr -d ' \r')"
-if [ -n "$team" ]; then
+
+# Ten characters, capitals and digits. Checked rather than merely present,
+# because the string that was actually in there was
+# `$(TRUELINE_DEVELOPMENT_TEAM)` -- the placeholder pointing at itself -- and
+# this line reported it as the team with a green tick. Every check above it
+# passed, xcodebuild refused the build, and nothing in the output said why.
+if printf '%s' "$team" | grep -qE '^[A-Z0-9]{10}$'; then
   ok "$team"
 else
-  warn "No team set, so the build will be refused for a device."
-  echo "     Once, in Xcode: bash setup-mac.sh, then Trueline → Signing &"
-  echo "     Capabilities → tick Automatically manage signing → pick your team."
-  echo "     Then run this script again and it will move it out of the tracked"
-  echo "     file for you and never ask again."
+  if [ -n "$team" ]; then
+    bad "ios/Signing.local.xcconfig holds \"$team\", which is not a team."
+  else
+    bad "No signing team, so xcodebuild will refuse to build for a device."
+  fi
+  echo "     Fix it without opening Xcode:  bash setup-mac.sh"
+  echo "     It reads the team off your own signing certificate and writes it"
+  echo "     there. If this Mac has no certificate yet, it says so and tells"
+  echo "     you the one thing to do in Xcode to create one."
+  echo
+  echo "     Stopping here rather than compiling for two minutes and failing"
+  echo "     on the last step."
+  exit 1
 fi
 
 say "Building"

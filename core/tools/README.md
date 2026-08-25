@@ -231,3 +231,46 @@ shipped. See `NOTICES` at the repository root.
 
 Not opened in AutoCAD, Revit or SketchUp. LibreCAD rendering it correctly through its own
 engine is strong evidence and is not the same thing.
+
+## check-reachable.py — what is left
+
+```bash
+npm run what-is-left
+```
+
+Lists every function the measurement layer exports that nothing outside a test
+calls. It exists because `section.ts` held a dollhouse, a cut plane and a
+walkthrough for weeks and **nothing in the app called any of it** — finished,
+tested, and invisible. Sam had already found the same shape by hand once:
+*"I couldn't even use the insurance mode, no way to get there."*
+
+A feature nothing reaches is not built. This says so with a list instead of
+somebody's memory.
+
+**Functions only, and that is the design.** The first version looked at every
+export and produced two hundred findings, which is the same as producing none:
+types, interfaces and `Error` subclasses are almost all of them and almost none
+is a problem — a type is used as a type, and an error is thrown where it is
+declared and caught elsewhere by `instanceof`, neither of which a name search
+models.
+
+Two lists come out, and the second is the one that matters:
+
+- **Exported and never referenced** — dead, or a feature with no way in.
+- **Proven and unreachable** — reached only by its own tests. That is the exact
+  shape of the bug this exists for. Every one of `section.ts`'s exports was
+  tested and none of them was reachable, and a passing test suite said nothing
+  about it.
+
+It found the frame alarm, which is the best example of what it is for.
+`heightsAboveFloor` measures how high above the floor each photograph was
+taken; `checkCapture` raises a **stop** when those heights are not a person
+holding a phone, because that means the photographs and the walls are in
+different coordinate systems and everything drawn from them is somewhere
+plausible and wrong. Both halves existed. Both were tested. Nothing ever called
+the first one, so the alarm could not fire. It is wired now, and
+`capture.test.ts` runs the whole round trip against Sam's real garage scan —
+quiet at a believable height, loud two metres out.
+
+It is not a gate. The remaining entries are a work list, not failures, and
+several are honest internal helpers. Read it, do not obey it.

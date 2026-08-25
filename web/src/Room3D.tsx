@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { type Footprint } from '../../core/src/obstruction.ts';
+import { CONVENTIONAL_CUT_HEIGHT, cutAt, cutStops } from '../../core/src/section.ts';
 import {
   type Camera,
   type Standing,
@@ -9,6 +10,7 @@ import {
   standingInside,
 } from '../../core/src/project.ts';
 import type { Room } from '../../core/src/room.ts';
+import { useUnits } from './units.tsx';
 
 /**
  * The room, from somewhere other than straight above.
@@ -38,6 +40,18 @@ import type { Room } from '../../core/src/room.ts';
  * a wall works identically in either and selects the wall the tape box
  * re-solves. That is the whole reason this is drawn from the room rather than
  * from the scanner's mesh.
+ *
+ * ## And a plane through it
+ *
+ * **Cut it** slices the room at a height and takes everything above off. It is
+ * the oldest drawing convention there is and the one a remodeler reads without
+ * being taught: cut at four foot, look down, and the base cabinets, the pony
+ * wall and the opening that is not a door are all suddenly legible.
+ *
+ * Where the plane falls, which walls it passes through and which openings it
+ * crosses are all `section.ts`'s answers. This asks and draws; it decides
+ * nothing, which is why a pony wall comes out whole rather than sawn off at a
+ * plane that passes over it.
  */
 
 const SIZE = 1000;
@@ -65,6 +79,9 @@ export function Room3D({
 }) {
   const [camera, setCamera] = useState<Camera>(DEFAULT_CAMERA);
   const [inside, setInside] = useState<Standing | null>(null);
+  /** Where the plane sits, or nothing for the whole room. */
+  const [plane, setPlane] = useState<bigint | null>(null);
+  const { len } = useUnits();
   // A drag is a turn, not a tap. Held in a ref so a re-render mid-drag cannot
   // lose where the finger started.
   const drag = useRef<{
@@ -83,19 +100,43 @@ export function Room3D({
 
   const view = useMemo(() => {
     try {
+      // A plane belongs to the orbit view. From inside a room, a cut at four
+      // foot puts the viewer's own head above the plane and shows them the
+      // tops of their own walls disappearing, which is not a drawing of
+      // anything.
+      const section = plane !== null && !inside ? cutAt(room, { height: plane }) : undefined;
       return {
         projection: inside
           ? projectFrom(room, inside, SIZE, furniture ? footprints : [])
-          : project(room, camera, SIZE, furniture ? footprints : []),
+          : project(room, camera, SIZE, furniture ? footprints : [], section),
+        section,
         trouble: null as string | null,
       };
     } catch (error) {
       return {
         projection: null,
+        section: undefined,
         trouble: error instanceof Error ? error.message : String(error),
       };
     }
-  }, [room, camera, inside, footprints, furniture]);
+  }, [room, camera, inside, footprints, furniture, plane]);
+
+  /**
+   * The heights worth stopping at, tallest first.
+   *
+   * Not a free slider. Every one of these is somewhere in the room -- the top
+   * of a pony wall, a window sill, a door head, and the conventional four foot
+   * -- so every stop shows something rather than most of them showing the same
+   * picture a fraction shorter.
+   */
+  const stops = useMemo(() => {
+    try {
+      const found = cutStops(room);
+      return found.length > 0 ? found : [CONVENTIONAL_CUT_HEIGHT];
+    } catch {
+      return [];
+    }
+  }, [room]);
 
   if (!view.projection) {
     return (
@@ -238,6 +279,76 @@ export function Room3D({
           </p>
         )}
       </div>
+
+      {/* The horizontal section. Only outside: from inside the room a plane at
+          four foot cuts through the viewer's own head. */}
+      {!inside && stops.length > 0 && (
+        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPlane(plane === null ? (stops.find((h) => h === CONVENTIONAL_CUT_HEIGHT) ?? stops[0]!) : null)}
+              aria-pressed={plane !== null}
+              className={`min-h-11 rounded-md px-3 text-sm font-medium ${
+                plane !== null
+                  ? 'bg-slate-900 text-white active:bg-slate-700'
+                  : 'border border-slate-300 text-slate-700 active:bg-slate-100'
+              }`}
+            >
+              {plane !== null ? 'Whole room' : 'Cut it'}
+            </button>
+            {plane !== null && (
+              <span className="text-sm text-slate-700">
+                Cut at <strong className="tabular-nums">{len(plane)}</strong>, looking down
+              </span>
+            )}
+          </div>
+
+          {plane !== null && (
+            <>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {stops.map((height) => (
+                  <button
+                    key={String(height)}
+                    type="button"
+                    onClick={() => setPlane(height)}
+                    aria-pressed={height === plane}
+                    aria-label={`Cut at ${len(height)}`}
+                    className={`min-h-11 rounded-md px-2.5 text-sm tabular-nums ${
+                      height === plane
+                        ? 'bg-sky-700 font-semibold text-white'
+                        : 'border border-slate-300 text-slate-700 active:bg-slate-100'
+                    }`}
+                  >
+                    {len(height)}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                Every height here is somewhere in this room — the top of a wall that
+                stops short, a window sill, a door head — and{' '}
+                <span className="tabular-nums">{len(CONVENTIONAL_CUT_HEIGHT)}</span>, which is
+                where a drawing is cut by convention: above the counters, below the door heads.
+                {view.section && view.section.needsSillHeight.length > 0 && (
+                  <>
+                    {' '}
+                    <span className="text-amber-800">
+                      {view.section.needsSillHeight.length} window
+                      {view.section.needsSillHeight.length === 1 ? ' has' : 's have'} no recorded
+                      sill, so the plane cannot say whether it crosses{' '}
+                      {view.section.needsSillHeight.length === 1 ? 'it' : 'them'}. Set the sill
+                      under the wall to find out.
+                    </span>
+                  </>
+                )}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                A cut moves no number. It is a way of looking at the room, not a change to it.
+              </p>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

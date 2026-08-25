@@ -1,3 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { importRoomPlan } from '../import-roomplan.ts';
+import { checkCapture } from '../health.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NM_PER_METRE, parseLength } from '../length.ts';
@@ -531,4 +536,58 @@ test('which way up is a display decision and moves nothing on the plan', () => {
   assert.notEqual(a.upright, b.upright);
   assert.deepEqual(a.pose.at, b.pose.at);
   assert.deepEqual(a.pose.forward, b.pose.forward);
+});
+
+/* ------------------------------------------- the alarm, actually connected */
+
+/**
+ * The frame alarm, from a real scan to a finding.
+ *
+ * `heightsAboveFloor` and the finding it feeds both existed, both were tested,
+ * and **nothing ever called the first one** -- so the alarm that catches the
+ * worst silent failure in this product could not fire. Found by
+ * `core/tools/check-reachable.py`, which lists every function nothing outside a
+ * test calls.
+ *
+ * This is the round trip: a real scan in, the floor read off it, a camera at a
+ * believable height, and no alarm; the same camera two metres out, and an
+ * alarm. Both halves matter. An alarm that never fires is the bug that was
+ * here; an alarm that fires on every scan teaches people to close alarms,
+ * which is the same bug wearing a hat.
+ */
+test('a believable camera height raises nothing, and an unbelievable one does', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const scan = JSON.parse(
+    readFileSync(join(here, '..', '..', '..', 'web', 'audit', 'garage.json'), 'utf8')
+  );
+  const { room, report, frame } = importRoomPlan(scan, { at: T0, name: 'garage' });
+
+  // The garage's floor sits 1.2 m BELOW the origin of its own scan session,
+  // which is the whole reason the floor has to be carried rather than assumed
+  // to be zero: a phone at chest height reads as y = 0.2 in this capture.
+  const floor = Number(frame.floor) / 1e9;
+  assert.ok(floor < 0, `expected a floor below the session origin, got ${floor}`);
+
+  // The same `camera` fixture the rest of this file uses, so a change to what
+  // a captured photo looks like reaches this test too rather than leaving a
+  // hand-rolled copy quietly out of date.
+  const at = (metresAboveFloor: number[]): PhotoManifest => ({
+    schema: PHOTO_MANIFEST_SCHEMA,
+    capturedAt: T0,
+    device: 'test',
+    photos: metresAboveFloor.map((h, i) => ({
+      ...camera([3, floor + h, 2], 0),
+      id: `p${i}`,
+    })),
+  });
+
+  const alarms = (manifest: PhotoManifest) =>
+    checkCapture({
+      room,
+      report,
+      cameraHeights: heightsAboveFloor(manifest, frame.floor),
+    }).filter((f) => /same room as the walls/.test(f.what));
+
+  assert.equal(alarms(at([1.3, 1.4, 1.55])).length, 0, 'a person holding a phone is not an alarm');
+  assert.equal(alarms(at([3.3, 3.4, 3.55])).length, 1, 'two metres out has to be one');
 });

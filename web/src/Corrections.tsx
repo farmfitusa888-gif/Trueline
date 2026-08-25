@@ -28,6 +28,13 @@ export interface CorrectionsProps {
   readonly photos: readonly Photo[];
   readonly rejectedPhotos: PhotoImport['rejected'];
   readonly refusedPins: readonly { readonly id: string; readonly reason: string }[];
+  /**
+   * How high each photograph was taken above the floor.
+   *
+   * Feeds the one alarm that catches the worst silent failure there is: the
+   * photographs and the walls ending up in different coordinate systems.
+   */
+  readonly cameraHeights: readonly bigint[];
   readonly selected: string | null;
   readonly onSelect: (wallId: string) => void;
   readonly onMake: (wallId: string, as: 'wall' | 'open' | 'cased') => void;
@@ -67,6 +74,7 @@ export function Corrections({
   photos,
   rejectedPhotos,
   refusedPins,
+  cameraHeights,
   selected,
   onSelect,
   onMake,
@@ -75,7 +83,9 @@ export function Corrections({
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
   // The same checks the command-line tool ran, on screen, because the app put
   // the file here and should be the one to say whether it is any good.
-  const findings = checkCapture({ room, report, photos, rejectedPhotos, refusedPins });
+  const findings = checkCapture({
+    room, report, photos, rejectedPhotos, refusedPins, cameraHeights,
+  });
   const openSpans = room.walls.filter((w) => w.open);
   const inTheWay = obstructions.filter((o) => o.blockedLength > 0n);
 

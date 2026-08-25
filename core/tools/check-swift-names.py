@@ -138,6 +138,14 @@ NEEDS_IMPORT: list[tuple[str, str, set[str]]] = [
     (r'\bObservableObjectPublisher\b', 'ObservableObjectPublisher', {'Combine', 'SwiftUI'}),
     (r'\b(?:PassthroughSubject|CurrentValueSubject)\b', 'a Combine subject', {'Combine', 'SwiftUI'}),
     (r'@StateObject\b', '@StateObject', {'SwiftUI'}),
+    # These two are the reason to keep the list growing. Both read like plain
+    # property wrappers and both are SwiftUI's, so both are easy to reach for
+    # in a helper file that never imports SwiftUI -- which compiles nowhere.
+    (r'@FocusState\b', '@FocusState', {'SwiftUI'}),
+    (r'@AppStorage\b', '@AppStorage', {'SwiftUI'}),
+    (r'@SceneStorage\b', '@SceneStorage', {'SwiftUI'}),
+    (r'@GestureState\b', '@GestureState', {'SwiftUI'}),
+    (r'@Namespace\b', '@Namespace', {'SwiftUI'}),
     (r'@ObservedObject\b', '@ObservedObject', {'SwiftUI'}),
     (r'@EnvironmentObject\b', '@EnvironmentObject', {'SwiftUI'}),
     (r'@ViewBuilder\b', '@ViewBuilder', {'SwiftUI'}),

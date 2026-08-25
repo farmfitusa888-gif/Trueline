@@ -1,7 +1,7 @@
 import { type Nanometres, NM_PER_FOOT } from './length.ts';
 import { type Opening, type Point, type Room, corners, runLength, validate } from './room.ts';
 import { type Footprint } from './obstruction.ts';
-import { outwardNormals } from './section.ts';
+import { type SectionView, outwardNormals } from './section.ts';
 
 /**
  * The room as a picture of a room, rather than a plan of one.
@@ -127,7 +127,22 @@ export function project(
    * None of this touches a measurement: an object contributes no facet the
    * takeoff reads and no wall the solver sees.
    */
-  footprints: readonly Footprint[] = []
+  footprints: readonly Footprint[] = [],
+  /**
+   * A cut plane, from `section.ts`, or nothing for the whole room.
+   *
+   * The horizontal section is the oldest drawing convention there is and the
+   * one a remodeler reads without being taught: slice the room at four foot,
+   * look down, and everything above the counters and below the heads of the
+   * doors is gone. It is how you see the base cabinets, the pony wall, the
+   * opening that is not a door.
+   *
+   * `section.ts` has produced this since early on and nothing ever drew it.
+   * All the arithmetic -- which walls the plane passes through, which openings
+   * it crosses, which windows have no recorded sill so it cannot say -- is
+   * decided there. This only draws what it was handed.
+   */
+  section?: SectionView
 ): Projection {
   validate(room);
   if (!Number.isFinite(camera.turn) || !Number.isFinite(camera.tilt)) {
@@ -181,6 +196,10 @@ export function project(
     shade: 0.92,
   });
 
+  const cutBy = section
+    ? new Map(section.walls.map((w) => [w.wallId, w]))
+    : null;
+
   room.walls.forEach((wall, i) => {
     const a = points[i]!;
     const b = points[(i + 1) % points.length]!;
@@ -192,7 +211,18 @@ export function project(
       return;
     }
 
-    const top = feet((wall.height ?? room.ceilingHeight).value);
+    const cut = cutBy?.get(wall.id);
+    if (cut && !cut.visible) {
+      hidden.push(wall.id);
+      return;
+    }
+
+    // The plane's own answer for this wall, which is not simply the cut
+    // height: a wall that stops below the plane is drawn whole, and
+    // `section.ts` has already worked out which is which.
+    const top = cut
+      ? feet(cut.drawnTo)
+      : feet((wall.height ?? room.ceilingHeight).value);
     const quad = [view(a, 0), view(b, 0), view(b, top), view(a, top)];
     // A wall square to the viewer is brightest; one seen edge-on is darkest.
     const shade = 0.55 + 0.35 * Math.abs(towardsViewer);
@@ -211,7 +241,16 @@ export function project(
       const from = Number(opening.offsetFromStart.value) / length;
       const to = from + Number(opening.width.value) / length;
       const sill = feet(opening.sillHeight?.value ?? 0n);
-      const head = sill + feet(opening.height.value);
+      let head = sill + feet(opening.height.value);
+      // Under the plane entirely, so there is nothing of it left to draw; or
+      // crossing it, so it is drawn up to the cut and no further. A window
+      // whose head is drawn above a plane the plane went through is the thing
+      // that makes a section look like a mistake.
+      if (cut) {
+        const plane = feet(cut.drawnTo);
+        if (sill >= plane) continue;
+        if (head > plane) head = plane;
+      }
       const along = (t: number): Point => ({
         x: a.x + ((b.x - a.x) * BigInt(Math.round(t * 1e6))) / 1_000_000n,
         y: a.y + ((b.y - a.y) * BigInt(Math.round(t * 1e6))) / 1_000_000n,

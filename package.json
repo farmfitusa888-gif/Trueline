@@ -17,6 +17,7 @@
     "build": "npm run build -w web",
     "audit": "npm run build --workspace=@trueline/web && node web/audit/run.mjs",
     "check-guide": "python3 docs/build/check-guide.py docs/handbook.html",
+    "what-is-left": "python3 core/tools/check-reachable.py",
     "verify": "npm test && npm run typecheck && npm run build && npm run check-guide",
     "ship-web": "npm run build && rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/"
   }

@@ -724,6 +724,7 @@ export function App() {
                 photos={loaded.photos}
                 rejectedPhotos={loaded.rejectedPhotos}
                 refusedPins={loaded.refusedPins}
+                cameraHeights={loaded.cameraHeights}
                 selected={state.selected}
                 onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                 onMake={(wallId, as) => dispatch({ type: 'make', wallId, as })}
