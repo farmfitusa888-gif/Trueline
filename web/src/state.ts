@@ -11,6 +11,7 @@ import {
   makeWall,
   setRoomThickness,
   setWallThickness,
+  verifyCeiling,
   verifyOpening,
   verifyWall,
 } from '../../core/src/edit.ts';
@@ -130,6 +131,8 @@ export type Action =
       by: string;
       at: string;
     }
+  /** Somebody measured the ceiling, or said what it is. */
+  | { type: 'ceiling'; text: string; how: 'stated' | 'tape'; by: string; at: string }
   | { type: 'undo' }
   | { type: 'dismissError' }
   | { type: 'close' };
@@ -474,6 +477,22 @@ export function reduce(state: State, action: Action): State {
           next,
           `${action.openingId} in ${action.wallId}: ${SAID[action.field]} is ` +
             `${formatFeetInches(length)}.`
+        );
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'ceiling': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const height = parseLength(action.text, { defaultUnit: 'ft' });
+        return edited(
+          state,
+          loaded,
+          verifyCeiling(loaded.room, height, action.by, action.at, action.how),
+          `Ceiling is ${formatFeetInches(height)}. Every square foot of board follows it.`
         );
       } catch (error) {
         return { ...state, error: message(error) };

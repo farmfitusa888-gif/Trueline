@@ -354,8 +354,19 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
     wallEnds.set(wall.identifier, [toDatum(a, datum), toDatum(b, datum)]);
   }
 
+  // Ceiling height: the tallest wall in the scan, because a lower one is a pony
+  // wall or a soffit rather than the room getting shorter. Sam's kitchen has one
+  // wall at 2.13 m among seven at 2.4257 m.
+  //
+  // Worked out here rather than after the walls, because each wall needs it: a
+  // wall at the ceiling must carry no height of its own.
+  const tallest = scan.walls.reduce((best, w) => Math.max(best, w.dimensions[1] ?? 0), 0);
+  if (tallest <= 0) throw new ImportError('No wall in the scan has a height, so the room has no ceiling.');
+
   const usedWalls = new Set<string>();
   const walls: Wall[] = [];
+  /** Walls that genuinely stop short of the ceiling, for the report. */
+  const short: { wallId: string; height: Nanometres }[] = [];
   const openSpans: { wallId: string; length: Nanometres }[] = [];
   const snapped: SnappedEdge[] = [];
   const diagonals: string[] = [];
@@ -410,11 +421,22 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
     const scanWall = matched ? scan.walls.find((w) => w.identifier === matched) : undefined;
     const heightMetres = scanWall?.dimensions[1];
 
+    // A wall only carries a height of its own when it genuinely stops short of
+    // the ceiling. Every wall used to carry one, copied straight from the scan,
+    // and the consequences were quiet and bad: every wall in a room read as a
+    // pony wall, and measuring the ceiling changed no quantity at all, because
+    // every wall was overriding it with the scanner's own guess. A wall within
+    // the sensor's own tolerance of the tallest is the ceiling as far as
+    // anybody can tell, so it says nothing and follows the room.
+    const stopsShort =
+      heightMetres !== undefined && nm(tallest) - nm(heightMetres) > tolerance;
+    if (stopsShort) short.push({ wallId: id, height: nm(heightMetres) });
+
     walls.push({
       id,
       heading: direction,
       length: measured(length),
-      ...(heightMetres !== undefined ? { height: measured(nm(heightMetres)) } : {}),
+      ...(stopsShort ? { height: measured(nm(heightMetres)) } : {}),
       ...(matched ? {} : { open: true as const }),
     });
 
@@ -432,11 +454,6 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
         'this room. On a real scan that is a fragment of the space next door, seen through a doorway.',
     }));
 
-  // Ceiling height: the tallest wall in the scan, because a lower one is a pony
-  // wall or a soffit rather than the room getting shorter. Sam's kitchen has one
-  // wall at 2.13 m among seven at 2.4257 m.
-  const tallest = scan.walls.reduce((best, w) => Math.max(best, w.dimensions[1] ?? 0), 0);
-  if (tallest <= 0) throw new ImportError('No wall in the scan has a height, so the room has no ceiling.');
 
   // RoomPlan labels a room it could not classify "unidentified", which is a
   // status, not a name. Sam's garage came through as a room called
@@ -463,6 +480,8 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
     diagonals,
     before,
     recoveredSills: withOpenings.recoveredSills,
+    short,
+    ceiling: nm(tallest),
   });
 
   return {
@@ -635,6 +654,8 @@ function describe(parts: {
   diagonals: readonly string[];
   before: Point;
   recoveredSills: readonly string[];
+  short: readonly { wallId: string; height: Nanometres }[];
+  ceiling: Nanometres;
 }): string[] {
   const notes: string[] = [];
 
@@ -669,6 +690,16 @@ function describe(parts: {
     notes.push(
       `After straightening, the room was ${formatMetric(drift, 'mm')} from closing. The scanned ` +
         `walls absorbed it in proportion to how unsure the sensor was about each of them.`
+    );
+  }
+  if (parts.short.length > 0) {
+    notes.push(
+      `${parts.short.length} wall${parts.short.length === 1 ? '' : 's'} stop${parts.short.length === 1 ? 's' : ''} ` +
+        `short of the ${formatFeetInches(parts.ceiling)} ceiling: ` +
+        parts.short.map((x) => `${x.wallId} at ${formatFeetInches(x.height)}`).join(', ') +
+        `. A pony wall, a bar, or a soffit — genuinely built, so it takes board, paint and base, ` +
+        `it just does not go up. Every other wall follows the ceiling, so measuring the ceiling ` +
+        `moves them all.`
     );
   }
   if (parts.recoveredSills.length > 0) {

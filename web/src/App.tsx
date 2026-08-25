@@ -15,6 +15,7 @@ import { Takeoff } from './Takeoff.tsx';
 import { Thickness } from './Thickness.tsx';
 import { Measure } from './Measure.tsx';
 import { Openings } from './Openings.tsx';
+import { Ceiling } from './Ceiling.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -315,6 +316,13 @@ export function App() {
                 )}
               </div>
             )}
+
+            <Ceiling
+              room={loaded.room}
+              onSet={(text, how) =>
+                dispatch({ type: 'ceiling', text, how, by: 'me', at: new Date().toISOString() })
+              }
+            />
 
             <Thickness
               room={loaded.room}

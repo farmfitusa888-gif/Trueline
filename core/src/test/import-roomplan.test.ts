@@ -13,6 +13,8 @@ import {
   importRoomPlan,
 } from '../import-roomplan.ts';
 import { DEFAULT_REACH, describe, obstructions, punchList } from '../obstruction.ts';
+import { roomQuantities } from '../zone.ts';
+import { verifyCeiling } from '../edit.ts';
 
 const AT = '2026-08-20T17:12:09Z';
 
@@ -582,4 +584,44 @@ test('furniture lands inside the room it was scanned in', () => {
     `the bench is outside the room: x ${bench.min.x}..${bench.max.x} in ${low.x}..${high.x}, ` +
       `y ${bench.min.y}..${bench.max.y} in ${low.y}..${high.y}`
   );
+});
+
+/* ------------------------------------------------ heights, and who owns them */
+
+test('a wall at the ceiling carries no height of its own', () => {
+  // Every wall used to carry one, copied straight from the scan, and the damage
+  // was silent: every wall in every room read as a pony wall, and measuring the
+  // ceiling changed no quantity at all because every wall was overriding it with
+  // the scanner's guess. The fixture has one genuinely short wall — east-upper
+  // at 2.1 m among 2.4 m — so this tells the two apart rather than just checking
+  // nothing is set.
+  const { room } = importRoomPlan(scan(), { at: AT });
+  const short = room.walls.filter((w) => w.height !== undefined);
+  assert.equal(short.length, 1, 'only the wall that stops short should say so');
+  assert.equal(short[0]!.id, 'wall-3');
+  assert.equal(formatMetric(room.ceilingHeight.value, 'mm'), '2400 mm');
+  assert.equal(formatMetric(short[0]!.height!.value, 'mm'), '2100 mm');
+});
+
+test('measuring the ceiling moves the wall face, which is the whole point of it', () => {
+  const { room } = importRoomPlan(scan(), { at: AT });
+  const before = roomQuantities(room).wallFaceArea;
+  const taller = verifyCeiling(room, room.ceilingHeight.value + parseLength(`1'`), 'sam', AT, 'tape');
+  const after = roomQuantities(taller).wallFaceArea;
+  assert.ok(after > before, 'a taller room takes more board');
+
+  // Exactly one foot times the run of every wall that follows the ceiling. The
+  // pony wall does not, and neither does the open span.
+  const following = room.walls
+    .filter((w) => !w.open && w.height === undefined)
+    .reduce((total, w) => total + runLength(w), 0n);
+  assert.equal(after - before, following * parseLength(`1'`));
+});
+
+test('the report says which walls stop short and what that means', () => {
+  const { report } = importRoomPlan(scan(), { at: AT });
+  const note = report.notes.find((n) => n.includes('stop'));
+  assert.ok(note, 'a wall stopping short of the ceiling should be named');
+  assert.match(note, /wall-3 at/);
+  assert.match(note, /measuring the ceiling\s+moves them all/);
 });

@@ -476,3 +476,129 @@ export function verifyOpening(
   validate(changed);
   return changed;
 }
+
+/* --------------------------------------------------------------- heights */
+
+/**
+ * Every opening that would stick out through a wall of this height.
+ *
+ * Shared by the two functions below because they are the same question asked
+ * from either end: lowering the ceiling and raising a window's sill both put the
+ * top of something above the top of what it is in.
+ */
+function pokingThrough(
+  height: Nanometres,
+  walls: readonly Wall[]
+): { wall: Wall; opening: Opening; top: Nanometres }[] {
+  const out: { wall: Wall; opening: Opening; top: Nanometres }[] = [];
+  for (const wall of walls) {
+    const standing = wall.height?.value ?? height;
+    for (const opening of wall.openings ?? []) {
+      const top = (opening.sillHeight?.value ?? 0n) + opening.height.value;
+      if (top > standing) out.push({ wall, opening, top });
+    }
+  }
+  return out;
+}
+
+function tooTall(
+  over: readonly { wall: Wall; opening: Opening; top: Nanometres }[],
+  height: Nanometres
+): string {
+  return (
+    over
+      .map(
+        (x) =>
+          `the ${x.opening.kind} in ${x.wall.id} tops out at ${formatFeetInches(x.top)}`
+      )
+      .join('; ') +
+    `. Nothing in a wall can be taller than the wall. Either the ceiling is higher than ` +
+    `${formatFeetInches(height)}, or ${over.length === 1 ? 'that opening was' : 'those openings were'} ` +
+    `measured wrong — the scan is routinely a foot out on them.`
+  );
+}
+
+/**
+ * Somebody measured the ceiling.
+ *
+ * The import takes the tallest wall in the scan, on the reasoning that a shorter
+ * one is a pony wall or a soffit rather than the room getting lower. That is the
+ * right guess and it is still a guess, carrying the sensor's band — and it
+ * multiplies every square foot of drywall and paint in the room. A 2 inch error
+ * over 80 ft of wall is 13 sq ft of board and two coats on it.
+ *
+ * Wall face, opening returns and everything downstream of them move when this
+ * does. Floor and baseboard do not: neither has ever cared how high the room is.
+ */
+export function verifyCeiling(
+  room: Room,
+  height: Nanometres,
+  by: string,
+  at: string,
+  method: VerificationMethod
+): Room {
+  if (height <= 0n) {
+    throw new EditError(`A ceiling ${formatFeetInches(height)} above the floor is not a ceiling.`);
+  }
+  const over = pokingThrough(height, room.walls);
+  if (over.length > 0) throw new EditError(tooTall(over, height));
+
+  const next: Room = { ...room, ceilingHeight: verify(room.ceilingHeight, height, by, at, method) };
+  validate(next);
+  return next;
+}
+
+/**
+ * One wall that does not go to the ceiling — a pony wall, a breakfast bar, the
+ * half wall round a stair.
+ *
+ * It is genuinely built, so it takes drywall, paint and a cap and it divides the
+ * space, but it is not the room getting shorter. `undefined` puts it back to
+ * full height.
+ */
+export function setWallHeight(
+  room: Room,
+  wallId: string,
+  height: Nanometres | undefined,
+  by: string,
+  at: string,
+  method: VerificationMethod
+): Room {
+  const { wall, index } = find(room, wallId);
+  if (wall.open) {
+    throw new EditError(
+      `"${wallId}" is an open span — there is no wall there to have a height. If there really ` +
+        `is one, make it a wall first.`
+    );
+  }
+  if (height !== undefined && height <= 0n) {
+    throw new EditError(`A wall ${formatFeetInches(height)} high is not a wall.`);
+  }
+  if (height !== undefined && height > room.ceilingHeight.value) {
+    throw new EditError(
+      `That would make "${wallId}" ${formatFeetInches(height)} high in a room whose ceiling is ` +
+        `${formatFeetInches(room.ceilingHeight.value)}. If the room really is that tall, ` +
+        `measure the ceiling first and this wall after.`
+    );
+  }
+
+  const walls = [...room.walls];
+  const { height: _dropped, ...bare } = wall;
+  walls[index] =
+    height === undefined
+      ? bare
+      : {
+          ...wall,
+          height:
+            wall.height === undefined
+              ? verified(height, by, at, method)
+              : verify(wall.height, height, by, at, method),
+        };
+
+  const over = pokingThrough(room.ceilingHeight.value, [walls[index]!]);
+  if (over.length > 0) throw new EditError(tooTall(over, height ?? room.ceilingHeight.value));
+
+  const next: Room = { ...room, walls };
+  validate(next);
+  return next;
+}

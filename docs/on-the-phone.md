@@ -1,6 +1,6 @@
 # Getting the current build onto your phone, and what to test on it
 
-Everything below has been run and passes on this machine: 374 tests, both
+Everything below has been run and passes on this machine: 389 tests, both
 typechecks, the web build, and the app driven end to end in a browser against
 your own garage scan. **None of it has been run on a phone since the plan was
 un-mirrored.** That is what this page is for.
@@ -116,7 +116,25 @@ has never been run on a device.**
 - Select one wall on the plan first and the card retargets to that wall, so the
   outside walls can be 2x6 while the partitions are 2x4.
 
-### 5. Door and window sizes
+### 5. Ceiling height
+
+The scan takes this from the tallest wall it saw. It is the number that
+multiplies every square foot of drywall and paint in the room, and it is the
+one nobody ever looks at and disagrees with, because a ceiling has no corner to
+stand in.
+
+- Under the plan: **How high is the ceiling?** It shows the scanned figure and
+  its band, and what two inches of error is worth in *that* room.
+- Tap 8', 9' or 10' if you know it, or type a tape reading.
+- **Pass:** the takeoff's **Wall face** moves and **Floor** and **Baseboard**
+  do not — neither of those has ever cared how high the room is.
+- **This was broken until today and is worth watching.** Every wall arrived
+  carrying its own height copied from the scan, so every wall was overriding
+  the ceiling and measuring it changed nothing at all. Now only a wall that
+  genuinely stops short — a pony wall, a bar, a soffit — carries its own, and
+  the import notes say which. Your garage has none; Gilbert's kitchen has one.
+
+### 6. Door and window sizes
 
 The measurement a scan is worst at. RoomPlan called a 16 ft 11 in span a window
 in your garage, and a kitchen door came back 2 ft 7 in wide — nobody carries a
@@ -135,7 +153,7 @@ sheet of plywood through that.
   says by how much and what the wall measures, so you know which of the two to
   go and measure.
 
-### 6. The takeoff, off the phone
+### 7. The takeoff, off the phone
 
 - **Send it** should open the iPhone share sheet — text it to yourself.
 - **Pass:** what arrives says *"THESE ARE THE SCANNER'S NUMBERS"* until a wall
@@ -143,7 +161,7 @@ sheet of plywood through that.
 - **Spreadsheet** saves a CSV. Every row carries its own unit and its own
   provenance in their own columns.
 
-### 7. Typing a tape reading
+### 8. Typing a tape reading
 
 - Tap a wall. Put a real tape on it. Type what the tape says.
 - **Pass:** that wall is now marked measured and never moves again; the other
@@ -151,13 +169,13 @@ sheet of plywood through that.
   and whether any moved further than the scanner's own tolerance.
 - **This is the whole product.** No other scanning app re-solves the room.
 
-### 8. Compass
+### 9. Compass
 
 - Scan with the phone away from a truck, a panel or a fridge.
 - **Pass:** the N arrow on the plan points the same way your phone's Compass
   app does, and the drawing says **±N°** — how much the phone itself doubted it.
 
-### 9. Two scans, two sets of corrections
+### 10. Two scans, two sets of corrections
 
 - Scan the kitchen, correct a wall. Go back. Scan the garage. Go back. Open the
   kitchen again.
