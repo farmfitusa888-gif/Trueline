@@ -1,0 +1,422 @@
+<title>What Trueline Should Cost</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --ground:#F6F7F8; --sheet:#FFFFFF; --ink:#14181B; --ink-2:#4A5459; --ink-3:#6E787E;
+    --rule:#C9D0D5; --rule-soft:#E3E8EA; --amber:#B8590A; --amber-wash:#FBF3EA;
+    --redline:#B03024; --red-wash:#FBEEEC; --built:#1B6340; --built-wash:#EDF5F0;
+    --shadow:0 1px 2px rgba(20,24,27,.05), 0 8px 24px -16px rgba(20,24,27,.30);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#101416; --sheet:#171C1F; --ink:#E8EDEF; --ink-2:#A9B4BA; --ink-3:#7D8890;
+      --rule:#333C41; --rule-soft:#242B2F; --amber:#E08A3C; --amber-wash:#241A0F;
+      --redline:#E3695C; --red-wash:#26140F; --built:#5FBE8C; --built-wash:#0F1F17;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#101416; --sheet:#171C1F; --ink:#E8EDEF; --ink-2:#A9B4BA; --ink-3:#7D8890;
+    --rule:#333C41; --rule-soft:#242B2F; --amber:#E08A3C; --amber-wash:#241A0F;
+    --redline:#E3695C; --red-wash:#26140F; --built:#5FBE8C; --built-wash:#0F1F17;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+  * { box-sizing:border-box; }
+  body {
+    background:var(--ground); color:var(--ink);
+    font-family:"Source Serif 4", Georgia, serif; font-size:17px; line-height:1.62;
+    margin:0; padding:0 20px 96px; -webkit-font-smoothing:antialiased;
+  }
+  .col { max-width:66ch; margin:0 auto; }
+  .wide { max-width:1040px; margin:0 auto; }
+
+  header.mast { max-width:1040px; margin:0 auto; padding:56px 0 28px; border-bottom:2px solid var(--ink); }
+  .eyebrow { font-family:"IBM Plex Mono", monospace; font-size:11.5px; letter-spacing:.13em;
+             text-transform:uppercase; color:var(--ink-3); margin:0 0 14px; }
+  h1 { font-family:Archivo, "Helvetica Neue", Arial, sans-serif; font-weight:700;
+       font-size:clamp(36px,6.6vw,58px); line-height:1.03; letter-spacing:-.028em; margin:0;
+       text-wrap:balance; }
+  h1 em { font-style:normal; color:var(--amber); }
+  .standfirst { margin:18px 0 0; max-width:62ch; font-size:20px; line-height:1.5; color:var(--ink-2); }
+
+  section { padding-top:54px; }
+  h2 { font-family:Archivo, sans-serif; font-weight:600; font-size:clamp(23px,3.4vw,30px);
+       letter-spacing:-.018em; line-height:1.16; margin:0 0 6px; text-wrap:balance; }
+  h2 + .kicker { margin:0 0 26px; color:var(--ink-3); font-size:15.5px; }
+  .sechead { max-width:1040px; margin:0 auto 26px; }
+  .sechead::after { content:""; display:block; height:1px; background:var(--rule); margin-top:18px; }
+  h3 { font-family:Archivo, sans-serif; font-weight:600; font-size:18px; letter-spacing:-.01em; margin:0 0 6px; }
+  p { margin:0 0 16px; }
+  .col > p:last-child { margin-bottom:0; }
+  a { color:var(--amber); text-underline-offset:2px; }
+  a:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
+
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; min-width:640px; font-size:14.5px; }
+  caption { text-align:left; color:var(--ink-3); font-size:13.5px; padding-bottom:10px; }
+  th,td { text-align:left; vertical-align:top; padding:11px 14px; border-bottom:1px solid var(--rule-soft); }
+  thead th { font-family:"IBM Plex Mono", monospace; font-size:10.5px; letter-spacing:.1em;
+             text-transform:uppercase; color:var(--ink-3); border-bottom:1px solid var(--rule); font-weight:500; }
+  tbody th { font-family:Archivo, sans-serif; font-weight:600; font-size:15px; white-space:nowrap; }
+  td.num { font-family:"IBM Plex Mono", monospace; font-size:13.5px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  tr.us td, tr.us th { background:var(--amber-wash); }
+  tr.us th { color:var(--amber); }
+
+  .tiers { display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(268px,1fr)); }
+  .tier { background:var(--sheet); border:1px solid var(--rule-soft); border-radius:4px;
+          padding:22px; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+  .tier.pick { border:2px solid var(--amber); }
+  .tier .name { font-family:Archivo,sans-serif; font-weight:700; font-size:20px; margin:0 0 2px; }
+  .tier .who { font-size:14px; color:var(--ink-3); margin:0 0 16px; }
+  .price { font-family:"IBM Plex Mono", monospace; font-variant-numeric:tabular-nums;
+           font-size:34px; font-weight:600; line-height:1; letter-spacing:-.02em; }
+  .price small { font-size:14px; font-weight:400; color:var(--ink-3); letter-spacing:0; }
+  .yearly { font-family:"IBM Plex Mono", monospace; font-size:12.5px; color:var(--ink-3); margin-top:6px; }
+  .tier ul { list-style:none; margin:18px 0 0; padding:0; font-size:15px; }
+  .tier li { position:relative; padding-left:22px; margin-bottom:9px; line-height:1.45; }
+  .tier li::before { content:"→"; position:absolute; left:0; color:var(--amber);
+                     font-family:"IBM Plex Mono",monospace; }
+  .tier li.no { color:var(--ink-3); }
+  .tier li.no::before { content:"—"; color:var(--ink-3); }
+  .badge { display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10px;
+           letter-spacing:.1em; text-transform:uppercase; background:var(--amber); color:#fff;
+           padding:3px 8px; border-radius:3px; margin-bottom:10px; }
+
+  .maths { background:var(--sheet); border:1px solid var(--rule-soft); border-left:3px solid var(--built);
+           border-radius:4px; padding:20px 22px; box-shadow:var(--shadow); }
+  .maths dl { display:grid; grid-template-columns:1fr auto; gap:9px 20px; margin:0;
+              font-family:"IBM Plex Mono",monospace; font-size:14px; font-variant-numeric:tabular-nums; }
+  .maths dt { color:var(--ink-2); font-family:"Source Serif 4",Georgia,serif; }
+  .maths dd { margin:0; text-align:right; font-weight:600; }
+  .maths .rule { grid-column:1/-1; height:1px; background:var(--rule); }
+
+  .note { background:var(--sheet); border:1px solid var(--rule-soft); border-radius:4px;
+          padding:20px 22px; box-shadow:var(--shadow); }
+  .note.warn { border-left:3px solid var(--amber); }
+  ul.plain { margin:0; padding-left:20px; }
+  ul.plain li { margin-bottom:9px; }
+  ul.plain li:last-child { margin-bottom:0; }
+
+  ol.steps { list-style:none; margin:0; padding:0; counter-reset:s; }
+  ol.steps > li { counter-increment:s; display:grid; grid-template-columns:52px 1fr; gap:0 18px;
+                  padding:20px 0; border-top:1px solid var(--rule-soft); }
+  ol.steps > li:first-child { border-top:1px solid var(--rule); }
+  ol.steps > li::before { content:counter(s,decimal-leading-zero);
+    font-family:"IBM Plex Mono",monospace; font-size:24px; font-weight:600; color:var(--amber);
+    font-variant-numeric:tabular-nums; }
+  ol.steps p { font-size:16px; margin-bottom:10px; }
+  ol.steps p:last-child { margin-bottom:0; }
+
+  footer { max-width:1040px; margin:54px auto 0; padding-top:44px; border-top:1px solid var(--rule);
+           font-size:13px; line-height:1.6; color:var(--ink-3); }
+  footer a { color:var(--ink-2); }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+
+<header class="mast">
+  <p class="eyebrow">Trueline · pricing · 25 August 2026</p>
+  <h1>What <em>Trueline</em> Should Cost</h1>
+  <p class="standfirst">
+    Every platform in this market charges by the seat and every scanner charges by
+    the scan. The second one is repeatedly called out as punishing exactly the
+    contractor this is built for. That is the opening.
+  </p>
+</header>
+
+<section>
+  <div class="sechead wide">
+    <h2>What everyone else charges</h2>
+    <p class="kicker">Reported by trade comparison sites in 2026. None of these was quoted to me.</p>
+  </div>
+  <div class="wide scroll">
+    <table>
+      <caption>Ordered by what a one-to-three person remodeler would actually end up paying.</caption>
+      <thead>
+        <tr><th scope="col">Product</th><th scope="col">What it does</th><th scope="col">Monthly</th><th scope="col">The catch</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">magicplan</th><td>Scan → floor plan → restoration estimate</td>
+          <td class="num">~$33</td><td>$40 per project above the plan limit</td>
+        </tr>
+        <tr>
+          <th scope="row">Jobber</th><td>Quote, schedule, invoice</td>
+          <td class="num">$49 / $149 / $249</td><td>Most land on $149</td>
+        </tr>
+        <tr>
+          <th scope="row">Houzz&nbsp;Pro</th><td>Design-led sales</td>
+          <td class="num">from $65</td><td>The pitch is renders, not measurement</td>
+        </tr>
+        <tr>
+          <th scope="row">CompanyCam</th><td>Job photos, nothing else</td>
+          <td class="num">$79 / $149 / $249</td><td>Extra seats $34 each</td>
+        </tr>
+        <tr>
+          <th scope="row">Hover</th><td>Exterior photo takeoff</td>
+          <td class="num">$99</td><td>plus $29–139 <em>per project</em></td>
+        </tr>
+        <tr>
+          <th scope="row">JobTread</th><td>Estimating, CRM, job costing</td>
+          <td class="num">$199</td><td>+$20 per user</td>
+        </tr>
+        <tr>
+          <th scope="row">Buildertrend</th><td>Full construction management</td>
+          <td class="num">~$339–499</td><td>Now quoted individually</td>
+        </tr>
+        <tr class="us">
+          <th scope="row">Trueline</th>
+          <td>Measure → price → propose → sign → change orders</td>
+          <td class="num">$29 proposed</td>
+          <td>No per-scan fee, no per-project fee, ever</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col" style="padding-top:30px">
+    <p>
+      Read the middle column and the wedge is obvious. <strong>There is nothing
+      between $33 and $49</strong>, and the $33 is a scanner that stops at the
+      drawing. Everything that does proposals and change orders starts at $149.
+    </p>
+    <p>
+      Trueline does what the $33 tool does, plus the two things a contractor
+      actually buys the $149 tool for: a proposal a homeowner can sign, and a
+      scope that freezes when they do. It does not do scheduling, invoicing, crew
+      management or a CRM — and pricing it as though it did would be the fastest
+      way to lose to a product that does.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="sechead wide">
+    <h2>What I would charge</h2>
+    <p class="kicker">Two tiers at launch. The third needs a server, so it is not a launch tier.</p>
+  </div>
+  <div class="wide tiers">
+
+    <div class="tier">
+      <p class="name">Free</p>
+      <p class="who">Anyone, forever</p>
+      <div class="price">$0</div>
+      <div class="yearly">no card, no account</div>
+      <ul>
+        <li>Scan and measure any room</li>
+        <li>The full plan, the 3D, all the editing</li>
+        <li>The takeoff</li>
+        <li>One job kept at a time</li>
+        <li class="no">No proposal, no signature</li>
+        <li class="no">No exports</li>
+      </ul>
+    </div>
+
+    <div class="tier pick">
+      <span class="badge">The one to launch</span>
+      <p class="name">Trueline</p>
+      <p class="who">One person, unlimited jobs</p>
+      <div class="price">$29<small> /month</small></div>
+      <div class="yearly">or $249 a year — two months free</div>
+      <ul>
+        <li>Everything above, unlimited</li>
+        <li>Proposals with options</li>
+        <li>Signatures, with the full record</li>
+        <li>The signed baseline and change orders</li>
+        <li>Every export: PDF, CSV, DXF, ESX</li>
+        <li>Your own price book and supplier lists</li>
+      </ul>
+    </div>
+
+    <div class="tier">
+      <p class="name">Crew</p>
+      <p class="who">Year two, not launch</p>
+      <div class="price">$59<small> /month</small></div>
+      <div class="yearly">up to 5 people on one job</div>
+      <ul>
+        <li>Everything in Trueline</li>
+        <li>The same job on several phones</li>
+        <li class="no">Needs a server, which you do not have</li>
+        <li class="no">iCloud is per Apple ID, so it cannot share today</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col" style="padding-top:30px">
+    <h3>Why $29 and not $19, $49 or $99</h3>
+    <p>
+      <strong>$19 is too cheap to be believed.</strong> A contractor comparing a
+      $19 tool against a $149 one does not conclude it is a bargain; he concludes
+      it is a toy. The price is a claim about the product.
+    </p>
+    <p>
+      <strong>$49 puts you in Jobber's entry tier</strong> and invites the
+      comparison you lose — Jobber schedules and invoices and you do not.
+    </p>
+    <p>
+      <strong>$29 sits just under magicplan</strong>, which is the product a
+      remodeler is most likely to have tried, while doing more than it does. It
+      is the only number where "cheaper than the scanner and it also writes the
+      proposal" is literally true.
+    </p>
+    <p>
+      And it is one number. No per-scan fee and no per-project fee — which is the
+      single loudest complaint in this market and the one thing every competitor
+      does. Say it on the pricing page in those words.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="sechead col">
+    <h2>What you keep</h2>
+    <p class="kicker">You are on the Small Business Program, so Apple takes 15%.</p>
+  </div>
+  <div class="col maths">
+    <dl>
+      <dt>$29 monthly, gross</dt><dd>$29.00</dd>
+      <dt>Apple, 15%</dt><dd>−$4.35</dd>
+      <div class="rule"></div>
+      <dt><strong>Per subscriber, per month</strong></dt><dd><strong>$24.65</strong></dd>
+      <div class="rule"></div>
+      <dt>$249 yearly, gross</dt><dd>$249.00</dd>
+      <dt>Apple, 15%</dt><dd>−$37.35</dd>
+      <div class="rule"></div>
+      <dt><strong>Per subscriber, per year</strong></dt><dd><strong>$211.65</strong></dd>
+    </dl>
+    <p style="margin:18px 0 0; font-size:15px; color:var(--ink-2)">
+      Your running costs are <strong>$99 a year</strong> for the developer program
+      and <strong>nothing else</strong>. There is no server: every scan lives in
+      the customer's own iCloud, so storage is their bill, not yours. That is
+      already built and shipping.
+    </p>
+    <dl style="margin-top:18px">
+      <dt>Subscribers to cover the $99</dt><dd>1</dd>
+      <dt>At 25 subscribers</dt><dd>$7,395 / yr</dd>
+      <dt>At 100 subscribers</dt><dd>$29,580 / yr</dd>
+      <dt>At 500 subscribers</dt><dd>$147,900 / yr</dd>
+    </dl>
+    <p style="margin:16px 0 0; font-size:14px; color:var(--ink-3)">
+      Monthly at $24.65 net × 12. Real revenue will be a mix of monthly and
+      annual and will be lower per head than this, because annual is cheaper per
+      month and most people who stay will take it. These are the ceiling of that
+      range, not a forecast.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="sechead col">
+    <h2>Why the free tier is not generosity</h2>
+  </div>
+  <div class="col">
+    <p>
+      It is doing three jobs at once, and dropping it would cost you all three.
+    </p>
+    <p>
+      <strong>It is what gets you through App Store review.</strong> The rejection
+      that matters here is Guideline 4.2 — an app that is a login wall with no
+      standalone value. A free tier that genuinely measures a room is not that.
+    </p>
+    <p>
+      <strong>It is the fallback if review ever goes badly.</strong> Slack, Notion
+      and Figma all ship a free app and sell the plan on the web. That route only
+      exists if the free app is genuinely useful on its own.
+    </p>
+    <p>
+      <strong>And it is how a contractor tries it.</strong> Nobody in this trade
+      subscribes to a measuring app they have not stood in a room with. Let him
+      measure his own kitchen for nothing, then charge him the first time he wants
+      to send the proposal.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="sechead wide">
+    <h2>What has to be built before you can charge</h2>
+    <p class="kicker">None of this exists yet. In the order it has to happen.</p>
+  </div>
+  <div class="wide">
+    <ol class="steps">
+      <li><div>
+        <h3>StoreKit 2, and a paywall that is honest about what it gates</h3>
+        <p>
+          Two products in App Store Connect — a monthly and a yearly auto-renewing
+          subscription — and the code that reads whether the person has one. Apple
+          gives you the receipt validation; you do not need a server for it.
+        </p>
+      </div></li>
+      <li><div>
+        <h3>The gate itself, in one place</h3>
+        <p>
+          A single check the whole app asks, rather than a paywall scattered
+          through every screen. Measuring, the plan and the takeoff never ask it.
+          Proposals, signatures and exports do.
+        </p>
+      </div></li>
+      <li><div>
+        <h3>A free tier that cannot be mistaken for a broken one</h3>
+        <p>
+          When a locked thing is tapped, say what it does and what it costs — not
+          "upgrade to unlock". A contractor who has just measured his kitchen has
+          earned a straight sentence.
+        </p>
+      </div></li>
+      <li><div>
+        <h3>Restore purchases, and the family case</h3>
+        <p>
+          Apple requires a restore path. It is small and it is a rejection if it
+          is missing.
+        </p>
+      </div></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="sechead col">
+    <h2>What I am not certain of</h2>
+  </div>
+  <div class="col">
+    <div class="note warn">
+      <ul class="plain">
+        <li>
+          <strong>No price in the table was quoted to me.</strong> All of it comes
+          from trade comparison articles, several published by competitors of the
+          products they compare. Right order of magnitude, not quotes.
+        </li>
+        <li>
+          <strong>$29 is a judgement, not a finding.</strong> No contractor has
+          been asked what they would pay for this. The reasoning above is the best
+          I can do without that, and one afternoon of asking would beat it.
+        </li>
+        <li>
+          <strong>The revenue lines are arithmetic, not a forecast.</strong> They
+          are what N subscribers produce. Nothing here predicts N.
+        </li>
+        <li>
+          <strong>I have not read Apple's current agreement.</strong> The 15% is
+          the Small Business Program rate as reported; confirm it against your own
+          App Store Connect account before relying on it.
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer class="wide">
+  <strong>Sources.</strong>
+  <a href="https://www.scanmanifold.com/blog-posts/jobber-pricing-2026-what-every-plan-costs">Jobber pricing 2026</a> ·
+  <a href="https://www.scanmanifold.com/blog-posts/companycam-bloat-2026-what-you-are-paying-for">CompanyCam tiers 2026</a> ·
+  <a href="https://www.scanmanifold.com/blog-posts/magicplan-pricing-2026-848ee">magicplan pricing 2026</a> ·
+  <a href="https://contractortoolstack.com/software/magicplan/">magicplan review</a> ·
+  <a href="https://www.jobtread.com/blog/jobtread-vs-houzz-pro-construction-management-software-comparison-for-contractors-and-remodelers">JobTread vs Houzz Pro</a> ·
+  <a href="https://build-folio.com/best-contractor-estimating-software/">Contractor estimating software compared</a> ·
+  <a href="https://contractortoolstack.com/software/hover">Hover pricing</a> ·
+  <a href="https://developer.apple.com/app-store/review/guidelines/">App Review Guidelines</a>.
+  Apple's Small Business Program rate as reported by
+  <a href="https://www.forasoft.com/blog/article/how-to-avoid-apple-pay-commission-204">Fora Soft</a> and
+  <a href="https://dodopayments.com/blogs/digital-goods-outside-app-store">Dodo Payments</a>.
+</footer>
