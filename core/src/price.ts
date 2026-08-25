@@ -1,4 +1,3 @@
-import { type Nanometres, NM_PER_FOOT, formatFeetInches } from './length.ts';
 import { RoomError } from './room.ts';
 import { type TakeoffLine } from './takeoff.ts';
 
@@ -288,19 +287,9 @@ function median(values: readonly Cents[]): Cents {
   return sorted[Math.floor((sorted.length - 1) / 2)]!;
 }
 
-/** Linear feet as a rate is charged, for a book somebody is filling in by hand. */
-export function perFoot(cents: Cents, length: Nanometres): Cents {
-  const feet = (length * 100n + NM_PER_FOOT / 2n) / NM_PER_FOOT;
-  const raw = cents * feet;
-  return (raw + 50n) / 100n;
-}
 
 /** What a rate reads as on a line: `$12.50 / sq ft`. */
 export function rateLabel(rate: Rate): string {
   return `${money(rate.cents)} / ${rate.unit}`;
 }
 
-/** A length in the words a price book uses, for the note beside a rate. */
-export function describeLength(value: Nanometres): string {
-  return formatFeetInches(value);
-}

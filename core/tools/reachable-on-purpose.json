@@ -1,0 +1,30 @@
+{
+  "_why": "Functions the app deliberately does not call, each with the reason it stays. Anything not in here and not called is on the list until somebody deals with it. A reason is required: an entry with an empty one is refused, because 'we might need it' is how a list stops being read.",
+  "core/src/section.ts": {
+    "sectionFor": "The automatic view policy -- eye above the ceiling drops the ceiling, outside drops the near walls, inside is a walkthrough. The app deliberately gives explicit controls instead (Stand inside, Cut it), because a mode that changes itself as somebody drags is a mode nobody can predict. Kept because the policy is right and tested, and the day a second surface wants a view chosen for it, this is the one answer rather than a fourth invention."
+  },
+  "core/src/render.ts": {
+    "toRenderSection": "Turns a cut plane into a renderer-agnostic model. The app draws its sections through `project`, which is the same geometry aimed at an SVG. This is the export path -- DXF, a print pipeline, anything that is not a browser -- and it is tested against the same fixtures."
+  },
+  "core/src/zone.ts": {
+    "boundaryContributesNoUncertainty": "An invariant, asserted rather than assumed. A virtual boundary bounds area and never inherits a tolerance from the walls it lands between, and the day it silently starts carrying one is the day a zone area gains a band it has no business having. Its only caller is the test that would catch that, which is exactly right.",
+    "builtPerimeter": "The raw run of built edge round a zone, doors and all. The zone card shows `baseboardRun` instead, which is that run LESS the doors and cased openings -- because base is what gets ordered and base does not cross a doorway. The raw figure is what a framer or a paint estimator wants, and neither has a screen yet."
+  },
+  "core/src/issue.ts": {
+    "isIssuable": "The yes/no over `readiness`, whose full answer every screen shows instead -- which walls, and why. A boolean is what an export or an API gate wants, and neither exists yet."
+  },
+  "core/src/length.ts": {
+    "isExactAt": "Whether a value lands exactly on a sixteenth, so a display can tell a rounded number from a true one. Nothing shows that today; the day a sheet needs to mark a rounded dimension, this is the question.",
+    "toJSON": "Nanometres as a decimal string. `persist.ts` has its own encoder for whole projects; this is the single-value form for anything crossing a wire on its own."
+  },
+  "core/src/measurement.ts": {
+    "preferVerified": "Picks the better of two measurements of one thing -- verified beats scanned, and the tighter band wins a tie. The room model never holds two, because `postEntry`-style single-writer discipline applies here too. It is what a re-scan diff will need, and `docs/v3.md` names that as the next real feature.",
+    "formatWithConfidence": "A measurement and its band as one string. Every screen composes those two separately because it styles them separately -- the number in ink and the band in grey. This is the form for plain text, where there is no styling to do."
+  },
+  "core/src/quickbooks.ts": {
+    "readQuickbooks": "Reads a QuickBooks file back. The app only writes one today. It is here because writing an exporter without a reader is how an export format quietly stops round-tripping, and the test proves what is written can be read."
+  },
+  "core/src/trade.ts": {
+    "itemFor": "Maps a trade's word back to the item it renames, so a rate set under one trade is not orphaned when somebody switches trade. `wordFor` is the direction the screens use; this is the one that stops the switch losing money, and the test is what proves it."
+  }
+}

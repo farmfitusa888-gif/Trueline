@@ -272,5 +272,28 @@ the first one, so the alarm could not fire. It is wired now, and
 `capture.test.ts` runs the whole round trip against Sam's real garage scan —
 quiet at a believable height, loud two metres out.
 
-It is not a gate. The remaining entries are a work list, not failures, and
-several are honest internal helpers. Read it, do not obey it.
+It is a gate now, and it reaches zero. `npm run verify` runs it, and an entry
+leaves the list in exactly one of three ways:
+
+  **Wired** — because a person would notice. `setWallHeight` was the clearest:
+  a wall could not be given its own height, so the only way to make a pony wall
+  was to cut a full-height one in two, and a room scanned with a breakfast bar
+  already in it had every quantity priced as if it went to the ceiling.
+
+  **Deleted** — because it was a second way to say something. `floorExtent`
+  computed the floor's size a second time when `extentOf` is what the app
+  draws with, and two derivations of one datum is two chances to disagree.
+  Where a deleted function had a test worth keeping, the assertion moved onto
+  the path that runs rather than being thrown away with it.
+
+  **Excused in `reachable-on-purpose.json`, with a written reason.** Some
+  functions are deliberately not called: `boundaryContributesNoUncertainty` is
+  an invariant whose only right caller is the test that would catch it
+  breaking; `sectionFor` is an automatic view policy the app deliberately
+  replaced with explicit controls; `readQuickbooks` is the reader that stops an
+  export format quietly ceasing to round-trip.
+
+  The reason is checked for length and a thin one is refused as loudly as an
+  unreferenced function. "We might need it" is how a list like this stops
+  being read, and the whole value of the file is that somebody had to write a
+  sentence they were willing to sign.

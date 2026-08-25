@@ -12,7 +12,6 @@ import {
   footprint,
   footprintObstacle,
   framing,
-  fullyThick,
   jambDepth,
   openingReturns,
   thicknessGroups,
@@ -113,7 +112,10 @@ test('a room-wide thickness applies to every wall, and a wall overrides it', () 
   });
   assert.equal(thicknessOf(r.walls[0]!, r)!.value, parseLength(`6 1/2"`));
   assert.equal(thicknessOf(r.walls[1]!, r)!.value, parseLength(`4 1/2"`));
-  assert.equal(fullyThick(r), true);
+  // `fullyThick` was a one-line predicate over exactly this and was deleted:
+  // every caller wants to know WHICH walls are bare, not merely whether any
+  // are, so it was a second name for a shorter answer nobody needed.
+  assert.deepEqual(withoutThickness(r), []);
 });
 
 test('walls with no thickness are named, not assumed to be 2x4', () => {
@@ -121,7 +123,6 @@ test('walls with no thickness are named, not assumed to be 2x4', () => {
   // framing would reconcile perfectly and be wrong by the cost of the job.
   const r = room([w('south', 'east', `20'`, { thickness: stated(`4 1/2"`) }), ...box().slice(1)]);
   assert.deepEqual(withoutThickness(r), ['east', 'north', 'west']);
-  assert.equal(fullyThick(r), false);
 });
 
 test('an open span has no thickness and is never asked for one', () => {

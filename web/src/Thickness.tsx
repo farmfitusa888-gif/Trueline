@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { formatFeetInches as exact, parseLength } from '../../core/src/length.ts';
 import { Wants } from './Measure.tsx';
+import { startingThickness } from '../../core/src/company.ts';
 import { useUnits } from './units.tsx';
 import { isVerified } from '../../core/src/measurement.ts';
 import type { Room } from '../../core/src/room.ts';
@@ -8,6 +9,7 @@ import {
   ASSEMBLIES,
   thicknessGroups,
   thicknessOf,
+  thicknessProvenance,
   withoutThickness,
 } from '../../core/src/thickness.ts';
 
@@ -38,7 +40,7 @@ export function Thickness({
   readonly selected: string | null;
   readonly onSet: (wallId: string | null, text: string | null, how: 'stated' | 'tape') => void;
 }) {
-  const { len } = useUnits();
+  const { len, company } = useUnits();
   const [typed, setTyped] = useState('');
   const [wants, setWants] = useState<string | null>(null);
   const wall = selected ? room.walls.find((w) => w.id === selected) : undefined;
@@ -49,6 +51,8 @@ export function Thickness({
 
   const current = target ? thicknessOf(target, room) : room.wallThickness;
   const bare = withoutThickness(room);
+  const came = thicknessProvenance(room);
+  const usual = startingThickness(company, 'me', new Date().toISOString());
   // A room somebody typed by hand never had a scanner in it, and telling them
   // what the scan could not see would be describing a scan that never happened.
   const scanned = room.walls.some((w) => !isVerified(w.length));
@@ -82,6 +86,46 @@ export function Thickness({
           : 'Nothing has said yet how thick these walls are.'}{' '}
         Say what it is and you get the jamb to order, the wrap round each opening, and the framing.
       </p>
+
+      {/* Where every thickness in this room came from, in one word.
+          The distinction the whole product is built on, applied to the one
+          number a scan can never see: `measured` is a tape on a jamb,
+          `stated` is a build somebody tapped, `missing` is neither. Both
+          helpers existed and nothing asked them. */}
+      <p
+        className={`mt-1 text-sm ${
+          came === 'measured'
+            ? 'text-emerald-800'
+            : came === 'stated'
+              ? 'text-amber-800'
+              : 'text-slate-500'
+        }`}
+      >
+        {came === 'measured'
+          ? 'Every wall here has had a tape on a jamb. These are measurements.'
+          : came === 'stated'
+            ? 'Every wall here has a thickness, and it is a build somebody chose rather than one anybody measured. Good enough to price; check one jamb before ordering.'
+            : `${bare.length} wall${bare.length === 1 ? '' : 's'} still ${
+                bare.length === 1 ? 'has' : 'have'
+              } no thickness at all, so the framing and the jambs are left out of the takeoff rather than guessed at.`}
+      </p>
+
+      {/* The build this contractor's walls usually are, in one tap.
+          `Your business` has offered a default assembly since the profile
+          screen was written and nothing read it -- so somebody who builds 2x6
+          picked it out of the row every single time, on every room. One tap,
+          and only while nothing has been said yet: a default that overwrote a
+          number somebody had already given would be the worst kind. */}
+      {usual && !current && (
+        <button
+          type="button"
+          onClick={() => onSet(scope, exact(usual.value), 'stated')}
+          className="mt-3 min-h-12 w-full rounded-md bg-slate-900 px-4 font-semibold text-white
+                     active:bg-slate-700 print:hidden"
+        >
+          Your usual — {len(usual.value)}
+        </button>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2 print:hidden">
         {ASSEMBLIES.map((a) => {

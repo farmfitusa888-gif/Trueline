@@ -1,6 +1,6 @@
 import { type Nanometres, NM_PER_FOOT, NM_PER_INCH, add, formatFeetInches } from './length.ts';
 import { isAdjusted, isVerified, toleranceOf } from './measurement.ts';
-import { type Room, formatSquareFeet, runLength } from './room.ts';
+import { type Room, runLength } from './room.ts';
 import { type Quantities, roomQuantities } from './zone.ts';
 import { readiness, trustLabel } from './issue.ts';
 import {
@@ -429,7 +429,3 @@ export function wallSchedule(room: Room): string {
     .join('\n');
 }
 
-/** Floor area as the screen says it, for anything that wants one line. */
-export function areaLine(room: Room): string {
-  return formatSquareFeet(roomQuantities(room).floorArea);
-}

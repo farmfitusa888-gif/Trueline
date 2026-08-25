@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { startingCeiling } from '../../core/src/company.ts';
+import { formatFeetInches } from '../../core/src/length.ts';
 import { useUnits } from './units.tsx';
 import type { Room } from '../../core/src/room.ts';
 import {
@@ -42,9 +44,27 @@ export function Draw({
   readonly onDone: (room: Room, name: string) => void;
   readonly onCancel: () => void;
 }) {
-  const { len } = useUnits();
+  const { len, company } = useUnits();
+
+  /**
+   * The ceiling height this contractor's houses actually have.
+   *
+   * `Your business` has offered a default ceiling since the profile screen was
+   * written, and nothing read it -- so ticking the box and typing 9' did
+   * literally nothing, and every hand-drawn room started at a hard-coded 8'.
+   * A preference that has no effect is worse than no preference: somebody sets
+   * it, believes it, and gets 8' anyway. Found by `npm run what-is-left`.
+   *
+   * A scanned room is untouched by this. Its ceiling comes off the tallest
+   * wall the sensor saw, and a stated default must never overwrite something
+   * a sensor measured.
+   */
+  const startsAt = useMemo(() => {
+    const fromProfile = startingCeiling(company, 'me', new Date().toISOString());
+    return fromProfile ? formatFeetInches(fromProfile.value) : `8'`;
+  }, [company]);
   const [name, setName] = useState('');
-  const [ceiling, setCeiling] = useState(`8'`);
+  const [ceiling, setCeiling] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [fixing, setFixing] = useState<string | null>(null);
   const [fixTo, setFixTo] = useState('');
@@ -60,7 +80,7 @@ export function Draw({
           name: name.trim() || 'Room',
           enteredBy: 'me',
           at: new Date().toISOString(),
-          ceilingHeight: ceiling.trim() || `8'`,
+          ceilingHeight: ceiling.trim() || startsAt,
         })
       );
       setTrouble(null);
@@ -118,6 +138,11 @@ export function Draw({
             <input
               value={ceiling}
               onChange={(event) => setCeiling(event.target.value)}
+              // Empty shows what it will use, rather than filling the box with
+              // it: a prefilled number reads as something already decided, and
+              // a default is exactly the thing somebody should be able to
+              // leave alone or overrule without either looking like an edit.
+              placeholder={startsAt}
               inputMode="text"
               autoCapitalize="off"
               autoCorrect="off"

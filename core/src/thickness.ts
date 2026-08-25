@@ -1,6 +1,5 @@
 import {
   type Nanometres,
-  NM_PER_FOOT,
   NM_PER_INCH,
   add,
   formatFeetInches,
@@ -162,10 +161,6 @@ export function withoutThickness(room: Room): readonly string[] {
   return room.walls.filter((w) => !w.open && thicknessOf(w, room) === undefined).map((w) => w.id);
 }
 
-/** True when every built wall in the room has a thickness against it. */
-export function fullyThick(room: Room): boolean {
-  return withoutThickness(room).length === 0;
-}
 
 /**
  * The distinct thicknesses in the room, each with the walls that carry it.
@@ -452,14 +447,6 @@ export function footprint(room: Room): Footprint {
 
 /* ----------------------------------------------------------------- reading */
 
-/** Square feet from the doubled unit, rounded for reading only. */
-const HALF_NM2_PER_SQ_FT = 2n * NM_PER_FOOT * NM_PER_FOOT;
-
-export function squareFeet(halfNm2: bigint, places = 1): string {
-  const scale = 10n ** BigInt(places);
-  const scaled = (halfNm2 * scale + HALF_NM2_PER_SQ_FT / 2n) / HALF_NM2_PER_SQ_FT;
-  return `${Number(scaled) / Number(scale)}`;
-}
 
 /**
  * Whether anybody actually stood behind the thicknesses, or the room is running

@@ -1,4 +1,4 @@
-import { type Nanometres, add, hypotenuse } from './length.ts';
+import { type Nanometres } from './length.ts';
 import { type Point, area, corners, runLength } from './room.ts';
 import { type Floor, type Placed, layout, turnPoint } from './floor.ts';
 
@@ -235,11 +235,3 @@ export function placedArea(plan: FloorPlan): bigint {
   return plan.rooms.reduce((total, room) => total + room.area, 0n);
 }
 
-/** The built perimeter of everything placed, for a quick sanity figure. */
-export function placedPerimeter(plan: FloorPlan): Nanometres {
-  return add(
-    ...plan.walls
-      .filter((wall) => !wall.open)
-      .map((wall) => hypotenuse(wall.to.x - wall.from.x, wall.to.y - wall.from.y))
-  );
-}

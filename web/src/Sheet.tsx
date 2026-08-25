@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import { readiness } from '../../core/src/issue.ts';
 import { roomToDxf } from '../../core/src/dxf/room.ts';
-import { pricing } from '../../core/src/company.ts';
+import { isPresentable, pricing } from '../../core/src/company.ts';
 import { takeoff } from '../../core/src/takeoff.ts';
 import { quote } from '../../core/src/price.ts';
 import { photosOfWall, type Photo } from '../../core/src/photo.ts';
@@ -213,6 +213,20 @@ export function Sheet({
           </>
         )}
       </p>
+
+      {/* Whose drawing this is, before it goes to somebody's client.
+          `isPresentable` is the profile's own answer to "is there enough here
+          to put on something a client will see", and nothing asked it -- so a
+          sheet could go out with a blank title block and the first anybody
+          knew was the client asking who sent it. Never blocking: it is his
+          drawing and his call. */}
+      {!isPresentable(company) && (
+        <p className="mt-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+          Your business details are not filled in, so this goes out with a blank title block — no
+          name, no phone number, no licence. Two minutes under <strong>Your business</strong> puts
+          them on every sheet from now on. Nothing stops you sending it as it is.
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2 print:hidden">
         <button

@@ -22,6 +22,7 @@ of `section.ts`'s exports was tested and none of them was reachable.
 So a symbol reached only by tests is reported separately -- proven and
 unreachable, which is the exact shape of the bug this exists for.
 """
+import json
 import os
 import re
 import sys
@@ -29,6 +30,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CORE = ROOT / 'core' / 'src'
+ON_PURPOSE = Path(__file__).resolve().parent / 'reachable-on-purpose.json'
+
+
+def excused() -> dict[str, dict[str, str]]:
+    """Functions the app deliberately does not call, and why.
+
+    A reason is required and is checked for length, because "we might need it"
+    is how a list like this stops being read. An entry with a thin one is
+    refused as loudly as an unreferenced function -- the point of the file is
+    that somebody had to write a sentence they were willing to sign.
+    """
+    if not ON_PURPOSE.exists():
+        return {}
+    raw = json.loads(ON_PURPOSE.read_text(encoding='utf-8'))
+    return {k: v for k, v in raw.items() if not k.startswith('_')}
 
 # Functions only, and that is the whole design of this check.
 #
@@ -78,8 +94,11 @@ def main() -> int:
     for path in sorted((ROOT / 'web' / 'audit').rglob('*.mjs')):
         web[path] = path.read_text(encoding='utf-8')
 
+    allowed = excused()
     unused = []
     testOnly = []
+    onPurpose = []
+    thin = []
 
     for path, text in sources.items():
         if '/test/' in str(path).replace(os.sep, '/'):
@@ -98,7 +117,15 @@ def main() -> int:
                     inTest = True
                 else:
                     inApp = True
-            rel = os.path.relpath(path, ROOT)
+            rel = os.path.relpath(path, ROOT).replace(os.sep, '/')
+            reason = allowed.get(rel, {}).get(name)
+            if reason is not None:
+                if len(reason) < 40:
+                    thin.append(f'{rel}: {name} — its reason in '
+                                f'{ON_PURPOSE.name} is too thin to be one')
+                else:
+                    onPurpose.append(f'{rel}: {name}')
+                continue
             if not inApp and not inTest:
                 unused.append(f'{rel}: {name} — nothing references it at all')
             elif not inApp:
@@ -114,12 +141,19 @@ def main() -> int:
         for line in testOnly:
             print(f'  {line}')
         print()
-    if not unused and not testOnly:
-        print('Every function the measurement layer exports is called by something '
-          'that is not a test.')
+    if thin:
+        print(f'Excused in {ON_PURPOSE.name} with no real reason:')
+        for line in thin:
+            print(f'  {line}')
+        print()
+    if not unused and not testOnly and not thin:
+        print(f'Every function the measurement layer exports is called by something that is '
+              f'not a test, or is one of {len(onPurpose)} excused in {ON_PURPOSE.name} with a '
+              f'written reason.')
         return 0
     print(f'{len(unused)} function(s) nothing references, '
-          f'{len(testOnly)} reachable only from tests.')
+          f'{len(testOnly)} reachable only from tests, '
+          f'{len(onPurpose)} excused on purpose.')
     return 1
 
 
