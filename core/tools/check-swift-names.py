@@ -178,8 +178,136 @@ def missingFrameworks(source: str) -> list[tuple[str, str]]:
     return found
 
 
+# ---------------------------------------------------------------------------
+# The memberwise initialiser, and the order it insists on.
+#
+# A struct with no `init` of its own gets one for free, taking its stored
+# properties **in the order they are declared**. Swift refuses a call that
+# reorders them, and what Xcode says is "Incorrect argument labels in call"
+# followed by the whole list -- which reads like a spelling mistake and is
+# nothing of the sort.
+#
+# `ReviewScreen` called `CorrectView(subscribed:onVisits:roomJSON:...)` when
+# `CorrectView` declares `roomJSON` first and `subscribed` sixth. It had been
+# that way for as long as the call existed and nothing found it, because until
+# a Mac compiled this project nothing could.
+#
+# Everything here is skipped rather than guessed at when it cannot be read
+# confidently: a struct with its own `init`, a property with a default, a
+# computed property, a call whose arguments this cannot parse.
+
+ATTRIBUTED = re.compile(
+    r"""^\s*(?:@\w+(?:\([^)]*\))?\s+)*        # @ObservedObject, @State(...)
+        (?:public|private|internal|fileprivate)?\s*
+        (?:let|var)\s+(\w+)\s*:\s*([^={\n]+)$""",
+    re.X,
+)
+
+
+def bodyOf(source: str, start: int) -> str | None:
+    """The braces-matched body of a declaration whose `{` is at or after start."""
+    opened = source.find('{', start)
+    if opened == -1:
+        return None
+    depth = 0
+    for i in range(opened, len(source)):
+        if source[i] == '{':
+            depth += 1
+        elif source[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return source[opened + 1:i]
+    return None
+
+
+def memberwise(source: str) -> dict[str, list[str]]:
+    """Each struct that has a free initialiser, and the labels it takes."""
+    found = {}
+    for match in re.finditer(r'^(?:\w+\s+)*struct\s+(\w+)[^{\n]*\{', source, re.M):
+        body = bodyOf(source, match.start())
+        if body is None:
+            continue
+
+        # One pass, at the struct's own depth only.
+        #
+        # An `init` nested inside the struct -- CorrectView holds a
+        # `class Coordinator` that has one -- is not the struct's own, and
+        # searching the whole body for one skipped CorrectView entirely. This
+        # check reported success while checking nothing, and the bug it was
+        # written for walked straight past it. Depth is the whole fix.
+        labels: list[str] = []
+        ownInit = False
+        depth = 0
+        for line in body.split('\n'):
+            if depth == 0:
+                if re.match(r'\s*(?:public\s+|private\s+|internal\s+)?init\s*[(<]', line):
+                    ownInit = True
+                    break
+                prop = ATTRIBUTED.match(line)
+                # A default value or a computed body means it is not a plain
+                # stored property in the initialiser's sense.
+                if prop and '=' not in line.split(':', 1)[1] and not line.rstrip().endswith('{'):
+                    labels.append(prop.group(1))
+            depth += line.count('{') - line.count('}')
+        if labels and not ownInit:
+            found[match.group(1)] = labels
+    return found
+
+
+def callsTo(source: str, name: str) -> list[tuple[int, list[str]]]:
+    """Every `Name(...)` call, as (line number, the labels it passes)."""
+    calls = []
+    for match in re.finditer(r'(?<![\w.])' + re.escape(name) + r'\s*\(', source):
+        depth, i = 0, match.end() - 1
+        for j in range(i, len(source)):
+            if source[j] in '([{':
+                depth += 1
+            elif source[j] in ')]}':
+                depth -= 1
+                if depth == 0:
+                    inner = source[i + 1:j]
+                    break
+        else:
+            continue
+        # Labels at the call's own depth. Anything nested -- a closure body, a
+        # dictionary, another call -- is skipped by the depth counter.
+        labels, depth, start = [], 0, 0
+        for k, ch in enumerate(inner):
+            if ch in '([{':
+                depth += 1
+            elif ch in ')]}':
+                depth -= 1
+            elif ch == ',' and depth == 0:
+                start = k + 1
+        pieces, depth, at = [], 0, 0
+        for k, ch in enumerate(inner):
+            if ch in '([{':
+                depth += 1
+            elif ch in ')]}':
+                depth -= 1
+            elif ch == ',' and depth == 0:
+                pieces.append(inner[at:k])
+                at = k + 1
+        pieces.append(inner[at:])
+        for piece in pieces:
+            label = re.match(r'\s*(\w+)\s*:', piece)
+            if label:
+                labels.append(label.group(1))
+        if labels:
+            calls.append((source[:match.start()].count('\n') + 1, labels))
+    return calls
+
+
 def main(argv: list[str]) -> int:
     files = [Path(a) for a in argv] or sorted((ROOT / 'ios').rglob('*.swift'))
+
+    # Every struct in the project, so a call in one file can be checked against
+    # a declaration in another -- which is where the bug was.
+    shapes: dict[str, tuple[list[str], str]] = {}
+    for path in sorted((ROOT / 'ios').rglob('*.swift')):
+        for name, labels in memberwise(strip(path.read_text(encoding='utf-8'))).items():
+            shapes[name] = (labels, os.path.relpath(path, ROOT))
+
     bad = 0
     for path in files:
         raw = path.read_text(encoding='utf-8')
@@ -204,11 +332,26 @@ def main(argv: list[str]) -> int:
             print(f'{rel}: uses `{said}` without importing {wants}')
             print(f'    Xcode will say: cannot find \'{said}\' in scope')
 
+        # Memberwise initialisers, in the order they insist on.
+        for name, (labels, declaredIn) in shapes.items():
+            for line, passed in callsTo(source, name):
+                if set(passed) - set(labels):
+                    continue  # Not the memberwise init -- some other overload.
+                wanted = [l for l in labels if l in passed]
+                if passed != wanted:
+                    bad += 1
+                    print(f'{rel}:{line}: {name}(...) passes its arguments out of order')
+                    print(f'    passes: {", ".join(passed)}')
+                    print(f'    wants:  {", ".join(wanted)}   ({declaredIn} declares them so)')
+                    print(f"    Xcode will say: incorrect argument labels in call")
+
     if bad:
         print()
-        print(f'{bad} name(s) used that nothing declares or imports. Each is a compile error.')
+        print(f'{bad} name(s) used that nothing declares or imports, or passed in the '
+              'wrong order. Each is a compile error.')
         return 1
-    print(f'{len(files)} Swift files: every name they use is declared or imported')
+    print(f'{len(files)} Swift files: every name they use is declared or imported, '
+          'and every memberwise call is in order')
     return 0
 
 

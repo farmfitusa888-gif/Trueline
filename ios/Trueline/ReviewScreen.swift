@@ -14,16 +14,22 @@ struct ReviewScreen: View {
     @State private var sharing = false
 
     var body: some View {
+        // The order here is CorrectView's own declaration order, and it has to
+        // be: a struct's memberwise initialiser takes its arguments in the
+        // order the properties are declared, and Swift refuses a call that
+        // reorders them. This call had `subscribed` and `onVisits` first for
+        // as long as it has existed -- "Incorrect argument labels in call" --
+        // and nothing found it, because until today nothing had compiled.
         CorrectView(
-            subscribed: subscription.subscribed,
-            onVisits: { visits, company in
-                Task { await calendar.put(visits, company: company) }
-            },
             roomJSON: scan.roomJSON,
             photosJSON: scan.photosJSON,
             pinsJSON: scan.pinsJSON,
             traceJSON: scan.traceJSON,
             correctedJSON: scan.correctedJSON,
+            subscribed: subscription.subscribed,
+            onVisits: { visits, company in
+                Task { await calendar.put(visits, company: company) }
+            },
             title: scan.title,
             folder: scan.folder,
             onSave: { project in
