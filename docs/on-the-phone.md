@@ -1,9 +1,10 @@
 # Getting the current build onto your phone, and what to test on it
 
-Everything below has been run and passes on this machine: 462 tests, both
-typechecks, the web build, and the app driven end to end in a browser against
-your own garage scan. **None of it has been run on a phone since the plan was
-un-mirrored.** That is what this page is for.
+Everything below has been run and passes on this machine: 589 tests, both
+typechecks, the web build, and every screen driven end to end in a real
+browser. **None of it has been run on a phone since the plan was
+un-mirrored, and no Swift in this repository has ever been compiled** — Xcode
+is the first compiler the iOS half will meet. That is what this page is for.
 
 ---
 
@@ -288,10 +289,116 @@ phone, or an old drawing for a building you cannot get into.
 - **This is the one I would most like a result on.** It has been drawn correctly
   by one renderer here and never opened in Autodesk by anybody.
 
+### 18. Insurance mode — new
+
+Turn it on per job. A remodeler doing one restoration a year should not carry
+a claim number field on every kitchen.
+
+- Under the takeoff: **Is this an insurance job?** → **Turn it on**.
+- Fill the claim: number, date of loss, cause, address, owner, adjuster. What
+  is still missing is listed underneath and **nothing is blocked by it** — mark
+  the damage standing in front of it and do the paperwork from the truck.
+- Tap a wall. Under the elevation: **+ damaged area**. Pick Water, pick how
+  dirty it was, say what it is, then type *from*, *to* and *how high*.
+- **Pass:** the mark shows square feet immediately, with the doors and windows
+  in that stretch already taken off. On a 20 ft wall with a 3 ft door in it, a
+  9 ft water line 18 inches up is **9.0 sq ft**, not 13.5 — the door is 3 ft of
+  that run. Check it on paper.
+- Open the mark. Take the suggested **2'** flood cut. **Pass:** it becomes
+  12.0 sq ft and 6' of baseboard, the elevation draws the height you *saw* in
+  solid red and the height you *decided* in dashed red above it, and the plan
+  draws the affected stretch of that wall in red.
+- **Photograph it.** This is the one thing in the app that cannot be taken
+  again — once the wall is cut out and boarded, that photograph is the whole
+  argument. **Pass:** it appears on the mark, and the line under it says
+  *"Kept with the scan and backed up"* on the phone (in a plain browser it says
+  *"on this browser only"*, which is the truth there).
+- Log two moisture readings a day apart. **Pass:** it says *"Drying: 28 down
+  to 14 %MC"*. Two readings on different scales are listed rather than
+  compared — a curve drawn across a meter change is a fabricated trend.
+
+### 19. What the damage takes, and what goes to the adjuster
+
+- **What the damage takes** is its own sheet and never part of the room's
+  takeoff. Two payers, two sheets: a carrier must not be handed a remodel rate.
+- **Pass:** tear-out, protect and rebuild lines, each traceable to a mark. The
+  paint line is deliberately bigger than the damage and says why — paint runs
+  corner to corner, and nobody feathers a coat into the middle of a wall.
+- There is no equipment, no drying days and no dumpster on it. None of those
+  come off a wall.
+- **Send it to the adjuster** → one HTML file. Tick which rooms the claim
+  covers; the open one is always in.
+- **Pass:** it opens with wifi and data off and looks identical. The drawings
+  have the damage on them, the photographs are full size, and **there are no
+  prices on it** — the scope and its cost is the sheet you send after the
+  scope is agreed. An adjuster who reads your number first negotiates against
+  it.
+
+### 20. Changing the room — new
+
+- Top of the plan: **Rename**. Give the room the name you would say out loud.
+  **Pass:** it heads the drawing, the takeoff and the claim document. It used
+  to say `garage.json`.
+- Tap a wall → **Change this wall** → **Call it something**. "behind the
+  washer" beats "wall-1" on every sheet. **Pass:** anything marked on it moves
+  with it.
+- **Move it** — for a scan that put a wall in the wrong place. Type a length.
+  **Pass:** the wall goes exactly where you put it and the rest of the room
+  gives way, *and it turns violet on the plan and says "moved by hand"*.
+- **This is the test that matters most on this list.** Move all four walls.
+  **Pass:** the app still says the room has not been measured and still asks
+  you to put a tape on one wall running each way. If dragging ever made a room
+  claim it was measured, everything this app promises about where a number came
+  from would be worth nothing.
+- Now put a tape on that wall. **Pass:** it goes black, says measured, and the
+  app will not let you drag it again — it tells you to take the tape reading
+  off first if the wall really is different.
+- **Cut it in two** — for a pony wall meeting a full-height one. It asks how
+  high the second piece is, and refuses if the answer makes the two pieces
+  identical. That refusal is right: two walls in line that are alike in every
+  way are one wall written twice.
+- **Notch the corner after it** — for an alcove the scanner flattened. It puts
+  **two** walls in, because a room with square corners always has an even
+  number of sides. **Pass:** the room does not change size — the two walls
+  beside the corner give up the length.
+- **There is no wall here at all** removes a side. **Pass:** the line under the
+  plan names which walls moved and by how far. Undo is one tap.
+
+### 21. Pricing a different number
+
+- **What it comes to** → **Price a different number** on any line.
+- Type 450 against a floor that measures 420, with no reason. **Pass:** it
+  refuses and says why a reason is required.
+- Give one — "diagonal lay, 7% waste". **Pass:** the quote prices 450, and
+  **both numbers stay on the line**: *"450.00 sq ft, not the 420.0 sq ft this
+  room measures — diagonal lay, 7% waste"*. That sentence goes onto the client
+  file too.
+- **Pass:** the quote no longer calls itself measured, even if every wall has
+  had a tape on it. A typed number is not a measured one.
+
+### 22. Your supplier's prices
+
+- **Your business** → **Your supplier's prices** → **Choose a price list**.
+  Any CSV from the yard. (Anything that opens in a spreadsheet can save as one.)
+- **Pass:** it guesses which column is which and shows four of your own rows
+  against the guess. Fix anything wrong before importing — a price per sheet
+  mapped onto a rate per square foot is a quote out by a factor of thirty-two.
+- **Pass:** rows it cannot read are listed with their line number and the
+  reason. A price per *sheet* is left out rather than divided by 32 — a sheet
+  is 32 square feet only if it is 4x8, and the app was never told.
+- If it changes a rate you already had, it says so, with the old and new price.
+- **Then close the app and open it again.** **Pass:** your rates are still
+  there. Until this week they were not — every rate anybody typed was lost when
+  the tab closed, and nothing said so.
+
 ### Not built yet, so do not test for them
 
-Multiple floors with stairs, exteriors, a hosted client link, and accounts that
-join two phones to one job. `docs/v3.md` has the order and the reasoning.
+Dropping a damage pin **while you are scanning** — the marks above are all
+made afterwards, on the plan. Walking through the room in 3D rather than
+orbiting it, measuring anything on screen after you have left, tags pinned in
+space, and the dollhouse view of a whole floor. Multiple floors with stairs,
+exteriors, a hosted client link, and accounts that join two phones to one job.
+`docs/v3.md` has the order and the reasoning.
 
 ---
 

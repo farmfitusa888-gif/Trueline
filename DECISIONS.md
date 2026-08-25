@@ -1661,18 +1661,67 @@ Connect name availability, USPTO trademark. Outbound connections to those hosts 
 this environment's network policy. A real trademark clearance is a lawyer's job and must happen
 before any money goes into branding.
 
+## Decisions taken since, in Sam's words
+
+Asked through the pop-up, four at a time, and answered:
+
+| Question | Answer | What it decided |
+|---|---|---|
+| Prices on the claim document? | **Quantities and evidence only** | The adjuster gets measurements and photographs; the priced scope is a separate sheet sent after the scope is agreed. A test refuses a dollar sign anywhere in the file. |
+| One room or the whole job? | **Whole job, tick the rooms** | The send card gathers every room on the device, ticks the ones with damage on them, and totals across the job rather than per room. |
+| What a live damage pin captures | **The point and a photograph, automatically** | He is already holding the phone at the damage; that is the one moment the photograph is free. Not built yet — the iOS half. |
+| What dragging a wall makes it | **A new kind: adjusted by hand** | A fourth provenance, violet on the plan, which never satisfies "put a tape on one wall running each way". |
+
+## A fourth provenance
+
+`scanned`, `verified`, `derived` — and now `adjusted`. A wall somebody dragged
+on a screen is not the sensor's number any more and nobody put a tape on it
+either. It carries the band of what it replaced as a **floor** rather than a
+guarantee, prints "(moved by hand)" instead of a ± band, and is never counted
+as measured anywhere. The rule it protects: if dragging ever produced a
+verified measurement, an unchecked scan could be made to claim it had been
+measured by nudging four walls.
+
+## One invariant refined, with the reason
+
+"Two collinear built walls are one wall written twice" was absolute. It is now
+qualified: **unless they are genuinely different walls** — a pony wall meeting
+a full-height one, a 2x6 run meeting a 2x4 partition. The rule's own stated
+justification ("the solver would move both to correct one error") does not
+apply to those. Compared at *effective* values, not as fields: a wall with no
+height stands at the room's ceiling, so an explicit 9' in a 9' room is not a
+difference.
+
+That refinement is what makes `splitWall` possible, and `splitWall` requires a
+difference rather than allowing one.
+
+## A geometric fact that killed a feature as specified
+
+**You cannot add one wall to a closed rectilinear room.** The walk alternates
+axes, so it always has an even number of sides; a fifth wall on a rectangle
+cannot close, and it lands in line with a neighbour and gets merged. Driving it
+in a browser, a 2 ft alcove swallowed a 14'6" wall and took its name.
+
+So `insertWall` is gone and `notchCorner` replaces it: two walls, out and back,
+paid for by the two beside the corner, and the room does not change size.
+
 ## Still open
 
 - **The batch photo delete spec** — checkboxes, select-all, and the warning when the photo
   being deleted is the only one showing a wall. Decided (gap 3 above), not written.
 - **The scanner has never been compiled.** It is written — RoomPlan capture, photographs with
-  poses, AR measure, the correction screens in a web view — and this container is Linux with no
-  Swift toolchain, so not one line of it has been through a compiler. Until it builds on a Mac
-  the hosted page is still the only thing that runs, and it reads scans rather than making them.
-- **Manual draw has no screen.** `draft.ts` builds a room wall by wall and computes the closing
-  wall, and there is no way to reach it. That is the offline fallback for a room with no scan.
-- **Stitching rooms.** Both scans are one room. The dropped fragment of the space next door is
-  evidence of where the next room starts, and it is thrown away today.
+  poses, AR measure, the correction screens in a web view, CloudKit backup including damage
+  photographs — and this container is Linux with no Swift toolchain, so not one line of it has
+  been through a compiler. Until it builds on a Mac the hosted page is still the only thing
+  that runs, and it reads scans rather than making them. **This is now the largest unverified
+  surface in the repository and it grows with every iOS commit.**
+- **Live damage pins during a scan.** Answered and specified — tap drops the point and grabs
+  the frame right then — and not built. It touches `ARMeasureSession`, which is the file behind
+  the "Measure a room still doesn't work" report, so it wants a build on a phone first.
+- **The four Matterport features.** Walk through the room in 3D rather than orbiting it,
+  measure anything on screen after leaving, tags pinned in space, dollhouse for a whole floor.
+  All four asked for, none built.
+- **`docs/on-the-phone.md` describes 22 tests and none have been run on a phone.**
 
 Everything else: build proceeds.
 
