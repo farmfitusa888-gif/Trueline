@@ -5,6 +5,9 @@ import { scanned, verified } from '../measurement.ts';
 import { type Heading, type Opening, type Room, type Wall } from '../room.ts';
 import { roomQuantities, wholeRoom } from '../zone.ts';
 import { makeWall } from '../edit.ts';
+import { takeoff, wallSchedule } from '../takeoff.ts';
+import { formatSquareFeet } from '../room.ts';
+import { verify } from '../measurement.ts';
 
 /**
  * The four numbers a contractor prices off.
@@ -172,4 +175,101 @@ test('merging a stub into a full-height wall gives a full-height wall', () => {
   const wall = merged.walls.find((x) => x.heading === 'west');
   assert.ok(wall);
   assert.equal(wall.height, undefined, 'the merged wall should stand to the ceiling');
+});
+
+/* ------------------------------------------------------------ sending it */
+
+test('the text says what the numbers are and whose they are', () => {
+  const t = takeoff(plain, '2026-08-24 18:19');
+  assert.match(t.text, /Floor\s+200\.0 sq ft/);
+  assert.match(t.text, /Baseboard\s+60\.00 lf/);
+  // The caveat is the point of the whole product. A takeoff off an unchecked
+  // scan that leaves this device without it is a guess wearing a number's
+  // clothes, and nothing downstream will ever say so.
+  assert.match(t.text, /THESE ARE THE SCANNER/);
+  assert.match(t.text, /Scanned — not checked/);
+});
+
+test('every csv row carries its own unit and its own provenance', () => {
+  const t = takeoff(plain, '2026-08-24 18:19');
+  const rows = t.csv.split('\n');
+  assert.equal(rows[0], 'item,quantity,unit,prices,workings,provenance,room,taken_off');
+  for (const row of rows.slice(1)) {
+    // A bare number in a cell is how a square foot becomes a linear foot three
+    // steps later, and how a guess becomes a fact.
+    assert.match(row, /,(sq ft|lf|ea),/, `no unit on: ${row}`);
+    assert.match(row, /,(scanned|measured),/, `no provenance on: ${row}`);
+  }
+});
+
+/** A small CSV reader, so the test checks the file rather than counting commas. */
+function parseCsv(row: string): string[] {
+  const out: string[] = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < row.length; i += 1) {
+    const c = row[i]!;
+    if (quoted) {
+      if (c === '"' && row[i + 1] === '"') {
+        field += '"';
+        i += 1;
+      } else if (c === '"') quoted = false;
+      else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ',') {
+      out.push(field);
+      field = '';
+    } else field += c;
+  }
+  out.push(field);
+  return out;
+}
+
+test('a comma in a room name does not become a new column', () => {
+  // Several fields carry commas of their own — "flooring, tile, underlay" — so
+  // counting them proves nothing. Read the file the way a spreadsheet will.
+  const t = takeoff({ ...plain, name: 'Kitchen, rear' }, '2026-08-24 18:19');
+  const rows = t.csv.split('\n');
+  const columns = parseCsv(rows[0]!).length;
+  for (const row of rows.slice(1)) {
+    const cells = parseCsv(row);
+    assert.equal(cells.length, columns, `wrong number of columns in: ${row}`);
+    assert.equal(cells[6], 'Kitchen, rear', 'the room name lost its comma or gained a column');
+  }
+});
+
+test('a quote in a room name survives the trip', () => {
+  const t = takeoff({ ...plain, name: 'The "big" room' }, '2026-08-24 18:19');
+  for (const row of t.csv.split('\n').slice(1)) {
+    assert.equal(parseCsv(row)[6], 'The "big" room');
+  }
+});
+
+test('the exported floor area is the number on the screen', () => {
+  // Truncating where the screen rounds had the garage reading 411.7 here and
+  // 411.8 there, from one exact value. Two of the app's own surfaces disagreeing
+  // about a number is worse than either of them being a tenth out.
+  const t = takeoff(plain, '2026-08-24 18:19');
+  const floor = t.lines.find((l) => l.what === 'Floor')!;
+  assert.equal(`${floor.quantity} sq ft`, formatSquareFeet(roomQuantities(plain).floorArea));
+});
+
+test('once every wall is measured, the takeoff stops apologising', () => {
+  const measured: Room = {
+    ...plain,
+    walls: plain.walls.map((wall) => ({
+      ...wall,
+      length: verify(wall.length, parseLength(`20'`), 'sam', T0, 'tape'),
+    })),
+  };
+  const t = takeoff(measured, '2026-08-24 18:19');
+  assert.match(t.text, /Every wall behind these numbers has had a tape on it/);
+  assert.doesNotMatch(t.text, /SCANNER/);
+  assert.ok(t.lines.filter((l) => l.unit !== 'ea').every((l) => l.provenance === 'measured'));
+});
+
+test('the wall schedule says which walls were measured and which were guessed', () => {
+  const schedule = wallSchedule(plain);
+  assert.equal(schedule.split('\n').length, plain.walls.length);
+  for (const line of schedule.split('\n')) assert.match(line, /scanned ±/);
 });

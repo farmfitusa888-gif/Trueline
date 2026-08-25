@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { formatFeetInches } from '../../core/src/length.ts';
 import { type Room, formatSquareFeet } from '../../core/src/room.ts';
 import { roomQuantities } from '../../core/src/zone.ts';
+import { takeoff as buildTakeoff } from '../../core/src/takeoff.ts';
 import { type Readiness, trustLabel } from '../../core/src/issue.ts';
 
 /**
@@ -35,6 +36,51 @@ function squareFeet(squareNanometres: bigint): string {
 
 export function Takeoff({ room, readiness }: { readonly room: Room; readonly readiness: Readiness }) {
   const [open, setOpen] = useState(false);
+  const [told, setTold] = useState<string | null>(null);
+  const sheet = useMemo(() => buildTakeoff(room, new Date().toLocaleString()), [room]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(sheet.text);
+      setTold('Copied.');
+    } catch {
+      setTold('This browser would not let the app reach the clipboard.');
+    }
+  }
+
+  async function send() {
+    // Web Share is what puts this into Messages on an iPhone, which is how a
+    // takeoff actually reaches whoever is pricing it.
+    if (!navigator.share) {
+      void copy();
+      return;
+    }
+    try {
+      await navigator.share({ title: `${room.name} — takeoff`, text: sheet.text });
+    } catch (error) {
+      // Cancelling is not failing. Anything else is, and falling back to the
+      // clipboard beats a button that silently does nothing twice.
+      if (!(error instanceof DOMException && error.name === 'AbortError')) void copy();
+    }
+  }
+
+  function spreadsheet() {
+    // A file, because the person who prices this is at a desk and the thing
+    // they price in eats CSV. Built and revoked in the same breath: a blob URL
+    // left behind is a copy of somebody's building held in memory.
+    try {
+      const blob = new Blob([sheet.csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${room.name.replace(/[^\w -]/g, '')} takeoff.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setTold('Saved as a spreadsheet.');
+    } catch (error) {
+      setTold(error instanceof Error ? error.message : 'The file could not be made.');
+    }
+  }
   const q = useMemo(() => {
     try {
       return { it: roomQuantities(room), trouble: null as string | null };
@@ -100,6 +146,35 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
           </div>
         ))}
       </dl>
+
+      <div className="mt-3 flex flex-wrap gap-2 print:hidden">
+        <button
+          type="button"
+          onClick={() => void send()}
+          className="min-h-12 rounded-md bg-slate-900 px-5 font-semibold text-white active:bg-slate-700"
+        >
+          Send it
+        </button>
+        <button
+          type="button"
+          onClick={() => void copy()}
+          className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700 active:bg-slate-100"
+        >
+          Copy
+        </button>
+        <button
+          type="button"
+          onClick={spreadsheet}
+          className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700 active:bg-slate-100"
+        >
+          Spreadsheet
+        </button>
+      </div>
+      {told && (
+        <p aria-live="polite" className="mt-2 text-sm text-slate-600">
+          {told}
+        </p>
+      )}
 
       <p className="mt-2 text-sm text-slate-600">
         {readiness.blocking.length > 0 ? (

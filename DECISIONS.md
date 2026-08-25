@@ -1598,6 +1598,45 @@ uses. Until a tape has been on one wall running each way they are the scanner's,
 and printing four figures as though they were facts would undo everything the
 provenance model is for.
 
+## Tests that can see a mirror
+
+Every check in this codebase was invariant under reflection, which is why three
+hundred green tests sat over a mirrored plan for the life of the project.
+`reflection.test.ts` fixes that in two directions.
+
+It **asserts the blindness**: a room and its mirror image have the same wall
+lengths, the same perimeter, the same area, close exactly, and produce an
+identical takeoff. Those are written down as passing tests so nobody ever again
+takes a correct area as evidence of a correct drawing.
+
+And it pins the handful of things that *can* see it: the world-to-plan drop must
+reverse handedness, a photographer's right hand must come out clockwise of their
+view, and the 3D view must hide different walls for a room than for its
+reflection. Reintroducing the mirror — one sign, in one line — turns **twelve**
+tests red.
+
+## The takeoff leaves the phone
+
+`takeoff.ts` produces the same numbers in two shapes, because two very different
+readers get them. Plain text for a person, in a message: what each number is
+for, and whose numbers they are. CSV for a spreadsheet or an estimating package,
+where **every row carries its own unit and its own provenance in their own
+columns** — a bare number in a cell is how a square foot becomes a linear foot
+three steps later, and how a guess becomes a fact.
+
+Both shapes carry the caveat. A takeoff off an unchecked scan that leaves this
+device without one is a guess wearing a number's clothes, and nothing downstream
+will ever say so again. Once every wall has had a tape on it, the apology
+disappears on its own.
+
+Two bugs found writing it, both in the exporter and neither in the model: a
+comma in a room name was tested by counting commas, which proves nothing when
+four other fields have commas of their own — the test parses the CSV properly
+now. And truncating where the screen rounds had the garage reading **411.7 sq ft
+in the export and 411.8 on screen**, from one exact value. A tenth of a square
+foot is nothing; two of the app's own surfaces disagreeing about a number is
+not.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.
