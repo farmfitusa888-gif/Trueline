@@ -1,5 +1,5 @@
 import { NM_PER_FOOT } from '../../core/src/length.ts';
-import { type Room, area, isDiagonal, runLength } from '../../core/src/room.ts';
+import { type Point, type Room, area, isDiagonal, runLength } from '../../core/src/room.ts';
 import { letterhead } from '../../core/src/company.ts';
 import { useUnits } from './units.tsx';
 import { readiness, trustLabel } from '../../core/src/issue.ts';
@@ -95,6 +95,11 @@ export interface PlanProps {
    * ring is a loss, a blue square is a fact about the building.
    */
   readonly tags?: readonly Tag[];
+  /** The line dividing an open plan, and what each side is called. */
+  readonly divide?: {
+    readonly boundary: { readonly from: Point; readonly to: Point };
+    readonly names: readonly [string, string];
+  } | null;
   readonly onSelect: (wallId: string | null) => void;
 }
 
@@ -200,6 +205,7 @@ export function Plan({
   furniture = true,
   damages = [],
   tags = [],
+  divide = null,
   onSelect,
 }: PlanProps) {
   const { len, area: showArea, company } = useUnits();
@@ -651,6 +657,40 @@ export function Plan({
           </g>
         );
       })}
+
+      {/*
+        The divide in an open plan. Dashed, and in the same violet the plan
+        uses for "moved by hand", because it is the same kind of thing: a
+        person's decision rather than something a sensor found. A solid line
+        would read as a wall, and a wall is exactly what it is not.
+      */}
+      {divide && (
+        <g aria-label={`Divided into ${divide.names[0]} and ${divide.names[1]}`}>
+          <title>
+            {divide.names[0]} / {divide.names[1]} — a line on the floor, not a wall
+          </title>
+          <line
+            x1={px(feet(divide.boundary.from.x))}
+            y1={scaleY(feet(divide.boundary.from.y))}
+            x2={px(feet(divide.boundary.to.x))}
+            y2={scaleY(feet(divide.boundary.to.y))}
+            stroke="#7C3AED"
+            strokeWidth={3}
+            strokeDasharray="14 9"
+            strokeLinecap="round"
+          />
+          <text
+            x={(px(feet(divide.boundary.from.x)) + px(feet(divide.boundary.to.x))) / 2}
+            y={(scaleY(feet(divide.boundary.from.y)) + scaleY(feet(divide.boundary.to.y))) / 2 - 8}
+            textAnchor="middle"
+            fontSize={13}
+            fontWeight={600}
+            fill="#6D28D9"
+          >
+            {divide.names[0]} / {divide.names[1]}
+          </text>
+        </g>
+      )}
 
       {/*
         Hidden conditions. Square rather than round, and slate rather than red,

@@ -23,6 +23,7 @@ import { Agree } from './Agree.tsx';
 import { Gate } from './Locked.tsx';
 import { Work } from './Work.tsx';
 import { Tags } from './Tags.tsx';
+import { Zones } from './Zones.tsx';
 import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Sections.tsx';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
@@ -468,6 +469,7 @@ export function App() {
                       // behind the wall is on it always, because it is true
                       // either way.
                       tags={loaded.tags}
+                      divide={loaded.divide}
                       onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                     />
                     {loaded.footprints.length > 0 && (
@@ -751,12 +753,21 @@ export function App() {
                 }
                 onRemove={(tagId) => dispatch({ type: 'untag', tagId })}
               />
+
+              {/* Open plans. Under Room because a divide is a fact about the
+                  space, and it changes every quantity downstream. */}
+              <Zones
+                room={loaded.room}
+                boundary={loaded.divide?.boundary ?? null}
+                onSplit={(boundary, names) => dispatch({ type: 'divide', boundary, names })}
+                onClear={() => dispatch({ type: 'undivide' })}
+              />
             </Panel>
 
             <Panel section="takeoff" active={section}>
               <Gate feature="takeoff">
               <div data-sheet="yes">
-                <Takeoff room={loaded.room} readiness={derived.state} />
+                <Takeoff room={loaded.room} readiness={derived.state} divide={loaded.divide} />
               </div>
               </Gate>
             </Panel>

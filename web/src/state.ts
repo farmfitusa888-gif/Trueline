@@ -38,6 +38,7 @@ import type { Photo } from '../../core/src/photo.ts';
 import type { Damage, Reading } from '../../core/src/damage.ts';
 import { type PinImport, type PinManifest, importPins } from '../../core/src/pins.ts';
 import { type Tag, CONDITION, tagAt } from '../../core/src/tag.ts';
+import { type Boundary, splitByBoundary } from '../../core/src/zone.ts';
 import { validateDamage } from '../../core/src/damage.ts';
 import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
 import { type Override, validateOverride } from '../../core/src/override.ts';
@@ -158,6 +159,16 @@ export interface Loaded {
    * at 16 in centres" in front of an insurer as a reported claim item.
    */
   readonly tags: readonly Tag[];
+  /**
+   * The line dividing an open plan, and what the two sides are called.
+   *
+   * One boundary, not a list, and that is a deliberate limit rather than a
+   * missing feature: `splitByBoundary` cuts a room in two, and cutting a
+   * three-part great room needs it applied to a zone rather than to a room.
+   * Shipping the two-part case honestly beats shipping a list that quietly
+   * only works for the first entry.
+   */
+  readonly divide: { readonly boundary: Boundary; readonly names: readonly [string, string] } | null;
   /**
    * Quantities somebody typed over, and why.
    *
@@ -297,6 +308,8 @@ export type Action =
       by: string;
     }
   | { type: 'untag'; tagId: string }
+  | { type: 'divide'; boundary: Boundary; names: readonly [string, string] }
+  | { type: 'undivide' }
   | { type: 'unmark'; damageId: string }
   /** A cut height decided, or taken off again. Seen and decided stay apart. */
   | { type: 'cutTo'; damageId: string; text: string | null }
@@ -364,6 +377,7 @@ function restored(saved: SavedProject, note: string): State {
     north?: NorthOnPlan;
     damages?: readonly Damage[];
     tags?: readonly Tag[];
+    divide?: Loaded['divide'];
     overrides?: readonly Override[];
     claim?: Claim;
     proposal?: Proposal;
@@ -387,6 +401,7 @@ function restored(saved: SavedProject, note: string): State {
       frame: extras.frame ?? NO_SCAN_FRAME,
       damages: extras.damages ?? [],
       tags: extras.tags ?? [],
+      divide: extras.divide ?? null,
       overrides: extras.overrides ?? [],
       claim: extras.claim ?? NO_CLAIM,
       proposal: extras.proposal ?? null,
@@ -497,6 +512,7 @@ export function reduce(state: State, action: Action): State {
             frame,
             damages,
             tags: [],
+            divide: null,
             refusedPins,
             overrides: [],
             claim: NO_CLAIM,
@@ -576,6 +592,7 @@ export function reduce(state: State, action: Action): State {
             frame: NO_SCAN_FRAME,
             damages: [],
             tags: [],
+            divide: null,
             overrides: [],
             claim: NO_CLAIM,
             proposal: null,
@@ -627,6 +644,7 @@ export function reduce(state: State, action: Action): State {
           frame: NO_SCAN_FRAME,
           damages: [],
           tags: [],
+          divide: null,
           overrides: [],
           claim: NO_CLAIM,
           proposal: null,
@@ -1179,6 +1197,38 @@ export function reduce(state: State, action: Action): State {
       };
     }
 
+    // An open plan split into the several spaces it has to be priced as.
+    case 'divide': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        // Cut it here rather than only in the screen, so a divider that will
+        // not reconcile never reaches the saved room at all.
+        splitByBoundary(loaded.room, action.boundary, action.names);
+        return {
+          ...state,
+          error: null,
+          loaded: {
+            ...loaded,
+            divide: { boundary: action.boundary, names: action.names },
+            lastEdit: `Split into ${action.names[0]} and ${action.names[1]}.`,
+          },
+        };
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'undivide': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: { ...loaded, divide: null, lastEdit: 'Back to one space.' },
+      };
+    }
+
     case 'unmark': {
       const loaded = state.loaded;
       if (!loaded) return state;
@@ -1342,6 +1392,7 @@ export function persist(loaded: Loaded, at: string): string | null {
         north: loaded.north,
         damages: loaded.damages,
         tags: loaded.tags,
+        divide: loaded.divide,
         claim: loaded.claim,
         proposal: loaded.proposal,
         baseline: loaded.baseline,

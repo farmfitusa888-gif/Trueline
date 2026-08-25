@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import { useUnits } from './units.tsx';
-import { roomQuantities } from '../../core/src/zone.ts';
+import { type Boundary, report, roomQuantities, splitByBoundary } from '../../core/src/zone.ts';
 import { takeoff as buildTakeoff } from '../../core/src/takeoff.ts';
 import { type Readiness, trustLabel } from '../../core/src/issue.ts';
 import { order, tradeOf, wordFor } from '../../core/src/trade.ts';
@@ -28,14 +28,44 @@ import { order, tradeOf, wordFor } from '../../core/src/trade.ts';
  * they were facts.
  */
 
-export function Takeoff({ room, readiness }: { readonly room: Room; readonly readiness: Readiness }) {
-  const { area, run, company } = useUnits();
+export function Takeoff({
+  room,
+  readiness,
+  divide = null,
+}: {
+  readonly room: Room;
+  readonly readiness: Readiness;
+  /** How the space is split, when it is. */
+  readonly divide?: {
+    readonly boundary: Boundary;
+    readonly names: readonly [string, string];
+  } | null;
+}) {
+  const { area, len, run, company } = useUnits();
   const [open, setOpen] = useState(false);
   const [told, setTold] = useState<string | null>(null);
   const sheet = useMemo(
     () => buildTakeoff(room, new Date().toLocaleString(), { company: company.name }),
     [room, company.name]
   );
+
+  /**
+   * The same takeoff, split the way the space is split.
+   *
+   * Beside the whole-room sheet rather than instead of it. The whole is what
+   * gets ordered — one delivery of flooring, one order of board — and the
+   * split is what gets priced and scheduled, and a screen that shows only one
+   * of them makes somebody do the other by hand.
+   */
+  const perZone = useMemo(() => {
+    if (!divide) return null;
+    try {
+      const zones = splitByBoundary(room, divide.boundary, divide.names);
+      return { report: report(room, zones), trouble: null as string | null };
+    } catch (error) {
+      return { report: null, trouble: error instanceof Error ? error.message : String(error) };
+    }
+  }, [room, divide]);
 
   async function copy() {
     try {
@@ -154,6 +184,50 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
           </div>
         ))}
       </dl>
+
+      {/* The same numbers, split the way the space is. Below the whole rather
+          than instead of it: the whole is what gets ordered, and the split is
+          what gets priced and scheduled. */}
+      {perZone?.report && (
+        <div className="mt-5 rounded-md border border-violet-200 bg-violet-50 p-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-violet-900">
+            And split into {perZone.report.zones.map((z) => z.zone.name).join(' and ')}
+          </h3>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            {perZone.report.zones.map(({ zone, quantities }) => (
+              <dl key={zone.id} className="rounded-md bg-white p-3 text-sm">
+                <p className="mb-1 font-semibold text-slate-900">{zone.name}</p>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-600">{wordFor(trade, 'Floor')}</dt>
+                  <dd className="font-semibold tabular-nums">{area(quantities.floorArea)}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-600">{wordFor(trade, 'Wall face')}</dt>
+                  <dd className="font-semibold tabular-nums">
+                    {area(quantities.wallFaceArea * 2n)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-600">{wordFor(trade, 'Baseboard')}</dt>
+                  <dd className="font-semibold tabular-nums">{len(quantities.baseboardRun)}</dd>
+                </div>
+              </dl>
+            ))}
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-violet-900">
+            The two floors add up to the whole room to the square inch, checked every time. The{' '}
+            {len(perZone.report.total.virtualRun)} between them is a line somebody drew: it bounds
+            floor area and carries no drywall, no paint and no base, because nothing was ever
+            built along it.
+          </p>
+        </div>
+      )}
+
+      {perZone?.trouble && (
+        <p role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-900">
+          The split could not be worked out, so only the whole room is shown: {perZone.trouble}
+        </p>
+      )}
 
       {extras.length > 0 && (
         <>

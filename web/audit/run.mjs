@@ -49,6 +49,7 @@ const parts = [
   'a12-everything.mjs',
   'a13-handbook.mjs',
   'a14-inside.mjs',
+  'a15-openplan.mjs',
 ];
 
 function run(part) {
