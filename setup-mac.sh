@@ -3,11 +3,18 @@
 #
 # Run it in Terminal on the Mac:
 #
+#   cd ~/trueline && bash setup-mac.sh
+#
+# The very first time, the script is not on your Mac yet, so pull once by hand:
+#
 #   cd ~/trueline && git pull && bash setup-mac.sh
 #
-# `git pull` first the very first time: this script lives in the repository, so
-# it is not on your Mac until you have pulled once. "No such file or directory"
-# means exactly that.
+# If that pull stops with "your local changes would be overwritten by merge"
+# and names the project file, that is Xcode having written your signing team
+# into it. Throw that one line away and pull again — from then on this script
+# holds on to it for you and the pull never stops again:
+#
+#   git checkout -- ios/Trueline.xcodeproj/project.pbxproj && git pull
 #
 # It does not install anything and it does not change any of your code. It
 # pulls, checks the things that have gone wrong before, and opens the project.
@@ -30,9 +37,41 @@ if [ ! -d ios/Trueline.xcodeproj ]; then
   exit 1
 fi
 
+say "Your signing team"
+# Xcode writes your Apple developer team into the project file the moment you
+# pick it, and that file is tracked. So the next pull says "your local changes
+# would be overwritten" and stops — which is exactly what happened. The team is
+# yours and belongs to your Mac, not to the repository, so it is lifted out
+# before the pull and put back after it.
+pbx="ios/Trueline.xcodeproj/project.pbxproj"
+team=""
+if ! git diff --quiet -- "$pbx"; then
+  team="$(git diff -U0 -- "$pbx" \
+    | sed -n 's/^+[[:space:]]*DEVELOPMENT_TEAM = \(.*\);$/\1/p' \
+    | head -1 | tr -d '"')"
+  other="$(git diff -U0 -- "$pbx" | grep -E '^[+-][^+-]' \
+    | grep -vcE 'DEVELOPMENT_TEAM|CODE_SIGN_STYLE|LastUpgradeCheck')"
+  if [ "${other:-0}" -gt 0 ]; then
+    bad "The project file has changes that are not just your signing team."
+    echo "     That is a real edit and this script will not throw it away."
+    echo "     Look at it with:  git diff -- $pbx"
+    echo "     Keep it:   git stash push -- $pbx     (then re-run this script)"
+    echo "     Drop it:   git checkout -- $pbx       (then re-run this script)"
+    exit 1
+  fi
+  if [ -n "$team" ]; then
+    ok "found your team ($team) — holding it while we pull"
+  else
+    ok "the only change is signing — setting it aside"
+  fi
+  git checkout -- "$pbx"
+else
+  ok "nothing of yours in the project file"
+fi
+
 say "Getting the latest code"
 if ! git diff --quiet || ! git diff --cached --quiet; then
-  warn "You have local changes. They are being put aside so the pull is clean."
+  warn "You have other local changes. They are being put aside so the pull is clean."
   git stash push -u -m "setup-mac $(date +%Y-%m-%d-%H%M)" >/dev/null
   warn "Get them back later with:  git stash pop"
 fi
@@ -42,14 +81,41 @@ if [ "$branch" != "main" ]; then
   git checkout main >/dev/null 2>&1 || { bad "Could not switch to main."; exit 1; }
 fi
 before="$(git rev-parse --short HEAD)"
+# Only a network failure is worth waiting out. Anything the pull refuses on
+# grounds of the working tree will refuse again in four seconds, and in
+# sixteen, so it is reported at once with what to do about it.
+pulled=no
 for try in 1 2 3 4; do
-  if git pull --ff-only origin main; then break; fi
-  warn "Pull failed (try $try). Waiting $((2 ** try))s."
-  sleep $((2 ** try))
+  out="$(git pull --ff-only origin main 2>&1)"
+  if [ $? -eq 0 ]; then printf '%s\n' "$out"; pulled=yes; break; fi
+  printf '%s\n' "$out" | sed 's/^/     /'
+  if printf '%s' "$out" | grep -qiE 'could not resolve|connection|timed out|network is unreachable|unable to access|ssl|tls|502|503|504'; then
+    warn "That looks like the network (try $try of 4). Waiting $((2 ** try))s."
+    sleep $((2 ** try))
+    continue
+  fi
+  bad "The pull stopped, and waiting will not change it."
+  echo "     Read the lines above — they name the file and the reason."
+  break
 done
 after="$(git rev-parse --short HEAD)"
 if [ "$before" = "$after" ]; then ok "Already up to date at $after"; else ok "$before → $after"; fi
 echo "     $(git log -1 --format='%s')"
+
+if [ -n "$team" ]; then
+  say "Your signing team, back where it was"
+  sed -i.setupbak "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $team;/g" "$pbx"
+  rm -f "$pbx.setupbak"
+  n="$(grep -c "DEVELOPMENT_TEAM = $team;" "$pbx")"
+  if [ "$n" -gt 0 ]; then
+    ok "$team is set again in $n place(s) — Xcode will not ask you for it"
+    echo "     git will show the project file as changed. That is this line, and"
+    echo "     this script will lift it out again on every pull."
+  else
+    warn "Could not put $team back. Pick your team once more in Xcode:"
+    echo "     Trueline → Signing & Capabilities → Team"
+  fi
+fi
 
 say "The web screens inside the app"
 # This is the one that bit us: the correction screens live in a web bundle
