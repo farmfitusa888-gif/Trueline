@@ -22,6 +22,7 @@ import { planThumbnail } from './sheet.ts';
 import { Agree } from './Agree.tsx';
 import { Gate } from './Locked.tsx';
 import { Work } from './Work.tsx';
+import { Tags } from './Tags.tsx';
 import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Sections.tsx';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
@@ -462,6 +463,11 @@ export function App() {
                       footprints={loaded.footprints}
                       furniture={furniture}
                       damages={loaded.claim.on ? loaded.damages : []}
+                      // Always drawn, claim or no claim. Damage is only on the
+                      // drawing when the job is an insurance job; what is
+                      // behind the wall is on it always, because it is true
+                      // either way.
+                      tags={loaded.tags}
                       onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                     />
                     {loaded.footprints.length > 0 && (
@@ -721,6 +727,28 @@ export function App() {
                 selected={state.selected}
                 onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                 onMake={(wallId, as) => dispatch({ type: 'make', wallId, as })}
+              />
+
+              {/* What is behind the wall. Under Room rather than Insurance,
+                  because a joist is a fact about the building and not a loss —
+                  it belongs to the room for as long as the room exists, on a
+                  claim or on an ordinary remodel alike. */}
+              <Tags
+                room={loaded.room}
+                tags={loaded.tags}
+                onAdd={(input) =>
+                  dispatch({
+                    type: 'tag',
+                    id: `tag-${Date.now()}`,
+                    condition: input.condition,
+                    at: input.at,
+                    ...(input.height !== undefined ? { height: input.height } : {}),
+                    note: input.note,
+                    at_: new Date().toISOString(),
+                    by: 'me',
+                  })
+                }
+                onRemove={(tagId) => dispatch({ type: 'untag', tagId })}
               />
             </Panel>
 

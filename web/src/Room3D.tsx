@@ -1,6 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { type Footprint } from '../../core/src/obstruction.ts';
-import { type Camera, DEFAULT_CAMERA, project } from '../../core/src/project.ts';
+import {
+  type Camera,
+  type Standing,
+  DEFAULT_CAMERA,
+  project,
+  projectFrom,
+  standingInside,
+} from '../../core/src/project.ts';
 import type { Room } from '../../core/src/room.ts';
 
 /**
@@ -15,6 +22,22 @@ import type { Room } from '../../core/src/room.ts';
  *
  * Drag to walk around it. That is the whole interaction, because a contractor
  * holding a phone in one hand has one thumb.
+ *
+ * ## Two places to look from
+ *
+ * **Around it** orbits: the room turned and tipped back, walls between the
+ * viewer and the room taken off so you can see in. Right for showing somebody
+ * the shape of a room.
+ *
+ * **Stand inside** puts the viewer in it, in perspective, with the ceiling on.
+ * Right for the question a plan cannot answer -- what does it actually look
+ * like from the door -- and for a client, who sees a diagram in a plan and
+ * their own kitchen in this.
+ *
+ * Both draw from the same model and both produce the same `Facet`s, so tapping
+ * a wall works identically in either and selects the wall the tape box
+ * re-solves. That is the whole reason this is drawn from the room rather than
+ * from the scanner's mesh.
  */
 
 const SIZE = 1000;
@@ -41,9 +64,17 @@ export function Room3D({
   readonly furniture?: boolean;
 }) {
   const [camera, setCamera] = useState<Camera>(DEFAULT_CAMERA);
+  const [inside, setInside] = useState<Standing | null>(null);
   // A drag is a turn, not a tap. Held in a ref so a re-render mid-drag cannot
   // lose where the finger started.
-  const drag = useRef<{ x: number; y: number; from: Camera; moved: boolean } | null>(null);
+  const drag = useRef<{
+    x: number;
+    y: number;
+    from: Camera;
+    /** Where the viewer was standing when the drag began, if inside. */
+    standing: Standing | null;
+    moved: boolean;
+  } | null>(null);
   // `click` fires after `pointerup`, by which time the drag is already cleared,
   // so asking `drag.current?.moved` inside the click handler always read
   // undefined and every drag that ended over a wall selected it. The answer has
@@ -53,7 +84,9 @@ export function Room3D({
   const view = useMemo(() => {
     try {
       return {
-        projection: project(room, camera, SIZE, furniture ? footprints : []),
+        projection: inside
+          ? projectFrom(room, inside, SIZE, furniture ? footprints : [])
+          : project(room, camera, SIZE, furniture ? footprints : []),
         trouble: null as string | null,
       };
     } catch (error) {
@@ -62,7 +95,7 @@ export function Room3D({
         trouble: error instanceof Error ? error.message : String(error),
       };
     }
-  }, [room, camera, footprints, furniture]);
+  }, [room, camera, inside, footprints, furniture]);
 
   if (!view.projection) {
     return (
@@ -73,7 +106,7 @@ export function Room3D({
   }
 
   const start = (x: number, y: number) => {
-    drag.current = { x, y, from: camera, moved: false };
+    drag.current = { x, y, from: camera, standing: inside, moved: false };
   };
 
   const move = (x: number, y: number) => {
@@ -82,6 +115,17 @@ export function Room3D({
     const dx = x - at.x;
     const dy = y - at.y;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) at.moved = true;
+    if (at.standing) {
+      // From inside, a drag turns your head. Dragging left has to look left,
+      // which is the opposite sign from orbiting: out there you are pushing the
+      // room around, in here you are turning yourself.
+      setInside({
+        ...at.standing,
+        turn: at.standing.turn - dx * 0.3,
+        tilt: Math.max(-85, Math.min(85, at.standing.tilt + dy * 0.25)),
+      });
+      return;
+    }
     setCamera({
       turn: at.from.turn + dx * 0.4,
       tilt: Math.max(6, Math.min(86, at.from.tilt + dy * 0.3)),
@@ -99,7 +143,11 @@ export function Room3D({
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="w-full touch-none"
         role="img"
-        aria-label={`${room.name} in three dimensions`}
+        aria-label={
+          inside
+            ? `Standing in ${room.name}, looking around`
+            : `${room.name} in three dimensions`
+        }
         onPointerDown={(event) => {
           // Captured on the svg, not on the polygon under the finger: the
           // polygons are re-keyed as the depth order changes while turning, so
@@ -121,7 +169,12 @@ export function Room3D({
               points={facet.points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
               fill={
                 facet.kind === 'floor'
-                  ? '#E8EDEF'
+                  // The ceiling arrives as a floor-kind facet called `ceiling`.
+                  // Drawn paler than the floor so a room seen from inside does
+                  // not read as two identical slabs.
+                  ? facet.wallId === 'ceiling'
+                    ? '#F4F7F8'
+                    : '#E8EDEF'
                   : facet.kind === 'object'
                     // Warm and pale against the room's cool slate, so a box
                     // reads as something standing in the room rather than as
@@ -151,18 +204,37 @@ export function Room3D({
       </svg>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
-        <p>Drag to walk around it. Tap a wall to measure it.</p>
-        <button
-          type="button"
-          onClick={() => setCamera(DEFAULT_CAMERA)}
-          className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700 active:bg-slate-100"
-        >
-          Straighten up
-        </button>
+        <p>
+          {inside
+            ? 'Drag to look around. Tap a wall to measure it.'
+            : 'Drag to walk around it. Tap a wall to measure it.'}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setInside(inside ? null : standingInside(room))}
+            aria-pressed={inside !== null}
+            className={`min-h-11 rounded-md px-3 font-medium ${
+              inside
+                ? 'bg-slate-900 text-white active:bg-slate-700'
+                : 'border border-slate-300 text-slate-700 active:bg-slate-100'
+            }`}
+          >
+            {inside ? 'Back outside' : 'Stand inside'}
+          </button>
+          <button
+            type="button"
+            onClick={() => (inside ? setInside(standingInside(room)) : setCamera(DEFAULT_CAMERA))}
+            className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700 active:bg-slate-100"
+          >
+            Straighten up
+          </button>
+        </div>
         {view.projection.hidden.length > 0 && (
           <p>
             {view.projection.hidden.length} wall
-            {view.projection.hidden.length === 1 ? '' : 's'} taken off so you can see in
+            {view.projection.hidden.length === 1 ? '' : 's'}{' '}
+            {inside ? 'behind you' : 'taken off so you can see in'}
           </p>
         )}
       </div>

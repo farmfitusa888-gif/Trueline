@@ -1,7 +1,7 @@
 import { formatFeetInches, fromJSON, parseLength } from '../../core/src/length.ts';
 import { scanned, verified } from '../../core/src/measurement.ts';
 import { type TracedCorner, roomFromCorners } from '../../core/src/trace.ts';
-import type { Room } from '../../core/src/room.ts';
+import type { Point, Room } from '../../core/src/room.ts';
 import type { ImportReport } from '../../core/src/import-roomplan.ts';
 import { importRoomPlan } from '../../core/src/import-roomplan.ts';
 import type { Footprint } from '../../core/src/obstruction.ts';
@@ -36,6 +36,7 @@ import {
 import type { Photo } from '../../core/src/photo.ts';
 import type { Damage, Reading } from '../../core/src/damage.ts';
 import { type PinImport, type PinManifest, importPins } from '../../core/src/pins.ts';
+import { type Tag, CONDITION, tagAt } from '../../core/src/tag.ts';
 import { validateDamage } from '../../core/src/damage.ts';
 import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
 import { type Override, validateOverride } from '../../core/src/override.ts';
@@ -132,6 +133,15 @@ export interface Loaded {
    * damage must not touch a dimension.
    */
   readonly damages: readonly Damage[];
+  /**
+   * Hidden conditions somebody found and pinned: joists, the stack, the
+   * knob-and-tube behind the closet.
+   *
+   * Beside the damages rather than among them, because a joist is not a loss.
+   * See `core/src/tag.ts` -- merging the two would eventually put "2x10 joists
+   * at 16 in centres" in front of an insurer as a reported claim item.
+   */
+  readonly tags: readonly Tag[];
   /**
    * Quantities somebody typed over, and why.
    *
@@ -260,6 +270,17 @@ export type Action =
    * and correcting a wall leaves every mark exactly where it was.
    */
   | { type: 'mark'; damage: Damage }
+  | {
+      type: 'tag';
+      id: string;
+      condition: Tag['condition'];
+      at: Point;
+      height?: bigint;
+      note: string;
+      at_: string;
+      by: string;
+    }
+  | { type: 'untag'; tagId: string }
   | { type: 'unmark'; damageId: string }
   /** A cut height decided, or taken off again. Seen and decided stay apart. */
   | { type: 'cutTo'; damageId: string; text: string | null }
@@ -326,6 +347,7 @@ function restored(saved: SavedProject, note: string): State {
     frame?: RoomFrame;
     north?: NorthOnPlan;
     damages?: readonly Damage[];
+    tags?: readonly Tag[];
     overrides?: readonly Override[];
     claim?: Claim;
     proposal?: Proposal;
@@ -347,6 +369,7 @@ function restored(saved: SavedProject, note: string): State {
       north: (extras.north as NorthOnPlan | undefined) ?? null,
       frame: extras.frame ?? NO_SCAN_FRAME,
       damages: extras.damages ?? [],
+      tags: extras.tags ?? [],
       overrides: extras.overrides ?? [],
       claim: extras.claim ?? NO_CLAIM,
       proposal: extras.proposal ?? null,
@@ -445,6 +468,7 @@ export function reduce(state: State, action: Action): State {
             north,
             frame,
             damages,
+            tags: [],
             refusedPins,
             overrides: [],
             claim: NO_CLAIM,
@@ -522,6 +546,7 @@ export function reduce(state: State, action: Action): State {
             north: null,
             frame: NO_SCAN_FRAME,
             damages: [],
+            tags: [],
             overrides: [],
             claim: NO_CLAIM,
             proposal: null,
@@ -571,6 +596,7 @@ export function reduce(state: State, action: Action): State {
           north: null,
           frame: NO_SCAN_FRAME,
           damages: [],
+          tags: [],
           overrides: [],
           claim: NO_CLAIM,
           proposal: null,
@@ -1080,6 +1106,49 @@ export function reduce(state: State, action: Action): State {
       }
     }
 
+    // A hidden condition somebody found: joists, the stack, a shut-off. It is
+    // not damage and it never becomes a quantity -- see `core/src/tag.ts`.
+    case 'tag': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const tag = tagAt(loaded.room, {
+          id: action.id,
+          condition: action.condition,
+          at: action.at,
+          ...(action.height !== undefined ? { height: action.height } : {}),
+          note: action.note,
+          recordedAt: action.at_,
+          recordedBy: action.by,
+        });
+        return {
+          ...state,
+          error: null,
+          loaded: {
+            ...loaded,
+            tags: [...loaded.tags.filter((t) => t.id !== tag.id), tag],
+            lastEdit: `Pinned ${CONDITION[tag.condition].plain.toLowerCase()}.`,
+          },
+        };
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'untag': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          tags: loaded.tags.filter((t) => t.id !== action.tagId),
+          lastEdit: 'Took a pin off.',
+        },
+      };
+    }
+
     case 'unmark': {
       const loaded = state.loaded;
       if (!loaded) return state;
@@ -1242,6 +1311,7 @@ export function persist(loaded: Loaded, at: string): string | null {
         frame: loaded.frame,
         north: loaded.north,
         damages: loaded.damages,
+        tags: loaded.tags,
         claim: loaded.claim,
         proposal: loaded.proposal,
         baseline: loaded.baseline,

@@ -12,6 +12,7 @@ import {
   damageOnPlan,
   damageRunOnPlan,
 } from '../../core/src/damage.ts';
+import { type Tag, CONDITION, describeTag } from '../../core/src/tag.ts';
 
 /**
  * The plan, drawn from the render model and nothing else.
@@ -88,6 +89,12 @@ export interface PlanProps {
    * should not have to open a second screen to find out which wall it was.
    */
   readonly damages?: readonly Damage[];
+  /**
+   * Hidden conditions found and pinned. Drawn in a different colour and a
+   * different shape from damage, because they mean a different thing: a red
+   * ring is a loss, a blue square is a fact about the building.
+   */
+  readonly tags?: readonly Tag[];
   readonly onSelect: (wallId: string | null) => void;
 }
 
@@ -192,6 +199,7 @@ export function Plan({
   footprints,
   furniture = true,
   damages = [],
+  tags = [],
   onSelect,
 }: PlanProps) {
   const { len, area: showArea, company } = useUnits();
@@ -643,6 +651,36 @@ export function Plan({
           </g>
         );
       })}
+
+      {/*
+        Hidden conditions. Square rather than round, and slate rather than red,
+        so a plan carrying both never lets a joist be read as a loss.
+      */}
+      {tags.map((tag) => (
+        <g key={tag.id} aria-label={describeTag(tag)}>
+          <title>{describeTag(tag)}</title>
+          <rect
+            x={px(feet(tag.at.x)) - 8}
+            y={scaleY(feet(tag.at.y)) - 8}
+            width={16}
+            height={16}
+            rx={2}
+            fill="#ffffff"
+            stroke="#0EA5E9"
+            strokeWidth={3.5}
+          />
+          <text
+            x={px(feet(tag.at.x))}
+            y={scaleY(feet(tag.at.y)) + 4}
+            textAnchor="middle"
+            fontSize={11}
+            fontWeight={700}
+            fill="#0369A1"
+          >
+            {CONDITION[tag.condition].plain.slice(0, 1)}
+          </text>
+        </g>
+      ))}
 
       {/*
         The title block: everything a drawing has to say about itself before
