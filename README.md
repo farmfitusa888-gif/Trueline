@@ -129,7 +129,15 @@ was captured changes nothing about how it is corrected.**
 
 `ios/Trueline.xcodeproj` is checked in: open it, set your signing team, press Run.
 
-Not built yet: manual draw's screen, the API, accounts, exports.
+**There is a handbook.** `docs/handbook.html` — every screen and every button in the app, in
+47 cards, with a search box that filters them live and a card for each that says where it is,
+what it does, the steps, and how you know it worked. `docs/handbook.pdf` is the same thing
+printed. `docs/build/check-guide.py` holds it honest: every button the handbook quotes has to
+exist in the app's own source, so renaming a control fails the check rather than silently
+leaving somebody hunting for a button that is not there.
+
+Not built yet: the API, accounts, and the hosted client link — the last of which needs a
+server, which is exactly why it is not built. `docs/v3.md` says what comes after.
 
 ```bash
 cd trueline && npm install && npm test && npm run typecheck
