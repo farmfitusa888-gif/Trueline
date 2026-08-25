@@ -45,12 +45,15 @@ enum CaptureWriter {
         let folder: URL
         let roomJSON: Data
         let photosJSON: Data
+        /// What was marked during the walk. Empty when nothing was.
+        let pinsJSON: Data
     }
 
     @discardableResult
     static func write(
         room: CapturedRoom?,
         photos: PhotoRecorder,
+        pins: PinRecorder,
         device: String,
         to folder: URL
     ) throws -> Written {
@@ -72,6 +75,16 @@ enum CaptureWriter {
         let photosJSON = try encoder.encode(photos.manifest(device: device))
         try photosJSON.write(to: folder.appendingPathComponent("photos.json"), options: .atomic)
 
+        // What somebody pointed at while walking. Its own file rather than a
+        // field inside photos.json: a pin is evidence about a place and a
+        // photograph is evidence about a moment, and a capture with no pins
+        // should have no pins file rather than an empty list inside another one.
+        var pinsJSON = Data()
+        if !pins.isEmpty {
+            pinsJSON = try encoder.encode(pins.manifest())
+            try pinsJSON.write(to: folder.appendingPathComponent("pins.json"), options: .atomic)
+        }
+
         // Apple's own 3D model alongside. It is not what any measurement comes
         // from — the measurements come from room.json — but it is what opens in
         // Quick Look when somebody taps the file, and that is worth having.
@@ -82,7 +95,12 @@ enum CaptureWriter {
             // does not stop the save.
         }
 
-        return Written(folder: folder, roomJSON: roomJSON, photosJSON: photosJSON)
+        return Written(
+            folder: folder,
+            roomJSON: roomJSON,
+            photosJSON: photosJSON,
+            pinsJSON: pinsJSON
+        )
     }
 
     /// A folder name somebody can find again: what it is, and when.

@@ -24,9 +24,11 @@ export interface TruelineBridge {
    * Called by the native scanner when a capture is finished.
    *
    * `room` is `CapturedRoom` as `JSONEncoder` writes it. `photos` is the
-   * manifest from `capture.ts`, or omitted when a scan carries none.
+   * manifest from `capture.ts`, or omitted when a scan carries none. `pins` is
+   * what somebody pointed at while walking, as `pins.ts` reads it, and is
+   * omitted by the scans -- most of them -- where nothing was marked.
    */
-  open(room: unknown, photos?: unknown, fileName?: string): void;
+  open(room: unknown, photos?: unknown, fileName?: string, pins?: unknown): void;
   /**
    * Called when the room was walked with AR or traced off a drawing rather than
    * scanned. Different capture, same everything afterwards.
@@ -236,11 +238,12 @@ export function insideApp(): boolean {
  * between the script running and React mounting.
  */
 export function installBridge(dispatch: (action: Action) => void): Window['truelinePayload'] {
-  const open = (room: unknown, photos?: unknown, fileName?: string) => {
+  const open = (room: unknown, photos?: unknown, fileName?: string, pins?: unknown) => {
     dispatch({
       type: 'open',
       json: room,
       photos,
+      pins,
       fileName: fileName ?? 'scan from this device',
       at: new Date().toISOString(),
     });

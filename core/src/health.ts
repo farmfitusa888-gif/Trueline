@@ -79,6 +79,17 @@ export interface HealthInput {
   readonly rejectedPhotos?: PhotoImport['rejected'];
   /** Camera heights above the floor, if they were worked out. */
   readonly cameraHeights?: readonly Nanometres[];
+  /**
+   * Pins marked during the walk that would not place, so they are reported
+   * rather than lost.
+   *
+   * The most expensive silence this app could keep. A refused photograph is one
+   * of hundreds and losing it costs nothing; a refused pin is a thing somebody
+   * stood in front of, pointed at, and typed a sentence about, and it is not on
+   * the claim. So it is reported at a higher severity than a photograph and it
+   * says how many, not just the first reason.
+   */
+  readonly refusedPins?: readonly { readonly id: string; readonly reason: string }[];
 }
 
 export function checkCapture(input: HealthInput): Finding[] {
@@ -252,6 +263,19 @@ export function checkCapture(input: HealthInput): Finding[] {
       severity: 'check',
       what: `${input.rejectedPhotos.length} photograph${input.rejectedPhotos.length === 1 ? '' : 's'} could not be placed`,
       detail: input.rejectedPhotos[0]!.reason,
+    });
+  }
+
+  if (input.refusedPins && input.refusedPins.length > 0) {
+    const many = input.refusedPins.length !== 1;
+    findings.push({
+      severity: 'stop',
+      what: `${input.refusedPins.length} thing${many ? 's' : ''} marked on the walk ` +
+        `${many ? 'are' : 'is'} not on the plan`,
+      detail:
+        input.refusedPins.map((one) => one.reason).join(' ') +
+        ' Nothing was guessed at: a pin drawn where somebody was not standing would go to an ' +
+        'adjuster looking exactly like one that was.',
     });
   }
 

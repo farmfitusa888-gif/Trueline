@@ -191,6 +191,51 @@ final class Subscription: ObservableObject {
     /// do that by hand gets a country wrong.
     func price(of product: Product) -> String { product.displayPrice }
 
+    /// Whether the plans on sale are still the founding ones.
+    ///
+    /// ## Why it is read off the product and not written here
+    ///
+    /// The screen says "the first 100 subscribers", and this app cannot count
+    /// subscribers -- it never phones anywhere, which is the point of it. A
+    /// number hard-coded here would go on being said long after it stopped
+    /// being true, and the first person to be told a founding rate that has
+    /// already ended is the person who finds out this app lies.
+    ///
+    /// So the claim is tied to the thing that actually decides it. The founding
+    /// products are named "Founding rate" in App Store Connect. Rename them
+    /// when the hundred are gone and this screen stops making the promise the
+    /// same day, with no app update and nothing to remember.
+    ///
+    /// **That rename is the mechanism.** It is not a nicety: leaving the
+    /// products named "Founding" past the hundredth subscriber is the app
+    /// saying something untrue, and no code here can catch it.
+    var founding: Bool {
+        products.contains { $0.displayName.localizedCaseInsensitiveContains("founding") }
+    }
+
+    /// What the founding plans cost, in the store's own words.
+    ///
+    /// Built from `displayPrice`, so it is whatever App Store Connect says in
+    /// whatever currency the person is buying in -- never a figure typed into
+    /// this file. Returns nothing until the store has answered, because a price
+    /// this app made up is worse than a price it has not shown yet.
+    var foundingPrices: String? {
+        guard founding else { return nil }
+        let said = products.compactMap { product -> (Int, String)? in
+            guard let period = product.subscription?.subscriptionPeriod else { return nil }
+            switch period.unit {
+            case .month where period.value == 1: return (0, "\(product.displayPrice) a month")
+            case .year where period.value == 1: return (1, "\(product.displayPrice) a year")
+            default: return nil
+            }
+        }
+        .sorted { $0.0 < $1.0 }
+        .map(\.1)
+
+        guard !said.isEmpty else { return nil }
+        return said.joined(separator: ", or ")
+    }
+
     /// The introductory offer on a plan, said plainly, or nothing.
     ///
     /// Read from the product rather than written into the app, so changing the

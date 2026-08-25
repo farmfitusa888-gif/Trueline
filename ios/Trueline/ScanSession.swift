@@ -34,6 +34,13 @@ final class ScanSession: NSObject, ObservableObject {
     /// RoomPlan's own coaching, passed through untouched. It reads the session; we do not.
     @Published private(set) var instruction: String?
     @Published private(set) var failure: String?
+    /// A tap that has a place and is waiting for words. Non-nil puts the sheet
+    /// asking what it is on screen.
+    @Published var pending: PinRecorder.Pending?
+    @Published private(set) var pinCount = 0
+    /// What the last tap did, in words, for a second or two. A tap that found
+    /// nothing has to say so on the spot: the person is still pointing at it.
+    @Published var pinTrouble: String?
 
     struct LiveWall: Identifiable {
         let id: UUID
@@ -53,6 +60,10 @@ final class ScanSession: NSObject, ObservableObject {
     let captureView: RoomCaptureView
     private var captureSession: RoomCaptureSession { captureView.captureSession }
     private let recorder: PhotoRecorder
+    /// What was marked while walking. Kept beside the photographs rather than
+    /// inside them: a pin is evidence about a place, a photograph is evidence
+    /// about a moment, and they are written to the capture as two files.
+    let pins = PinRecorder()
     /// Reads the magnetometer alongside the scan, so the finished plan can carry
     /// a north arrow. Nothing measured depends on it — see `Compass`.
     private let compass = Compass()
@@ -122,6 +133,77 @@ final class ScanSession: NSObject, ObservableObject {
             // not worth hiding either.
             failure = "A photograph could not be saved: \(error.localizedDescription)"
         }
+    }
+
+    /* ------------------------------------------------------------- marking */
+
+    /// Somebody pointed at something and tapped.
+    ///
+    /// Two things have to happen at the instant of the tap and cannot happen a
+    /// second later: the ray has to be cast from where the phone is **now**, and
+    /// the photograph has to be of what is in front of it **now**. A second
+    /// later the person has lowered the phone to type and both are of the floor.
+    ///
+    /// So the place and the picture are taken here and held. The words come
+    /// afterwards, and `keep` writes the pin only once there are some.
+    func markWhereTapped(at point: CGPoint, in viewport: CGSize, orientation: UIInterfaceOrientation) {
+        pinTrouble = nil
+        guard isRunning else { return }
+        guard let frame = captureSession.arSession.currentFrame else {
+            pinTrouble = "The camera is not tracking yet, so there is nothing to point at."
+            return
+        }
+        guard let landed = PinRecorder.hit(
+            frame,
+            at: point,
+            in: viewport,
+            orientation: orientation,
+            session: captureSession.arSession
+        ) else {
+            pinTrouble = "Nothing there yet. Point at a wall the phone has already covered."
+            return
+        }
+        if landed.found == .estimated {
+            // Refused here as well as on the far side, because here is where the
+            // person can do something about it -- they are still standing in
+            // front of the thing they were trying to mark.
+            pinTrouble = "The phone has not mapped that surface yet. Scan across it and mark it again."
+            return
+        }
+
+        // The evidence. A pin without a photograph is a dot with a note on it;
+        // an adjuster wants the picture.
+        let photoId = try? recorder.record(frame: frame, trigger: .manual)
+        photoCount = recorder.count
+
+        pending = PinRecorder.Pending(
+            at: landed.position,
+            found: landed.found,
+            photoId: photoId,
+            droppedAt: PinRecorder.stamp.string(from: Date())
+        )
+    }
+
+    /// Writes the held tap down, now that there are words for it.
+    func keep(kind: String, note: String) {
+        guard let waiting = pending else { return }
+        let said = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !said.isEmpty else {
+            pinTrouble = "Say what is wrong with it — a pin with no words is a dot on a drawing."
+            return
+        }
+        pins.keep(waiting, kind: kind, note: said)
+        pinCount = pins.count
+        pending = nil
+    }
+
+    /// Drops the held tap without writing anything.
+    func forgetPending() { pending = nil }
+
+    /// Takes the last pin back off, for the one that went on the wrong wall.
+    func undoPin() {
+        pins.undo()
+        pinCount = pins.count
     }
 
     /// The finished room, once the scan has stopped and RoomPlan has settled.

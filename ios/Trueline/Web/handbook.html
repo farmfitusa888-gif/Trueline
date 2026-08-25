@@ -1,8 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Trueline Handbook</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+</head>
+<body>
 
+<style>
+  .back-to-app {
+    position:sticky; top:0; z-index:30;
+    display:block; padding:12px 0; margin:0 0 4px;
+    font-family:"IBM Plex Mono","DejaVu Sans Mono",monospace; font-size:13px;
+    letter-spacing:.06em; text-transform:uppercase;
+    color:var(--amber); text-decoration:none; background:var(--ground);
+  }
+  .back-to-app:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
+  @media print { .back-to-app { display:none; } }
+</style>
+<div class="wrap"><a class="back-to-app" href="./index.html">&larr; Back to Trueline</a></div>
+
+<title>The Trueline Handbook</title>
 <style>
   :root {
     --ground:#F6F7F8; --sheet:#FFFFFF; --ink:#14181B; --ink-2:#4A5459; --ink-3:#6E787E;
@@ -686,3 +704,6 @@ find.addEventListener('input', () => {
 });
 render('');
 </script>
+
+</body>
+</html>

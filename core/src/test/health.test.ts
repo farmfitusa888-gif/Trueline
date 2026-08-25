@@ -155,3 +155,43 @@ test('the frame alarm quotes the bad photographs, not all of them', () => {
   assert.match(alarm[0]!.detail, /2 of 5/);
   assert.doesNotMatch(alarm[0]!.detail, /3' 11/, 'it quoted a perfectly good photograph');
 });
+
+/* --------------------------------------------------- pins that would not place */
+
+test('a pin that would not place is a stop, not a footnote', () => {
+  // Louder than a refused photograph on purpose. A photograph is one of
+  // hundreds; a pin is a thing somebody stood in front of, pointed at, and
+  // typed a sentence about, and it is not on the claim.
+  const findings = checkCapture({
+    room,
+    report: REPORT,
+    refusedPins: [{ id: 'pin-3', reason: 'The pin "pin-3" says nothing about what is wrong.' }],
+  });
+  const lost = named(findings, 'is not on the plan');
+  assert.equal(lost.length, 1);
+  assert.equal(lost[0]!.severity, 'stop');
+  assert.match(lost[0]!.detail, /says nothing about what is wrong/);
+});
+
+test('every refused pin is quoted, not just the first', () => {
+  // The photograph finding quotes one reason because they are all the same
+  // reason. Pins fail for different reasons -- one had no words, one landed
+  // below the floor -- and knowing which is what tells somebody what to do.
+  const findings = checkCapture({
+    room,
+    report: REPORT,
+    refusedPins: [
+      { id: 'pin-1', reason: 'No words.' },
+      { id: 'pin-2', reason: 'Below the floor.' },
+    ],
+  });
+  const lost = named(findings, 'are not on the plan');
+  assert.equal(lost.length, 1);
+  assert.match(lost[0]!.what, /^2 things marked on the walk/);
+  assert.match(lost[0]!.detail, /No words\./);
+  assert.match(lost[0]!.detail, /Below the floor\./);
+});
+
+test('a walk where every pin placed says nothing at all', () => {
+  assert.equal(named(checkCapture({ room, report: REPORT, refusedPins: [] }), 'on the plan').length, 0);
+});

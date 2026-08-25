@@ -320,6 +320,18 @@ export function App() {
           >
             {showing === 'floor' ? 'This room' : 'The floor'}
           </button>
+          {/* The handbook travels with the app rather than living on a
+              website, because the person who needs it is standing in an
+              unfinished basement with no signal. It opens in this same view
+              and has a way back at the top of it; what is being corrected is
+              in this browser's own storage, so coming back finds the room
+              exactly where it was left. */}
+          <a
+            href="./handbook.html"
+            className="text-sm text-slate-500 underline underline-offset-4"
+          >
+            How to use it
+          </a>
           <button
             type="button"
             onClick={() => setSettings(!settings)}
@@ -705,6 +717,7 @@ export function App() {
                 punchList={derived.punchList}
                 photos={loaded.photos}
                 rejectedPhotos={loaded.rejectedPhotos}
+                refusedPins={loaded.refusedPins}
                 selected={state.selected}
                 onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                 onMake={(wallId, as) => dispatch({ type: 'make', wallId, as })}

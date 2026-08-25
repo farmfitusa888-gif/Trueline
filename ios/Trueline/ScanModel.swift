@@ -86,6 +86,7 @@ final class ScanModel: ObservableObject {
             let written = try CaptureWriter.write(
                 room: session.capturedRoom,
                 photos: recorder,
+                pins: session.pins,
                 device: UIDevice.current.model,
                 to: folder
             )
@@ -101,7 +102,8 @@ final class ScanModel: ObservableObject {
                 folder: written.folder,
                 title: name,
                 roomJSON: written.roomJSON,
-                photosJSON: written.photosJSON
+                photosJSON: written.photosJSON,
+                pinsJSON: written.pinsJSON
             )
         } catch {
             session.reportFailure(error.localizedDescription)
@@ -122,6 +124,8 @@ struct SavedScan: Identifiable, Hashable {
     let roomJSON: Data
     /// The photo manifest. Empty for a walked room.
     let photosJSON: Data
+    /// What was pointed at during the walk. Empty when nothing was.
+    let pinsJSON: Data
     /// The corners somebody tapped. Empty for a LiDAR scan.
     let traceJSON: Data
     /// The room as somebody corrected it, if they have.
@@ -137,6 +141,7 @@ struct SavedScan: Identifiable, Hashable {
         title: String,
         roomJSON: Data,
         photosJSON: Data,
+        pinsJSON: Data = Data(),
         traceJSON: Data = Data(),
         correctedJSON: Data = Data()
     ) {
@@ -144,6 +149,7 @@ struct SavedScan: Identifiable, Hashable {
         self.title = title
         self.roomJSON = roomJSON
         self.photosJSON = photosJSON
+        self.pinsJSON = pinsJSON
         self.traceJSON = traceJSON
         self.correctedJSON = correctedJSON
     }

@@ -21,6 +21,7 @@ struct ReviewScreen: View {
             },
             roomJSON: scan.roomJSON,
             photosJSON: scan.photosJSON,
+            pinsJSON: scan.pinsJSON,
             traceJSON: scan.traceJSON,
             correctedJSON: scan.correctedJSON,
             title: scan.title,

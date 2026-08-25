@@ -74,6 +74,29 @@ struct PaywallView: View {
                         .foregroundStyle(.secondary)
                     }
 
+                    // The founding terms, said out loud rather than left for
+                    // somebody to work out from two prices. Shown only while
+                    // the products on sale are still named as the founding
+                    // ones -- see `Subscription.founding` for why the claim is
+                    // tied to that and not to a number written in here.
+                    if let prices = subscription.foundingPrices {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Founding rate — the first 100")
+                                .font(.subheadline.weight(.semibold))
+                            Text(
+                                "\(prices). Apple keeps that price for you for as long as you "
+                                + "stay subscribed, even after it goes up for everybody else — "
+                                + "so it is a promise the App Store enforces rather than one "
+                                + "anybody has to remember."
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+                    }
+
                     if subscription.products.isEmpty {
                         ProgressView().frame(maxWidth: .infinity)
                     } else {

@@ -217,6 +217,20 @@ else
   warn "No python3 on this Mac, so the Swift cannot be parse-checked here."
 fi
 
+say "Names the Swift uses"
+# A file can parse perfectly and still not compile, and the one that bit us was
+# exactly that: ScanScreen called dismiss() with no @Environment(\.dismiss)
+# declared anywhere in it. The grammar had nothing to say about it. This does.
+if command -v python3 >/dev/null 2>&1; then
+  if python3 core/tools/check-swift-env.py >/dev/null 2>&1; then
+    ok "every SwiftUI environment value they use is declared"
+  else
+    bad "Something is used that is not declared. Xcode will refuse this:"
+    python3 core/tools/check-swift-env.py 2>&1 | sed 's/^/     /'
+    exit 1
+  fi
+fi
+
 say "The Xcode project file itself"
 if command -v python3 >/dev/null 2>&1; then
   if python3 core/tools/check-pbxproj.py >/dev/null 2>&1; then

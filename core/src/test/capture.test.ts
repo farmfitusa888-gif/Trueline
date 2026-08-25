@@ -44,8 +44,11 @@ const nm = (metres: number) => BigInt(Math.round(metres * Number(NM_PER_METRE)))
 /** A room whose first corner is already at the plan origin, so nothing shifts. */
 const NOWHERE = { x: 0n, y: 0n };
 
+/** A floor at ARKit's own zero, so a height is the pose's y unchanged. */
+const FLOOR_AT_ZERO = 0n;
+
 /** No rotation and no reference transform: ARKit's axes are the room's. */
-const PLAIN: RoomFrame = { datum: { x: 1, y: 0 }, origin: NOWHERE };
+const PLAIN: RoomFrame = { datum: { x: 1, y: 0 }, origin: NOWHERE, floor: FLOOR_AT_ZERO };
 const room2frame = PLAIN;
 
 /**
@@ -141,7 +144,7 @@ test('the room datum is applied, so photos and walls share one set of axes', () 
   // A datum of (0, -1) is what the importer picks when the longest wall runs
   // along the scan's -z. The plan drop makes (x, z) into (x, -z), and the datum
   // then turns that: (2, 3) becomes (2, -3) becomes (3, 2).
-  const turned: RoomFrame = { datum: { x: 0, y: -1 }, origin: NOWHERE };
+  const turned: RoomFrame = { datum: { x: 0, y: -1 }, origin: NOWHERE, floor: FLOOR_AT_ZERO };
   const photo = toPhoto(camera([2, 1.6, 3], 0), turned);
   assert.deepEqual(photo.pose.at, { x: 3n * NM_PER_METRE, y: 2n * NM_PER_METRE });
 });

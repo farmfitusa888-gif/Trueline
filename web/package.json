@@ -6,6 +6,7 @@
   "description": "The web shell. First screen: correct an imported scan.",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node tools/handbook.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json"

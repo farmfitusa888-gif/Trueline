@@ -141,6 +141,21 @@ export interface RoomFrame {
    * it is. Subtracting this puts everything in the frame the plan is drawn in.
    */
   readonly origin: Point;
+  /**
+   * Where the floor is, in the scanner's own vertical axis.
+   *
+   * A `Room` has no altitude: the wall chain is laid out from (0, 0) and every
+   * height in it is measured from a floor at zero. Anything read out of the
+   * scan carries ARKit's own y instead -- metres above wherever the session
+   * started, which is roughly where the phone was when somebody pressed start
+   * and is never the floor.
+   *
+   * The importer reads the floor off a wall (its centre less half its height)
+   * and it comes across here, so that a camera pose or a pin tapped during the
+   * walk can be turned into a height above the finished floor by subtraction
+   * rather than by assuming the two zeros are the same one. They are not.
+   */
+  readonly floor: Nanometres;
 }
 
 export class CaptureError extends PhotoError {}

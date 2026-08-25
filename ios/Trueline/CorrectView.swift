@@ -21,6 +21,8 @@ struct CorrectView: UIViewRepresentable {
     /// The scan to hand over: RoomPlan's own JSON, and the photo manifest.
     let roomJSON: Data
     let photosJSON: Data
+    /// What somebody pointed at while walking. Empty for most scans.
+    let pinsJSON: Data
     /// The corners somebody tapped, when the room was walked rather than scanned.
     let traceJSON: Data
     /// The room as somebody already corrected it, if they have. Outranks the
@@ -342,15 +344,24 @@ struct CorrectView: UIViewRepresentable {
                 let photos = String(data: parent.photosJSON, encoding: .utf8)
             else { return }
 
+            // `null` rather than an omitted argument when nothing was marked:
+            // the far side reads a missing `pins` as "nothing was marked",
+            // which is the truth for most scans and needs no special case.
+            let pins = String(data: parent.pinsJSON, encoding: .utf8)
+            let pinsLiteral = pins.map { "JSON.parse(\(quoted($0)))" } ?? "null"
+
             let script = """
             (function () {
               var room = JSON.parse(\(quoted(room)));
               var photos = JSON.parse(\(quoted(photos)));
+              var pins = \(pinsLiteral);
               var name = \(quoted(parent.title));
               if (window.trueline && window.trueline.open) {
-                window.trueline.open(room, photos, name);
+                window.trueline.open(room, photos, name, pins);
               } else {
-                window.truelinePayload = { room: room, photos: photos, fileName: name };
+                window.truelinePayload = {
+                  room: room, photos: photos, pins: pins, fileName: name
+                };
               }
             })();
             """

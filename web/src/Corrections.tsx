@@ -27,6 +27,7 @@ export interface CorrectionsProps {
   readonly punchList: readonly PunchListItem[];
   readonly photos: readonly Photo[];
   readonly rejectedPhotos: PhotoImport['rejected'];
+  readonly refusedPins: readonly { readonly id: string; readonly reason: string }[];
   readonly selected: string | null;
   readonly onSelect: (wallId: string) => void;
   readonly onMake: (wallId: string, as: 'wall' | 'open' | 'cased') => void;
@@ -65,6 +66,7 @@ export function Corrections({
   punchList,
   photos,
   rejectedPhotos,
+  refusedPins,
   selected,
   onSelect,
   onMake,
@@ -73,7 +75,7 @@ export function Corrections({
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
   // The same checks the command-line tool ran, on screen, because the app put
   // the file here and should be the one to say whether it is any good.
-  const findings = checkCapture({ room, report, photos, rejectedPhotos });
+  const findings = checkCapture({ room, report, photos, rejectedPhotos, refusedPins });
   const openSpans = room.walls.filter((w) => w.open);
   const inTheWay = obstructions.filter((o) => o.blockedLength > 0n);
 

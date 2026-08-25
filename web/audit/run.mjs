@@ -47,6 +47,7 @@ const parts = [
   'a10-gate.mjs',
   'a11-work.mjs',
   'a12-everything.mjs',
+  'a13-handbook.mjs',
 ];
 
 function run(part) {

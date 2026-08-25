@@ -508,7 +508,10 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
       min: { x: f.min.x - origin.x, y: f.min.y - origin.y },
       max: { x: f.max.x - origin.x, y: f.max.y - origin.y },
     })),
-    frame: { datum, origin },
+    // The floor's own height in the scanner's axis, so a photograph's or a
+    // pin's height above the finished floor is a subtraction rather than an
+    // assumption that the two zeros are the same one.
+    frame: { datum, origin, floor: nm(floorLevel(scan)) },
   };
 }
 

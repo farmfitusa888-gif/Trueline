@@ -116,7 +116,10 @@ final class PhotoRecorder {
     /// JPEG at 0.8 rather than HEIC: a scan is a few hundred photographs and
     /// they are evidence, not portraits — and a JPEG opens on anything a
     /// contractor might forward it to.
-    func record(frame: ARFrame, trigger: Trigger) throws {
+    /// Returns the id it was filed under, so a pin dropped at the same instant
+    /// can name the photograph that is its evidence.
+    @discardableResult
+    func record(frame: ARFrame, trigger: Trigger) throws -> String {
         try ensureDirectory()
         let index = records.count + 1
         let fileName = String(format: "photo_%05d.jpg", index)
@@ -147,6 +150,7 @@ final class PhotoRecorder {
                 trackingQuality: String(describing: frame.camera.trackingState)
             )
         )
+        return "photo-\(index)"
     }
 
     /// Set once, the first time a usable heading and a pose land together.

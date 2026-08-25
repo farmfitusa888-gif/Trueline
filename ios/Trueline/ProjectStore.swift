@@ -86,11 +86,16 @@ final class ProjectStore: ObservableObject {
         guard !room.isEmpty || !trace.isEmpty else { return nil }
         let photos = (try? Data(contentsOf: entry.folder.appendingPathComponent("photos.json")))
             ?? Data(#"{"schema":"trueline.photos.v1","capturedAt":"","device":"","photos":[]}"#.utf8)
+        // Empty when nothing was marked, which is most scans. The far side
+        // reads an empty manifest as "nothing was marked during the walk"
+        // rather than as a missing file it has to explain.
+        let pins = (try? Data(contentsOf: entry.folder.appendingPathComponent("pins.json"))) ?? Data()
         return SavedScan(
             folder: entry.folder,
             title: entry.name,
             roomJSON: room,
             photosJSON: photos,
+            pinsJSON: pins,
             traceJSON: trace,
             correctedJSON: (try? Data(contentsOf: entry.folder.appendingPathComponent(Self.correctedFile))) ?? Data()
         )

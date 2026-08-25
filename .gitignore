@@ -14,3 +14,7 @@ web/audit/audit-*
 
 # The Apple developer team ID, which belongs to a Mac and not to a repository.
 ios/Signing.local.xcconfig
+
+# Generated from docs/handbook.html before every web build, so that the copy
+# inside the app can never be older than the copy in docs/.
+web/public/handbook.html

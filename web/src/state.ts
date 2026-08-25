@@ -35,6 +35,7 @@ import {
 } from '../../core/src/capture.ts';
 import type { Photo } from '../../core/src/photo.ts';
 import type { Damage, Reading } from '../../core/src/damage.ts';
+import { type PinImport, type PinManifest, importPins } from '../../core/src/pins.ts';
 import { validateDamage } from '../../core/src/damage.ts';
 import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
 import { type Override, validateOverride } from '../../core/src/override.ts';
@@ -43,6 +44,22 @@ import { type Invoice } from '../../core/src/invoice.ts';
 import { type Proposal } from '../../core/src/proposal.ts';
 import { type Visit } from '../../core/src/schedule.ts';
 import { handBack } from './bridge.ts';
+
+/**
+ * The frame a room has when it did not come out of a scan.
+ *
+ * A room drawn by hand or walked with AR has no scanner coordinate system to be
+ * moved out of, so the datum is the identity, the origin is where the wall
+ * chain starts, and the floor is at zero because there is nothing above or
+ * below it to be measured from. Named rather than written out three times: the
+ * three copies had already drifted once when `floor` was added.
+ */
+const NO_SCAN_FRAME: RoomFrame = {
+  datum: { x: 1, y: 0 },
+  origin: { x: 0n, y: 0n },
+  floor: 0n,
+};
+
 
 /**
  * All the state this screen has, and every way it can change.
@@ -93,6 +110,15 @@ export interface Loaded {
   readonly photos: readonly Photo[];
   /** Photographs the import would not place, so the screen can say which and why. */
   readonly rejectedPhotos: PhotoImport['rejected'];
+  /**
+   * Pins marked during the walk that could not be placed, and why.
+   *
+   * Kept beside the room rather than shown once and forgotten. A refusal here
+   * is a thing somebody stood in front of and pointed at which is not on the
+   * claim, and the screen that lists what the import decided has to be able to
+   * say so every time it is opened, not only on the first render.
+   */
+  readonly refusedPins: PinImport['refused'];
   /** Which way north points, when the phone's compass was worth believing. */
   readonly north: NorthOnPlan | null;
   /** The coordinate frame the room came in on, so more photos can be placed later. */
@@ -152,7 +178,7 @@ export interface State {
 export const EMPTY: State = { loaded: null, error: null, selected: null };
 
 export type Action =
-  | { type: 'open'; json: unknown; fileName: string; at: string; photos?: unknown }
+  | { type: 'open'; json: unknown; fileName: string; at: string; photos?: unknown; pins?: unknown }
   /**
    * Bring a saved room back.
    *
@@ -317,8 +343,9 @@ function restored(saved: SavedProject, note: string): State {
       footprints: extras.footprints ?? [],
       photos: extras.photos ?? [],
       rejectedPhotos: [],
+      refusedPins: [],
       north: (extras.north as NorthOnPlan | undefined) ?? null,
-      frame: extras.frame ?? { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
+      frame: extras.frame ?? NO_SCAN_FRAME,
       damages: extras.damages ?? [],
       overrides: extras.overrides ?? [],
       claim: extras.claim ?? NO_CLAIM,
@@ -385,6 +412,27 @@ export function reduce(state: State, action: Action): State {
           if (manifest.north) north = northOnPlan(manifest.north, frame.datum);
         }
 
+        // What somebody pointed at while walking the room. Read the same way
+        // photographs are and refused the same way: a pin that cannot be
+        // placed is named rather than dropped, because a refusal here is
+        // somebody's evidence not reaching the claim.
+        let damages: Damage[] = [];
+        let refusedPins: PinImport['refused'] = [];
+        if (action.pins) {
+          try {
+            const marked = importPins(action.pins as PinManifest, frame, room);
+            damages = [...marked.pins];
+            refusedPins = marked.refused;
+          } catch (error) {
+            // The room is still perfectly good without them, and losing a
+            // whole scan because a pin file is from another version would be
+            // the wrong trade. Said out loud rather than swallowed.
+            photoTrouble = photoTrouble
+              ? `${photoTrouble} ${message(error)}`
+              : message(error);
+          }
+        }
+
         return {
           selected: null,
           error: photoTrouble,
@@ -396,7 +444,8 @@ export function reduce(state: State, action: Action): State {
             rejectedPhotos,
             north,
             frame,
-            damages: [],
+            damages,
+            refusedPins,
             overrides: [],
             claim: NO_CLAIM,
             proposal: null,
@@ -469,8 +518,9 @@ export function reduce(state: State, action: Action): State {
             footprints: [],
             photos: [],
             rejectedPhotos: [],
+            refusedPins: [],
             north: null,
-            frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
+            frame: NO_SCAN_FRAME,
             damages: [],
             overrides: [],
             claim: NO_CLAIM,
@@ -517,8 +567,9 @@ export function reduce(state: State, action: Action): State {
           footprints: [],
           photos: [],
           rejectedPhotos: [],
+          refusedPins: [],
           north: null,
-          frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
+          frame: NO_SCAN_FRAME,
           damages: [],
           overrides: [],
           claim: NO_CLAIM,
