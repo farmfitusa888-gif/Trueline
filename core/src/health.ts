@@ -59,6 +59,15 @@ export interface Finding {
  */
 export const WIDEST_LIKELY_WINDOW: Nanometres = 8n * 12n * 25400000n;
 
+/**
+ * How far below the ceiling a wall has to stand before it is worth a look.
+ *
+ * 1 ft. A pony wall or a breakfast bar is much shorter than that and a scanning
+ * error is usually smaller, so this is the band where the two are hard to tell
+ * apart — which is exactly when somebody should look rather than the app guess.
+ */
+export const SHORT_WALL: Nanometres = 12n * 25400000n;
+
 /** Apple's own recommended maximum for one capture. */
 export const ROOMPLAN_MAX_SIDE: Nanometres = 9n * NM_PER_METRE;
 
@@ -227,7 +236,11 @@ export function checkCapture(input: HealthInput): Finding[] {
         what: 'The photographs do not appear to be in the same room as the walls',
         detail:
           `${odd.length} of ${input.cameraHeights.length} were taken between ` +
-          `${formatFeetInches(min(input.cameraHeights))} and ${formatFeetInches(max(input.cameraHeights))} ` +
+          // The range of the BAD ones. Quoting min and max over every photograph
+          // meant a stop finding understating its own evidence — six frames at
+          // 13 to 15 ft reported as "between 3' 11" and 15' 6"", because one
+          // perfectly good photograph was the minimum.
+          `${formatFeetInches(min(odd))} and ${formatFeetInches(max(odd))} ` +
           'above the floor. A person holds a phone somewhere between knee and head height, so ' +
           'anything else means the poses and the room are in different coordinate systems. ' +
           'Nothing should be drawn from this until it is worked out.',
@@ -290,6 +303,38 @@ export function checkCapture(input: HealthInput): Finding[] {
     });
   }
 
+  // Every wall keeps its own scanned height and the ceiling is the tallest of
+  // them, so a wall the scanner read short stands short — and Sam's garage came
+  // back with heights of 2.13, 1.95, 1.95, 1.62 and 2.13 m off one slab, which
+  // the model presents as a garage with a 5'4" pony wall. There is a
+  // plausibility check for door heights and there was none for walls, and the
+  // wall face is what drywall and paint are priced off.
+  const ceiling = room.ceilingHeight.value;
+  const short = room.walls.filter(
+    (wall) => wall.height !== undefined && ceiling - wall.height.value > SHORT_WALL
+  );
+  if (short.length > 0) {
+    const missing = short.reduce(
+      (total, wall) => total + runLength(wall) * (ceiling - wall.height!.value),
+      0n
+    );
+    findings.push({
+      severity: 'check',
+      what: `${short.length} wall${short.length === 1 ? ' stands' : 's stand'} well short of the ceiling`,
+      detail:
+        short
+          .map(
+            (wall) =>
+              `${wall.id} at ${formatFeetInches(wall.height!.value)} against a ` +
+              `${formatFeetInches(ceiling)} ceiling`
+          )
+          .join('; ') +
+        `. Some are real — a pony wall, a breakfast bar — and some are a wall the scanner read ` +
+        `short. It is ${formatFeetInches(sideOf(missing))} squared of wall face either way, so it ` +
+        'is worth a look before anything is priced by area.',
+    });
+  }
+
   /* -------------------------------------------------------- always worth saying */
 
   const bands = room.walls.filter((w) => !isVerified(w.length) && toleranceOf(w.length) > 0n);
@@ -323,6 +368,18 @@ function min(values: readonly Nanometres[]): Nanometres {
 
 function max(values: readonly Nanometres[]): Nanometres {
   return values.reduce((a, b) => (a > b ? a : b));
+}
+
+/** The side of a square of this area — a readable way to say a square-nanometre. */
+function sideOf(squareNanometres: bigint): Nanometres {
+  let low = 0n;
+  let high = squareNanometres + 1n;
+  while (low + 1n < high) {
+    const mid = (low + high) / 2n;
+    if (mid * mid <= squareNanometres) low = mid;
+    else high = mid;
+  }
+  return low;
 }
 
 /** How far the room reaches in each direction. */

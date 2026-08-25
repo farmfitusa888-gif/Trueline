@@ -112,3 +112,46 @@ test('with no photographs at all, nothing is claimed either way', () => {
   const findings = checkCapture({ room, report: REPORT });
   assert.equal(named(findings, 'outside').length, 0);
 });
+
+/* ------------------------------------------------------ walls that stand short */
+
+test('a wall standing well short of the ceiling is worth a look', () => {
+  // Sam's garage came back with wall heights of 2.13, 1.95, 1.95, 1.62 and
+  // 2.13 m off one slab. The model presents that as a garage with a 5'4" pony
+  // wall in it. There was a plausibility check for door heights and none at all
+  // for walls, and the wall face is what drywall and paint are priced off.
+  const stubby: Room = {
+    ...room,
+    walls: room.walls.map((wall) =>
+      wall.id === 'east'
+        ? { ...wall, height: scanned(parseLength(`5' 4"`), parseLength(`50mm`), T0, 'roomplan') }
+        : wall
+    ),
+  };
+  const findings = checkCapture({ room: stubby, report: REPORT });
+  const short = named(findings, 'short of the ceiling');
+  assert.equal(short.length, 1);
+  assert.equal(short[0]!.severity, 'check');
+  assert.match(short[0]!.detail, /east at 5' 4"/);
+});
+
+test('a room whose walls all reach the ceiling says nothing about it', () => {
+  assert.equal(named(checkCapture({ room, report: REPORT }), 'short of the ceiling').length, 0);
+});
+
+test('the frame alarm quotes the bad photographs, not all of them', () => {
+  // It filtered the implausible heights and then reported the min and max over
+  // every photograph, so one good picture at 3' 11" became the bottom of a
+  // range describing six frames at 13 to 15 ft. A stop finding understating its
+  // own evidence teaches people to argue with it.
+  const nm = (metres: number) => BigInt(Math.round(metres * Number(NM_PER_METRE)));
+  const findings = checkCapture({
+    room,
+    report: REPORT,
+    cameraHeights: [nm(1.2), nm(1.5), nm(1.6), nm(4.2), nm(4.6)],
+  });
+  const alarm = named(findings, 'same room as the walls');
+  assert.equal(alarm.length, 1);
+  assert.match(alarm[0]!.detail, /2 of 5/);
+  assert.doesNotMatch(alarm[0]!.detail, /3' 11/, 'it quoted a perfectly good photograph');
+});

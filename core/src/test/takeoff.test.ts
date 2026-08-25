@@ -4,6 +4,7 @@ import { parseLength } from '../length.ts';
 import { scanned, verified } from '../measurement.ts';
 import { type Heading, type Opening, type Room, type Wall } from '../room.ts';
 import { roomQuantities, wholeRoom } from '../zone.ts';
+import { makeWall } from '../edit.ts';
 
 /**
  * The four numbers a contractor prices off.
@@ -30,20 +31,26 @@ function w(id: string, heading: Heading, length: string, openings?: Opening[]): 
   };
 }
 
+/** A scanned measurement, for the fixtures that need one inline. */
+const m = (text: string) => scanned(parseLength(text), parseLength(`50mm`), T0, 'roomplan');
+
 function opening(id: string, kind: Opening['kind'], width: string, height: string, at: string): Opening {
   const m = (text: string) => scanned(parseLength(text), parseLength(`50mm`), T0, 'roomplan');
   return { id, kind, width: m(width), height: m(height), offsetFromStart: m(at) };
 }
 
 /** 20 ft by 10 ft, 8 ft to the ceiling. Round numbers so the sums are checkable by hand. */
-function room(walls: Wall[]): Room {
+function room(walls: Wall[], ceiling = `8'`): Room {
   return {
     id: 'r1',
     name: 'test room',
     walls,
-    ceilingHeight: verified(parseLength(`8'`), 'sam', T0, 'tape'),
+    ceilingHeight: verified(parseLength(ceiling), 'sam', T0, 'tape'),
   };
 }
+
+/** What a wall actually stands at — its own height, or the room's ceiling. */
+const standsAt = (wall: Wall, r: Room) => (wall.height ?? r.ceilingHeight).value;
 
 const plain = room([
   w('south', 'east', `20'`),
@@ -113,4 +120,56 @@ test('the whole room becomes a zone with one edge per wall', () => {
     assert.equal(edge.spanStart, 0n);
     assert.equal(edge.spanEnd, plain.walls[i]!.length.value);
   }
+});
+
+/* ------------------------------------------- merging, and the height it keeps */
+
+test('merging two wall stubs keeps the taller, not whichever came first', () => {
+  // Sam's garage arrives as two short stubs either side of a garage door, and
+  // the importer's own note tells the user to turn that opening into a wall if
+  // it really is one. The merge spread the first segment's properties over the
+  // result, so 5.94 m of wall inherited a 1950 mm stub's height, the 2130 mm
+  // piece was thrown away, and 16.8 sq ft of drywall and paint left the takeoff.
+  // The room still closed exactly and nothing was reported.
+  // A 10 ft ceiling, so "full height" and "the tallest stub" are different
+  // answers and the test can tell which one came back.
+  const stubs = room(
+    [
+      w('south', 'east', `20'`),
+      w('east', 'north', `10'`),
+      { ...w('north-a', 'west', `6'`), height: m(`6' 6"`) },
+      { ...w('door', 'west', `8'`), open: true as const },
+      { ...w('north-b', 'west', `6'`), height: m(`8'`) },
+      w('west', 'south', `10'`),
+    ],
+    `10'`
+  );
+  const merged = makeWall(stubs, 'door');
+  const wall = merged.walls.find((x) => x.heading === 'west');
+  assert.ok(wall, 'the stubs and the closed opening should have become one wall');
+  assert.equal(wall.length.value, parseLength(`20'`), 'and it should span the whole side');
+
+  // The wall built across the opening stands to the ceiling, so the merged wall
+  // does too. What matters is that it is never the shortest piece: that is the
+  // answer that silently removes drywall from the takeoff.
+  assert.equal(standsAt(wall, merged), parseLength(`10'`));
+  assert.notEqual(standsAt(wall, merged), parseLength(`6' 6"`), 'it took the shortest stub');
+});
+
+test('merging a stub into a full-height wall gives a full-height wall', () => {
+  // No height at all means the room's ceiling, which is the tallest thing
+  // there is. The key has to come off the merged wall rather than be left
+  // behind by the spread, or a full-height wall inherits a pony wall's height.
+  const stubs = room([
+    w('south', 'east', `20'`),
+    w('east', 'north', `10'`),
+    { ...w('north-a', 'west', `6'`), height: m(`4'`) },
+    { ...w('door', 'west', `8'`), open: true as const },
+    w('north-b', 'west', `6'`),
+    w('west', 'south', `10'`),
+  ]);
+  const merged = makeWall(stubs, 'door');
+  const wall = merged.walls.find((x) => x.heading === 'west');
+  assert.ok(wall);
+  assert.equal(wall.height, undefined, 'the merged wall should stand to the ceiling');
 });

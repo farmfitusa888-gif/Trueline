@@ -183,7 +183,28 @@ function mergeCollinear(walls: readonly Wall[]): Wall[] {
     }));
     const openings = [...(previous.openings ?? []), ...moved];
 
-    out[out.length - 1] = {
+    // A merged wall stands as tall as the tallest piece of it.
+    //
+    // Spreading `previous` kept whichever height happened to be first in the
+    // ring. On Sam's garage — where the importer's own note tells you to do this
+    // merge — a 572 mm stub was first, so 5.94 m of wall came out 1950 mm high
+    // and 16.8 sq ft of drywall and paint vanished from the takeoff with the
+    // room still closing exactly and no finding raised.
+    //
+    // Tallest is the safe direction: it never under-orders material, and the
+    // pieces disagreeing at all is itself worth seeing on the drawing.
+    // An undefined height means "the room's ceiling", which is the tallest thing
+    // there is — so one full-height piece makes the whole merged wall full
+    // height, and the key has to come off rather than be left behind by the
+    // spread below.
+    const fullHeight = previous.height === undefined || wall.height === undefined;
+    const tallest = fullHeight
+      ? undefined
+      : previous.height!.value >= wall.height!.value
+        ? previous.height
+        : wall.height;
+
+    const merged: { -readonly [K in keyof Wall]: Wall[K] } = {
       ...previous,
       length: {
         ...previous.length,
@@ -200,6 +221,9 @@ function mergeCollinear(walls: readonly Wall[]): Wall[] {
       },
       ...(openings.length > 0 ? { openings } : {}),
     };
+    if (tallest) merged.height = tallest;
+    else delete (merged as { height?: Measurement }).height;
+    out[out.length - 1] = merged;
   }
 
   // The list is a ring, so the last may run into the first.

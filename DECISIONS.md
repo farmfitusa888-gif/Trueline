@@ -1382,17 +1382,84 @@ that test throws against the old code, because a perfectly upright phone gave it
 a wedge of zero width. And a photograph aimed at the floor must be refused by
 name rather than failing later as a vector of zero length.
 
-## The plan is not mirrored, and here is why
+## The plan WAS mirrored. I got this wrong twice.
 
-Sam's other reading — that the drawing is a mirror image — is worth answering
-with the derivation rather than an opinion. Screen right is world +x, screen up
-is world +z, so the direction into the screen is x × z = −y. The viewer is above
-the room looking down. That is a correct bird's-eye view, not its mirror.
+Sam said a door that was on his right was on the left of the drawing. I told him
+it was rotation, not reflection, and gave a derivation. **The derivation was
+wrong and he was right.**
 
-What it is *not* is oriented. The datum is the longest wall, so the plan can come
-out at any rotation, and a door on the right becomes a door on the left under a
-180 degree turn. That is what makes it look wrong, and it is why the drawing now
-carries the walk and the window instead of a compass.
+Redone: screen-right is world +x and screen-up was world +z, so R x U = -y —
+and in a right-handed basis R x U points **toward the viewer**. The viewer was
+therefore at -y, underneath the floor, looking up. A view from below the slab.
+
+The physical statement, which is what the test now asserts: **a photographer's
+right hand is clockwise from where they are looking, seen from above.** Face the
+bottom of a map and your right hand points to its left. Under the old projection
+it pointed right. That is the whole bug in one sentence, and no length, area or
+closure check has an opinion about it — which is why a suite of 300 tests sat
+green over a mirrored drawing for the life of the project.
+
+An independent check found it the hard way: gravity-aligning the photographs
+from Sam's own garage and comparing which landmark is left of which against
+what the plan says. **0 of 12 landmark pairs agreed; 12 of 12 were mirrored.**
+
+**The fix is a sign, in six places.** `planOrigin`, `planDirection`, the floor
+outline, the two object axes in `readObjects`, and the world-to-plan drop in
+`capture.ts`, which now has a name — `planFromWorld` — precisely so the question
+has one place to be asked and one test to answer it.
+
+**Nothing measured moved.** Verified against all three real scans, before and
+after: kitchen 175.3 sq ft, garage 418.0, Sam's garage 411.8, every wall length
+identical to the nanometre, and the takeoff unchanged — floor 411.8, wall face
+460.5, baseboard 78' 10 1/16". What changed is the compass label on each wall
+(north and south swap) and which way round the drawing is.
+
+**The compass was out by twice the heading**, as a consequence, and the unit
+test that should have caught it could not: the fixture built a left turn and
+paired it with a right-handed bearing, so the mirror cancelled itself. The
+fixture now derives the turn from the bearing — one argument, one direction, no
+way to pair them wrong — and a new test walks one room with three different
+bearings and insists on one north.
+
+The lesson worth keeping: **every check in this codebase was invariant under
+reflection.** Lengths, areas, closure, tolerance, the solver. A property that
+nothing tests is a property that is free to be wrong, and the way it surfaced
+was a man standing in his own garage saying the door is on the other side.
+
+## Three more from the same audit
+
+**Merging two wall stubs kept whichever came first.** `makeWall` on a garage
+door merges the stubs either side of it, and the merged wall inherited the first
+segment's height — on Sam's garage, 5.94 m of wall at a 572 mm stub's 1950 mm,
+with the 2130 mm piece discarded. **16.8 sq ft of drywall and paint left the
+takeoff**, the room still closed exactly, and nothing was reported. It takes the
+tallest now, and a piece with no height of its own means the ceiling, which is
+taller than anything — so the key is removed rather than left behind by the
+spread. Two tests, both failing against the old code.
+
+**The frame alarm quoted the wrong numbers.** It filtered the implausible camera
+heights and then reported the range over *all* of them, so six frames at 13–15 ft
+were described as "between 3' 11" and 15' 6"" because one good photograph was the
+minimum. A stop finding that understates its own evidence teaches people to argue
+with it.
+
+**Walls that stand short had no check.** Every wall keeps its own scanned height
+and the ceiling is the tallest of them, so a wall the scanner read short simply
+stands short. The older garage has one at 5'4" against a 7' ceiling, presented
+without comment as a pony wall. There was a plausibility check for door heights
+and none for walls, and the wall face is what drywall and paint are priced off.
+
+## The plan is not mirrored, and here is why — WRONG, see above
+
+Kept as written, because being able to see the mistake matters more than
+tidying it away. The derivation below is the one that got the handedness
+backwards; the section above has the correction and the test.
+
+> Screen right is world +x, screen up is world +z, so the direction into the
+> screen is x × z = −y. The viewer is above the room looking down.
+
+`R × U` points at the viewer, not away from them. It said the viewer was under
+the floor.
 
 ## A plan with a north arrow on it
 

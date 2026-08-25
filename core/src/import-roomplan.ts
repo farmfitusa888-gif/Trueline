@@ -148,13 +148,26 @@ interface PlanPoint {
   readonly y: number;
 }
 
+/**
+ * The vertical axis, dropped — and why the sign is there.
+ *
+ * RoomPlan is right-handed with +y up, so looking DOWN at the floor from above,
+ * screen-up is **-z**. Taking plan y as +z draws the room as seen from
+ * underneath: every wall the right length, every corner in the right place,
+ * every closure exact, and the whole thing reflected. Nothing in the model can
+ * catch it, because none of those checks has an opinion about handedness.
+ *
+ * Sam caught it, standing in a room: a door that was on his right was on the
+ * left of the drawing. It cost six tests their expected compass labels and not
+ * one dimension anywhere.
+ */
 function planOrigin(m: RoomPlanTransform): PlanPoint {
-  return { x: at(m, 3, 0), y: at(m, 3, 2) };
+  return { x: at(m, 3, 0), y: -at(m, 3, 2) };
 }
 
 /** The surface's own long axis, projected onto the plan. */
 function planDirection(m: RoomPlanTransform): PlanPoint {
-  return { x: at(m, 0, 0), y: at(m, 0, 2) };
+  return { x: at(m, 0, 0), y: -at(m, 0, 2) };
 }
 
 function surfaceEnds(s: RoomPlanSurface): [PlanPoint, PlanPoint] {
@@ -328,7 +341,7 @@ export function importRoomPlan(scan: RoomPlanExport, options: ImportOptions): Im
     const pz = corner[2] ?? 0;
     const world = (row: number) =>
       at(m, 0, row) * px + at(m, 1, row) * py + at(m, 2, row) * pz + at(m, 3, row);
-    return toDatum({ x: world(0), y: world(2) }, datum);
+    return toDatum({ x: world(0), y: -world(2) }, datum);
   });
 
   // Where the outline actually is, before the wall chain is re-laid from the
@@ -583,9 +596,9 @@ function readObjects(scan: RoomPlanExport, datum: PlanPoint): Footprint[] {
     const depth = object.dimensions[2] ?? 0;
     const centre = planOrigin(object.transform);
     const alongX = at(object.transform, 0, 0);
-    const alongY = at(object.transform, 0, 2);
+    const alongY = -at(object.transform, 0, 2);
     const acrossX = at(object.transform, 2, 0);
-    const acrossY = at(object.transform, 2, 2);
+    const acrossY = -at(object.transform, 2, 2);
 
     const corners = [
       [1, 1],

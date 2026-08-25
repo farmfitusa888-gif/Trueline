@@ -93,10 +93,9 @@ export function northOnPlan(
   const m = north.atPose;
   if (m.length !== 16) return null;
 
-  // Where the camera looked, on the plan.
-  const forward = [-at(m, 2, 0), -at(m, 2, 2)];
-  const fx = forward[0]! * datum.x + forward[1]! * datum.y;
-  const fy = -forward[0]! * datum.y + forward[1]! * datum.x;
+  // Where the camera looked, on the plan — through the same drop as everything
+  // else, so the compass cannot end up in a different frame from the walls.
+  const [fx, fy] = planFromWorld(-at(m, 2, 0), -at(m, 2, 2), datum);
   const length = Math.hypot(fx, fy);
   // Pointing straight up or down: the phone had no bearing worth the name.
   if (length < 0.15) return null;
@@ -202,6 +201,30 @@ function cross(a: Vec2, b: Vec2): bigint {
  */
 const MIN_HORIZONTAL_RAY = 0.15;
 
+/**
+ * ARKit's world onto the plan, dropping the vertical axis.
+ *
+ * The one line the whole drawing hangs from, and it is worth naming because it
+ * answers a question no length or area or closure check can: is the plan a view
+ * from above the room, or from underneath the floor? Both are self-consistent.
+ * Both close exactly. Only one of them is a plan.
+ *
+ * ARKit is right-handed with +y up, so looking DOWN the +y axis at the floor,
+ * screen-up is **-z**. Taking `y = z` and drawing it upward reflects the room —
+ * every wall the right length, every corner in the right place, and the whole
+ * thing flipped. Hence the negation, and hence the test beside it that states
+ * the physical fact rather than the arithmetic.
+ */
+export function planFromWorld(
+  x: number,
+  z: number,
+  datum: RoomFrame['datum']
+): [number, number] {
+  const px = x;
+  const py = -z;
+  return [px * datum.x + py * datum.y, -px * datum.y + py * datum.x];
+}
+
 /* ---------------------------------------------------------------- the work */
 
 /**
@@ -273,8 +296,7 @@ export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
 
   // Y is up, so the plan is x and z. Then the datum rotation the importer
   // chose, so photos and walls share one set of axes.
-  const d = frame.datum;
-  const plan = (x: number, z: number): [number, number] => [x * d.x + z * d.y, -x * d.y + z * d.x];
+  const plan = (x: number, z: number) => planFromWorld(x, z, frame.datum);
 
   const [px, py] = plan(position[0]!, position[2]!);
   const [fxp, fyp] = plan(forward[0]!, forward[2]!);

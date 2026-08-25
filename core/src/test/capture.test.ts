@@ -15,6 +15,7 @@ import {
   heightsAboveFloor,
   importPhotos,
   northOnPlan,
+  planFromWorld,
   toPhoto,
 } from '../capture.ts';
 
@@ -84,7 +85,9 @@ function camera(
 
 test('a camera lands where it was standing, to the nanometre', () => {
   const photo = toPhoto(camera([1.5, 1.6, 2.0], 0), PLAIN);
-  assert.deepEqual(photo.pose.at, { x: 1500n * NM_PER_METRE / 1000n, y: 2n * NM_PER_METRE });
+  // The plan looks down at the floor, so the scan's +z runs down the page and
+  // a camera 2 m along it is 2 m down. See the handedness test below.
+  assert.deepEqual(photo.pose.at, { x: 1500n * NM_PER_METRE / 1000n, y: -2n * NM_PER_METRE });
   assert.equal(photo.id, 'p1');
   assert.equal(photo.trigger, 'automatic');
 });
@@ -102,18 +105,20 @@ test('the frame edges are oriented so the camera is always inside its own view',
 });
 
 test('a camera in the middle of the room sees the wall it is pointing at', () => {
-  // ARKit's camera looks down its own negative Z, so an untur​ned camera faces
-  // the scan's -z, which is south once it is in the plan.
-  const photo = toPhoto(camera([3, 1.6, 2], 0), PLAIN);
-  assert.deepEqual(photo.pose.forward, { x: 0n, y: -1_000_000_000n }, 'facing south');
-  assert.equal(shows(photo, room, 'south'), true);
-  assert.equal(shows(photo, room, 'north'), false, 'the wall behind is not in shot');
+  // ARKit's camera looks down its own negative Z, and the plan is a view from
+  // above, so the scan's -z runs UP the page: an unturned camera faces north.
+  // The camera stands at the scan's z = -2, which is 2 m up the plan and inside
+  // this room.
+  const photo = toPhoto(camera([3, 1.6, -2], 0), PLAIN);
+  assert.deepEqual(photo.pose.forward, { x: 0n, y: 1_000_000_000n }, 'facing north');
+  assert.equal(shows(photo, room, 'north'), true);
+  assert.equal(shows(photo, room, 'south'), false, 'the wall behind is not in shot');
 
   // Turned around, it sees the other one, from the same spot.
-  const around = toPhoto(camera([3, 1.6, 2], Math.PI), PLAIN);
+  const around = toPhoto(camera([3, 1.6, -2], Math.PI), PLAIN);
   assert.equal(around.pose.at.y, 2n * NM_PER_METRE, 'it did not move, only turned');
-  assert.equal(shows(around, room, 'north'), true);
-  assert.equal(shows(around, room, 'south'), false);
+  assert.equal(shows(around, room, 'south'), true);
+  assert.equal(shows(around, room, 'north'), false);
 });
 
 test('a wider lens takes in more of the wall it is pointing at', () => {
@@ -134,10 +139,11 @@ test('a wider lens takes in more of the wall it is pointing at', () => {
 
 test('the room datum is applied, so photos and walls share one set of axes', () => {
   // A datum of (0, -1) is what the importer picks when the longest wall runs
-  // along the scan's -z. It maps (x, z) to (-z, x).
+  // along the scan's -z. The plan drop makes (x, z) into (x, -z), and the datum
+  // then turns that: (2, 3) becomes (2, -3) becomes (3, 2).
   const turned: RoomFrame = { datum: { x: 0, y: -1 }, origin: NOWHERE };
   const photo = toPhoto(camera([2, 1.6, 3], 0), turned);
-  assert.deepEqual(photo.pose.at, { x: -3n * NM_PER_METRE, y: 2n * NM_PER_METRE });
+  assert.deepEqual(photo.pose.at, { x: 3n * NM_PER_METRE, y: 2n * NM_PER_METRE });
 });
 
 test('a camera pose and a wall are read in the same space', () => {
@@ -154,7 +160,7 @@ test('a camera pose and a wall are read in the same space', () => {
   //
   // So a pose gets the datum rotation and the origin shift, and nothing else.
   const photo = toPhoto(camera([2, 1.6, 3], 0), PLAIN);
-  assert.deepEqual(photo.pose.at, { x: 2n * NM_PER_METRE, y: 3n * NM_PER_METRE });
+  assert.deepEqual(photo.pose.at, { x: 2n * NM_PER_METRE, y: -3n * NM_PER_METRE });
 });
 
 /* ------------------------------------------------------------------ heights */
@@ -244,13 +250,13 @@ test('a wall wider than the frame is still seen, corners and all outside it', ()
   // put one of them a fraction of a nanometre outside its own edge and throw the
   // entire wall away. Every direction has to behave the same way.
   const facings: [string, number, string][] = [
-    ['south', 0, 'south'],
-    ['north', Math.PI, 'north'],
+    ['north', 0, 'north'],
+    ['south', Math.PI, 'south'],
     ['west', Math.PI / 2, 'west'],
     ['east', -Math.PI / 2, 'east'],
   ];
   for (const [name, turn, wallId] of facings) {
-    const photo = toPhoto(camera([3, 1.6, 2], turn), PLAIN);
+    const photo = toPhoto(camera([3, 1.6, -2], turn), PLAIN);
     const inFrame = wallsInFrame(photo, room).find((x) => x.wallId === wallId);
     assert.ok(inFrame, `facing ${name}, the wall in front of the camera was not found`);
     assert.ok(inFrame.visibleLength > 0n, `facing ${name}, nothing of it was visible`);
@@ -258,8 +264,8 @@ test('a wall wider than the frame is still seen, corners and all outside it', ()
 
   // The two long walls are 2 m away and 6 m across, so neither end fits in the
   // frame and the middle is what comes back. That is the case that used to fail.
-  for (const [turn, wallId] of [[0, 'south'], [Math.PI, 'north']] as [number, string][]) {
-    const inFrame = wallsInFrame(toPhoto(camera([3, 1.6, 2], turn), PLAIN), room).find(
+  for (const [turn, wallId] of [[0, 'north'], [Math.PI, 'south']] as [number, string][]) {
+    const inFrame = wallsInFrame(toPhoto(camera([3, 1.6, -2], turn), PLAIN), room).find(
       (x) => x.wallId === wallId
     )!;
     assert.ok(inFrame.fractionPerMille > 0n && inFrame.fractionPerMille < 1000n, wallId);
@@ -298,7 +304,9 @@ test('a photo is placed against the room, not against where the scan began', () 
   const startedAtTheDoor = toPhoto(camera([2, 1.5, 3], 0), PLAIN);
   const startedAtTheSink = toPhoto(camera([2 + 9.4, 1.5, 3 - 6.1], 0), {
     ...PLAIN,
-    origin: { x: nm(9.4), y: nm(-6.1) },
+    // The scan started 9.4 m along x and 6.1 m back along z, and the plan drop
+    // turns that -6.1 into +6.1 up the page.
+    origin: { x: nm(9.4), y: nm(6.1) },
   });
 
   assert.equal(startedAtTheSink.pose.at.x, startedAtTheDoor.pose.at.x);
@@ -370,27 +378,41 @@ test('a photo of the floor is refused rather than pointed somewhere', () => {
 
 /* -------------------------------------------------------------- the compass */
 
-/** A heading reading taken beside a camera pose, as the app records it. */
-function heading(trueHeading: number, turn: number, accuracy = 8): CapturedNorth {
-  return { trueHeading, accuracy, atPose: camera([0, 1.6, 0], turn).cameraPoseARFrame };
+/**
+ * A heading reading taken beside the camera pose from the same instant.
+ *
+ * The turn is derived from the bearing rather than passed in beside it, and
+ * that is deliberate: `camera(_, turn)` turns the phone anticlockwise seen from
+ * above, while a compass bearing counts clockwise from north. Handing both in
+ * separately let a test pair a left turn with a right bearing, and the mirror
+ * cancelled out — which is how the whole plan stayed reflected with a green
+ * suite. One argument, one direction, no way to pair them wrong.
+ */
+function heading(bearing: number, accuracy = 8): CapturedNorth {
+  const turn = (-bearing * Math.PI) / 180;
+  return {
+    trueHeading: bearing,
+    accuracy,
+    atPose: camera([0, 1.6, 0], turn).cameraPoseARFrame,
+  };
 }
 
 test('a phone facing north puts north up the plan', () => {
-  // camera(_, 0) looks along the world's -z, and with an identity datum the
-  // plan's -y. If the compass says that direction is due north, then north on
-  // the plan is -y.
-  const north = northOnPlan(heading(0, 0), PLAIN.datum);
+  // camera(_, 0) looks along the world's -z, which the plan drop puts up the
+  // page. If the compass says that direction is due north, north on the plan is
+  // straight up — which is what a person expects a north arrow to do.
+  const north = northOnPlan(heading(0), PLAIN.datum);
   assert.ok(north);
   assert.ok(Math.abs(north.x - 0) < 1e-6, `x was ${north.x}`);
-  assert.ok(Math.abs(north.y - -1) < 1e-6, `y was ${north.y}`);
+  assert.ok(Math.abs(north.y - 1) < 1e-6, `y was ${north.y}`);
   assert.equal(north.accuracy, 8);
 });
 
 test('a quarter turn of the phone turns the arrow a quarter turn', () => {
-  const facingNorth = northOnPlan(heading(0, 0), PLAIN.datum)!;
+  const facingNorth = northOnPlan(heading(0), PLAIN.datum)!;
   // Same room, but the reading was taken while facing east. North on the plan
   // has to come out in the same place either way — that is the whole point.
-  const facingEast = northOnPlan(heading(90, Math.PI / 2), PLAIN.datum)!;
+  const facingEast = northOnPlan(heading(90), PLAIN.datum)!;
   assert.ok(Math.abs(facingEast.x - facingNorth.x) < 1e-6, `${facingEast.x} vs ${facingNorth.x}`);
   assert.ok(Math.abs(facingEast.y - facingNorth.y) < 1e-6, `${facingEast.y} vs ${facingNorth.y}`);
 });
@@ -398,10 +420,52 @@ test('a quarter turn of the phone turns the arrow a quarter turn', () => {
 test('a heading the phone does not trust draws no arrow at all', () => {
   // Core Location reports a negative accuracy for a reading it will not stand
   // behind. An arrow drawn off that is worse than no arrow.
-  assert.equal(northOnPlan({ ...heading(0, 0), accuracy: -1 }, PLAIN.datum), null);
+  assert.equal(northOnPlan({ ...heading(0), accuracy: -1 }, PLAIN.datum), null);
 });
 
 test('a heading taken pointing at the floor draws no arrow', () => {
-  const down = { ...heading(0, 0), atPose: [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1.6, 0, 1] };
+  const down = { ...heading(0), atPose: [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1.6, 0, 1] };
   assert.equal(northOnPlan(down, PLAIN.datum), null);
+});
+
+/* ------------------------------------------------------- which way round */
+
+test('a photographer holds their right hand clockwise from where they look', () => {
+  // This is a fact about people seen from above, not about code. Look down at
+  // somebody walking toward the bottom of a map: their right hand points to the
+  // left of the page. Turn to face the right of the page and their right hand
+  // points down it. Right is always CLOCKWISE of forward in a plan view.
+  //
+  // The plan is built by dropping the vertical axis: (x, y, z) becomes (x, z).
+  // Whether that is a view from above or a view from underneath the floor is
+  // exactly this question, and getting it wrong mirrors every drawing the
+  // product makes while leaving every length, every area and every closure
+  // check perfectly intact — which is why nothing caught it for so long.
+  //
+  // `camera(_, 0)` looks along the world's -z, and a right-handed camera basis
+  // puts its +x on the photographer's right.
+  //
+  // Asked of the mapping itself, not of `toPhoto`'s wedge: that labels whichever
+  // edge is clockwise of forward as `rightEdge`, so asking it this question only
+  // gets its own convention back.
+  const [fx, fy] = planFromWorld(0, -1, PLAIN.datum); // looking along world -z
+  const [rx, ry] = planFromWorld(1, 0, PLAIN.datum); // right hand along world +x
+  const clockwise = fx * ry - fy * rx;
+  assert.ok(
+    clockwise < 0,
+    `the photographer's right hand came out anticlockwise of their view, which means the plan ` +
+      `is drawn from underneath the floor: cross was ${clockwise}`
+  );
+});
+
+test('one room, three readings, one north', () => {
+  // The reading can be taken at any moment of the walk, facing anywhere. If the
+  // arrow moves when the photographer turns, the pairing between the heading
+  // and the pose is wrong — and that is exactly what a mirrored plan does,
+  // silently, by putting the arrow out by twice the bearing.
+  const norths = [0, 90, 210].map((bearing) => northOnPlan(heading(bearing), PLAIN.datum)!);
+  for (const north of norths) {
+    assert.ok(Math.abs(north.x - norths[0]!.x) < 1e-6, `x drifted to ${north.x}`);
+    assert.ok(Math.abs(north.y - norths[0]!.y) < 1e-6, `y drifted to ${north.y}`);
+  }
 });
