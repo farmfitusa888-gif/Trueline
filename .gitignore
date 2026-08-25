@@ -15,6 +15,11 @@ web/audit/audit-*
 # The Apple developer team ID, which belongs to a Mac and not to a repository.
 ios/Signing.local.xcconfig
 
+# Where build.sh puts derived data and its logs. Hundreds of megabytes, rebuilt
+# from source every time, and it showed up as an untracked folder on the first
+# Mac that ever ran a build -- which then read as "you have local changes" and
+# stopped the next pull.
+.build/
 # Generated from docs/handbook.html before every web build, so that the copy
 # inside the app can never be older than the copy in docs/.
 web/public/handbook.html

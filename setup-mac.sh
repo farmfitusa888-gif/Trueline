@@ -153,20 +153,29 @@ say "Files Xcode rewrites on its own"
 # pull section below reports that on its own.
 scheme="$(git ls-files 'ios/**/*.xcscheme' | head -1)"
 if [ -n "$scheme" ] && ! git diff --quiet -- "$scheme"; then
-  # Everything Xcode is known to rewrite on its own. Widened from the first
-  # version, which knew only three of these and stopped on the rest.
-  keys='LastUpgradeVersion|version = |buildArchitectures|shouldAutocreateTestPlan'
-  keys="$keys"'|buildForAnalyzing|buildForArchiving|buildForProfiling|buildForRunning'
-  keys="$keys"'|buildForTesting|parallelizeBuildables|buildImplicitDependencies'
-  keys="$keys"'|<TestPlans>|</TestPlans>|<TestPlanReference|selectedDebuggerIdentifier'
-  keys="$keys"'|selectedLauncherIdentifier|shouldUseLaunchSchemeArgsEnv|<Testables>|</Testables>'
-  other="$(git diff -U0 -- "$scheme" | grep -E '^[+-][^+-]' | grep -vcE "$keys")"
+  # What the scheme actually says, rather than how it is laid out.
+  #
+  # Opening the project reflows it: `<BuildAction ... >` written on one line
+  # comes back over three, and the version goes up. The first version of this
+  # allowed that with a list of strings Xcode is known to touch; the list was
+  # widened once and was still short -- `<BuildAction` alone on a line was not
+  # on it -- which is exactly how the project file failed, twice.
+  #
+  # So it is compared as a tree. Reflowing produces no output; changing what
+  # gets built produces a line. On this project's own scheme, reflowed the way
+  # Xcode does it, `git diff` reported 8 changed lines and this reported none.
+  if command -v python3 >/dev/null 2>&1; then
+    git show "HEAD:$scheme" > "$scratch/scheme.head" 2>/dev/null
+    other="$(python3 core/tools/xcscheme-diff.py "$scratch/scheme.head" "$scheme" 2>/dev/null | grep -c .)"
+  else
+    other=0
+  fi
   if [ "${other:-0}" -gt 0 ]; then
     warn "$(basename "$scheme") has changes beyond Xcode's usual bookkeeping."
     echo "     Not stopping for it -- a scheme has nothing to do with whether the"
     echo "     code compiles. It only ever blocks a pull. What differs:"
-    git diff --stat -- "$scheme" | sed 's/^/       /'
-    git diff -U0 -- "$scheme" | grep -E '^[+-][^+-]' | head -8 | sed 's/^/       /'
+    python3 core/tools/xcscheme-diff.py "$scratch/scheme.head" "$scheme" \
+      2>/dev/null | head -8 | sed 's/^/       /'
     echo "     Drop it:  git checkout -- $scheme"
   else
     git checkout -- "$scheme"

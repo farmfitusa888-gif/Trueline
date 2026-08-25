@@ -508,8 +508,16 @@ extension ARMeasureSession: ARSessionDelegate {
 
 /// The bit of the view the session needs, kept behind a protocol so the session
 /// does not have to know what kind of view is showing it.
+/// Class-bound, because `aimer` above is `weak` and Swift will not make a
+/// weak reference to something that might be a struct -- there would be
+/// nothing to zero out. The only conformer is `ARMeasureScreen.Coordinator`,
+/// a final class holding the view, so the bound costs nothing and says what
+/// was always true.
+///
+/// Xcode: "'weak' must not be applied to non-class-bound 'any
+/// ARSCNViewProviding'". The first error a compiler ever gave this project.
 @MainActor
-protocol ARSCNViewProviding {
+protocol ARSCNViewProviding: AnyObject {
     func raycastQueryFromCentre() -> ARRaycastQuery?
     /// A ray through a point somebody touched, so the point measured is the
     /// point they chose rather than whatever the middle of the screen was on.

@@ -298,6 +298,50 @@ def callsTo(source: str, name: str) -> list[tuple[int, list[str]]]:
     return calls
 
 
+# ---------------------------------------------------------------------------
+# `weak` on something that might not be a class.
+#
+# A weak reference works by being zeroed when what it points at goes away, and
+# only a class has an identity to go away. So `weak var x: SomeProtocol?` is
+# refused unless the protocol says it is class-only -- `: AnyObject`.
+#
+# Xcode: "'weak' must not be applied to non-class-bound 'any Something';
+# consider adding a protocol conformance that has a class bound". That was the
+# first error a real compiler ever gave this project, on a protocol whose only
+# conformer is a final class -- so the bound was always true and never said.
+
+WEAK = re.compile(r'^\s*(?:@\w+\s+)*(?:private\s+|public\s+|internal\s+)?weak\s+var\s+\w+\s*:\s*([A-Za-z_]\w*)\??')
+
+
+def classBound(source: str, name: str) -> bool | None:
+    """Whether a protocol is class-only. None when it is not a protocol here.
+
+    A type this file does not declare -- `ARSCNView`, `UIView`, anything from
+    a framework -- returns None and is left alone. Guessing about a name whose
+    declaration is not in front of us is how a checker starts crying wolf.
+    """
+    found = re.search(
+        r'^(?:\w+\s+)*protocol\s+' + re.escape(name) + r'\s*(:[^{\n]*)?\{', source, re.M
+    )
+    if not found:
+        return None
+    inherits = found.group(1) or ''
+    return bool(re.search(r'\b(AnyObject|class)\b', inherits))
+
+
+def weakOnAStruct(source: str, everywhere: str) -> list[tuple[int, str]]:
+    """Every `weak var` whose type is a protocol with no class bound."""
+    bad = []
+    for number, line in enumerate(source.split('\n'), start=1):
+        match = WEAK.match(line)
+        if not match:
+            continue
+        bound = classBound(everywhere, match.group(1))
+        if bound is False:
+            bad.append((number, match.group(1)))
+    return bad
+
+
 def main(argv: list[str]) -> int:
     files = [Path(a) for a in argv] or sorted((ROOT / 'ios').rglob('*.swift'))
 
@@ -307,6 +351,21 @@ def main(argv: list[str]) -> int:
     for path in sorted((ROOT / 'ios').rglob('*.swift')):
         for name, labels in memberwise(strip(path.read_text(encoding='utf-8'))).items():
             shapes[name] = (labels, os.path.relpath(path, ROOT))
+
+    # Every protocol in the project, so a `weak var` in one file can be checked
+    # against a declaration in another.
+    #
+    # The files actually being checked come FIRST, and that ordering is the
+    # whole correctness of it: `classBound` takes the first declaration it
+    # finds, so a file passed on the command line is read as itself rather than
+    # as whatever the repository says about a protocol of the same name. The
+    # first version put the repository first, and re-breaking a copied file to
+    # test the check gave a clean bill of health -- it was reading the fixed
+    # protocol out of the repo the whole time.
+    everywhere = '\n'.join(
+        [strip(p.read_text(encoding='utf-8')) for p in files]
+        + [strip(p.read_text(encoding='utf-8')) for p in sorted((ROOT / 'ios').rglob('*.swift'))]
+    )
 
     bad = 0
     for path in files:
@@ -331,6 +390,13 @@ def main(argv: list[str]) -> int:
             bad += 1
             print(f'{rel}: uses `{said}` without importing {wants}')
             print(f'    Xcode will say: cannot find \'{said}\' in scope')
+
+        for line, kind in weakOnAStruct(source, everywhere):
+            bad += 1
+            print(f'{rel}:{line}: `weak` on {kind}, which is not class-bound')
+            print(f'    Xcode will say: \'weak\' must not be applied to '
+                  f'non-class-bound \'any {kind}\'')
+            print(f'    Fix: protocol {kind}: AnyObject')
 
         # Memberwise initialisers, in the order they insist on.
         for name, (labels, declaredIn) in shapes.items():
