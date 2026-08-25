@@ -21,6 +21,7 @@ import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
 import { Settings } from './Settings.tsx';
+import { PriceList } from './PriceList.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Price } from './Price.tsx';
 import { JobStatus } from './JobStatus.tsx';
@@ -280,8 +281,11 @@ export function App() {
       </header>
 
       {settings && (
-        <div className="mb-5">
+        <div className="mb-5 space-y-5">
           <Settings onClose={() => setSettings(false)} />
+          {/* Beside the profile rather than beside a room: a price list belongs
+              to the business, not to the job somebody happens to have open. */}
+          <PriceList />
         </div>
       )}
 

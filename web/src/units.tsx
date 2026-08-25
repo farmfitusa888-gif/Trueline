@@ -7,6 +7,9 @@ import {
   showLength,
   showRun,
 } from '../../core/src/company.ts';
+import { decode, encode } from '../../core/src/persist.ts';
+import type { Rate } from '../../core/src/price.ts';
+import type { JobRecord } from '../../core/src/price.ts';
 import { handBackCompany, onCompany } from './bridge.ts';
 
 /**
@@ -48,7 +51,10 @@ export function loadCompany(): Company {
   try {
     const text = window.localStorage.getItem(KEY);
     if (!text) return EMPTY_COMPANY;
-    const raw = JSON.parse(text) as Partial<Company>;
+    // `decode`, not `JSON.parse`. Money is `bigint` cents, and plain JSON turns
+    // one into `{"$nm":"875"}` on the way out and leaves it as an object on the
+    // way back — a rate that is not a number and prices nothing.
+    const raw = decode(text) as Partial<Company>;
     // Field by field with a fallback, rather than trusting the shape. A profile
     // saved by an older build is missing keys, and a missing `units` would make
     // every number on every screen `undefined`.
@@ -63,10 +69,41 @@ export function loadCompany(): Company {
       useDefaultCeiling: raw.useDefaultCeiling === true,
       defaultCeiling: typeof raw.defaultCeiling === 'string' ? raw.defaultCeiling : `8'`,
       ...(raw.defaultAssembly ? { defaultAssembly: raw.defaultAssembly } : {}),
+      // The rates and the history. These were being dropped on every load —
+      // field-by-field is safe against a missing key and silent about a key
+      // nobody remembered to add, and this is the one that got forgotten. A
+      // contractor typed his rates, closed the app, and they were gone.
+      ...(isBook(raw.prices) ? { prices: raw.prices } : {}),
+      ...(Array.isArray(raw.jobs) ? { jobs: raw.jobs as readonly JobRecord[] } : {}),
     };
   } catch {
     return EMPTY_COMPANY;
   }
+}
+
+/**
+ * Whether what came back out of storage is a price book.
+ *
+ * Shape-checked rather than trusted, like everything else read back here. A
+ * rate whose `cents` came back as an object instead of a bigint would multiply
+ * into `NaN` and put "$NaN" on a quote in front of a client — so a book that
+ * does not hold what it should is dropped whole rather than half-used.
+ */
+function isBook(value: unknown): value is Company['prices'] {
+  if (typeof value !== 'object' || value === null) return false;
+  const book = value as { rates?: unknown };
+  if (!Array.isArray(book.rates)) return false;
+  return book.rates.every((rate: unknown) => {
+    if (typeof rate !== 'object' || rate === null) return false;
+    const r = rate as Partial<Rate>;
+    return (
+      typeof r.item === 'string' &&
+      (r.unit === 'sq ft' || r.unit === 'lf' || r.unit === 'ea') &&
+      typeof r.cents === 'bigint' &&
+      typeof r.source === 'object' &&
+      r.source !== null
+    );
+  });
 }
 
 export function UnitsProvider({ children }: { children: ReactNode }) {
@@ -94,8 +131,22 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
       company,
       save: (next) => {
         setCompany(next);
+        // `encode`, not `JSON.stringify`. Money is `bigint` cents and
+        // `JSON.stringify` throws on a bigint — which it was doing, outside the
+        // try below, on the line that hands the profile to the app. So every
+        // rate anybody typed threw on the way out, the localStorage write in
+        // the catch was silently skipped, and the rates lived until the tab
+        // closed. Found by importing a supplier's price list.
+        let text: string;
         try {
-          window.localStorage.setItem(KEY, JSON.stringify(next));
+          text = encode(next);
+        } catch {
+          // Nothing in a profile should be unencodable now, and if something
+          // ever is, losing the screen is worse than losing the save.
+          return;
+        }
+        try {
+          window.localStorage.setItem(KEY, text);
         } catch {
           // A profile that will not save is a profile somebody retypes. It must
           // not take the screen down, and the room's own saving is separate.
@@ -103,7 +154,7 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
         // And to the app, which keeps it beside the scans and in iCloud. A
         // contractor should type his licence number once per lifetime, not once
         // per phone.
-        handBackCompany(JSON.stringify(next));
+        handBackCompany(text);
       },
       len: (v) => showLength(v, company.units),
       area: (v, places) => showArea(v, company.units, places),
