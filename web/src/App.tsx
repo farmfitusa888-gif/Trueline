@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { area, isDiagonal, runLength } from '../../core/src/room.ts';
+import { isAdjusted } from '../../core/src/measurement.ts';
+import { EditWall, RenameRoom } from './Edit.tsx';
 import { useUnits } from './units.tsx';
 import { readiness } from '../../core/src/issue.ts';
 import { extent } from '../../core/src/health.ts';
@@ -340,6 +342,16 @@ export function App() {
                 </p>
               </div>
 
+              {/* Out of the importer the name is a file name, and "garage.json"
+                  at the head of a document going to an insurer reads as a
+                  machine's output rather than a contractor's. */}
+              <div data-sheet="no" className="mb-3 px-1">
+                <RenameRoom
+                  room={loaded.room}
+                  onRename={(name) => dispatch({ type: 'renameRoom', name })}
+                />
+              </div>
+
               <div
                 role="tablist"
                 data-sheet="no"
@@ -376,7 +388,10 @@ export function App() {
                     onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                   />
                   <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-slate-500">
-                    {legendFor(loaded.claim.on && loaded.damages.length > 0).map((item) => (
+                    {legendFor(
+                      loaded.claim.on && loaded.damages.length > 0,
+                      loaded.room.walls.some((wall) => isAdjusted(wall.length))
+                    ).map((item) => (
                       <li key={item.label} className="flex items-center gap-1.5">
                         <span className={`inline-block h-2 w-4 rounded-sm ${item.className}`} />
                         {item.label}
@@ -478,6 +493,48 @@ export function App() {
                     }
                   />
                 )}
+
+                <EditWall
+                  room={loaded.room}
+                  wall={selectedWall}
+                  onRename={(name) =>
+                    dispatch({ type: 'renameWall', wallId: selectedWall.id, name })
+                  }
+                  onDrag={(text) =>
+                    dispatch({
+                      type: 'drag',
+                      wallId: selectedWall.id,
+                      text,
+                      by: 'me',
+                      at: new Date().toISOString(),
+                    })
+                  }
+                  onUnverify={() => dispatch({ type: 'unverify', wallId: selectedWall.id })}
+                  onSplit={(at, newId, height) =>
+                    dispatch({
+                      type: 'split',
+                      wallId: selectedWall.id,
+                      at,
+                      newId,
+                      height,
+                      by: 'me',
+                      when: new Date().toISOString(),
+                    })
+                  }
+                  onDelete={() => dispatch({ type: 'deleteWall', wallId: selectedWall.id })}
+                  onNotch={(out, along, outId, alongId) =>
+                    dispatch({
+                      type: 'notch',
+                      wallId: selectedWall.id,
+                      out,
+                      along,
+                      outId,
+                      alongId,
+                      by: 'me',
+                      at: new Date().toISOString(),
+                    })
+                  }
+                />
 
                 <WallPhotos room={loaded.room} wallId={selectedWall.id} photos={loaded.photos} />
 

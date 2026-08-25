@@ -1,5 +1,12 @@
 import { type Nanometres, formatFeetInches } from './length.ts';
-import { type Measurement, type VerificationMethod, verified, verify } from './measurement.ts';
+import {
+  type Measurement,
+  type VerificationMethod,
+  adjust,
+  isVerified,
+  verified,
+  verify,
+} from './measurement.ts';
 import {
   type Opening,
   type Room,
@@ -10,6 +17,7 @@ import {
   isDiagonal,
   runLength,
   runOf,
+  sameBuild,
   solve,
   validate,
 } from './room.ts';
@@ -682,4 +690,480 @@ export function removeOpening(room: Room, wallId: string, openingId: string): Ro
   const next: Room = { ...room, walls };
   validate(next);
   return next;
+}
+
+/* ------------------------------------------------------------------ names */
+
+/**
+ * What a room is called.
+ *
+ * It is on the drawing, on the takeoff, on the client file and at the top of
+ * the claim document, and out of the importer it is a file name. "garage.json"
+ * at the head of a document going to an insurer is not a small thing: it reads
+ * as a machine's output rather than a contractor's, which is exactly the
+ * impression this app exists to prevent.
+ *
+ * A name is not a measurement, so it carries no provenance and re-solves
+ * nothing. It is the one edit in this module that cannot change a number.
+ */
+export function renameRoom(room: Room, name: string): Room {
+  const trimmed = name.trim();
+  if (trimmed === '') {
+    throw new EditError('A room with no name is a room nobody can find again.');
+  }
+  if (trimmed.length > 120) {
+    throw new EditError(
+      `That name is ${trimmed.length} characters. Something that long is a note rather than a ` +
+        `name, and it will not fit in the title block on the drawing.`
+    );
+  }
+  const next: Room = { ...room, name: trimmed };
+  validate(next);
+  return next;
+}
+
+/**
+ * What a wall is called.
+ *
+ * "wall-1" is the importer counting. "the wall behind the washer" is a person
+ * telling somebody else which wall, and every sheet this app produces names
+ * walls: the schedule, the punch list, the damage workings, the claim document.
+ *
+ * Ids are what everything else in the model points at — openings belong to a
+ * wall id, damage is marked against one, joins between rooms name one — so this
+ * changes the id itself and it has to refuse a collision rather than produce a
+ * room with two walls answering to one name. Callers holding a wall id (a
+ * selection, a damage mark) must move with it; `renameWall` returns the room
+ * and the caller is responsible for its own references, because this module
+ * does not know what they are.
+ */
+export function renameWall(room: Room, wallId: string, name: string): Room {
+  const { wall, index } = find(room, wallId);
+  const trimmed = name.trim();
+  if (trimmed === '') {
+    throw new EditError('A wall with no name is a wall nothing else can point at.');
+  }
+  if (trimmed === wallId) return room;
+  if (room.walls.some((w) => w.id === trimmed)) {
+    throw new EditError(
+      `"${room.name}" already has a wall called "${trimmed}". Two walls with one name is two ` +
+        `walls nothing can tell apart — including the openings and the damage marked on them.`
+    );
+  }
+  const walls = [...room.walls];
+  walls[index] = { ...wall, id: trimmed };
+  const next: Room = { ...room, walls };
+  validate(next);
+  return next;
+}
+
+/* ------------------------------------------------- moved rather than measured */
+
+/**
+ * Somebody drags a wall to a new length.
+ *
+ * The room re-solves around it exactly as it does for a tape — that part is the
+ * same operation — but what lands in the model is **not** a verified
+ * measurement. A wall moved with a finger is not the sensor's number any more
+ * and nobody put a tape on it either, so it goes in as `adjusted`: its own
+ * word, its own colour on the plan, and it does not satisfy "put a tape on one
+ * wall running each way".
+ *
+ * That distinction is the whole product. The moment dragging produced a
+ * verified measurement, somebody could make an unchecked scan say "measured" by
+ * nudging four walls, and every promise this app makes about where a number
+ * came from would be worth nothing.
+ *
+ * A dragged wall stays movable by a later tape, deliberately: a tape beats a
+ * finger, always.
+ */
+export function adjustWall(
+  room: Room,
+  wallId: string,
+  length: Nanometres,
+  by: string,
+  at: string,
+  note?: string
+): Verification {
+  const { wall, index } = find(room, wallId);
+  if (length <= 0n) {
+    throw new EditError(`A wall of ${formatFeetInches(length)} is not a wall.`);
+  }
+  if (isVerified(wall.length)) {
+    throw new EditError(
+      `"${wallId}" has had a tape on it. Dragging it would quietly replace a measurement with a ` +
+        `guess, and the plan would still say somebody measured this room. Type what the tape ` +
+        `says instead, or take the verification off it first.`
+    );
+  }
+
+  const moved = adjust(wall.length, length, by, at, note);
+  const walls = [...room.walls];
+  walls[index] = isDiagonal(wall.heading)
+    ? { ...wall, heading: diagonal(length, runOf(wall)), length: moved }
+    : { ...wall, length: moved };
+
+  // Held for this solve, exactly as a tape reading is. Somebody who drags a
+  // wall to twenty-one feet and watches it settle at twenty-and-a-half has not
+  // moved a wall — the room gave way in the wrong direction and the edit did
+  // nothing. It is held for this solve only: a tape typed later moves it like
+  // any other unverified wall.
+  const solved = solve({ ...room, walls }, new Set([wallId]));
+  return { room: solved.room, adjustments: solved.adjustments };
+}
+
+/**
+ * Takes a person's word back off a wall.
+ *
+ * Needed because the refusal above needs a way out: somebody types a tape
+ * reading, then finds they read the wrong wall. Restoring what the measurement
+ * superseded is the only honest undo — the alternative is leaving a wrong
+ * number wearing a tape's authority.
+ *
+ * A measurement with nothing under it was verified from the start (a room drawn
+ * by hand), and there is nothing to fall back to, so it is refused rather than
+ * quietly turned into a scan the sensor never produced.
+ */
+export function unverifyWall(room: Room, wallId: string): Room {
+  const { wall, index } = find(room, wallId);
+  const provenance = wall.length.provenance;
+  if (provenance.kind !== 'verified') {
+    throw new EditError(`"${wallId}" has not had a tape on it, so there is nothing to take off.`);
+  }
+  if (!provenance.supersedes) {
+    throw new EditError(
+      `"${wallId}" has never been anything but somebody's word — this room was drawn by hand ` +
+        `rather than scanned. There is no earlier number to go back to. Type the right one.`
+    );
+  }
+  const walls = [...room.walls];
+  walls[index] = { ...wall, length: provenance.supersedes };
+  const next: Room = { ...room, walls };
+  validate(next);
+  return next;
+}
+
+/* -------------------------------------------------- adding and taking away */
+
+/**
+ * One wall becomes two, at a point along it.
+ *
+ * Exact: the two pieces run in the same direction and their lengths sum to the
+ * original, so the walk closes exactly as it did before. Nothing moves and
+ * nothing re-solves.
+ *
+ * **The second piece has to be different from the first, and that is not a
+ * formality.** Two collinear built walls that are alike in every way are one
+ * wall written twice — the model refuses them, and rightly, because the solver
+ * would move both of them to correct one error. So a split says what makes the
+ * second piece a second wall: a height, a thickness, or both. That is also what
+ * a split is actually *for* — a pony wall meeting a full-height one, a 2x6 run
+ * meeting a 2x4 partition. Wanting half a wall to mark damage on needs no split
+ * at all: a damaged area already runs from here to there along a wall.
+ *
+ * Both pieces keep the original's provenance rather than being marked adjusted.
+ * That is the one case where inheriting is honest: if the sensor said twenty
+ * feet ± two inches, then eight feet of it is eight feet ± two inches. Cutting
+ * a run in two states nothing new about the building's size.
+ *
+ * An opening the cut would run through is refused. What happens to half a door
+ * is a decision about somebody's building, not an arithmetic problem, and
+ * quietly putting the whole door on one side would move a header three feet
+ * without saying so.
+ */
+export interface SplitDifference {
+  /** How tall the second piece stands. Omit to leave it at the room's ceiling. */
+  readonly height?: Measurement;
+  /** How thick the second piece is. */
+  readonly thickness?: Measurement;
+}
+
+export function splitWall(
+  room: Room,
+  wallId: string,
+  at: Nanometres,
+  newId: string,
+  difference: SplitDifference
+): Room {
+  const { wall, index } = find(room, wallId);
+  if (wall.open) {
+    throw new EditError(
+      `"${wallId}" is an open span — there is no wall there to split. Make it a wall first.`
+    );
+  }
+  if (isDiagonal(wall.heading)) {
+    throw new EditError(
+      `"${wallId}" runs at an angle. Splitting it would need the point on the run rather than a ` +
+        `distance along it, and getting that wrong changes the angle — which is a measurement.`
+    );
+  }
+  const whole = runLength(wall);
+  if (at <= 0n || at >= whole) {
+    throw new EditError(
+      `"${wallId}" is ${formatFeetInches(whole)} long, so it cannot be split at ` +
+        `${formatFeetInches(at)}. The point has to be somewhere along it.`
+    );
+  }
+  if (newId.trim() === '') throw new EditError('The second piece needs a name.');
+  if (room.walls.some((w) => w.id === newId.trim())) {
+    throw new EditError(`"${room.name}" already has a wall called "${newId.trim()}".`);
+  }
+
+  const straddling = (wall.openings ?? []).filter(
+    (o) => o.offsetFromStart.value < at && o.offsetFromStart.value + o.width.value > at
+  );
+  if (straddling.length > 0) {
+    throw new EditError(
+      `The cut at ${formatFeetInches(at)} runs through ${straddling
+        .map((o) => `the ${o.kind} "${o.id}"`)
+        .join(' and ')}. Split somewhere else, or take it out first — what happens to half a ` +
+        `door is a decision about the building rather than about arithmetic.`
+    );
+  }
+
+  // The provenance rides along unchanged: a piece of a scanned wall is scanned,
+  // with the same band. Only the value changes.
+  const piece = (value: Nanometres): Measurement => ({ ...wall.length, value });
+
+  const before = (wall.openings ?? []).filter((o) => o.offsetFromStart.value + o.width.value <= at);
+  const after = (wall.openings ?? [])
+    .filter((o) => o.offsetFromStart.value >= at)
+    .map((o) => ({
+      ...o,
+      offsetFromStart: { ...o.offsetFromStart, value: o.offsetFromStart.value - at },
+    }));
+
+  const first: Wall = {
+    ...wall,
+    length: piece(at),
+    ...(before.length > 0 ? { openings: before } : {}),
+  };
+  if (before.length === 0) delete (first as { openings?: readonly Opening[] }).openings;
+
+  const second: Wall = {
+    ...wall,
+    id: newId.trim(),
+    length: piece(whole - at),
+    ...(after.length > 0 ? { openings: after } : {}),
+    ...(difference.height === undefined ? {} : { height: difference.height }),
+    ...(difference.thickness === undefined ? {} : { thickness: difference.thickness }),
+  };
+  if (after.length === 0) delete (second as { openings?: readonly Opening[] }).openings;
+  // An explicit "no height given" means the room's ceiling, and the key has to
+  // come off rather than be left behind by the spread above — otherwise a pony
+  // wall split into two pony walls would keep a height nobody asked for.
+  if (difference.height === undefined && 'height' in difference) {
+    delete (second as { height?: Measurement }).height;
+  }
+  if (difference.thickness === undefined && 'thickness' in difference) {
+    delete (second as { thickness?: Measurement }).thickness;
+  }
+
+  // Compared at their effective values: a wall with no height on it stands at
+  // the room's ceiling, so an explicit nine feet in a nine-foot room is not a
+  // difference at all — and letting it look like one would produce exactly the
+  // two identical walls this refusal exists to stop.
+  if (sameBuild(first, second, room.ceilingHeight.value)) {
+    throw new EditError(
+      `Nothing would tell the two pieces of "${wallId}" apart — same height, same thickness — ` +
+        `and two walls in line that are alike in every way are one wall written twice. Say what ` +
+        `is different about the second piece: how tall it stands, or how thick it is. If what ` +
+        `you actually want is to mark part of this wall, a damaged area already runs from here ` +
+        `to there along it without splitting anything.`
+    );
+  }
+
+  const walls = [...room.walls];
+  walls.splice(index, 1, first, second);
+  const next: Room = { ...room, walls };
+  validate(next);
+  return next;
+}
+
+/**
+ * A wall comes out of the room, and the room closes back up around it.
+ *
+ * This is the edit that can quietly change a building, so it does not do it
+ * quietly. Removing a wall leaves the walk short by exactly that wall's run,
+ * and the room has to make it up somewhere — so the return is the same
+ * `Verification` a tape produces, carrying every wall that moved and how far.
+ * The screen shows those before anybody prices off the result.
+ *
+ * When there is nothing on that axis left to absorb it, `solve` refuses and
+ * says which walls were held and why. That is the right answer rather than a
+ * shape nobody asked for: in a plain rectangle, deleting one wall leaves three
+ * sides and nothing that can close them, and the honest response is "this is
+ * not a room any more".
+ *
+ * A wall with openings in it is refused. A door does not stop existing because
+ * somebody deleted the wall it was in — either it moved to another wall or it
+ * came out, and both of those are decisions.
+ */
+export function deleteWall(room: Room, wallId: string): Verification {
+  const { wall, index } = find(room, wallId);
+  if (room.walls.length <= 3) {
+    throw new EditError(
+      `"${room.name}" has ${room.walls.length} sides. Taking another out does not leave a room.`
+    );
+  }
+  if ((wall.openings?.length ?? 0) > 0) {
+    throw new EditError(
+      `"${wallId}" has ${wall.openings!.map((o) => o.kind).join(' and ')} in it. Take ` +
+        `${wall.openings!.length === 1 ? 'it' : 'them'} out first — a door does not stop ` +
+        `existing because the wall it was in was deleted.`
+    );
+  }
+
+  const walls = room.walls.filter((_, i) => i !== index);
+  // Collinear neighbours become one wall, exactly as they do when an opening is
+  // closed up. Two built walls on one axis are one wall written twice, and the
+  // solver would move both to correct one error.
+  const merged = mergeCollinear(walls);
+  validate({ ...room, walls: merged });
+  const solved = solve({ ...room, walls: merged });
+  return { room: solved.room, adjustments: solved.adjustments };
+}
+
+/**
+ * A corner becomes a step: the alcove the scanner flattened.
+ *
+ * **Two walls, never one, and that is geometry rather than taste.** A closed
+ * rectilinear walk alternates axes, so it always has an even number of sides;
+ * adding a single wall would leave five sides on a rectangle, which cannot
+ * close, and the model would see the new wall in line with one of its
+ * neighbours and rightly call it one wall written twice. What people mean by
+ * "add a wall" here is a notch — out and back — and that is what this does.
+ *
+ * Given a wall running east into one running north, notching by `out` and
+ * `along` replaces the corner between them with a step:
+ *
+ *     before                 after
+ *     ────────────┐          ─────────┐
+ *                 │                   └──┐  <- out, along
+ *                 │                      │
+ *
+ * The incoming wall gives up `along` and the outgoing one gives up `out`, so
+ * the room's overall extent does not move at all — the walk is exactly as long
+ * on each axis as it was. Nothing else in the room has to give way, and the
+ * returned adjustments are the solver's, which for a well-formed notch is
+ * nothing.
+ *
+ * The two new lengths are `verified`, like any wall a person puts in: somebody
+ * saying an alcove is two feet deep is stating a fact about the building, not
+ * nudging a line. The two walls that gave up length keep their own provenance
+ * with the new value — they are the same walls, shortened, and a shortened
+ * scan is still a scan.
+ *
+ * A wall somebody put a tape on will not give up length to a notch. Shortening
+ * a measured wall by a side effect is how a tape reading quietly stops being
+ * true.
+ */
+export function notchCorner(
+  room: Room,
+  wallId: string,
+  notch: {
+    /** How far the step goes out, taken off the wall after this one. */
+    readonly out: Nanometres;
+    /** How far along the step runs, taken off this wall. */
+    readonly along: Nanometres;
+    readonly outId: string;
+    readonly alongId: string;
+  },
+  by: string,
+  at: string,
+  method: VerificationMethod = 'tape'
+): Verification {
+  const { wall, index } = find(room, wallId);
+  const next = room.walls[(index + 1) % room.walls.length]!;
+
+  if (isDiagonal(wall.heading) || isDiagonal(next.heading)) {
+    throw new EditError(
+      `"${wallId}" or the wall after it runs at an angle. Notching a corner between two square ` +
+        `walls is exact arithmetic; between angled ones it is a decision about where the corner ` +
+        `actually is.`
+    );
+  }
+  if (wall.open || next.open) {
+    throw new EditError(
+      `There is no wall on one side of that corner, so there is no corner to notch. Make it a ` +
+        `wall first.`
+    );
+  }
+  for (const [id, name] of [[notch.outId, 'first'], [notch.alongId, 'second']] as const) {
+    if (id.trim() === '') throw new EditError(`The ${name} new wall needs a name.`);
+    if (room.walls.some((w) => w.id === id.trim())) {
+      throw new EditError(`"${room.name}" already has a wall called "${id.trim()}".`);
+    }
+  }
+  if (notch.outId.trim() === notch.alongId.trim()) {
+    throw new EditError('The two new walls need different names.');
+  }
+
+  const along = notch.along;
+  const out = notch.out;
+  if (along <= 0n || out <= 0n) {
+    throw new EditError('A notch with no depth or no width is not a notch.');
+  }
+  const wallRun = runLength(wall);
+  const nextRun = runLength(next);
+  if (along >= wallRun) {
+    throw new EditError(
+      `"${wallId}" is ${formatFeetInches(wallRun)} long, so a notch cannot take ` +
+        `${formatFeetInches(along)} off it — there would be no wall left before the step.`
+    );
+  }
+  if (out >= nextRun) {
+    throw new EditError(
+      `"${next.id}" is ${formatFeetInches(nextRun)} long, so a notch cannot take ` +
+        `${formatFeetInches(out)} off it — there would be no wall left after the step.`
+    );
+  }
+  for (const [w, taken] of [
+    [wall, along],
+    [next, out],
+  ] as const) {
+    if (isVerified(w.length)) {
+      throw new EditError(
+        `"${w.id}" has had a tape on it, and notching would quietly take ` +
+          `${formatFeetInches(taken)} off it. A measurement that changed as a side effect of a ` +
+          `different edit is a measurement nobody can rely on. Take the tape reading off it first ` +
+          `if the wall really is shorter than it was measured.`
+      );
+    }
+  }
+  const inTheWay = (wall.openings ?? []).filter(
+    (o) => o.offsetFromStart.value + o.width.value > wallRun - along
+  );
+  if (inTheWay.length > 0) {
+    throw new EditError(
+      `The step would start ${formatFeetInches(wallRun - along)} along "${wallId}", which is ` +
+        `inside ${inTheWay.map((o) => `the ${o.kind} "${o.id}"`).join(' and ')}. Move the step, ` +
+        `or take it out first.`
+    );
+  }
+
+  const shorter = (w: Wall, value: Nanometres): Wall => ({
+    ...w,
+    length: { ...w.length, value },
+  });
+
+  const outWall: Wall = {
+    id: notch.outId.trim(),
+    heading: next.heading,
+    length: verified(out, by, at, method),
+  };
+  const alongWall: Wall = {
+    id: notch.alongId.trim(),
+    heading: wall.heading,
+    length: verified(along, by, at, method),
+  };
+
+  const walls = [...room.walls];
+  walls[index] = shorter(wall, wallRun - along);
+  const after = (index + 1) % room.walls.length;
+  walls[after] = shorter(next, nextRun - out);
+  walls.splice(index + 1, 0, outWall, alongWall);
+
+  const solved = solve({ ...room, walls });
+  return { room: solved.room, adjustments: solved.adjustments };
 }

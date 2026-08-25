@@ -11,15 +11,26 @@ import { type Nanometres, abs, add, formatFeetInches } from './length.ts';
  * So a length never travels alone here. It carries where it came from, and the
  * screen and every export say so.
  *
- * Three ways a number gets into the model:
+ * Four ways a number gets into the model:
  *
  *   scanned   — a sensor produced it, and it is only as good as its tolerance
  *   verified  — a person put a tape on it and typed what the tape said
  *   derived   — computed from others, and no more certain than its worst input
+ *   adjusted  — a person moved it by hand, without a tape
  *
  * A verified measurement has no tolerance, and that is a statement about
  * responsibility rather than about physics: the number is what the person said
  * it is, and the record says who said it and when.
+ *
+ * **Adjusted is the awkward one, and it is honest about being awkward.** A wall
+ * somebody dragged into place on a screen is not the sensor's number any more,
+ * and nobody put a tape on it either. It sits between the two and is never
+ * allowed to pass for either: it does not satisfy "put a tape on one wall
+ * running each way", and it does not claim the sensor's band as its own
+ * guarantee. It carries the band of whatever it replaced as a **floor** — the
+ * least uncertainty it could possibly have — because moving a line with a
+ * finger cannot make a number more certain than the instrument that produced
+ * it, and inventing a wider band would be inventing a number.
  */
 
 export type VerificationMethod = 'tape' | 'laser' | 'plans' | 'stated';
@@ -51,7 +62,32 @@ export interface Derived {
   readonly from: readonly string[];
 }
 
-export type Provenance = Scanned | Verified | Derived;
+/**
+ * Somebody moved it on the screen, without a tape.
+ *
+ * Dragging a wall is a real thing people need — a scan puts a wall in the wrong
+ * place, or a room is drawn from an old sheet and one corner is plainly out —
+ * and pretending it produces either a scan or a verified measurement would be
+ * the one dishonest thing in this model.
+ */
+export interface Adjusted {
+  readonly kind: 'adjusted';
+  readonly adjustedBy: string;
+  readonly adjustedAt: string;
+  /** Why it was moved, in the person's own words, when they gave one. */
+  readonly note?: string;
+  /**
+   * What it said before. Never discarded, and never optional.
+   *
+   * Required, unlike the one on `Verified`, because an adjustment has no
+   * standing of its own: a verified measurement is somebody's word and can
+   * exist without a predecessor, and an adjusted one is only ever a change to
+   * something that was already there. It is also where the band comes from.
+   */
+  readonly supersedes: Measurement;
+}
+
+export type Provenance = Scanned | Verified | Derived | Adjusted;
 
 export interface Measurement {
   readonly value: Nanometres;
@@ -173,9 +209,22 @@ export function isVerified(m: Measurement): boolean {
   return m.provenance.kind === 'verified';
 }
 
-/** The half-width of the band this number lives in. Zero once a person signs it. */
+/** Somebody moved this one on a screen rather than measuring it. */
+export function isAdjusted(m: Measurement): boolean {
+  return m.provenance.kind === 'adjusted';
+}
+
+/**
+ * The half-width of the band this number lives in. Zero once a person signs it.
+ *
+ * An adjusted number inherits the band of what it replaced, as a floor rather
+ * than a guarantee — see the note at the top of this file. It is the least
+ * uncertainty a dragged wall could have, not a promise about the building.
+ */
 export function toleranceOf(m: Measurement): Nanometres {
-  return m.provenance.kind === 'verified' ? 0n : m.provenance.tolerance;
+  if (m.provenance.kind === 'verified') return 0n;
+  if (m.provenance.kind === 'adjusted') return toleranceOf(m.provenance.supersedes);
+  return m.provenance.tolerance;
 }
 
 /** The interval the true value is guaranteed to lie in. */
@@ -218,6 +267,8 @@ function instantOf(m: Measurement): string {
       return m.provenance.verifiedAt;
     case 'derived':
       return '';
+    case 'adjusted':
+      return m.provenance.adjustedAt;
   }
 }
 
@@ -225,11 +276,17 @@ function instantOf(m: Measurement): string {
 export function history(m: Measurement): Measurement[] {
   const chain: Measurement[] = [m];
   let current = m;
-  while (current.provenance.kind === 'verified' && current.provenance.supersedes) {
-    current = current.provenance.supersedes;
+  for (;;) {
+    const previous =
+      current.provenance.kind === 'verified'
+        ? current.provenance.supersedes
+        : current.provenance.kind === 'adjusted'
+          ? current.provenance.supersedes
+          : undefined;
+    if (!previous) return chain;
+    current = previous;
     chain.push(current);
   }
-  return chain;
 }
 
 /* ---------------------------------------------------------------- for eyes */
@@ -245,11 +302,43 @@ export function formatWithConfidence(
 ): string {
   if (isVerified(m)) return format(m.value);
   const t = toleranceOf(m);
+  // Said in words rather than as a band, because the band is a floor and
+  // printing "20' 3" ± 2"" would be claiming the scanner's guarantee for a
+  // number the scanner did not produce.
+  if (isAdjusted(m)) return `${format(m.value)} (moved by hand)`;
   if (t === 0n) return `${format(m.value)} (unverified)`;
   return `${format(m.value)} ± ${format(abs(t))}`;
 }
 
 /** A short word for a badge next to the number. */
-export function confidenceLabel(m: Measurement): 'verified' | 'scanned' | 'derived' {
+export function confidenceLabel(m: Measurement): 'verified' | 'scanned' | 'derived' | 'adjusted' {
   return m.provenance.kind;
+}
+
+/**
+ * A person moves a measurement on the screen. What it said before is kept.
+ *
+ * Deliberately not `verify` with a different method. A `stated` verification is
+ * still somebody putting their name to a number as fact — "the plans say eight
+ * foot" — and this is not that. This is "I dragged it here because the scan was
+ * plainly wrong", which is worth recording and is not worth trusting like a
+ * tape.
+ */
+export function adjust(
+  existing: Measurement,
+  value: Nanometres,
+  adjustedBy: string,
+  adjustedAt: string,
+  note?: string
+): Measurement {
+  return {
+    value,
+    provenance: {
+      kind: 'adjusted',
+      adjustedBy: requireSomebody(adjustedBy, 'adjustedBy'),
+      adjustedAt: requireInstant(adjustedAt, 'adjustedAt'),
+      ...(note === undefined ? {} : { note }),
+      supersedes: existing,
+    },
+  };
 }

@@ -1,5 +1,5 @@
 import { type Nanometres, NM_PER_FOOT, NM_PER_INCH, add, formatFeetInches } from './length.ts';
-import { isVerified, toleranceOf } from './measurement.ts';
+import { isAdjusted, isVerified, toleranceOf } from './measurement.ts';
 import { type Room, formatSquareFeet, runLength } from './room.ts';
 import { type Quantities, roomQuantities } from './zone.ts';
 import { readiness, trustLabel } from './issue.ts';
@@ -406,7 +406,14 @@ export function wallSchedule(room: Room): string {
     return [
       wall.id,
       formatFeetInches(length),
-      isVerified(wall.length) ? 'measured' : `scanned ±${formatFeetInches(band)}`,
+      // Never "scanned" for a wall somebody dragged: it is not the sensor's
+      // number any more, and printing the sensor's band beside it on a sheet a
+      // sub prices off would be putting a guarantee on a guess.
+      isVerified(wall.length)
+        ? 'measured'
+        : isAdjusted(wall.length)
+          ? 'moved by hand'
+          : `scanned ±${formatFeetInches(band)}`,
       wall.open ? 'no wall built here' : '',
       (wall.openings ?? []).map((o) => `${o.kind} ${formatFeetInches(o.width.value)}`).join(' + '),
     ];

@@ -69,7 +69,7 @@ export interface RenderWall {
   readonly thicknessAssumed: boolean;
   readonly height: number;
   /** Ours, and the reason this adapter exists rather than a straight port. */
-  readonly confidence: 'scanned' | 'verified' | 'derived';
+  readonly confidence: 'scanned' | 'verified' | 'derived' | 'adjusted';
   /**
    * True when there is no wall here — a garage door opening, a wide span to the
    * next room. The edge is on the outline and it was measured; the renderer

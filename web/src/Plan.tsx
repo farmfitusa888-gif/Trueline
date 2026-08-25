@@ -297,13 +297,19 @@ export function Plan({
         const y2 = scaleY(w.end.y);
         const mx = (x1 + x2) / 2;
         const my = (y1 + y2) / 2;
+        // Four colours for four ways a number got here. A wall somebody
+        // dragged gets its own — violet, unlike anything else on the sheet —
+        // because the one thing that must never happen is a moved wall reading
+        // like a measured one.
         const stroke = w.open
           ? '#94a3b8'
           : w.confidence === 'verified'
             ? '#0f172a'
-            : w.confidence === 'derived'
-              ? '#64748b'
-              : '#b45309';
+            : w.confidence === 'adjusted'
+              ? '#7c3aed'
+              : w.confidence === 'derived'
+                ? '#64748b'
+                : '#b45309';
         const share = blocked.get(w.id)?.blockedPerMille ?? 0n;
 
         return (
@@ -529,10 +535,14 @@ export function Plan({
  * at all — somebody looks for the red on the plan and cannot find it, and then
  * doubts the rest of the key. So damage is listed only when damage is drawn.
  */
-export function legendFor(anyDamage: boolean): readonly { label: string; className: string }[] {
+export function legendFor(
+  anyDamage: boolean,
+  anyAdjusted = false
+): readonly { label: string; className: string }[] {
   return [
     { label: 'Measured', className: 'bg-slate-900' },
     { label: 'Scanned', className: 'bg-amber-700' },
+    ...(anyAdjusted ? [{ label: 'Moved by hand', className: 'bg-violet-600' }] : []),
     { label: 'No wall here', className: 'bg-slate-400' },
     { label: 'Something in the way', className: 'bg-red-600' },
     { label: 'What was in the room', className: 'bg-slate-300' },

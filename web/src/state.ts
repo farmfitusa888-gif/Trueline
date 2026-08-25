@@ -16,6 +16,13 @@ import {
   removeOpening,
   verifyOpening,
   verifyWall,
+  adjustWall,
+  deleteWall,
+  notchCorner,
+  renameRoom,
+  renameWall,
+  splitWall,
+  unverifyWall,
 } from '../../core/src/edit.ts';
 import { type SavedProject, loadProject, saveProject } from '../../core/src/persist.ts';
 import {
@@ -199,6 +206,22 @@ export type Action =
   | { type: 'cutTo'; damageId: string; text: string | null }
   | { type: 'reading'; damageId: string; reading: Reading }
   | { type: 'damagePhotos'; damageId: string; photos: readonly string[] }
+  | { type: 'renameRoom'; name: string }
+  | { type: 'renameWall'; wallId: string; name: string }
+  | { type: 'drag'; wallId: string; text: string; by: string; at: string }
+  | { type: 'unverify'; wallId: string }
+  | { type: 'split'; wallId: string; at: string; newId: string; height: string; by: string; when: string }
+  | { type: 'deleteWall'; wallId: string }
+  | {
+      type: 'notch';
+      wallId: string;
+      out: string;
+      along: string;
+      outId: string;
+      alongId: string;
+      by: string;
+      at: string;
+    }
   | { type: 'claim'; claim: Claim }
   | { type: 'undo' }
   | { type: 'dismissError' }
@@ -546,6 +569,206 @@ export function reduce(state: State, action: Action): State {
                 ? `, and ${beyond.length} moved further than the scanner's own tolerance — worth a tape.`
                 : '.');
         return edited(state, loaded, room, note);
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    /* ------------------------------------------------------------- names */
+
+    case 'renameRoom': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const room = renameRoom(loaded.room, action.name);
+        return edited(state, loaded, room, `This room is called "${room.name}" now.`);
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'renameWall': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const room = renameWall(loaded.room, action.wallId, action.name);
+        const to = action.name.trim();
+        // Everything pointing at the old id has to move with it. Damage marks
+        // name a wall, and a mark left pointing at a wall that no longer exists
+        // is a mark that vanishes off the plan and off the claim — silently,
+        // which is the worst way for evidence to go.
+        const damages = loaded.damages.map((damage) => {
+          const shape = damage.shape;
+          if (shape.kind === 'pin' && shape.wallId === action.wallId) {
+            return { ...damage, shape: { ...shape, wallId: to } };
+          }
+          if (shape.kind === 'patch' && shape.wallId === action.wallId) {
+            return { ...damage, shape: { ...shape, wallId: to } };
+          }
+          if (shape.kind === 'surface' && shape.wallId === action.wallId) {
+            return { ...damage, shape: { ...shape, wallId: to } };
+          }
+          return damage;
+        });
+        const next = edited(state, loaded, room, `That wall is called "${to}" now.`);
+        return next.loaded
+          ? {
+              ...next,
+              selected: state.selected === action.wallId ? to : state.selected,
+              loaded: { ...next.loaded, damages },
+            }
+          : next;
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    /* --------------------------------------------- moved rather than measured */
+
+    case 'drag': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const length = parseLength(action.text, { defaultUnit: 'ft' });
+        const { room, adjustments } = adjustWall(
+          loaded.room,
+          action.wallId,
+          length,
+          action.by,
+          action.at
+        );
+        const moved = adjustments.filter((a) => a.by !== 0n);
+        return edited(
+          state,
+          loaded,
+          room,
+          `${action.wallId} moved by hand — not measured, and the plan says so. ` +
+            (moved.length === 0
+              ? 'Nothing else had to move.'
+              : `${moved.length} other wall${moved.length === 1 ? '' : 's'} moved to close the room.`)
+        );
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'unverify': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const room = unverifyWall(loaded.room, action.wallId);
+        return edited(
+          state,
+          loaded,
+          room,
+          `Took the tape reading off ${action.wallId}. It is back to what it was before.`
+        );
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    /* ------------------------------------------------- adding and taking away */
+
+    case 'split': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const room = splitWall(
+          loaded.room,
+          action.wallId,
+          parseLength(action.at, { defaultUnit: 'ft' }),
+          action.newId,
+          {
+            height: verified(
+              parseLength(action.height, { defaultUnit: 'ft' }),
+              action.by,
+              action.when,
+              'tape'
+            ),
+          }
+        );
+        return edited(
+          state,
+          loaded,
+          room,
+          `${action.wallId} is two walls now — the second one is "${action.newId.trim()}".`
+        );
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'deleteWall': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const { room, adjustments } = deleteWall(loaded.room, action.wallId);
+        const moved = adjustments.filter((a) => a.by !== 0n);
+        // Damage marked on a wall that is gone goes with it. Leaving a mark
+        // pointing at nothing would put a quantity on a claim that no wall in
+        // the room can account for.
+        const kept = loaded.damages.filter((damage) => {
+          const shape = damage.shape;
+          const on =
+            shape.kind === 'pin' || shape.kind === 'patch' || shape.kind === 'surface'
+              ? shape.wallId
+              : undefined;
+          return on !== action.wallId;
+        });
+        const lost = loaded.damages.length - kept.length;
+        const next = edited(
+          state,
+          loaded,
+          room,
+          `${action.wallId} is gone. ` +
+            (moved.length === 0
+              ? 'Nothing else had to move.'
+              : `${moved.map((a) => a.wallId).join(' and ')} moved to close the room back up.`) +
+            (lost > 0 ? ` ${lost} mark${lost === 1 ? '' : 's'} on it went with it.` : '')
+        );
+        return next.loaded
+          ? {
+              ...next,
+              selected: state.selected === action.wallId ? null : state.selected,
+              loaded: { ...next.loaded, damages: kept },
+            }
+          : next;
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'notch': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        const { room, adjustments } = notchCorner(
+          loaded.room,
+          action.wallId,
+          {
+            out: parseLength(action.out, { defaultUnit: 'ft' }),
+            along: parseLength(action.along, { defaultUnit: 'ft' }),
+            outId: action.outId,
+            alongId: action.alongId,
+          },
+          action.by,
+          action.at,
+          'tape'
+        );
+        const moved = adjustments.filter((a) => a.by !== 0n);
+        return edited(
+          state,
+          loaded,
+          room,
+          `The corner after ${action.wallId} is a step now. ` +
+            // A well-formed notch is paid for by the two walls it came out of,
+            // so nothing else should move. If anything did, say so — it means
+            // the room was not closing the way this assumed.
+            (moved.length === 0
+              ? 'The room is the same size — the step came out of the two walls beside it.'
+              : `${moved.map((a) => a.wallId).join(' and ')} also moved.`)
+        );
       } catch (error) {
         return { ...state, error: message(error) };
       }

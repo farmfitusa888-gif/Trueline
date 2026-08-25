@@ -367,12 +367,27 @@ export function validate(room: Room): void {
     // garage is the proof: a 4.8 m garage door with a 0.57 m stub of wall either
     // side of it, all three dead in line down the east side of the building.
     // Three collinear segments there is what the building is.
+    //
+    // The exception is two pieces of one straight run that are genuinely
+    // different walls: a pony wall meeting a full-height one, a 2x6 run meeting
+    // a 2x4 partition. The rule's own reason does not apply to those — they are
+    // not one wall written twice, they are two walls that happen to be in line
+    // — and a builder standing in front of them would call them two.
     const hereAxis = axisOf(here);
-    if (hereAxis !== null && hereAxis === axisOf(next) && !here.open && !next.open) {
+    if (
+      hereAxis !== null &&
+      hereAxis === axisOf(next) &&
+      !here.open &&
+      !next.open &&
+      sameBuild(here, next, room.ceilingHeight.value)
+    ) {
       throw new RoomError(
-        `Walls "${here.id}" and "${next.id}" both run ${hereAxis === 'x' ? 'east-west' : 'north-south'}. ` +
-          `In a rectilinear room every wall turns a corner into the next one. If there is a real ` +
-          `angle between them, the wall carrying it is a diagonal — build it with diagonal().`
+        `Walls "${here.id}" and "${next.id}" both run ${hereAxis === 'x' ? 'east-west' : 'north-south'}, ` +
+          `and nothing tells them apart — same height, same thickness. In a rectilinear room every ` +
+          `wall turns a corner into the next one, so that is one wall written twice, and the ` +
+          `solver would move both of them to correct one error. If there is a real angle between ` +
+          `them, the wall carrying it is a diagonal — build it with diagonal(). If they really are ` +
+          `two walls, say what is different about the second one.`
       );
     }
   }
@@ -381,6 +396,26 @@ export function validate(room: Room): void {
 /* ----------------------------------------------------------------- walking */
 
 /** The corner positions, starting at the origin and walking the walls in order. */
+/**
+ * Whether two walls are built the same way, to the model's eye.
+ *
+ * The only thing that can make two collinear built walls two walls rather than
+ * one written twice. Height and thickness, because those are the only per-wall
+ * facts about how a wall is made — everything else about a wall is where it is
+ * and what is in it.
+ *
+ * **Compared at their effective values, not as fields.** A wall with no height
+ * on it stands at the room's ceiling, so a wall carrying an explicit nine feet
+ * beside one carrying nothing in a nine-foot room are the same height — and
+ * treating "one has the field set" as a difference would let a split produce
+ * two identical walls, which is the one thing this check exists to stop.
+ */
+export function sameBuild(a: Wall, b: Wall, ceiling: Nanometres): boolean {
+  const height = (w: Wall) => w.height?.value ?? ceiling;
+  const thickness = (w: Wall, room?: Room) => w.thickness?.value ?? room?.wallThickness?.value ?? null;
+  return height(a) === height(b) && thickness(a) === thickness(b);
+}
+
 export function corners(room: Room): Point[] {
   validate(room);
   const points: Point[] = [];
@@ -474,7 +509,12 @@ function allocate(total: Nanometres, weights: readonly Nanometres[]): Nanometres
   return shares.map((s) => (negative ? -s : s));
 }
 
-function solveAxis(room: Room, axis: 'x' | 'y', residual: Nanometres): Adjustment[] {
+function solveAxis(
+  room: Room,
+  axis: 'x' | 'y',
+  residual: Nanometres,
+  hold: ReadonlySet<string>
+): Adjustment[] {
   if (residual === 0n) return [];
 
   // Diagonals are held. Stretching one along a single axis would change its
@@ -483,10 +523,22 @@ function solveAxis(room: Room, axis: 'x' | 'y', residual: Nanometres): Adjustmen
   // drift this module exists to stop. A diagonal changes only when a person
   // re-measures it.
   const onAxis = room.walls.filter((w) => axisOf(w) === axis);
-  const movable = onAxis.filter((w) => !isVerified(w.length));
+  // Held: anything a person put a tape on, and anything the caller is holding
+  // for this one solve.
+  //
+  // `hold` exists for dragging. Somebody who drags a wall to twenty-one feet
+  // and watches it settle at twenty-and-a-half has not moved a wall, they have
+  // made a suggestion — so the wall being dragged is held while the rest of the
+  // room gives way, exactly as a tape reading is. It is held for that solve
+  // only: a tape typed afterwards beats a finger, always, and a dragged wall
+  // moves for it like any other unverified one.
+  const movable = onAxis.filter((w) => !isVerified(w.length) && !hold.has(w.id));
 
   if (movable.length === 0) {
-    const held = room.walls.filter((w) => isDiagonal(w.heading)).map((w) => w.id);
+    const held = [
+      ...room.walls.filter((w) => isDiagonal(w.heading)).map((w) => w.id),
+      ...onAxis.filter((w) => hold.has(w.id)).map((w) => w.id),
+    ];
     throw new ClosureConflict(axis, residual, onAxis.map((w) => w.id), held);
   }
 
@@ -516,12 +568,12 @@ function solveAxis(room: Room, axis: 'x' | 'y', residual: Nanometres): Adjustmen
  * a person types one number, and the room rearranges itself around what they
  * said while leaving alone everything else a person has said.
  */
-export function solve(room: Room): Solution {
+export function solve(room: Room, hold: ReadonlySet<string> = new Set()): Solution {
   validate(room);
   const residual = closure(room);
   const adjustments = [
-    ...solveAxis(room, 'x', residual.x),
-    ...solveAxis(room, 'y', residual.y),
+    ...solveAxis(room, 'x', residual.x, hold),
+    ...solveAxis(room, 'y', residual.y, hold),
   ];
 
   const byId = new Map(adjustments.map((a) => [a.wallId, a.by]));
