@@ -604,11 +604,16 @@ export function App() {
               />
             )}
 
-            <Price room={loaded.room} />
+            <Price
+              room={loaded.room}
+              overrides={loaded.overrides}
+              onOverride={(override) => dispatch({ type: 'override', override })}
+              onClearOverride={(item, unit) => dispatch({ type: 'clearOverride', item, unit })}
+            />
 
             <JobStatus room={loaded.room} fileName={loaded.fileName} />
 
-            <Sheet room={loaded.room} photos={loaded.photos} />
+            <Sheet room={loaded.room} photos={loaded.photos} overrides={loaded.overrides} />
 
             <FieldSheet room={loaded.room} footprints={loaded.footprints} />
 

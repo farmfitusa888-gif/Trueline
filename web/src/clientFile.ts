@@ -3,7 +3,7 @@ import { type Company, letterhead, showArea, showLength } from '../../core/src/c
 import { readiness, trustLabel } from '../../core/src/issue.ts';
 import { area } from '../../core/src/room.ts';
 import { type Quote, money } from '../../core/src/price.ts';
-import type { Takeoff } from '../../core/src/takeoff.ts';
+import { type OverriddenLine, anyOverridden, describeOverride } from '../../core/src/override.ts';
 import { planSvg } from './sheet.ts';
 
 /**
@@ -50,7 +50,21 @@ function safe(text: string): string {
 export interface ClientFileParts {
   readonly room: Room;
   readonly company: Company;
-  readonly takeoff: Takeoff;
+  /**
+   * The quantities as they are being priced, with anything typed over marked.
+   *
+   * This replaced a whole `Takeoff` being passed in. The file only ever used
+   * its lines, and holding both meant a caller could hand over a takeoff and a
+   * set of lines that disagreed — with nothing to say which one the page would
+   * print.
+   *
+   * Passed in rather than rebuilt: the client has to be looking at the same
+   * numbers the contractor is, including the ones he changed and why. A client
+   * file that quietly showed the measured number while the quote priced a
+   * different one is the worst kind of disagreement — it looks like an error in
+   * the contractor's favour.
+   */
+  readonly lines: readonly OverriddenLine[];
   /** Omitted when the contractor has not set any rates. */
   readonly quote?: Quote;
   /** The plan, as it is on the screen. */
@@ -61,7 +75,7 @@ export interface ClientFileParts {
 }
 
 export function clientFile(parts: ClientFileParts): string {
-  const { room, company, takeoff, quote, plan, photos, at } = parts;
+  const { room, company, lines, quote, plan, photos, at } = parts;
   const state = readiness(room);
   const units = company.units;
   const head = letterhead(company);
@@ -69,10 +83,13 @@ export function clientFile(parts: ClientFileParts): string {
 
   const drawing = plan ? planSvg(plan) : '';
 
-  const rows = takeoff.lines
+  const rows = lines
     .filter((line) => line.group === undefined)
     .map(
-      (line) => `<tr><th>${safe(line.what)}</th><td>${safe(line.quantity)} ${safe(line.unit)}</td></tr>`
+      (line) =>
+        `<tr><th>${safe(line.what)}${
+          line.overridden ? `<span>${safe(describeOverride(line))}</span>` : ''
+        }</th><td>${safe(line.quantity)} ${safe(line.unit)}</td></tr>`
     )
     .join('');
 
@@ -140,6 +157,7 @@ export function clientFile(parts: ClientFileParts): string {
   svg { width: 100%; height: auto; display: block; }
   table { width: 100%; border-collapse: collapse; }
   th { text-align: left; font-weight: 400; padding: 9px 0; border-top: 1px solid #f1f5f9; }
+  th span { display: block; font-size: 13px; color: #92400e; margin-top: 2px; }
   td { text-align: right; font-weight: 600; padding: 9px 0; border-top: 1px solid #f1f5f9;
        font-variant-numeric: tabular-nums; white-space: nowrap; }
   tr:first-child th, tr:first-child td { border-top: 0; }
@@ -186,6 +204,12 @@ export function clientFile(parts: ClientFileParts): string {
           'so they will move when one does — usually by an inch or two, occasionally by more.'
         : 'Every wall behind these numbers has had a tape measure on it.'
     }</p>
+    ${
+      anyOverridden(lines)
+        ? '<p>Some quantities on this page are not what the room measures. Each one says so ' +
+          'underneath it, with the number the room measured and the reason it was changed.</p>'
+        : ''
+    }
     <p style="margin-bottom:0">${safe(trustLabel(state.trust))}.</p>
   </section>
 

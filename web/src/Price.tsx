@@ -10,6 +10,13 @@ import {
   quote,
   rateLabel,
 } from '../../core/src/price.ts';
+import {
+  type Override,
+  type OverriddenLine,
+  applyOverrides,
+  describeOverride,
+  provenanceOf,
+} from '../../core/src/override.ts';
 import { useUnits } from './units.tsx';
 
 /**
@@ -42,18 +49,45 @@ const KNOWN: readonly { item: string; unit: PriceUnit; prices: string }[] = [
   { item: 'Headers', unit: 'ea', prices: 'header stock' },
 ];
 
-export function Price({ room }: { readonly room: Room }) {
+export function Price({
+  room,
+  overrides,
+  onOverride,
+  onClearOverride,
+}: {
+  readonly room: Room;
+  readonly overrides: readonly Override[];
+  readonly onOverride: (override: Override) => void;
+  readonly onClearOverride: (item: string, unit: Override['unit']) => void;
+}) {
   const { company, save } = useUnits();
   const [editing, setEditing] = useState(false);
   const [typing, setTyping] = useState<Record<string, string>>({});
   const [trouble, setTrouble] = useState<string | null>(null);
+  const [changing, setChanging] = useState<string | null>(null);
+  const [amount, setAmount] = useState('');
+  const [why, setWhy] = useState('');
 
   const { book, suggestions } = useMemo(() => pricing(company), [company]);
   const sheet = useMemo(
     () => takeoff(room, new Date().toLocaleString(), { company: company.name }),
     [room, company.name]
   );
-  const priced = useMemo(() => quote(sheet.lines, book), [sheet, book]);
+  // The quantities, with whatever somebody typed over. What the room measured
+  // is still on every line that was changed — nothing here overwrites it.
+  const applied = useMemo(() => applyOverrides(sheet.lines, overrides), [sheet, overrides]);
+  const priced = useMemo(
+    () =>
+      quote(
+        applied.lines.map((line) => ({ ...line, provenance: provenanceOf(line) })),
+        book
+      ),
+    [applied, book]
+  );
+  const byItem = useMemo(
+    () => new Map(applied.lines.map((line) => [`${line.what}|${line.unit}`, line])),
+    [applied]
+  );
 
   function setRate(item: string, unit: PriceUnit, text: string) {
     try {
@@ -219,20 +253,120 @@ export function Price({ room }: { readonly room: Room }) {
       ) : (
         <>
           <dl className="mt-2 divide-y divide-slate-100">
-            {priced.lines.map((line) => (
-              <div key={line.item} className="flex items-baseline justify-between gap-4 py-2">
-                <dt className="text-slate-700">
-                  {line.item}
-                  <span className="block text-xs text-slate-500">
-                    {line.quantity} {line.unit} at {money(line.cents)}
-                  </span>
-                </dt>
-                <dd className="shrink-0 font-semibold tabular-nums text-slate-900">
-                  {money(line.total)}
-                </dd>
-              </div>
-            ))}
+            {priced.lines.map((line) => {
+              const key = `${line.item}|${line.unit}`;
+              const source: OverriddenLine | undefined = byItem.get(key);
+              const over = source?.overridden;
+              return (
+                <div key={key} className="py-2">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <dt className="text-slate-700">
+                      {line.item}
+                      <span className="block text-xs text-slate-500">
+                        {line.quantity} {line.unit} at {money(line.cents)}
+                      </span>
+                    </dt>
+                    <dd className="flex shrink-0 items-baseline gap-3">
+                      <span className="font-semibold tabular-nums text-slate-900">
+                        {money(line.total)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChanging(changing === key ? null : key);
+                          setAmount(over ? line.quantity : '');
+                          setWhy(over?.why ?? '');
+                        }}
+                        className="min-h-11 text-xs text-slate-500 underline underline-offset-4"
+                      >
+                        {changing === key ? 'Done' : over ? 'Change' : 'Price a different number'}
+                      </button>
+                    </dd>
+                  </div>
+
+                  {over && (
+                    <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                      {describeOverride(source!)}
+                    </p>
+                  )}
+
+                  {changing === key && (
+                    <div className="mt-2 rounded-md bg-slate-50 p-3">
+                      <p className="text-xs text-slate-600">
+                        This room measures{' '}
+                        <strong className="tabular-nums">
+                          {over ? over.was : line.quantity} {line.unit}
+                        </strong>
+                        . Price something else and both numbers stay on the sheet — the one the
+                        room measured never goes away, and the reason goes everywhere the number
+                        does.
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          value={amount}
+                          onChange={(event) => setAmount(event.target.value)}
+                          inputMode="decimal"
+                          placeholder={over ? over.was : line.quantity}
+                          aria-label={`Price this many ${line.unit} of ${line.item}`}
+                          className="min-h-12 w-28 shrink-0 rounded-md border border-slate-300 px-2 py-2
+                                     text-right tabular-nums focus:border-sky-500 focus:outline-none"
+                        />
+                        <input
+                          value={why}
+                          onChange={(event) => setWhy(event.target.value)}
+                          placeholder="why — waste, full boxes, access"
+                          aria-label={`Why ${line.item} is a different number`}
+                          className="min-h-12 w-full rounded-md border border-slate-300 px-3 py-2
+                                     focus:border-sky-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOverride({
+                              item: line.item,
+                              unit: line.unit,
+                              quantity: amount.trim(),
+                              why: why.trim(),
+                              by: company.name || 'me',
+                              at: new Date().toISOString(),
+                            })
+                          }
+                          className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-semibold
+                                     text-white active:bg-slate-700"
+                        >
+                          Price that
+                        </button>
+                        {over && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClearOverride(line.item, line.unit);
+                              setChanging(null);
+                            }}
+                            className="min-h-11 px-2 text-sm text-slate-500 underline underline-offset-4"
+                          >
+                            Back to what the room measures
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </dl>
+
+          {applied.stranded.length > 0 && (
+            <p className="mt-2 text-sm text-amber-800">
+              {applied.stranded.map((o) => o.item).join(', ')}{' '}
+              {applied.stranded.length === 1 ? 'is' : 'are'} no longer on this sheet, so the
+              number you typed for {applied.stranded.length === 1 ? 'it' : 'them'} is not being
+              used. The room changed after you set{' '}
+              {applied.stranded.length === 1 ? 'it' : 'them'}.
+            </p>
+          )}
 
           <div className="mt-2 border-t border-slate-200 pt-2">
             {priced.margin !== 0n && (

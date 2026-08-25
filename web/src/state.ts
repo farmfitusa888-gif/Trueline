@@ -37,6 +37,7 @@ import type { Photo } from '../../core/src/photo.ts';
 import type { Damage, Reading } from '../../core/src/damage.ts';
 import { validateDamage } from '../../core/src/damage.ts';
 import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
+import { type Override, validateOverride } from '../../core/src/override.ts';
 import { handBack } from './bridge.ts';
 
 /**
@@ -101,6 +102,15 @@ export interface Loaded {
    * damage must not touch a dimension.
    */
   readonly damages: readonly Damage[];
+  /**
+   * Quantities somebody typed over, and why.
+   *
+   * Kept beside the room rather than in it, exactly as damage is: the room is a
+   * measurement of a building and an override is a decision about what to
+   * order. Correcting a wall must not disturb a waste factor, and changing a
+   * waste factor must not touch a measurement.
+   */
+  readonly overrides: readonly Override[];
   readonly claim: Claim;
   /** Rooms as they were before each edit, most recent last. */
   readonly undo: readonly Room[];
@@ -206,6 +216,8 @@ export type Action =
   | { type: 'cutTo'; damageId: string; text: string | null }
   | { type: 'reading'; damageId: string; reading: Reading }
   | { type: 'damagePhotos'; damageId: string; photos: readonly string[] }
+  | { type: 'override'; override: Override }
+  | { type: 'clearOverride'; item: string; unit: Override['unit'] }
   | { type: 'renameRoom'; name: string }
   | { type: 'renameWall'; wallId: string; name: string }
   | { type: 'drag'; wallId: string; text: string; by: string; at: string }
@@ -261,6 +273,7 @@ function restored(saved: SavedProject, note: string): State {
     frame?: RoomFrame;
     north?: NorthOnPlan;
     damages?: readonly Damage[];
+    overrides?: readonly Override[];
     claim?: Claim;
   };
   if (!extras.report) throw new Error('That saved room has no import report with it.');
@@ -276,6 +289,7 @@ function restored(saved: SavedProject, note: string): State {
       north: (extras.north as NorthOnPlan | undefined) ?? null,
       frame: extras.frame ?? { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
       damages: extras.damages ?? [],
+      overrides: extras.overrides ?? [],
       claim: extras.claim ?? NO_CLAIM,
       undo: [],
       lastEdit: note,
@@ -348,6 +362,7 @@ export function reduce(state: State, action: Action): State {
             north,
             frame,
             damages: [],
+            overrides: [],
             claim: NO_CLAIM,
             undo: [],
             lastEdit: null,
@@ -418,6 +433,7 @@ export function reduce(state: State, action: Action): State {
             north: null,
             frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
             damages: [],
+            overrides: [],
             claim: NO_CLAIM,
             undo: [],
             lastEdit: null,
@@ -461,6 +477,7 @@ export function reduce(state: State, action: Action): State {
           north: null,
           frame: { datum: { x: 1, y: 0 }, origin: { x: 0n, y: 0n } },
           damages: [],
+          overrides: [],
           claim: NO_CLAIM,
           undo: [],
           lastEdit: null,
@@ -572,6 +589,48 @@ export function reduce(state: State, action: Action): State {
       } catch (error) {
         return { ...state, error: message(error) };
       }
+    }
+
+    /* -------------------------------------------------------- typed over */
+
+    case 'override': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        validateOverride(action.override);
+        const rest = loaded.overrides.filter(
+          (o) => !(o.item === action.override.item && o.unit === action.override.unit)
+        );
+        return {
+          ...state,
+          error: null,
+          loaded: {
+            ...loaded,
+            overrides: [...rest, action.override],
+            lastEdit:
+              `${action.override.item}: pricing ${action.override.quantity} ${action.override.unit}. ` +
+              `What the room measures is still on the sheet beside it.`,
+          },
+        };
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'clearOverride': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          overrides: loaded.overrides.filter(
+            (o) => !(o.item === action.item && o.unit === action.unit)
+          ),
+          lastEdit: `${action.item} is back to what the room measures.`,
+        },
+      };
     }
 
     /* ------------------------------------------------------------- names */
@@ -1061,6 +1120,7 @@ export function persist(loaded: Loaded, at: string): string | null {
         north: loaded.north,
         damages: loaded.damages,
         claim: loaded.claim,
+        overrides: loaded.overrides,
       },
     });
     // The app first, and in its own right. It writes the room into the scan's

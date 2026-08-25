@@ -8,6 +8,11 @@ import { quote } from '../../core/src/price.ts';
 import { photosOfWall, type Photo } from '../../core/src/photo.ts';
 import { clientFile } from './clientFile.ts';
 import { fileNameFor, planPng, planSvg, printOnly, sendFile, sendPicture } from './sheet.ts';
+import {
+  type Override,
+  applyOverrides,
+  provenanceOf,
+} from '../../core/src/override.ts';
 import { useUnits } from './units.tsx';
 
 /**
@@ -83,7 +88,15 @@ async function shrink(src: string, upright: number, side = 560): Promise<string>
   return canvas.toDataURL('image/jpeg', 0.72);
 }
 
-export function Sheet({ room, photos }: { readonly room: Room; readonly photos: readonly Photo[] }) {
+export function Sheet({
+  room,
+  photos,
+  overrides,
+}: {
+  readonly room: Room;
+  readonly photos: readonly Photo[];
+  readonly overrides: readonly Override[];
+}) {
   const { company, len } = useUnits();
   const [told, setTold] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -157,12 +170,16 @@ export function Sheet({ room, photos }: { readonly room: Room; readonly photos: 
       const svg = document.querySelector<SVGSVGElement>('svg[aria-label^="Plan of"]');
       const sheet = takeoff(room, new Date().toLocaleString(), { company: company.name });
       const { book } = pricing(company);
-      const costed = quote(sheet.lines, book);
+      const applied = applyOverrides(sheet.lines, overrides);
+      const costed = quote(
+        applied.lines.map((line) => ({ ...line, provenance: provenanceOf(line) })),
+        book
+      );
       const shots = await smallShots(room, photos, len);
       const html = clientFile({
         room,
         company,
-        takeoff: sheet,
+        lines: applied.lines,
         ...(costed.lines.length > 0 ? { quote: costed } : {}),
         plan: svg,
         photos: shots,
