@@ -264,3 +264,37 @@ As-built workflow — existingconditions.com/service/as-built-drawings · iscano
 Loop closure / drift — oxmaint.com/blog/post/best-3d-mapping-robots-facility-maintenance-lidar-2026 ·
 Multi-storey scanning — poly.cam/blog/how-to-scan-a-building-interior-exterior-and-multi-story-workflows ·
 Wall editing UX — apps.apple.com/us/app/ar-plan-measure-room-scanner/id1459846158 · apps.apple.com/ca/app/roomscan-classic/id673673795
+
+---
+
+## 10. The rest of the field — added 25 Aug 2026
+
+Everything above surveys **scanners**. That was the wrong boundary: the products
+Trueline actually competes with for a contractor's monthly payment are estimating
+platforms, CRMs and proposal tools, and the features worth taking come from them.
+
+That survey, the four places a remodeler loses money, and a ranked build order are in
+**`docs/the-trueline-wedge.html`** (published as an artifact for Sam on the same date).
+
+The two findings that change the product:
+
+1. **The seam is the product.** The trade press puts the double entry between takeoff
+   and pricing at **30–45 minutes per bid**, with arithmetic errors on the way through
+   [square takeoff, scope takeoff]. Scanners stop at the drawing; estimating platforms
+   start at the quantities. Nothing crosses the gap. Trueline already does.
+2. **The measurement is the front door.** Hover built a business on measuring and then
+   handing the result to 50+ other tools. Trueline measures better than anything in the
+   table above and has almost no doors out — one export interface with several
+   destinations (CSV, QuickBooks-shaped invoice, the existing ESX, PDF, and Plumbline
+   later as one implementation among others, never as the assumption) is the highest-
+   value integration work available.
+
+Named gaps, in build order: a **signable proposal**; a **signed baseline with change
+orders against it** — the largest hole, and what JobTread/Buildertrend/Leap actually
+compete on; **more than one room per job**; photos filed against a wall; the export
+interface; and prices learned from the company's own closed jobs.
+
+**Not verified:** no price in that document was quoted to me, the e-signature
+close-rate figures are vendor marketing with no independent study found, and no
+contractor has been interviewed. One afternoon watching Gilbert write a bid is worth
+more than the whole document.

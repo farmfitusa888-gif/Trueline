@@ -1,0 +1,703 @@
+<title>The Trueline Wedge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --ground:     #F6F7F8;
+    --sheet:      #FFFFFF;
+    --ink:        #14181B;
+    --ink-2:      #4A5459;
+    --ink-3:      #6E787E;
+    --rule:       #C9D0D5;
+    --rule-soft:  #E3E8EA;
+    --amber:      #B8590A;
+    --amber-wash: #FBF3EA;
+    --redline:    #B03024;
+    --red-wash:   #FBEEEC;
+    --built:      #1B6340;
+    --built-wash: #EDF5F0;
+    --shadow:     0 1px 2px rgba(20,24,27,.05), 0 8px 24px -16px rgba(20,24,27,.30);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:     #101416;
+      --sheet:      #171C1F;
+      --ink:        #E8EDEF;
+      --ink-2:      #A9B4BA;
+      --ink-3:      #7D8890;
+      --rule:       #333C41;
+      --rule-soft:  #242B2F;
+      --amber:      #E08A3C;
+      --amber-wash: #241A0F;
+      --redline:    #E3695C;
+      --red-wash:   #26140F;
+      --built:      #5FBE8C;
+      --built-wash: #0F1F17;
+      --shadow:     0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:     #101416;
+    --sheet:      #171C1F;
+    --ink:        #E8EDEF;
+    --ink-2:      #A9B4BA;
+    --ink-3:      #7D8890;
+    --rule:       #333C41;
+    --rule-soft:  #242B2F;
+    --amber:      #E08A3C;
+    --amber-wash: #241A0F;
+    --redline:    #E3695C;
+    --red-wash:   #26140F;
+    --built:      #5FBE8C;
+    --built-wash: #0F1F17;
+    --shadow:     0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .col { max-width: 66ch; margin: 0 auto; }
+  .wide { max-width: 1040px; margin: 0 auto; }
+
+  /* ------------------------------------------------------------- masthead */
+
+  header.mast {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 56px 0 28px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(38px, 7vw, 62px);
+    line-height: 1.02;
+    letter-spacing: -.028em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h1 em { font-style: normal; color: var(--amber); }
+  .standfirst {
+    margin: 18px 0 0;
+    max-width: 62ch;
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .stamp {
+    display: flex; flex-wrap: wrap; gap: 8px 22px;
+    margin-top: 26px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px; letter-spacing: .05em;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .stamp b { color: var(--ink); font-weight: 600; }
+
+  /* -------------------------------------------------------------- section */
+
+  section { padding-top: 54px; }
+  h2 {
+    font-family: Archivo, sans-serif;
+    font-weight: 600;
+    font-size: clamp(23px, 3.4vw, 30px);
+    letter-spacing: -.018em;
+    line-height: 1.16;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  h2 + .kicker {
+    margin: 0 0 26px;
+    color: var(--ink-3);
+    font-size: 15.5px;
+  }
+  .sechead { max-width: 1040px; margin: 0 auto 26px; }
+  .sechead::after {
+    content: ""; display: block; height: 1px; background: var(--rule); margin-top: 18px;
+  }
+  h3 {
+    font-family: Archivo, sans-serif;
+    font-weight: 600; font-size: 18px; letter-spacing: -.01em;
+    margin: 0 0 6px;
+  }
+  p { margin: 0 0 16px; }
+  .col > p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; }
+  a { color: var(--amber); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 2px;
+  }
+
+  /* --------------------------------------------------------------- leaks */
+
+  .leaks { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .leak {
+    background: var(--sheet);
+    border: 1px solid var(--rule-soft);
+    border-left: 3px solid var(--redline);
+    border-radius: 3px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .leak .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--redline); display: block; margin-bottom: 8px;
+  }
+  .leak p { font-size: 15.5px; line-height: 1.55; margin-bottom: 12px; }
+  .leak p:last-child { margin-bottom: 0; }
+  .verdict {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; line-height: 1.5;
+    padding: 9px 11px; border-radius: 3px;
+  }
+  .verdict.have { background: var(--built-wash); color: var(--built); }
+  .verdict.gap  { background: var(--amber-wash); color: var(--amber); }
+
+  /* --------------------------------------------------------------- table */
+
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14.5px; }
+  caption {
+    text-align: left; color: var(--ink-3); font-size: 13.5px;
+    padding-bottom: 10px;
+  }
+  th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--rule-soft); }
+  thead th {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-3); border-bottom: 1px solid var(--rule); font-weight: 500;
+  }
+  tbody th { font-family: Archivo, sans-serif; font-weight: 600; font-size: 15px; white-space: nowrap; }
+  td.num { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pill {
+    display: inline-block; font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 7px; border-radius: 3px; white-space: nowrap;
+  }
+  .pill.have { background: var(--built-wash); color: var(--built); }
+  .pill.gap  { background: var(--red-wash);   color: var(--redline); }
+  .pill.part { background: var(--amber-wash); color: var(--amber); }
+
+  /* ---------------------------------------------------------- build order */
+
+  ol.build { list-style: none; margin: 0; padding: 0; counter-reset: b; }
+  ol.build > li {
+    counter-increment: b;
+    display: grid;
+    grid-template-columns: 58px 1fr;
+    gap: 0 20px;
+    padding: 24px 0;
+    border-top: 1px solid var(--rule-soft);
+  }
+  ol.build > li:first-child { border-top: 1px solid var(--rule); }
+  ol.build > li::before {
+    content: counter(b, decimal-leading-zero);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 26px; font-weight: 600; line-height: 1;
+    color: var(--amber);
+    font-variant-numeric: tabular-nums;
+    padding-top: 3px;
+  }
+  ol.build .body > p { font-size: 16px; margin-bottom: 12px; }
+  ol.build .body > p:last-child { margin-bottom: 0; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 6px 16px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px; letter-spacing: .04em; color: var(--ink-3);
+    margin-bottom: 10px;
+  }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+
+  /* --------------------------------------------------------------- notes */
+
+  .note {
+    background: var(--sheet);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px; padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .note h3 { margin-bottom: 10px; }
+  ul.plain { margin: 0; padding-left: 20px; }
+  ul.plain li { margin-bottom: 9px; }
+  ul.plain li:last-child { margin-bottom: 0; }
+
+  .ask { border-left: 3px solid var(--amber); }
+
+  footer {
+    max-width: 1040px; margin: 0 auto; padding-top: 44px; margin-top: 54px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px; line-height: 1.6; color: var(--ink-3);
+  }
+  footer a { color: var(--ink-2); }
+  footer h3 { font-size: 13px; color: var(--ink-2); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<header class="mast">
+  <p class="eyebrow">Trueline · product direction · 25 August 2026</p>
+  <h1>The <em>Trueline</em> Wedge</h1>
+  <p class="standfirst">
+    Everybody sells a scanner, or an estimating platform. Nobody sells the seam
+    between them — and the seam is where a remodeler loses 30 to 45 minutes on
+    every bid he writes.
+  </p>
+  <div class="stamp">
+    <span>Version <b>0.1</b> · build <b>1</b></span>
+    <span><b>640</b> tests · <b>110</b> browser checks</span>
+    <span><b>3,756</b> lines Swift · <b>33,600</b> TypeScript</span>
+    <span>Swift compiled on device: <b>once</b></span>
+  </div>
+</header>
+
+<section>
+  <div class="sechead col">
+    <h2>The one thing this is</h2>
+    <p class="kicker">If only one sentence survives this document, it should be this one.</p>
+  </div>
+  <div class="col">
+    <p>
+      Every product in this market sits on one side of a gap. <strong>Scanners</strong> —
+      magicplan, Polycam, CubiCasa, Matterport, Hover — turn a room into a drawing and
+      stop. <strong>Estimating platforms</strong> — Buildertrend, JobTread, Houzz Pro,
+      Contractor Foreman — turn a list of quantities into a price and a proposal, and
+      have no idea where the quantities came from. Between them sits a man at a kitchen
+      table at nine at night, typing numbers off one screen into another.
+    </p>
+    <p>
+      The trade press names the cost of that gap directly: the double entry between
+      takeoff and pricing runs <strong>30 to 45 minutes per bid</strong>, and it
+      produces arithmetic errors on the way through. That is not a missing feature.
+      That is the entire product.
+    </p>
+    <p>
+      Trueline is the only thing that measures and prices in one act — and the only
+      one that refuses to let a number pretend it was measured when it was not. That
+      refusal looks like a limitation until the first time a homeowner asks where a
+      figure came from.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="sechead wide">
+    <h2>Where the money actually leaks</h2>
+    <p class="kicker">The four you named, each against what the trade reports, and what Trueline does about it today.</p>
+  </div>
+  <div class="wide leaks">
+
+    <div class="leak">
+      <span class="tag">Leak 01 — the clock</span>
+      <p>
+        Hours at a kitchen table turning a tape and a notepad into a number, after a
+        day already worked. The bid goes out late, and sometimes not at all — the
+        job is lost to whoever answered first, not to whoever priced better.
+      </p>
+      <div class="verdict have">
+        BUILT · The takeoff is derived from the room the moment it closes. No
+        re-entry, no second tool, no arithmetic done by hand.
+      </div>
+    </div>
+
+    <div class="leak">
+      <span class="tag">Leak 02 — the winner’s curse</span>
+      <p>
+        The industry’s own name for it: scope gets missed, the bid comes in low, and
+        you win the job <em>because</em> the estimate was incomplete. Estimating
+        around a missing sheet is quoted as the fastest way to underbid by 15%.
+      </p>
+      <div class="verdict have">
+        BUILT · Every dimension carries where it came from, and the room refuses to
+        call itself measured until a tape has been on one wall running each way.
+      </div>
+    </div>
+
+    <div class="leak">
+      <span class="tag">Leak 03 — scope creep</span>
+      <p>
+        Work that grew, nothing signed, no clear record of what the original scope
+        was. The platforms that compete hardest here — JobTread, Buildertrend, Leap —
+        all compete on change orders tied to a budget, not on measuring.
+      </p>
+      <div class="verdict gap">
+        MISSING · There is no signed baseline, so there is nothing for a change to be
+        a change <em>from</em>. This is the largest hole in the product.
+      </div>
+    </div>
+
+    <div class="leak">
+      <span class="tag">Leak 04 — looking amateur</span>
+      <p>
+        Losing bids to someone with better paperwork rather than better numbers.
+        Vendors claim a digital, signable proposal closes materially better than a
+        handwritten one — treat their figures as marketing, but the direction is not
+        in dispute.
+      </p>
+      <div class="verdict gap">
+        PART BUILT · The drawing, the client file and the claim document exist and
+        are good. Nothing can be <em>signed</em>, and there is no priced proposal.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="sechead wide">
+    <h2>The field, past the scanners</h2>
+    <p class="kicker">
+      You were right that the existing research only looked at scanning apps. This is the
+      rest of the field — what each one is genuinely good at, and the one thing worth taking.
+    </p>
+  </div>
+  <div class="wide scroll">
+    <table>
+      <caption>
+        Prices are as reported by trade comparison sites in 2026, not measured or
+        quoted by me. Several vendors have moved to custom quoting.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Product</th>
+          <th scope="col">What it is</th>
+          <th scope="col">Reported price</th>
+          <th scope="col">The one thing to take</th>
+          <th scope="col">Us</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">JobTread</th>
+          <td>Estimating + CRM + job costing</td>
+          <td class="num">$199/mo<br>+$20/user</td>
+          <td>Change orders tied live to budget-vs-actual, so scope creep is visible the day it happens</td>
+          <td><span class="pill gap">Gap</span></td>
+        </tr>
+        <tr>
+          <th scope="row">Buildertrend</th>
+          <td>Full construction management</td>
+          <td class="num">~$339–499/mo<br>now quoted</td>
+          <td>Change-order approval workflow with a documented paper trail</td>
+          <td><span class="pill gap">Gap</span></td>
+        </tr>
+        <tr>
+          <th scope="row">Houzz&nbsp;Pro</th>
+          <td>Design-led sales</td>
+          <td class="num">from $65/mo</td>
+          <td>The pitch is the 3D and the selections — you sell the picture, not the spreadsheet</td>
+          <td><span class="pill part">Part</span></td>
+        </tr>
+        <tr>
+          <th scope="row">Contractor&nbsp;Foreman</th>
+          <td>Cheap all-in-one</td>
+          <td class="num">$49–332/mo</td>
+          <td>Proof a 2–3 person crew will pay monthly for breadth at a low seat price</td>
+          <td><span class="pill part">Part</span></td>
+        </tr>
+        <tr>
+          <th scope="row">CompanyCam</th>
+          <td>Job photo documentation</td>
+          <td class="num">per user/mo</td>
+          <td>Every photo GPS-stamped, timed, filed to the job automatically — 100k+ contractors, 60+ integrations</td>
+          <td><span class="pill part">Part</span></td>
+        </tr>
+        <tr>
+          <th scope="row">Jobber / Joist</th>
+          <td>Quote → sign → invoice</td>
+          <td class="num">per user/mo</td>
+          <td>Good / better / best options on one proposal, signed on the spot</td>
+          <td><span class="pill gap">Gap</span></td>
+        </tr>
+        <tr>
+          <th scope="row">Xactimate</th>
+          <td>Insurance estimating</td>
+          <td class="num">per user/mo</td>
+          <td>It is the language adjusters speak; you do not have to like it to have to export to it</td>
+          <td><span class="pill part">Part</span></td>
+        </tr>
+        <tr>
+          <th scope="row">QuickBooks</th>
+          <td>Accounting</td>
+          <td class="num">per co./mo</td>
+          <td>Where the invoice has to end up regardless of what wrote it</td>
+          <td><span class="pill gap">Gap</span></td>
+        </tr>
+        <tr>
+          <th scope="row">magicplan</th>
+          <td>Scanner + restoration estimating</td>
+          <td class="num">~$33/mo</td>
+          <td>The closest competitor — scan straight to an insurance claim</td>
+          <td><span class="pill have">Have</span></td>
+        </tr>
+        <tr>
+          <th scope="row">Hover</th>
+          <td>Exterior photo takeoff</td>
+          <td class="num">$99/mo +<br>$29–139/job</td>
+          <td>50+ integrations: the measurement is the front door to everything else</td>
+          <td><span class="pill gap">Gap</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col" style="padding-top:30px">
+    <p>
+      Two things fall out of that table. First, <strong>every serious platform charges
+      per seat per month and every scanner charges per scan or per project</strong> —
+      and per-scan pricing is repeatedly called out as punishing exactly the small
+      remodeler this is for. A flat seat price is a real weapon.
+    </p>
+    <p>
+      Second, and more important: <strong>the measurement is the front door.</strong>
+      Hover built a whole business on being the thing that measures and then handing
+      the result to fifty other tools. Trueline is already the best-measuring thing in
+      this list. It has almost none of the doors.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="sechead wide">
+    <h2>What to build, in this order</h2>
+    <p class="kicker">
+      Ordered by money recovered per week of work. The numbering is the build order and
+      nothing else — each one is worth doing on its own.
+    </p>
+  </div>
+  <div class="wide">
+    <ol class="build">
+
+      <li>
+        <div class="body">
+          <div class="meta"><span>Size <b>medium</b></span><span>Fixes <b>leak 04</b></span><span>Needs <b>no integration</b></span></div>
+          <h3>The signable proposal</h3>
+          <p>
+            The takeoff already knows the quantities and the price book already knows
+            the rates. What is missing is the document a homeowner says yes to: scope
+            in plain sentences, the drawing, the price, terms, and a signature taken
+            on the phone in the kitchen. Good / better / best as three columns, because
+            the trade is unanimous that options outsell a single number.
+          </p>
+          <p>
+            This is first because it needs nothing from anybody else — no account
+            system, no third-party API — and it is the only item here that directly
+            wins work rather than saving time.
+          </p>
+        </div>
+      </li>
+
+      <li>
+        <div class="body">
+          <div class="meta"><span>Size <b>medium</b></span><span>Fixes <b>leak 03</b></span><span>Depends on <b>01</b></span></div>
+          <h3>The signed baseline, and change orders against it</h3>
+          <p>
+            The moment a proposal is signed, freeze it. Every later edit to the room —
+            a wall moved, an opening added, a rate changed — becomes a diff against
+            that frozen scope, priced, with its own signature line. Scope creep stops
+            being an argument about memory and becomes a list.
+          </p>
+          <p>
+            This is the single largest hole in the product and the thing the expensive
+            platforms actually compete on. It is also nearly free once 01 exists,
+            because the ledger discipline for it is already in the codebase: nothing
+            is overwritten, and provenance is carried per dimension.
+          </p>
+        </div>
+      </li>
+
+      <li>
+        <div class="body">
+          <div class="meta"><span>Size <b>small</b></span><span>Fixes <b>leak 01</b></span><span>Unblocks <b>everything</b></span></div>
+          <h3>More than one room in a job</h3>
+          <p>
+            A remodel is a kitchen and a hallway and two baths. Today a scan is a room
+            and a job is a room, so a whole-house estimate is four files and a
+            calculator — which puts the 30-to-45-minute problem straight back.
+          </p>
+          <p>
+            Small only because the room model is clean enough to nest. Listed third
+            rather than first because a proposal for one room is still a proposal, and
+            a signed baseline for one room still stops an argument.
+          </p>
+        </div>
+      </li>
+
+      <li>
+        <div class="body">
+          <div class="meta"><span>Size <b>small</b></span><span>Fixes <b>leaks 02, 04</b></span><span>Half built</span></div>
+          <h3>Photos that file themselves</h3>
+          <p>
+            Damage photographs already attach to a wall. Generalise it: any photo,
+            stamped with the job, the room, the wall, the date and which way the
+            phone was pointing — because the room already knows where north is. Then a
+            before-and-after sheet costs one tap.
+          </p>
+          <p>
+            CompanyCam is a hundred-thousand-contractor business built on exactly this
+            and nothing else. Trueline can do something it cannot: file a photograph
+            against a <em>wall</em>, not just a job.
+          </p>
+        </div>
+      </li>
+
+      <li>
+        <div class="body">
+          <div class="meta"><span>Size <b>medium</b></span><span>Fixes <b>leak 01</b></span><span>Recurring revenue</span></div>
+          <h3>Doors out — one interface, several destinations</h3>
+          <p>
+            You are not sure Plumbline gets finished, so nothing should assume it. Build
+            one export interface and hang the destinations off it: a CSV a spreadsheet
+            reads, a QuickBooks-shaped invoice, the ESX for Xactimate that already
+            exists, a plain PDF for reading off, and Plumbline later as one more
+            implementation rather than the point.
+          </p>
+          <p>
+            Every destination added makes the app harder to leave. That is the entire
+            Hover playbook.
+          </p>
+        </div>
+      </li>
+
+      <li>
+        <div class="body">
+          <div class="meta"><span>Size <b>large</b></span><span>Fixes <b>leak 02</b></span><span>Needs <b>real history</b></span></div>
+          <h3>Prices that come from your own finished jobs</h3>
+          <p>
+            Not an AI guess and not a national average: what <em>you</em> actually got
+            paid, on jobs like this one, in this town. Once a job is priced, signed and
+            closed, that is a data point. Fifty of them and the app can tell a
+            contractor his tile rate is a year out of date.
+          </p>
+          <p>
+            Last because it needs a history that does not exist yet, and because it is
+            worthless until 01 and 02 are producing signed, closed jobs to learn from.
+          </p>
+        </div>
+      </li>
+
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="sechead wide">
+    <h2>Decisions only you can make</h2>
+    <p class="kicker">Each of these changes what gets built. None of them should be guessed.</p>
+  </div>
+  <div class="wide leaks">
+    <div class="note ask">
+      <h3>Does a signature have to hold up legally?</h3>
+      <p style="font-size:15.5px">
+        A picture of a finger-drawn squiggle and a genuine audit-trailed e-signature are
+        different products. The second means a third party, a monthly cost, and a privacy
+        story. The first is honest if it is never called more than it is.
+      </p>
+    </div>
+    <div class="note ask">
+      <h3>Does anything leave the phone?</h3>
+      <p style="font-size:15.5px">
+        Everything is local today, and the app says so. Accounts, sync, a customer portal
+        and a shared job all need a server — which means a bill, a backup policy, and
+        somebody's homeowner data in your care.
+      </p>
+    </div>
+    <div class="note ask">
+      <h3>One trade or all of them?</h3>
+      <p style="font-size:15.5px">
+        The interior remodeler is a real, underserved wedge. Roofing, flooring and
+        restoration each have their own vocabulary and their own incumbent. Winning one
+        properly beats being third in four.
+      </p>
+    </div>
+    <div class="note ask">
+      <h3>What does it cost, and who is billed?</h3>
+      <p style="font-size:15.5px">
+        A flat seat price is the competitive weapon here. But nothing has been built for
+        billing, and an App Store subscription is Apple's 15–30% plus a review process
+        that will look hard at a measurement claim.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sechead col">
+    <h2>What I could not verify</h2>
+  </div>
+  <div class="col">
+    <div class="note">
+      <ul class="plain">
+        <li>
+          <strong>No price here was quoted to me.</strong> All of them come from trade
+          comparison articles, several of which are published by competitors of the
+          products they compare. Treat them as the right order of magnitude, not as
+          quotes.
+        </li>
+        <li>
+          <strong>The e-signature close-rate figures are vendor marketing.</strong> They
+          appear in material published by companies selling e-signatures. I have not
+          found an independent study, and I am not going to repeat the percentages as
+          if I had.
+        </li>
+        <li>
+          <strong>No accuracy figure in this document was measured by me.</strong> There
+          is no LiDAR device and no Swift compiler in the environment this was written
+          in.
+        </li>
+        <li>
+          <strong>I have not spoken to a contractor.</strong> Everything about what
+          Gilbert needs is inference from you, from published complaints, and from the
+          shape of what the market sells. One afternoon watching him write a bid would
+          be worth more than this entire page.
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer class="wide">
+  <h3>Sources</h3>
+  <p>
+    Estimating platform comparison and pricing —
+    <a href="https://www.jobtread.com/blog/jobtread-vs-houzz-pro-construction-management-software-comparison-for-contractors-and-remodelers">JobTread vs Houzz Pro</a> ·
+    <a href="https://foreman.co/blog/houzz-pro-alternatives">Foreman: Houzz Pro alternatives</a> ·
+    <a href="https://build-folio.com/best-contractor-estimating-software/">Build-folio: contractor estimating software</a> ·
+    <a href="https://myquoteiq.com/top-10-remodeling-estimating-software-in-2026/">QuoteIQ: remodeling estimating software</a>.
+    Takeoff-to-pricing double entry, the winner's curse and change-order workflows —
+    <a href="https://squaretakeoff.com/blog/best-residential-construction-estimating-software-2026/">Square Takeoff</a> ·
+    <a href="https://scopetakeoff.com/blog/remodeling/best-remodeling-estimating-software/">Scope Takeoff</a> ·
+    <a href="https://buildcrux.com/for/remodelers/estimating-guide">BuildCrux remodeling estimating guide</a>.
+    Photo documentation —
+    <a href="https://contractortoolstack.com/software/companycam/">Contractor ToolStack: CompanyCam review</a> ·
+    <a href="https://companycam.com/resources/blog/construction-photo-documentation-software-what-to-look-for-and-why-it-matters">CompanyCam</a>.
+    Proposals and e-signature —
+    <a href="https://contractorguidepro.com/best-proposal-software-contractors-2026/">Contractor Guide Pro</a> ·
+    <a href="https://www.proposify.com/blog/how-boost-your-close-rate">Proposify</a>.
+    Scanner pricing and exports are carried forward from <code>MARKET-RESEARCH.md</code> in the repository, which cites its own sources.
+  </p>
+</footer>
