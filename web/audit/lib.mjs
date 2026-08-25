@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
  * one thing and does another.
  *
  * It is written to be re-run. `npm run audit` from the top of the repository
- * builds the web bundle, serves it, and walks all seven parts. Every fixture it
+ * builds the web bundle, serves it, and walks every part. Every fixture it
  * needs — two scans, a supplier price list, a photograph — is in this folder,
  * so it needs nothing from anybody's machine.
  *

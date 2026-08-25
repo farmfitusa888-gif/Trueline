@@ -14,7 +14,7 @@ import {
 } from '../../core/src/damage.ts';
 import { DamagePhotos } from './DamagePhotos.tsx';
 import { forget } from './photoStore.ts';
-import { Measure } from './Measure.tsx';
+import { Measure, Wants } from './Measure.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -68,6 +68,7 @@ export function DamageOnWall({
   const [kind, setKind] = useState<DamageKind>('water');
   const [category, setCategory] = useState<WaterCategory>(1);
   const [note, setNote] = useState('');
+  const [wants, setWants] = useState<string | null>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [high, setHigh] = useState('');
@@ -86,7 +87,11 @@ export function DamageOnWall({
   const feet = (text: string) => parseLength(text, { defaultUnit: 'ft' });
 
   function keep(shape: Mark['shape']) {
-    if (note.trim() === '') return;
+    if (note.trim() === '') {
+      setWants('Say what the damage is first — "water staining from the supply line above".');
+      return;
+    }
+    setWants(null);
     onMark({
       id: `${wall.id}-${kind}-${Date.now()}`,
       kind,
@@ -99,6 +104,7 @@ export function DamageOnWall({
       readings: [],
     });
     setAdding(null);
+    setWants(null);
     setNote('');
     setFrom('');
     setTo('');
@@ -107,6 +113,7 @@ export function DamageOnWall({
 
   const common = (
     <>
+      <Wants say={wants} />
       <div className="mt-2 flex flex-wrap gap-2">
         {KINDS.map((k) => (
           <button
@@ -463,6 +470,7 @@ export function DamageOnWall({
 function ReadingBox({ onAdd }: { readonly onAdd: (reading: Reading) => void }) {
   const [value, setValue] = useState('');
   const [scale, setScale] = useState('%MC');
+  const [wants, setWants] = useState<string | null>(null);
 
   return (
     <form
@@ -470,14 +478,22 @@ function ReadingBox({ onAdd }: { readonly onAdd: (reading: Reading) => void }) {
       onSubmit={(event) => {
         event.preventDefault();
         const number = Number(value.trim());
-        if (!Number.isFinite(number) || value.trim() === '') return;
+        if (value.trim() === '') {
+          setWants('Type the meter reading first — 18, or whatever it says.');
+          return;
+        }
+        if (!Number.isFinite(number)) {
+          setWants(`"${value.trim()}" is not a number the meter could have shown.`);
+          return;
+        }
+        setWants(null);
         onAdd({ at: new Date().toISOString(), value: number, scale, by: 'me' });
         setValue('');
       }}
     >
       <input
         value={value}
-        onChange={(event) => setValue(event.target.value)}
+        onChange={(event) => { setValue(event.target.value); setWants(null); }}
         inputMode="decimal"
         placeholder="reading"
         aria-label="Moisture reading"
@@ -501,6 +517,7 @@ function ReadingBox({ onAdd }: { readonly onAdd: (reading: Reading) => void }) {
       >
         Log it
       </button>
+      <Wants say={wants} />
     </form>
   );
 }

@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
  * Builds, serves, and walks the whole app.
  *
  * One command, because an audit somebody has to set up by hand is an audit
- * nobody runs. It starts the preview server, waits for it to answer, runs the
- * seven parts in order and reports the total. The server is stopped whatever
+ * nobody runs. It starts the preview server, waits for it to answer, runs every
+ * part in order and reports the total. The server is stopped whatever
  * happens, including a part that throws.
  */
 
@@ -46,6 +46,7 @@ const parts = [
   'a9-trade.mjs',
   'a10-gate.mjs',
   'a11-work.mjs',
+  'a12-everything.mjs',
 ];
 
 function run(part) {

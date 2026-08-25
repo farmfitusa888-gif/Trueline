@@ -113,6 +113,11 @@ async function onScreen(page) {
       if (box.width === 0 && box.height === 0) continue;
       seen.push({
         name: nameOf(el),
+        // An option that is already the chosen one changes nothing when it is
+        // pressed again, and that is correct rather than broken.
+        alreadyOn: el.getAttribute('aria-pressed') === 'true'
+          || el.getAttribute('aria-selected') === 'true'
+          || el.getAttribute('aria-checked') === 'true',
         placeholderOnly: !nameOf(el) && !!el.getAttribute('placeholder'),
         kind: el.tagName.toLowerCase() === 'input'
           ? `input:${el.getAttribute('type') || 'text'}`
@@ -212,6 +217,13 @@ while (queue.length) {
       const trial = await fresh();
       try {
         if (!(await walkTo(trial.page, tab, path))) continue;
+        // Printing is the one thing a headless browser cannot show. Rather
+        // than excuse those buttons, the print call itself is counted: a
+        // button that opens the print dialogue has done its whole job.
+        await trial.page.evaluate(() => {
+          window.__printed = 0;
+          window.print = () => { window.__printed += 1; };
+        });
         const before = await shape(trial.page);
         let downloaded = false;
         trial.page.once('download', () => { downloaded = true; });
@@ -228,8 +240,9 @@ while (queue.length) {
 
         if (failures.length) broke.push(`${where}: threw — ${failures[0]}`);
         if (!alive) broke.push(`${where}: the navigation is gone, so there is no way back`);
+        const printed = await trial.page.evaluate(() => window.__printed ?? 0);
         const moved = after.hash !== before.hash || after.length !== before.length;
-        if (!moved && !downloaded) inert.push(where);
+        if (!moved && !downloaded && !printed && !control.alreadyOn) inert.push(where);
 
         // Anything new it opened is somewhere else to go.
         if (moved && path.length < DEEPEST) {

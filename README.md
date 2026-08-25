@@ -57,7 +57,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **462 passing, 0 failing** (`npm test`) |
+| Tests | **695 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 

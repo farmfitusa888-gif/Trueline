@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Room, Wall } from '../../core/src/room.ts';
 import { runLength } from '../../core/src/room.ts';
 import { confidenceLabel, isAdjusted, isVerified } from '../../core/src/measurement.ts';
+import { Wants } from './Measure.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -76,8 +77,11 @@ export function EditWall({
   const { len } = useUnits();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  const [wants, setWants] = useState<string | null>(null);
   const [moveTo, setMoveTo] = useState('');
+  const [moveWants, setMoveWants] = useState<string | null>(null);
   const [cutAt, setCutAt] = useState('');
+  const [cutWants, setCutWants] = useState<string | null>(null);
   const [cutName, setCutName] = useState('');
   const [cutHigh, setCutHigh] = useState('');
   const [notchOut, setNotchOut] = useState('');
@@ -123,7 +127,7 @@ export function EditWall({
         <div className="mt-1 flex gap-2">
           <input
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => { setName(event.target.value); setWants(null); }}
             placeholder={wall.id}
             aria-label="What to call this wall"
             className="min-h-12 w-full rounded-md border border-slate-300 px-3 py-2
@@ -132,15 +136,23 @@ export function EditWall({
           <button
             type="button"
             onClick={() => {
-              if (name.trim() === '') return;
+              if (name.trim() === '') {
+                setWants('Type what to call this wall first — "the wall behind the washer".');
+                return;
+              }
+              setWants(null);
               onRename(name);
             }}
+            // Named, because there is more than one "Set" on this screen and a
+            // screen reader reads them all the same otherwise.
+            aria-label="Set what to call this wall"
             className="min-h-12 shrink-0 rounded-md border border-slate-300 px-4 font-medium
                        text-slate-700 active:bg-slate-100"
           >
             Set
           </button>
         </div>
+        <Wants say={wants} />
         <p className="mt-1 text-xs text-slate-500">
           "the wall behind the washer" beats "wall-1" on every sheet this makes. Anything marked
           on it moves with it.
@@ -177,7 +189,11 @@ export function EditWall({
             <button
               type="button"
               onClick={() => {
-                if (moveTo.trim() === '') return;
+                if (moveTo.trim() === '') {
+                  setMoveWants('Type where this wall really is first — 12\' 4".');
+                  return;
+                }
+                setMoveWants(null);
                 onDrag(moveTo);
               }}
               className="min-h-12 shrink-0 rounded-md border border-violet-400 bg-violet-50 px-4
@@ -186,6 +202,7 @@ export function EditWall({
               Move it
             </button>
           </div>
+          <Wants say={moveWants} />
           <p className="mt-1 text-xs text-slate-500">
             For a scan that put a wall in the wrong place. The room re-solves around it exactly
             as it does for a tape — but it goes on the drawing in violet as{' '}
@@ -228,7 +245,19 @@ export function EditWall({
           <button
             type="button"
             onClick={() => {
-              if (cutAt.trim() === '' || cutName.trim() === '' || cutHigh.trim() === '') return;
+              // Three boxes, so it says which one is empty rather than making
+              // somebody work it out. Naming all the missing ones at once beats
+              // three rounds of pressing and being refused.
+              const missing = [
+                cutAt.trim() === '' && 'how far along to cut it',
+                cutName.trim() === '' && 'what to call the second piece',
+                cutHigh.trim() === '' && 'how high the second piece stands',
+              ].filter(Boolean);
+              if (missing.length) {
+                setCutWants(`Fill in ${missing.join(', and ')} first.`);
+                return;
+              }
+              setCutWants(null);
               onSplit(cutAt, cutName, cutHigh);
             }}
             className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3 text-sm
@@ -236,6 +265,7 @@ export function EditWall({
           >
             Cut it
           </button>
+          <Wants say={cutWants} />
           <p className="mt-1 text-xs text-slate-500">
             For a pony wall meeting a full-height one, or a run that changes build-up half way.
             The second piece needs its own height, because two walls in line that are alike in

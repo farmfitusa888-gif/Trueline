@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatFeetInches as exact, parseLength } from '../../core/src/length.ts';
+import { Wants } from './Measure.tsx';
 import { useUnits } from './units.tsx';
 import { isVerified } from '../../core/src/measurement.ts';
 import type { Room } from '../../core/src/room.ts';
@@ -39,6 +40,7 @@ export function Thickness({
 }) {
   const { len } = useUnits();
   const [typed, setTyped] = useState('');
+  const [wants, setWants] = useState<string | null>(null);
   const wall = selected ? room.walls.find((w) => w.id === selected) : undefined;
   // An open span has nothing built across it, so it has no thickness and is
   // never asked for one.
@@ -106,7 +108,11 @@ export function Thickness({
         className="mt-2 flex flex-wrap gap-2 print:hidden"
         onSubmit={(event) => {
           event.preventDefault();
-          if (typed.trim() === '') return;
+          if (typed.trim() === '') {
+            setWants('Type the wall thickness first — 4 1/2", or tap one of the builds above.');
+            return;
+          }
+          setWants(null);
           // Typed rather than tapped means somebody went and looked, so it is
           // recorded as a tape rather than as an assumption.
           onSet(scope, typed.trim(), 'tape');
@@ -115,7 +121,7 @@ export function Thickness({
       >
         <input
           value={typed}
-          onChange={(event) => setTyped(event.target.value)}
+          onChange={(event) => { setTyped(event.target.value); setWants(null); }}
           inputMode="text"
           autoCapitalize="off"
           autoCorrect="off"
@@ -127,10 +133,14 @@ export function Thickness({
         />
         <button
           type="submit"
+          // Named, because "Set" on its own tells a screen reader nothing, and
+          // the ceiling height has a Set button of its own on the same screen.
+          aria-label="Set the wall thickness"
           className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700 active:bg-slate-100"
         >
           Set
         </button>
+        <Wants say={wants} />
         {reads && (
           <p aria-live="polite" className="basis-full text-sm text-slate-600">
             {reads}

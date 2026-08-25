@@ -52,6 +52,45 @@ check fails if a single request goes out.
 through the importer by `core/src/test/pricelist-shapes.test.ts`, which pins
 exactly what each one produces.
 
+## The complete click-through
+
+`a12-everything.mjs` is different from the others and is meant to be. The
+eleven before it check features somebody named. This one names nothing: it
+walks out from each of the eight sections, finds every button, link, box and
+list on the screen, presses each one from its own fresh copy of the app, and
+asks four things of it.
+
+1. **Does it have a name a screen reader can say?**
+2. **Is that name its own on that screen?** Two controls answering to one name
+   is the bug class that has already bitten this app twice.
+3. **Does the app survive it?** Nothing thrown, and the navigation still there
+   afterwards — a screen you cannot leave is a dead app.
+4. **Does it *do* anything?** A button that changes nothing on screen,
+   downloads nothing and prints nothing is invisible to every other test here.
+
+Most of the app is behind another control, so it crawls: every state is a path
+of names from a fresh app — `Insurance → Yes, this is an insurance job → Mark
+the damage` — and to press a control it starts a fresh app and replays the
+path. Starting fresh every time is slower than clicking forward and it is the
+only way one control's mess cannot be mistaken for the next control's bug. It
+takes several minutes.
+
+It found four real things on its first run:
+
+- The "Every dimension" list named each row by its length and nothing else, so
+  a rectangular room produced two rows called "20', scanned" and two called
+  "21', scanned" — indistinguishable on screen and to a screen reader alike.
+- Seven forms answered an empty box by doing **absolutely nothing**. On a phone
+  that is indistinguishable from a broken app, and the next move is to press
+  harder. They all say what they want now.
+- Two "Set" buttons had no accessible name beyond the word "Set", on screens
+  where there was more than one of them.
+
+Two of its findings were the harness being wrong rather than the app, and both
+were fixed by making the check smarter rather than by excusing the control: a
+print button is proved by counting the print call, and an option that is
+already the chosen one is expected to change nothing when pressed again.
+
 ## What it does not cover
 
 The iOS half. Capture, the AR walk, the CloudKit backup and the navigation are

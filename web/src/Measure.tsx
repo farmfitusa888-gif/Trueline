@@ -42,6 +42,30 @@ export function reading(text: string): { good: true; as: string; warn?: string }
 }
 
 /**
+ * What a form says when its button was pressed with the box empty.
+ *
+ * Pressing a button and having *nothing whatever* happen is the worst answer an
+ * app can give: on a phone, in daylight, it is indistinguishable from a broken
+ * app, and the person's next move is to press it harder. Every form in here
+ * used to do exactly that — `if (text.trim() === '') return;` and no more.
+ *
+ * The complete click-through found them before a contractor did. It presses
+ * every control in the app and asks whether anything on the screen moved, and
+ * these were the ones where nothing did.
+ *
+ * The message is per box on purpose. "Type something first" is not help;
+ * "Type the ceiling height before pressing Set — something like 8'" is.
+ */
+export function Wants({ say }: { readonly say: string | null }) {
+  if (!say) return null;
+  return (
+    <p role="status" className="basis-full text-sm text-amber-800">
+      {say}
+    </p>
+  );
+}
+
+/**
  * `name` is what this box measures; `label` is the hint inside it.
  *
  * They were one thing, and every box on the screen ended up named after its own
@@ -60,20 +84,25 @@ export function Measure({
   readonly onSubmit: (text: string) => void;
 }) {
   const [text, setText] = useState('');
+  const [wants, setWants] = useState<string | null>(null);
   const read = reading(text);
   return (
     <form
       className="flex flex-wrap gap-2"
       onSubmit={(event) => {
         event.preventDefault();
-        if (text.trim() === '') return;
+        if (text.trim() === '') {
+          setWants(`Type ${name} before pressing Set — ${label.replace(/^e\.g\. /, 'something like ')}.`);
+          return;
+        }
+        setWants(null);
         onSubmit(text.trim());
         setText('');
       }}
     >
       <input
         value={text}
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => { setText(event.target.value); setWants(null); }}
         // No number keypad: 12' 3 1/2" needs the full one, and a contractor
         // types exactly that.
         inputMode="text"
@@ -92,6 +121,7 @@ export function Measure({
       >
         Set
       </button>
+      <Wants say={wants} />
       {read && (
         <p
           aria-live="polite"

@@ -258,11 +258,21 @@ export function Corrections({
               <button
                 type="button"
                 onClick={() => onSelect(wall.id)}
+                // Named after the wall, not after its length. Every rectangular
+                // room has two walls the same length, so this list read as two
+                // rows saying "20', scanned" and two saying "21', scanned" --
+                // identical on screen and identical to a screen reader, with no
+                // way to tell which row was which wall. The complete
+                // click-through found it as a duplicate accessible name.
+                aria-label={`${wall.open ? 'Open span' : 'Wall'} ${wall.id}, ${len(runLength(wall))}`}
                 className={`flex w-full items-baseline justify-between gap-3 py-2 text-left ${
                   selected === wall.id ? 'font-semibold text-sky-700' : ''
                 }`}
               >
-                <span className="tabular-nums">{len(runLength(wall))}</span>
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate text-slate-500">{wall.id}</span>
+                  <span className="tabular-nums">{len(runLength(wall))}</span>
+                </span>
                 <span className="text-xs text-slate-500">
                   <span className="uppercase tracking-wide">
                     {wall.open ? 'no wall here' : confidenceLabel(wall.length)}
