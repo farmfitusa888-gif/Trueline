@@ -189,7 +189,22 @@ export function PriceList() {
               onChange={(code) => setMapping({ ...mapping, code })}
               optional
             />
+            <Column
+              label="How much one covers"
+              headers={list.headers}
+              value={mapping.coverage}
+              onChange={(coverage) => setMapping({ ...mapping, coverage })}
+              optional
+            />
           </div>
+
+          <p className="mt-1 text-xs text-slate-500">
+            <strong>How much one covers</strong> is what makes a flooring list work at all. Tile
+            is priced by the box and laid by the square foot, and the only thing connecting the
+            two is the number printed on the box — which any flooring price list carries in a
+            column. Map it and those rows come in; leave it and they are refused rather than
+            guessed at.
+          </p>
 
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
@@ -201,6 +216,9 @@ export function PriceList() {
                     </td>
                     <td className="py-2 pr-3 text-slate-600">
                       {mapping.unit === undefined ? '—' : row[mapping.unit]}
+                      {mapping.coverage !== undefined && row[mapping.coverage]
+                        ? ` · covers ${row[mapping.coverage]}`
+                        : ''}
                     </td>
                     <td className="py-2 text-right tabular-nums text-slate-900">
                       {mapping.price === undefined ? '—' : row[mapping.price]}
@@ -245,6 +263,27 @@ export function PriceList() {
             </div>
           )}
 
+          {done.converted.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm font-semibold text-slate-900">
+                {done.converted.length} price{done.converted.length === 1 ? '' : 's'} worked out
+                rather than read
+              </p>
+              <ul className="mt-1 space-y-1">
+                {done.converted.map((c) => (
+                  <li key={`${c.line}-${c.item}`} className="text-sm text-slate-600">
+                    {c.item}: <span className="tabular-nums">{c.workings}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-slate-500">
+                These will not match the price list in your hand, and that is the point — a
+                square is 100 square feet and a box covers what the box says. The sum is kept on
+                every one so you can check it.
+              </p>
+            </div>
+          )}
+
           {done.refused.length > 0 && (
             <div className="mt-2">
               <p className="text-sm font-semibold text-slate-900">
@@ -259,8 +298,9 @@ export function PriceList() {
                 ))}
               </ul>
               <p className="mt-2 text-xs text-slate-500">
-                Nothing here is converted. A price per sheet only becomes a price per square foot
-                if you know how big the sheet is, and this app was never told.
+                Nothing here is guessed at. A board foot is a volume and a hundredweight is a
+                mass — neither becomes an area without a thickness or a density nobody told this
+                app. Rows priced by the box just need the coverage column mapped.
               </p>
             </div>
           )}

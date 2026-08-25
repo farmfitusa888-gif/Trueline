@@ -45,6 +45,13 @@ to act on.
 claim document are both loaded from `file://` with the network watched, and the
 check fails if a single request goes out.
 
+## The sample supplier lists
+
+`lists/` holds six files shaped like what real suppliers hand a contractor.
+**Every price in them is invented** — see `lists/README.md` — and they are run
+through the importer by `core/src/test/pricelist-shapes.test.ts`, which pins
+exactly what each one produces.
+
 ## What it does not cover
 
 The iOS half. Capture, the AR walk, the CloudKit backup and the navigation are
