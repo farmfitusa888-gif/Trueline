@@ -18,7 +18,9 @@
     "audit": "npm run build --workspace=@trueline/web && node web/audit/run.mjs",
     "check-guide": "python3 docs/build/check-guide.py docs/handbook.html",
     "what-is-left": "python3 core/tools/check-reachable.py",
-    "verify": "npm test && npm run typecheck && npm run build && npm run check-guide && npm run what-is-left",
-    "ship-web": "npm run build && rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/"
+    "verify": "npm test && npm run typecheck && npm run build && npm run check-guide && npm run what-is-left && npm run check-swift && npm run check-the-checks",
+    "ship-web": "npm run build && rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/",
+    "check-swift": "python3 core/tools/check-swift.py && python3 core/tools/check-swift-names.py && python3 core/tools/check-pbxproj.py",
+    "check-the-checks": "python3 core/tools/check-the-checks.py"
   }
 }

@@ -37,16 +37,37 @@ ITS_OWN = {'version', 'LastUpgradeVersion'}
 def shape(element: ET.Element, path: str = '') -> list[str]:
     """One line per element, naming where it sits and what it says.
 
-    Sorted attributes, so a reordering by the writer is invisible. Children in
-    document order, because the order of scheme actions is meaningful.
+    Attributes sorted, so the writer's ordering is invisible.
+
+    ## Why the position is only counted among like siblings
+
+    The first version numbered every child by its position, so
+    `/Scheme[1]/LaunchAction` in one file and `/Scheme[2]/LaunchAction` in the
+    other read as two different things -- and inserting a single element made
+    everything after it look removed and re-added. Run against Sam's Mac it
+    reported six elements gone from a scheme that had lost nothing, which is
+    the same false alarm this tool exists to end, one level down.
+
+    A scheme holds one BuildAction, one LaunchAction, one of each. Those are
+    identified by their name and nothing else. Only where a tag genuinely
+    repeats -- `BuildActionEntry`, `BuildableReference` -- does the position
+    mean anything, and only there is it counted.
     """
     here = f'{path}/{element.tag}'
     attrs = sorted(
         (k, (v or '').strip()) for k, v in element.attrib.items() if k not in ITS_OWN
     )
     lines = [f'{here} ' + ' '.join(f'{k}={v}' for k, v in attrs)]
-    for index, child in enumerate(element):
-        lines.extend(shape(child, f'{here}[{index}]'))
+
+    seen: dict[str, int] = {}
+    repeats = {tag for tag in (c.tag for c in element)
+               if [c.tag for c in element].count(tag) > 1}
+    for child in element:
+        if child.tag in repeats:
+            seen[child.tag] = seen.get(child.tag, 0) + 1
+            lines.extend(shape(child, f'{here}[{seen[child.tag]}]'))
+        else:
+            lines.extend(shape(child, here))
     return lines
 
 

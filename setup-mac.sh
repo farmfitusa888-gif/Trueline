@@ -164,14 +164,27 @@ if [ -n "$scheme" ] && ! git diff --quiet -- "$scheme"; then
   # So it is compared as a tree. Reflowing produces no output; changing what
   # gets built produces a line. On this project's own scheme, reflowed the way
   # Xcode does it, `git diff` reported 8 changed lines and this reported none.
+  #
+  # Only the removals are counted, and that is the whole rule.
+  #
+  # A line beginning `-` means something the repository's scheme had is gone or
+  # has different attributes -- somebody changed Run from Debug to Release, and
+  # that shows as a `-` and a `+` together. A `+` on its own is Xcode filling in
+  # something the file did not have: it adds a `TestAction` to any scheme
+  # lacking one, which is where six phantom removals came from before the
+  # comparison stopped counting position among unlike siblings.
+  #
+  # No list of blessed strings anywhere. That approach was tried twice on the
+  # project file and once here, and was short every time.
   if command -v python3 >/dev/null 2>&1; then
     git show "HEAD:$scheme" > "$scratch/scheme.head" 2>/dev/null
-    other="$(python3 core/tools/xcscheme-diff.py "$scratch/scheme.head" "$scheme" 2>/dev/null | grep -c .)"
+    other="$(python3 core/tools/xcscheme-diff.py "$scratch/scheme.head" "$scheme" \
+      2>/dev/null | grep -c '^-')"
   else
     other=0
   fi
   if [ "${other:-0}" -gt 0 ]; then
-    warn "$(basename "$scheme") has changes beyond Xcode's usual bookkeeping."
+    warn "$(basename "$scheme") has changes that are not Xcode's own."
     echo "     Not stopping for it -- a scheme has nothing to do with whether the"
     echo "     code compiles. It only ever blocks a pull. What differs:"
     python3 core/tools/xcscheme-diff.py "$scratch/scheme.head" "$scheme" \

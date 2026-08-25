@@ -25,7 +25,21 @@ import UIKit
 /// chances to disagree about where somebody was standing.
 ///
 /// So the phone's job is: raycast, record, and never guess.
-@MainActor
+///
+/// ## Not `@MainActor`, and that is deliberate
+///
+/// `PhotoRecorder` -- this one's twin, doing the same job for pictures -- is
+/// not isolated either, and both are written to only from `ScanSession`, which
+/// is. Isolating one of a matched pair is not caution, it is an inconsistency,
+/// and this one had a cost: `CaptureWriter.write` is a plain static function
+/// that writes files, and a main-actor property cannot be read from it.
+///
+///     CaptureWriter.swift:83: main actor-isolated property 'isEmpty' can not
+///     be referenced from a nonisolated context
+///
+/// The fix is to take the isolation off rather than to spread it onto the file
+/// writer: what this holds is a list of records, and nothing about writing a
+/// list of records to disk belongs on the main thread.
 final class PinRecorder {
 
     /// What ARKit found under the finger, in its own words.

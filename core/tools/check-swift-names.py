@@ -12,6 +12,12 @@ this project, both invisible to a parser, both fatal to a build:
   * **An environment value used without being declared.** `ScanScreen.swift`
     called `dismiss()` with no `@Environment(\\.dismiss)` anywhere in it.
     Xcode: "cannot find 'dismiss' in scope".
+  * **A nonisolated static function reaching into a main-actor object.**
+    `CaptureWriter.write` is a plain static function that puts a scan on disk,
+    and it read `pins.isEmpty` off a `PinRecorder` that was marked
+    `@MainActor` while its twin `PhotoRecorder` was not. Xcode: "main
+    actor-isolated property 'isEmpty' can not be referenced from a nonisolated
+    context".
   * **A symbol used without its framework.** Seven files declared
     `ObservableObject` and `@Published` while importing only Foundation.
     Those live in Combine. Xcode: "cannot find type 'ObservableObject' in
@@ -342,6 +348,125 @@ def weakOnAStruct(source: str, everywhere: str) -> list[tuple[int, str]]:
     return bad
 
 
+# ---------------------------------------------------------------------------
+# A `static func` that is handed a main-actor object and then touches it.
+#
+# `CaptureWriter` is a plain `enum` with a `static func write(...)` that puts a
+# scan on disk. It takes the two recorders and reads `pins.isEmpty` and calls
+# `pins.manifest()`. `PinRecorder` had been marked `@MainActor`; its twin
+# `PhotoRecorder` never was. So the same two lines compiled for one and not for
+# the other:
+#
+#     CaptureWriter.swift:83: main actor-isolated property 'isEmpty' can not be
+#     referenced from a nonisolated context
+#     CaptureWriter.swift:84: call to main actor-isolated instance method
+#     'manifest()' in a synchronous nonisolated context
+#
+# A static function is the one place this can be said with certainty. An
+# instance method inherits whatever the type is isolated to, and a SwiftUI view
+# picks up isolation on `body` by conformance -- guessing at either would make
+# this cry wolf. A `static func` on a type that is not `@MainActor` is
+# nonisolated, full stop, and if it reaches into a main-actor object through a
+# parameter, that is a compile error every time.
+
+MAIN_ACTOR = re.compile(
+    r'@MainActor[\s\n]+(?:(?:public|private|internal|fileprivate|final|open)\s+)*'
+    r'(?:class|struct|enum|actor)\s+(\w+)'
+)
+
+STATIC_FUNC = re.compile(
+    r'^[ \t]*(?:(?:@\w+(?:\([^)]*\))?)[ \t]+)*'
+    r'(?:(?:public|private|internal|fileprivate|final|open|nonisolated)\s+)*'
+    r'static\s+func\s+(\w+)\s*(?:<[^>]*>)?\s*\(',
+    re.M,
+)
+
+
+def mainActorTypes(everywhere: str) -> set[str]:
+    """Every type in the project declared `@MainActor`."""
+    return set(MAIN_ACTOR.findall(everywhere))
+
+
+def isolatedSpans(source: str) -> list[tuple[int, int]]:
+    """Character ranges of this file that sit inside a `@MainActor` type.
+
+    A `static func` written inside one of these is isolated too, so it may
+    touch whatever it likes and nothing here has anything to say about it.
+    """
+    spans = []
+    for match in MAIN_ACTOR.finditer(source):
+        opened = source.find('{', match.end())
+        if opened == -1:
+            continue
+        depth = 0
+        for i in range(opened, len(source)):
+            if source[i] == '{':
+                depth += 1
+            elif source[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    spans.append((opened, i))
+                    break
+    return spans
+
+
+def parameters(source: str, openParen: int) -> list[tuple[str, str]]:
+    """The (name, type) pairs of a parameter list whose `(` is at openParen."""
+    depth = 0
+    for j in range(openParen, len(source)):
+        if source[j] in '([{<':
+            depth += 1
+        elif source[j] in ')]}>':
+            depth -= 1
+            if depth == 0:
+                inner = source[openParen + 1:j]
+                break
+    else:
+        return []
+    pairs, depth, at, pieces = [], 0, 0, []
+    for k, ch in enumerate(inner):
+        if ch in '([{<':
+            depth += 1
+        elif ch in ')]}>':
+            depth -= 1
+        elif ch == ',' and depth == 0:
+            pieces.append(inner[at:k])
+            at = k + 1
+    pieces.append(inner[at:])
+    for piece in pieces:
+        # `label name: Type`, `name: Type`, `_ name: Type`. The name a body
+        # says is always the last word before the colon.
+        found = re.match(r'\s*(?:\w+\s+)?(\w+)\s*:\s*(.+)$', piece, re.S)
+        if not found:
+            continue
+        kind = found.group(2).strip()
+        kind = re.sub(r'^(?:inout|borrowing|consuming|@\w+)\s+', '', kind).strip()
+        kind = kind.split('=')[0].strip().rstrip('?!')
+        pairs.append((found.group(1), kind))
+    return pairs
+
+
+def reachesIntoTheMainActor(source: str, actors: set[str]) -> list[tuple[int, str, str, str]]:
+    """Static funcs that take a main-actor object and use a member of it."""
+    isolated = isolatedSpans(source)
+    bad = []
+    for match in STATIC_FUNC.finditer(source):
+        if any(start < match.start() < end for start, end in isolated):
+            continue
+        openParen = match.end() - 1
+        body = bodyOf(source, openParen)
+        if body is None:
+            continue
+        for name, kind in parameters(source, openParen):
+            if kind not in actors:
+                continue
+            touch = re.search(r'(?<![\w.])' + re.escape(name) + r'\.(\w+)', body)
+            if touch:
+                line = source[:match.start()].count('\n') + 1
+                bad.append((line, match.group(1), f'{name}.{touch.group(1)}', kind))
+    return bad
+
+
 def main(argv: list[str]) -> int:
     files = [Path(a) for a in argv] or sorted((ROOT / 'ios').rglob('*.swift'))
 
@@ -366,6 +491,12 @@ def main(argv: list[str]) -> int:
         [strip(p.read_text(encoding='utf-8')) for p in files]
         + [strip(p.read_text(encoding='utf-8')) for p in sorted((ROOT / 'ios').rglob('*.swift'))]
     )
+
+    # Every type in the project that is pinned to the main actor. Read from the
+    # same `everywhere`, and for the same reason: a static function in one file
+    # is handed an object declared in another, and only the declaration says
+    # which thread it belongs to.
+    actors = mainActorTypes(everywhere)
 
     bad = 0
     for path in files:
@@ -397,6 +528,14 @@ def main(argv: list[str]) -> int:
             print(f'    Xcode will say: \'weak\' must not be applied to '
                   f'non-class-bound \'any {kind}\'')
             print(f'    Fix: protocol {kind}: AnyObject')
+
+        for line, func, touched, kind in reachesIntoTheMainActor(source, actors):
+            bad += 1
+            print(f'{rel}:{line}: static `{func}` reaches into `{touched}`, '
+                  f'and {kind} is @MainActor')
+            print(f'    Xcode will say: main actor-isolated member of \'{kind}\' can not be '
+                  'referenced from a nonisolated context')
+            print(f'    Fix: take @MainActor off {kind}, or make {func} async and await it')
 
         # Memberwise initialisers, in the order they insist on.
         for name, (labels, declaredIn) in shapes.items():
