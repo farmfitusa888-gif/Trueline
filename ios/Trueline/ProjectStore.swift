@@ -61,11 +61,7 @@ final class ProjectStore: ObservableObject {
                     name: folder.lastPathComponent,
                     modified: (try? folder.resourceValues(forKeys: [.contentModificationDateKey])
                         .contentModificationDate) ?? .distantPast,
-                    hasRoom: FileManager.default.fileExists(
-                        atPath: folder.appendingPathComponent("room.json").path
-                    ) || FileManager.default.fileExists(
-                        atPath: folder.appendingPathComponent("trace.json").path
-                    ),
+                    hasRoom: Self.holdsARoom(folder),
                     kind: FileManager.default.fileExists(
                         atPath: folder.appendingPathComponent("room.json").path
                     ) ? "scanned" : "walked",
@@ -98,6 +94,34 @@ final class ProjectStore: ObservableObject {
             traceJSON: trace,
             correctedJSON: (try? Data(contentsOf: entry.folder.appendingPathComponent(Self.correctedFile))) ?? Data()
         )
+    }
+
+    /// Whether this folder holds something that will actually open.
+    ///
+    /// It used to be enough that `room.json` existed. It is not: a capture from
+    /// before the writer refused wall-less rooms leaves a `room.json` with an
+    /// empty `walls` array in it, and the list offered that scan like any other.
+    /// Tapping it got "The scan has no walls" and a file-picker with nothing on
+    /// this phone to pick — a dead end reached from a list that said the scan
+    /// was fine.
+    ///
+    /// The writer stopped making new ones. It could not repair the ones already
+    /// on somebody's phone, and this is what does: the same question the
+    /// importer asks, asked before the scan is offered rather than after it is
+    /// opened.
+    ///
+    /// Deliberately cheap — the array's emptiness, not a parse of the whole
+    /// capture — because it runs for every folder every time the list refreshes.
+    static func holdsARoom(_ folder: URL) -> Bool {
+        if FileManager.default.fileExists(atPath: folder.appendingPathComponent("trace.json").path) {
+            return true
+        }
+        guard
+            let data = try? Data(contentsOf: folder.appendingPathComponent("room.json")),
+            let top = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return false }
+        let walls = top["walls"] as? [Any]
+        return (walls?.isEmpty == false)
     }
 
     /// What a corrected room is called inside a scan's folder.

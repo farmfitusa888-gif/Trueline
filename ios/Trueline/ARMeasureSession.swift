@@ -37,6 +37,10 @@ final class ARMeasureSession: NSObject, ObservableObject {
     @Published private(set) var floorFound = false
     @Published private(set) var aimingAt: SIMD3<Float>?
     @Published private(set) var failure: String?
+    /// What the tracker is complaining about, in words, or nothing when it is
+    /// happy. Without this a screen that cannot see the floor looks like a
+    /// screen that has stopped working.
+    @Published private(set) var trackingNote: String?
     /// How far the reticle is from the corner tapped first, once there are
     /// enough to close. Shown live so somebody can see themselves getting back
     /// to the start.
@@ -88,10 +92,14 @@ final class ARMeasureSession: NSObject, ObservableObject {
     /// was.
     func tap() {
         guard let at = aimingAt else {
-            failure = floorFound
-                ? "Point at the floor where the corner is, then tap."
-                : "The floor has not been found yet. Move the phone slowly across the floor "
-                    + "until it has, then tap."
+            // Whatever the tracker is unhappy about is the actual reason, so it
+            // is what gets said. "The floor has not been found" over a picture
+            // of a floor is an app arguing with its own screen.
+            failure = trackingNote
+                ?? (floorFound
+                    ? "Point at the floor where the corner is, then tap."
+                    : "The floor has not been found yet. Move the phone slowly across the floor "
+                        + "until it has, then tap.")
             return
         }
         corners.append(Placed(id: "c\(corners.count + 1)", position: at, placedAt: Date()))
@@ -133,11 +141,96 @@ final class ARMeasureSession: NSObject, ObservableObject {
                                 hit.worldTransform.columns.3.y,
                                 hit.worldTransform.columns.3.z)
         }
+        // Nothing along that ray. If the floor's height is known, meet the ray
+        // at that height instead: the far corner of a room is often beyond
+        // where any plane has grown to, and refusing there means refusing the
+        // corners that are hardest to walk to.
+        if let height = floorHeight, let camera = session.currentFrame?.camera {
+            return Self.meetFloor(at: height, from: camera)
+        }
         return nil
     }
 
+    /// Where the middle of the screen meets a floor at a known height.
+    ///
+    /// The camera's own transform gives the ray: its third column is the
+    /// direction it looks away from, so the view direction is that negated.
+    /// One division, and it is refused when the ray is pointing up or level,
+    /// because a ray that never reaches the floor has no answer and a made-up
+    /// one would be a corner in the wrong place.
+    static func meetFloor(at height: Float, from camera: ARCamera) -> SIMD3<Float>? {
+        let m = camera.transform
+        let eye = SIMD3<Float>(m.columns.3.x, m.columns.3.y, m.columns.3.z)
+        let look = -SIMD3<Float>(m.columns.2.x, m.columns.2.y, m.columns.2.z)
+        guard look.y < -0.05 else { return nil }
+        let distance = (height - eye.y) / look.y
+        guard distance > 0, distance < 30 else { return nil }
+        return eye + look * distance
+    }
+
+    /// Everything the screen needs, read straight off the current frame.
+    ///
+    /// Called about twenty times a second by the display link.
+    ///
+    /// **The floor is found here rather than in the session delegate**, and
+    /// that is the fix rather than a preference. `ARSCNView` takes the session's
+    /// delegate for itself the moment a session is assigned to it, so the
+    /// delegate this class installs may or may not survive depending on the
+    /// order SwiftUI happens to bring the view up in — and when it does not,
+    /// `didAdd anchors` never fires, `floorFound` stays false, the instruction
+    /// never moves past "move the phone slowly across the floor", and every tap
+    /// is refused. Which is exactly what "Measure a room does not work" looks
+    /// like, on a screen with a live camera picture on it because UIKit draws
+    /// that itself.
+    ///
+    /// The current frame is not anybody's to take. Reading the anchors from it
+    /// cannot be silently disconnected, so this cannot come back.
     func updateAim(using view: ARSCNViewProviding) {
+        let frame = session.currentFrame
+
+        if let camera = frame?.camera {
+            switch camera.trackingState {
+            case .normal:
+                trackingNote = nil
+            case .notAvailable:
+                trackingNote = "Starting up…"
+            case .limited(let why):
+                switch why {
+                case .initializing:
+                    trackingNote = "Move the phone slowly from side to side to start tracking"
+                case .excessiveMotion:
+                    trackingNote = "Slow down — the phone is moving too fast to track"
+                case .insufficientFeatures:
+                    trackingNote = "Not enough detail to track. More light, or point at "
+                        + "something with a pattern on it"
+                case .relocalizing:
+                    trackingNote = "Finding where it is again — hold still a moment"
+                @unknown default:
+                    trackingNote = "Tracking is limited"
+                }
+            }
+        }
+
+        // A horizontal plane anywhere in the session, read off the frame rather
+        // than waited for through a delegate. See the note above.
+        if let anchors = frame?.anchors {
+            let floors = anchors.compactMap { $0 as? ARPlaneAnchor }
+                .filter { $0.alignment == .horizontal }
+            if !floors.isEmpty {
+                floorFound = true
+                let lowest = floors.map { $0.transform.columns.3.y }.min()
+                if let lowest, floorHeight == nil || lowest < floorHeight! {
+                    floorHeight = lowest
+                }
+            }
+        }
+
         aimingAt = raycast(from: view)
+        // Something to put a corner on *is* a floor, whatever the plane
+        // detector has got round to naming. A person aiming at a spot and being
+        // told the floor has not been found, while the reticle sits solid on
+        // it, is the app arguing with its own screen.
+        if aimingAt != nil { floorFound = true }
         // Three corners is enough to be walking back to the first one, so the
         // live distance appears then — a tap earlier than `canClose` allows.
         if let first = corners.first, let aim = aimingAt, corners.count >= 3 {

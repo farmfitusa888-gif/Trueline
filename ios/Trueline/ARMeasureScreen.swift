@@ -11,9 +11,13 @@ import UIKit
 struct ARMeasureScreen: View {
 
     @StateObject private var model: ARMeasureModel
+    @ObservedObject var store: ProjectStore
+    @ObservedObject var backup: Backup
     @Environment(\.dismiss) private var dismiss
 
-    init(store: ProjectStore) {
+    init(store: ProjectStore, backup: Backup) {
+        self.store = store
+        self.backup = backup
         _model = StateObject(wrappedValue: ARMeasureModel(store: store))
     }
 
@@ -47,7 +51,7 @@ struct ARMeasureScreen: View {
         .onAppear { model.begin() }
         .onDisappear { model.session.stop() }
         .navigationDestination(item: $model.finished) { scan in
-            ReviewScreen(scan: scan)
+            ReviewScreen(scan: scan, store: store, backup: backup)
         }
     }
 

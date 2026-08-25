@@ -62,13 +62,6 @@ export interface TruelineBridge {
  * A browser with no app around it has no message handler, and nothing here
  * fails when there is none. The page is the same page either way.
  */
-function handler(name: string): { postMessage(body: unknown): void } | undefined {
-  return (
-    window as unknown as {
-      webkit?: { messageHandlers?: Record<string, { postMessage(body: unknown): void }> };
-    }
-  ).webkit?.messageHandlers?.[name];
-}
 
 /**
  * A picture of the plan, for the app's own list of scans.
@@ -118,7 +111,28 @@ declare global {
   }
 }
 
+function handler(name: string): { postMessage(body: unknown): void } | undefined {
+  return (
+    window as unknown as {
+      webkit?: { messageHandlers?: Record<string, { postMessage(body: unknown): void }> };
+    }
+  ).webkit?.messageHandlers?.[name];
+}
+
 export const BRIDGE_VERSION = 1;
+
+/**
+ * Whether these screens are running inside the app or in a browser.
+ *
+ * It changes what to offer when there is no room on screen. In a browser the
+ * answer is a file picker, because a scan is a file somebody drops on the page.
+ * On a phone it is not: there is no filesystem to pick from, and offering one
+ * is how somebody whose capture would not open ended up looking at a
+ * drag-and-drop box with nothing on the device to drag into it.
+ */
+export function insideApp(): boolean {
+  return handler('saved') !== undefined;
+}
 
 /**
  * Wires the hook up, and hands back whatever was already waiting.

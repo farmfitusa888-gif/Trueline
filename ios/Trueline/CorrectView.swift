@@ -131,12 +131,11 @@ struct CorrectView: UIViewRepresentable {
                 // checked before a byte is written: this is a web view handing
                 // the app a file to keep, and "it said it was a picture" is not
                 // a reason to believe it is one.
+                let prefix = "data:image/png;base64,"
                 guard
                     let url = body["thumbnail"] as? String,
-                    let comma = url.firstIndex(of: ","),
-                    url.hasPrefix("data:image/png;base64,"),
-                    case let encoded = String(url[url.index(after: comma)...]),
-                    let data = Data(base64Encoded: encoded),
+                    url.hasPrefix(prefix),
+                    let data = Data(base64Encoded: String(url.dropFirst(prefix.count))),
                     // A thumbnail is a few kilobytes. Anything the size of a
                     // photograph is not a thumbnail and is not written.
                     data.count < 2_000_000,

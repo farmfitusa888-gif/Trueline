@@ -52,6 +52,10 @@ struct ProjectsScreen: View {
             } else {
                 Section("On this phone") {
                     ForEach(store.scans) { entry in
+                        // A capture with nothing in it is not a link. Offering
+                        // one was the dead end: tap, get "The scan has no
+                        // walls", and land on a file picker with nothing on the
+                        // phone to pick.
                         NavigationLink(value: Route.open(entry)) {
                             HStack(spacing: 12) {
                                 // The drawing, so the list shows the room
@@ -75,7 +79,7 @@ struct ProjectsScreen: View {
                                     }
                                 }
                                 .frame(width: 56, height: 56)
-                                .background(Color(.secondarySystemBackground))
+                                .background(Color(UIColor.secondarySystemBackground))
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
                                 VStack(alignment: .leading, spacing: 2) {
@@ -85,13 +89,18 @@ struct ProjectsScreen: View {
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     } else {
-                                        Text("Nothing in this one — the capture did not finish")
-                                            .font(.caption)
-                                            .foregroundStyle(.orange)
+                                        Text(
+                                            "No walls in this one — the capture did not "
+                                            + "finish. Swipe to delete it, or scan the room "
+                                            + "again."
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
                                     }
                                 }
                             }
                         }
+                        .disabled(!entry.hasRoom)
                     }
                     .onDelete { indexes in
                         let going = indexes.map { store.scans[$0] }
@@ -151,9 +160,9 @@ struct ProjectsScreen: View {
         .navigationDestination(for: Route.self) { route in
             switch route {
             case .newScan:
-                ScanScreen(store: store)
+                ScanScreen(store: store, backup: backup)
             case .newMeasure:
-                ARMeasureScreen(store: store)
+                ARMeasureScreen(store: store, backup: backup)
             case .open(let entry):
                 if let scan = store.load(entry) {
                     ReviewScreen(scan: scan, store: store, backup: backup)

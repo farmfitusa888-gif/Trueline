@@ -15,7 +15,7 @@ import { Takeoff } from './Takeoff.tsx';
 import { Thickness } from './Thickness.tsx';
 import { Measure } from './Measure.tsx';
 import { planThumbnail } from './sheet.ts';
-import { handBackThumbnail } from './bridge.ts';
+import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
 import { Sheet } from './Sheet.tsx';
@@ -94,6 +94,41 @@ function Opener({
         </button>{' '}
         — a tape and this phone, or an old drawing.
       </p>
+    </div>
+  );
+}
+
+/**
+ * What to offer on a phone when there is no room on the screen.
+ *
+ * Not a file picker. In the app there is no filesystem to pick from, and
+ * offering one is how somebody whose capture would not open ended up looking at
+ * a drag-and-drop box with nothing on the device to drag into it — an error
+ * message above a control that could not do anything about it.
+ *
+ * What can actually be done from here is: go back and scan the room again, or
+ * draw it. So that is what it says.
+ */
+function NothingHere({ onDraw }: { onDraw: () => void }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
+      <h2 className="text-lg font-semibold text-slate-900">Nothing to show for this one</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
+        This capture has no room in it. That happens when a scan is stopped before the phone has
+        found any walls — there is nothing here to correct, and nothing that can be recovered
+        from it.
+      </p>
+      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-slate-600">
+        Go back and scan the room again, or measure it by hand — that needs no LiDAR and every
+        number in it is measured from the first keystroke.
+      </p>
+      <button
+        type="button"
+        onClick={onDraw}
+        className="mt-5 min-h-12 rounded-md bg-slate-900 px-6 font-semibold text-white active:bg-slate-700"
+      >
+        Draw it by hand
+      </button>
     </div>
   );
 }
@@ -238,6 +273,8 @@ export function App() {
             }}
             onCancel={() => setDrawing(false)}
           />
+        ) : insideApp() ? (
+          <NothingHere onDraw={() => setDrawing(true)} />
         ) : (
           <Opener
             onOpen={(json, fileName) =>

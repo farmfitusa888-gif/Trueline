@@ -47,6 +47,11 @@ final class ARMeasureModel: ObservableObject {
 
     /// What to do next, in one sentence.
     var instruction: String {
+        // Whatever the tracker is unhappy about comes first, because it is the
+        // reason nothing else is happening. A screen that says "point at a
+        // corner and tap" while the tracker cannot see anything is a screen
+        // that looks broken.
+        if let note = session.trackingNote { return note }
         if !session.floorFound {
             return "Move the phone slowly across the floor until it finds it"
         }
