@@ -218,15 +218,17 @@ else
 fi
 
 say "Names the Swift uses"
-# A file can parse perfectly and still not compile, and the one that bit us was
-# exactly that: ScanScreen called dismiss() with no @Environment(\.dismiss)
-# declared anywhere in it. The grammar had nothing to say about it. This does.
+# A file can parse perfectly and still not compile, and both of the ones that
+# bit us were exactly that: ScanScreen called dismiss() with no
+# @Environment(\.dismiss) declared, and seven files declared themselves
+# ObservableObject while importing only Foundation. The grammar had nothing to
+# say about either. This does.
 if command -v python3 >/dev/null 2>&1; then
-  if python3 core/tools/check-swift-env.py >/dev/null 2>&1; then
-    ok "every SwiftUI environment value they use is declared"
+  if python3 core/tools/check-swift-names.py >/dev/null 2>&1; then
+    ok "every name they use is declared or imported"
   else
-    bad "Something is used that is not declared. Xcode will refuse this:"
-    python3 core/tools/check-swift-env.py 2>&1 | sed 's/^/     /'
+    bad "Something is used that nothing declares or imports. Xcode will refuse this:"
+    python3 core/tools/check-swift-names.py 2>&1 | sed 's/^/     /'
     exit 1
   fi
 fi
