@@ -174,9 +174,9 @@ sheet of plywood through that.
 
 ### 7. The drawing, on paper and in a message
 
-- Under the takeoff: **Send the drawing**, with **Save as a picture** and
-  **Print it**.
-- **Save as a picture** should open the iPhone share sheet with a PNG. Text it
+- Under the takeoff: **Send the drawing**, with **Send to the client**, **Just
+  the drawing**, **Print it** and **CAD drawing**.
+- **Just the drawing** should open the iPhone share sheet with a PNG. Text it
   to yourself.
 - **Pass:** the picture has a title block under the drawing — room name, area,
   ceiling, and in amber, *"SCANNED — no wall here has had a tape on it. These

@@ -41,7 +41,24 @@ export function reading(text: string): { good: true; as: string; warn?: string }
   }
 }
 
-export function Measure({ label, onSubmit }: { label: string; onSubmit: (text: string) => void }) {
+/**
+ * `name` is what this box measures; `label` is the hint inside it.
+ *
+ * They were one thing, and every box on the screen ended up named after its own
+ * placeholder — "e.g. 20'". With a wall, a ceiling and a door's width open at
+ * once, a screen reader announced three fields called "e.g." something and
+ * three buttons called "Set", and nothing said which was which. The hint is for
+ * eyes; the name is for everybody.
+ */
+export function Measure({
+  name,
+  label,
+  onSubmit,
+}: {
+  readonly name: string;
+  readonly label: string;
+  readonly onSubmit: (text: string) => void;
+}) {
   const [text, setText] = useState('');
   const read = reading(text);
   return (
@@ -64,12 +81,13 @@ export function Measure({ label, onSubmit }: { label: string; onSubmit: (text: s
         autoCorrect="off"
         spellCheck={false}
         placeholder={label}
-        aria-label={label}
+        aria-label={name}
         className="min-h-12 flex-1 rounded-md border border-slate-300 px-3 py-2 tabular-nums
                    focus:border-sky-500 focus:outline-none"
       />
       <button
         type="submit"
+        aria-label={`Set ${name}`}
         className="min-h-12 rounded-md bg-slate-900 px-5 font-semibold text-white active:bg-slate-700"
       >
         Set

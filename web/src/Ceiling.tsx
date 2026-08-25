@@ -54,7 +54,11 @@ export function Ceiling({
       </p>
 
       <div className="mt-3 print:hidden">
-        <Measure label={`e.g. ${len(height.value)}`} onSubmit={(text) => onSet(text, 'tape')} />
+        <Measure
+          name="the ceiling height"
+          label={`e.g. ${len(height.value)}`}
+          onSubmit={(text) => onSet(text, 'tape')}
+        />
       </div>
 
       {!measured && (

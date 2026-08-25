@@ -1,0 +1,259 @@
+{
+  "version": 2,
+  "sections": [
+    {
+      "label": "kitchen"
+    }
+  ],
+  "walls": [
+    {
+      "identifier": "wall-south",
+      "category": {
+        "wall": {}
+      },
+      "confidence": {
+        "high": {}
+      },
+      "dimensions": [
+        6.096,
+        2.7432,
+        0
+      ],
+      "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        3.048,
+        0.17159999999999997,
+        0,
+        1
+      ]
+    },
+    {
+      "identifier": "wall-east",
+      "category": {
+        "wall": {}
+      },
+      "confidence": {
+        "high": {}
+      },
+      "dimensions": [
+        6.4008,
+        2.7432,
+        0
+      ],
+      "transform": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        6.096,
+        0.17159999999999997,
+        3.2004,
+        1
+      ]
+    },
+    {
+      "identifier": "wall-north",
+      "category": {
+        "wall": {}
+      },
+      "confidence": {
+        "high": {}
+      },
+      "dimensions": [
+        6.096,
+        2.7432,
+        0
+      ],
+      "transform": [
+        -1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        -1,
+        0,
+        3.048,
+        0.17159999999999997,
+        6.4008,
+        1
+      ]
+    },
+    {
+      "identifier": "wall-west",
+      "category": {
+        "wall": {}
+      },
+      "confidence": {
+        "high": {}
+      },
+      "dimensions": [
+        6.4008,
+        2.7432,
+        0
+      ],
+      "transform": [
+        0,
+        0,
+        -1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0.17159999999999997,
+        3.2004,
+        1
+      ]
+    }
+  ],
+  "doors": [
+    {
+      "identifier": "door-1",
+      "parentIdentifier": "wall-south",
+      "category": {
+        "door": {}
+      },
+      "confidence": {
+        "high": {}
+      },
+      "dimensions": [
+        0.9144,
+        2.032,
+        0
+      ],
+      "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1.2192,
+        -0.18399999999999994,
+        0,
+        1
+      ]
+    }
+  ],
+  "windows": [
+    {
+      "identifier": "window-1",
+      "parentIdentifier": "wall-south",
+      "category": {
+        "window": {}
+      },
+      "confidence": {
+        "high": {}
+      },
+      "dimensions": [
+        1.2192,
+        1.2192,
+        0
+      ],
+      "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        4.2672,
+        0.32400000000000007,
+        0,
+        1
+      ]
+    }
+  ],
+  "objects": [],
+  "openings": [],
+  "floors": [
+    {
+      "identifier": "floor-1",
+      "category": {
+        "floor": {}
+      },
+      "dimensions": [
+        6.096,
+        6.4008,
+        0
+      ],
+      "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        -1.2,
+        0,
+        1
+      ],
+      "polygonCorners": [
+        [
+          0,
+          0
+        ],
+        [
+          6.096,
+          0
+        ],
+        [
+          6.096,
+          6.4008
+        ],
+        [
+          0,
+          6.4008
+        ]
+      ]
+    }
+  ]
+}

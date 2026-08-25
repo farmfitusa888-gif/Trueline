@@ -7,3 +7,7 @@ __pycache__/
 docs/build/try.*
 docs/build/guide.html
 *.tsbuildinfo
+
+# What the audit produces as it runs. The fixtures beside them are checked in;
+# the output is not — it is regenerated every run and differs by the minute.
+web/audit/audit-*

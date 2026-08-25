@@ -265,6 +265,7 @@ export function App() {
           <button
             type="button"
             onClick={() => setShowing(showing === 'floor' ? 'room' : 'floor')}
+            aria-label={showing === 'floor' ? 'Back to this room' : 'The whole floor'}
             className="text-sm text-slate-500 underline underline-offset-4"
           >
             {showing === 'floor' ? 'This room' : 'The floor'}
@@ -272,7 +273,13 @@ export function App() {
           <button
             type="button"
             onClick={() => setSettings(!settings)}
-            aria-label="Your business"
+            // Named for what it does now, not for what it opens. It said
+            // "Your business" while showing the word "Close", so a screen
+            // reader announced one thing and the screen said the other — and
+            // the announced one was wrong twice over, because pressing it
+            // closed the business screen rather than opening it.
+            aria-label={settings ? 'Close your business details' : 'Your business'}
+            aria-expanded={settings}
             className="text-sm text-slate-500 underline underline-offset-4"
           >
             {settings ? 'Close' : 'Your business'}
@@ -433,6 +440,7 @@ export function App() {
                   this one never moves again.
                 </p>
                 <Measure
+                  name={`the length of ${selectedWall.id}`}
                   label={`e.g. ${len(runLength(selectedWall))}`}
                   onSubmit={(text) =>
                     dispatch({

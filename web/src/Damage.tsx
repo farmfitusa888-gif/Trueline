@@ -245,6 +245,7 @@ export function DamageOnWall({
                         </div>
                         <div className="mt-2">
                           <Measure
+                            name="the cut height"
                             label={`or type a cut height`}
                             onSubmit={(text) => onCutTo(damage.id, text)}
                           />

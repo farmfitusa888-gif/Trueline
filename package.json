@@ -14,6 +14,7 @@
     "test": "npm run test -w core",
     "typecheck": "npm run typecheck -w core && npm run typecheck -w web",
     "dev": "npm run dev -w web",
-    "build": "npm run build -w web"
+    "build": "npm run build -w web",
+    "audit": "npm run build --workspace=@trueline/web && node web/audit/run.mjs"
   }
 }

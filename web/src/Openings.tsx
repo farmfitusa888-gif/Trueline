@@ -33,12 +33,15 @@ function band(measurement: { provenance: unknown }, len: (v: bigint) => string):
 
 function Row({
   label,
+  /** Which opening this row belongs to, so its box has a name of its own. */
+  of,
   value,
   note,
   hint,
   onSubmit,
 }: {
   readonly label: string;
+  readonly of: string;
   readonly value: string;
   readonly note: string;
   readonly hint: string;
@@ -53,7 +56,7 @@ function Row({
         </span>
       </div>
       <div className="mt-1 print:hidden">
-        <Measure label={hint} onSubmit={onSubmit} />
+        <Measure name={`${label.toLowerCase()} of the ${of}`} label={hint} onSubmit={onSubmit} />
       </div>
     </div>
   );
@@ -121,6 +124,7 @@ export function Openings({
           </p>
           <div className="mt-2">
             <Measure
+              name={`how far the new ${adding} is from the corner`}
               label={`e.g. ${len(runLength(wall) / 4n)}`}
               onSubmit={(text) => {
                 onAdd(adding, text);
@@ -192,6 +196,7 @@ export function Openings({
                 <div className="mt-1 divide-y divide-sky-100 rounded-md bg-white/60 px-3">
                   <Row
                     label="Width"
+                    of={`${o.kind} "${o.id}"`}
                     value={len(o.width.value)}
                     note={band(o.width, len)}
                     hint={`e.g. ${len(o.width.value)}`}
@@ -199,6 +204,7 @@ export function Openings({
                   />
                   <Row
                     label="Height"
+                    of={`${o.kind} "${o.id}"`}
                     value={len(o.height.value)}
                     note={band(o.height, len)}
                     hint={o.kind === 'window' ? `e.g. ${len(o.height.value)}` : `e.g. 6'8"`}
@@ -207,6 +213,7 @@ export function Openings({
                   {o.kind === 'window' && (
                     <Row
                       label="Sill off the floor"
+                      of={`${o.kind} "${o.id}"`}
                       value={o.sillHeight ? len(o.sillHeight.value) : 'not known'}
                       // RoomPlan never states a sill; where one exists it was
                       // worked back from the window's centre and its height.
@@ -217,6 +224,7 @@ export function Openings({
                   )}
                   <Row
                     label="From the corner"
+                    of={`${o.kind} "${o.id}"`}
                     value={len(o.offsetFromStart.value)}
                     note={band(o.offsetFromStart, len)}
                     hint={`e.g. ${len(o.offsetFromStart.value)}`}

@@ -237,7 +237,11 @@ export function Draw({
           ))}
         </div>
         <div className="mt-2">
-          <Measure label={`how long, e.g. 12' 4 1/2"`} onSubmit={(text) => add(pick, text)} />
+          <Measure
+            name="how long this wall is"
+            label={`how long, e.g. 12' 4 1/2"`}
+            onSubmit={(text) => add(pick, text)}
+          />
         </div>
       </div>
 
