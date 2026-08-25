@@ -1483,6 +1483,54 @@ the wall painted over it. Solids are ordered by depth now, and each wall's
 openings follow it immediately: an opening is drawn on its own wall or not at
 all.
 
+## The takeoff — the arithmetic that was already written and had no door
+
+Three independent pieces of research landed on the same conclusion this week:
+the room is not the product, the **quantity takeoff** is. A remodeler spends two
+to three hours after every site visit turning a measure into priced numbers,
+most of it unpaid, and the proposal decays if it takes longer than a day or two
+to arrive. Contractors pay DocuSketch $42–55 a room and wait seven hours for a
+worse version of what a phone already holds.
+
+Every quantity any trade prices off is a pure function of the floor polygon, the
+ceiling height and the opening schedule. Drywall and paint: wall face less every
+opening. Trim: perimeter less door widths. Flooring and tile: floor area. All of
+it was already computed — `quantities()` in `zone.ts` has done exactly this since
+it was written, and **nothing has ever called it**, because it takes a `Zone` and
+there was no way to make one out of a plain room. Splitting an open plan into
+zones is the interesting case; a kitchen with four walls is the common one, and
+it had no door.
+
+`wholeRoom(room)` is that door, and `roomQuantities(room)` is the two of them
+together. Every wall becomes one edge spanning its whole length, and a wall with
+nothing built across it becomes an **open** edge rather than a built one, so a
+garage door is not quietly priced as drywall, paint and baseboard.
+
+**On the two real rooms:**
+
+| | Sam's garage | Gilbert's kitchen |
+|---|---|---|
+| floor / ceiling | 411.8 sq ft | 175.3 sq ft |
+| wall face, openings off | 460.5 sq ft | 372.0 sq ft |
+| baseboard, doors off | 78&prime; 10 1/16&Prime; | 49&prime; 5 9/16&Prime; |
+| open span | — | 11&prime; 6 3/4&Prime; |
+
+The garage checks by hand: its perimeter is 81&prime; 3&Prime; and the baseboard comes back
+78&prime; 10&Prime;, which is the perimeter less the 2&prime; 5 1/8&Prime; door exactly — and the
+16&prime; 11 13/16&Prime; garage door, which RoomPlan called a window, correctly took
+**nothing** off the trim, because a baseboard runs under a window.
+
+**What comes off is the part worth reading twice**, and it is what the tests
+pin: a door takes its width out of the baseboard and its whole opening out of
+the paintable face; a window takes nothing off the baseboard; an open side takes
+no drywall, no paint and no trim and is reported separately so somebody can
+price a garage door as a garage door.
+
+The card says whose numbers these are in the same words the rest of the app
+uses. Until a tape has been on one wall running each way they are the scanner's,
+and printing four figures as though they were facts would undo everything the
+provenance model is for.
+
 ## The wedge, most defensible first
 
 1. The **correction layer** — a typed exact measurement re-solves the whole model.

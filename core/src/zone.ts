@@ -8,6 +8,7 @@ import {
   RoomError,
   area,
   corners,
+  runLength,
   validate,
 } from './room.ts';
 
@@ -375,4 +376,49 @@ export function report(room: Room, zones: readonly Zone[]): ZoneReport {
  */
 export function boundaryContributesNoUncertainty(m: Measurement): boolean {
   return toleranceOf(m) === 0n;
+}
+
+/* --------------------------------------------------------------- the whole */
+
+/**
+ * The room itself, as a zone.
+ *
+ * `quantities()` has been able to produce the four numbers a contractor prices
+ * off — floor, ceiling, baseboard run less doors, wall face less every opening —
+ * since the day it was written, and nothing has ever called it, because it
+ * takes a `Zone` and there was no way to make one out of a whole room. Splitting
+ * an open plan into zones is the interesting case; a kitchen with four walls is
+ * the common one, and it had no door.
+ *
+ * Every wall becomes one edge spanning its whole length. A wall with nothing
+ * built across it becomes an `open` edge rather than a `built` one, so a garage
+ * door is not quietly priced as drywall, paint and baseboard.
+ */
+export function wholeRoom(room: Room): Zone {
+  validate(room);
+  const outline = corners(room);
+  return {
+    id: room.id,
+    name: room.name,
+    edges: room.walls.map((wall, i) => {
+      const from = outline[i]!;
+      const to = outline[(i + 1) % outline.length]!;
+      const span = { spanStart: 0n, spanEnd: runLength(wall), from, to };
+      return wall.open
+        ? { kind: 'open' as const, wallId: wall.id, ...span }
+        : { kind: 'built' as const, wallId: wall.id, ...span };
+    }),
+  };
+}
+
+/**
+ * What this room takes, priced the way each trade prices it.
+ *
+ * The convenience the whole product was missing: hand it a room, get the
+ * takeoff. It is `quantities(wholeRoom(room), room)` and nothing else, and it
+ * exists because that expression should not have to be discovered by whoever
+ * writes the next screen.
+ */
+export function roomQuantities(room: Room): Quantities {
+  return quantities(wholeRoom(room), room);
 }

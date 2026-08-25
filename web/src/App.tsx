@@ -11,6 +11,7 @@ import { Corrections } from './Corrections.tsx';
 import { FieldSheet } from './FieldSheet.tsx';
 import { Mark } from './Mark.tsx';
 import { Room3D } from './Room3D.tsx';
+import { Takeoff } from './Takeoff.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -377,6 +378,8 @@ export function App() {
                 )}
               </div>
             )}
+
+            <Takeoff room={loaded.room} readiness={derived.state} />
 
             <FieldSheet room={loaded.room} footprints={loaded.footprints} />
 
