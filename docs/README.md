@@ -8,6 +8,10 @@
 | `build/build_card.py` | Composes the card and finds a layout that fits. Edit here. |
 | `market-research.html` | What the field already does, and where the gap is. |
 | `on-the-phone.md` | Pulling the current build onto an iPhone, and the ordered list of what to test on it. |
+| `give-it-to-gilbert.md` | Getting the app onto somebody else's phone — TestFlight, and the two alternatives. |
+| `icloud-setup.md` | The three console steps that turn the backup on. One of them fails silently if skipped. |
+| `where-the-data-lives.md` | Why the backup is the user's own iCloud rather than a server. |
+| `money.md` | The price, what a server would cost, the ESX finding, and the pitch. |
 
 ## Rebuilding the card
 
