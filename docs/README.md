@@ -12,6 +12,7 @@
 | `icloud-setup.md` | The three console steps that turn the backup on. One of them fails silently if skipped. |
 | `where-the-data-lives.md` | Why the backup is the user's own iCloud rather than a server. |
 | `money.md` | The price, what a server would cost, the ESX finding, and the pitch. |
+| `v3.md` | What to build after V2, and the three things it changes about what to store today. |
 
 ## Rebuilding the card
 
