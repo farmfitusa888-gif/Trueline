@@ -1,0 +1,665 @@
+<title>The Trueline Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --ground:#F6F7F8; --sheet:#FFFFFF; --ink:#14181B; --ink-2:#4A5459; --ink-3:#6E787E;
+    --rule:#C9D0D5; --rule-soft:#E3E8EA; --amber:#B8590A; --amber-wash:#FBF3EA;
+    --built:#1B6340; --built-wash:#EDF5F0; --violet:#7C3AED; --sky:#0EA5E9;
+    --shadow:0 1px 2px rgba(20,24,27,.05), 0 8px 24px -16px rgba(20,24,27,.30);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#101416; --sheet:#171C1F; --ink:#E8EDEF; --ink-2:#A9B4BA; --ink-3:#7D8890;
+      --rule:#333C41; --rule-soft:#242B2F; --amber:#E08A3C; --amber-wash:#241A0F;
+      --built:#5FBE8C; --built-wash:#0F1F17; --violet:#A78BFA; --sky:#38BDF8;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#101416; --sheet:#171C1F; --ink:#E8EDEF; --ink-2:#A9B4BA; --ink-3:#7D8890;
+    --rule:#333C41; --rule-soft:#242B2F; --amber:#E08A3C; --amber-wash:#241A0F;
+    --built:#5FBE8C; --built-wash:#0F1F17; --violet:#A78BFA; --sky:#38BDF8;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+  * { box-sizing:border-box; }
+  body {
+    background:var(--ground); color:var(--ink);
+    font-family:"Source Serif 4", Georgia, serif; font-size:17px; line-height:1.6;
+    margin:0; padding:0 18px 90px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1080px; margin:0 auto; }
+
+  header.mast { padding:48px 0 22px; border-bottom:2px solid var(--ink); }
+  .eyebrow { font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em;
+             text-transform:uppercase; color:var(--ink-3); margin:0 0 12px; }
+  h1 { font-family:Archivo,"Helvetica Neue",Arial,sans-serif; font-weight:700;
+       font-size:clamp(34px,6.4vw,56px); line-height:1.03; letter-spacing:-.028em;
+       margin:0; text-wrap:balance; }
+  h1 em { font-style:normal; color:var(--amber); }
+  .standfirst { margin:16px 0 0; max-width:60ch; font-size:19px; color:var(--ink-2); }
+
+  /* ------------------------------------------------------------- search */
+  .finder { position:sticky; top:0; z-index:20; padding:14px 0 12px;
+            background:var(--ground); border-bottom:1px solid var(--rule-soft); }
+  .finder input {
+    width:100%; font-family:inherit; font-size:17px; color:var(--ink);
+    background:var(--sheet); border:2px solid var(--rule); border-radius:6px;
+    padding:13px 15px 13px 42px;
+  }
+  .finder input:focus { outline:none; border-color:var(--amber); }
+  .finder .box { position:relative; }
+  .finder svg { position:absolute; left:13px; top:50%; transform:translateY(-50%);
+                width:18px; height:18px; color:var(--ink-3); pointer-events:none; }
+  .count { font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-3);
+           margin:8px 0 0; }
+
+  /* ------------------------------------------------------------- groups */
+  .group { padding-top:44px; }
+  .group > h2 {
+    font-family:Archivo,sans-serif; font-weight:600; font-size:clamp(22px,3.2vw,29px);
+    letter-spacing:-.018em; margin:0 0 4px; text-wrap:balance;
+  }
+  .group > .why { margin:0 0 20px; color:var(--ink-3); font-size:15px; }
+  .group::after { content:""; }
+
+  .cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); }
+
+  .card {
+    background:var(--sheet); border:1px solid var(--rule-soft); border-radius:5px;
+    padding:20px 22px; box-shadow:var(--shadow);
+    display:flex; flex-direction:column;
+    animation:rise .32s cubic-bezier(.2,.7,.3,1) both;
+  }
+  @keyframes rise { from { opacity:0; transform:translateY(10px); } }
+  .card h3 { font-family:Archivo,sans-serif; font-weight:600; font-size:18px;
+             letter-spacing:-.01em; margin:0 0 3px; }
+  .card .where { font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+                 letter-spacing:.09em; text-transform:uppercase; color:var(--amber);
+                 margin:0 0 10px; }
+  .card .what { font-size:15.5px; color:var(--ink-2); margin:0 0 14px; }
+  .card ol { margin:0; padding:0; list-style:none; counter-reset:step; }
+  .card ol li { counter-increment:step; position:relative; padding-left:26px;
+                margin-bottom:9px; font-size:15px; line-height:1.5; }
+  .card ol li::before {
+    content:counter(step); position:absolute; left:0; top:1px;
+    width:18px; height:18px; border-radius:50%; background:var(--ink); color:var(--sheet);
+    font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .card .done {
+    margin-top:auto; padding-top:12px; font-size:14px; line-height:1.5;
+    color:var(--built); border-top:1px solid var(--rule-soft);
+  }
+  .card .done b { font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+                  letter-spacing:.09em; text-transform:uppercase; display:block;
+                  margin-bottom:3px; font-weight:600; }
+  .card .warn { margin-top:10px; font-size:14px; line-height:1.5; color:var(--amber);
+                background:var(--amber-wash); border-radius:4px; padding:9px 11px; }
+  .tag { display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:9.5px;
+         letter-spacing:.1em; text-transform:uppercase; padding:2px 6px; border-radius:3px;
+         margin-left:6px; vertical-align:2px; }
+  .tag.free { background:var(--built-wash); color:var(--built); }
+  .tag.paid { background:var(--amber-wash); color:var(--amber); }
+  kbd { font-family:"IBM Plex Mono",monospace; font-size:.88em; background:var(--ground);
+        border:1px solid var(--rule); border-radius:3px; padding:1px 5px; }
+
+  .nothing { text-align:center; padding:60px 20px; color:var(--ink-3); }
+  .nothing b { display:block; font-family:Archivo,sans-serif; font-size:20px;
+               color:var(--ink); margin-bottom:6px; }
+
+  /* --------------------------------------------------- the moving picture */
+  .demo { margin:22px 0 0; display:flex; gap:26px; align-items:center; flex-wrap:wrap; }
+  .phone { width:180px; height:330px; flex:0 0 auto; border-radius:24px;
+           border:3px solid var(--ink); background:var(--sheet); position:relative;
+           overflow:hidden; box-shadow:var(--shadow); }
+  .phone .screen { position:absolute; inset:0; }
+  .phone .floorline { position:absolute; left:0; right:0; top:58%; height:1px;
+                      background:var(--rule); }
+  .phone .cross { position:absolute; left:50%; top:50%; width:26px; height:26px;
+                  margin:-13px 0 0 -13px; }
+  .phone .cross circle { fill:none; stroke:var(--ink); stroke-width:2; }
+  .dot { position:absolute; width:11px; height:11px; margin:-5.5px 0 0 -5.5px;
+         border-radius:50%; background:var(--amber); opacity:0;
+         animation:pop 6s infinite; }
+  .dot.d1 { left:24%; top:64%; animation-delay:.4s; }
+  .dot.d2 { left:76%; top:64%; animation-delay:1.6s; }
+  .dot.d3 { left:76%; top:40%; animation-delay:2.8s; }
+  .dot.d4 { left:24%; top:40%; animation-delay:4.0s; }
+  @keyframes pop {
+    0%, 4% { opacity:0; transform:scale(.4); }
+    9%     { opacity:1; transform:scale(1.35); }
+    14%,88%{ opacity:1; transform:scale(1); }
+    100%   { opacity:0; transform:scale(1); }
+  }
+  .wallline { position:absolute; background:var(--amber); height:2px; opacity:0;
+              animation:draw 6s infinite; transform-origin:left center; }
+  .wallline.w1 { left:24%; top:64%; width:52%; animation-delay:1.6s; }
+  .wallline.w2 { left:76%; top:40%; width:24%; height:2px;
+                 transform:rotate(90deg); transform-origin:left center;
+                 animation-delay:2.8s; }
+  .wallline.w3 { left:24%; top:40%; width:52%; animation-delay:4.0s; }
+  .wallline.w4 { left:24%; top:40%; width:24%;
+                 transform:rotate(90deg); transform-origin:left center;
+                 animation-delay:5.0s; }
+  @keyframes draw { 0%,3% { opacity:0; } 8%,88% { opacity:1; } 100% { opacity:0; } }
+  .demo .says { flex:1 1 240px; font-size:15px; color:var(--ink-2); }
+  .demo .says b { display:block; font-family:Archivo,sans-serif; color:var(--ink);
+                  font-size:16px; margin-bottom:5px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, .card, .dot, .wallline { animation:none !important; transition:none !important; }
+    .dot, .wallline { opacity:1; }
+  }
+
+  footer { margin-top:56px; padding-top:34px; border-top:1px solid var(--rule);
+           font-size:13.5px; color:var(--ink-3); }
+
+  @media print {
+    .finder, .demo { display:none; }
+    body { padding:0; font-size:10.5pt; }
+    .card { break-inside:avoid; box-shadow:none; }
+    .cards { grid-template-columns:1fr 1fr; }
+    .group { break-before:page; padding-top:0; }
+    .group:first-of-type { break-before:auto; }
+  }
+</style>
+
+<div class="wrap">
+<header class="mast">
+  <p class="eyebrow">Trueline · how to use it · every feature</p>
+  <h1>The <em>Trueline</em> Handbook</h1>
+  <p class="standfirst">
+    Every screen, every button, and what each one is actually for. Written for
+    somebody who has never opened it. Search below, or read it straight through.
+  </p>
+
+  <div class="demo">
+    <div class="phone" role="img" aria-label="A room being walked: four corners tapped in turn, with the walls drawing themselves between them">
+      <div class="screen">
+        <div class="floorline"></div>
+        <svg class="cross" viewBox="0 0 26 26"><circle cx="13" cy="13" r="9"/></svg>
+        <div class="wallline w1"></div><div class="wallline w2"></div>
+        <div class="wallline w3"></div><div class="wallline w4"></div>
+        <div class="dot d1"></div><div class="dot d2"></div>
+        <div class="dot d3"></div><div class="dot d4"></div>
+      </div>
+    </div>
+    <div class="says">
+      <b>This is the whole idea.</b>
+      Touch the foot of each corner as you walk round. The walls draw themselves
+      between them. Then a tape goes on one wall running each way — and until it
+      does, the app will not call anything measured.
+    </div>
+  </div>
+</header>
+
+<div class="finder">
+  <div class="box">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    <input id="find" type="search" placeholder="Search — try “tape”, “damage”, “invoice”, “change order”"
+           aria-label="Search the handbook" autocomplete="off">
+  </div>
+  <p class="count" id="count" role="status" aria-live="polite"></p>
+</div>
+
+<main id="out"></main>
+
+<footer>
+  Written against the app as it stands on 25 August 2026. Every screen name and
+  every button label in it was taken from the app’s own source rather than from
+  memory. Where something is not built yet, this says so rather than describing it.
+</footer>
+</div>
+
+<script>
+const FREE = 'free';
+const PAID = 'paid';
+
+const GUIDE = [
+  {
+    group: 'Before you start',
+    why: 'Five minutes, once. Everything after this is the job.',
+    cards: [
+      { t: 'Getting it on the phone', where: 'Terminal, on the Mac', tag: null,
+        what: 'Trueline is not on the App Store yet, so it goes on your phone from your own Mac.',
+        steps: ['Plug the iPhone in with a cable, unlock it, and tap Trust if it asks.',
+                'Open Terminal and type <kbd>cd ~/trueline &amp;&amp; git pull &amp;&amp; bash build.sh</kbd>',
+                'It pulls, checks everything, compiles, installs and launches. No Xcode window.',
+                'First time only: on the phone, Settings → General → VPN &amp; Device Management → your Apple ID → Trust. Then run it again.'],
+        done: 'Trueline opens on the phone and shows an empty list of rooms.' },
+      { t: 'What it costs, and what it never will', where: 'Free / paid', tag: null,
+        what: 'Measuring is free forever. What turns a drawing into money is the subscription.',
+        steps: ['Free, with no account and no card: scanning, walking a room, the drawing, the 3D view, correcting anything on it, and the room’s dimensions.',
+                'Free keeps two rooms at a time.',
+                'The subscription adds the quantities, pricing, proposals, signatures, change orders, scheduling, invoices, insurance mode and every export.'],
+        done: 'You can measure your own kitchen tonight without paying anything.' },
+      { t: 'Your business details', where: 'Top of the screen → Your business', tag: FREE,
+        what: 'What goes at the top of everything a client sees. Fill it in once.',
+        steps: ['Tap <b>Your business</b> at the top.',
+                'Name, phone, email, licence number and insurance. Add a logo if you have one.',
+                'Under <b>What do you do?</b> pick your trade — painting, flooring, drywall, tile, trim, restoration, framing, or general remodeling.',
+                'Pick feet and inches, or metric.',
+                'Tap <b>Save</b>.'],
+        done: 'Your name and licence appear on every drawing and document from now on.',
+        warn: 'The trade you pick changes the words and the order on the takeoff — never a number. A rate you set stays set if you change your mind later.' },
+    ],
+  },
+
+  {
+    group: 'Getting a room in',
+    why: 'Three ways in, depending on the phone and what is in front of you.',
+    cards: [
+      { t: 'Scan a room', where: 'First screen → Scan a room', tag: FREE,
+        what: 'For an iPhone with LiDAR. The phone finds the walls itself while you walk.',
+        steps: ['Stand in a corner with the room in front of you.',
+                'Walk the perimeter slowly, keeping the phone up and pointed at the walls.',
+                'Cover every wall, including behind furniture where you can.',
+                'Tap <b>Done</b> when the room is closed.'],
+        done: 'The room appears in the list, and opens on the drawing.',
+        warn: 'A scan arrives already squared up. Every corner meets perfectly whether the room is right or wrong — which is why nothing is called measured until a tape has been on it.' },
+      { t: 'Measure a room by hand', where: 'First screen → Measure a room', tag: FREE,
+        what: 'Works on any iPhone, with or without LiDAR. You place every corner yourself.',
+        steps: ['Watch the sentence at the top. It will say <i>Starting up</i>, then ask you to move the phone slowly from side to side.',
+                'When it settles it says <b>Lay the phone flat on the floor and tap Set floor</b>. Do exactly that — face up, flat, then tap.',
+                'Pick the phone up. It now says <b>Touch the foot of a corner — anywhere on the picture</b>, and the crosshair goes solid.',
+                'Touch the picture where each corner meets the floor — anywhere on the screen, not just the middle. Walk to the next one and touch it.',
+                'Wall lengths appear along the bottom as you go.',
+                'Back at the first corner it says so. Touch it again, name the room, and tap <b>Done</b>.'],
+        done: 'Dots on every corner, lines along every wall, and the lengths written on them.',
+        warn: 'If it stalls, the sentence on screen is the diagnosis — it is different for every reason it can fail. Read it rather than guessing.' },
+      { t: 'Move a corner you already placed', where: 'While measuring', tag: FREE,
+        what: 'For the corner that landed a foot off because a chair was in the way.',
+        steps: ['Press on the dot you want to move and drag it.',
+                'The sentence at the top changes to <b>Moving that corner — let go to drop it</b>.',
+                'Let go when it is where you want it.'],
+        done: 'The dot and the wall lines follow your finger.' },
+      { t: 'Measure between any two things', where: 'While measuring → Distance', tag: FREE,
+        what: 'Not a room — one measurement. A countertop, a window, a gap.',
+        steps: ['Tap <b>Distance</b> at the top of the measuring screen.',
+                'Touch one end of what you are measuring.',
+                'Touch the other end.',
+                'The length appears big enough to read at arm’s length.'],
+        done: 'A number you can write down. Touch anywhere to start another.' },
+      { t: 'Draw a room with no scan at all', where: 'First screen → Draw it by hand', tag: FREE,
+        what: 'For a room you already have the numbers for, or a phone that will not track.',
+        steps: ['Tap <b>Draw it by hand</b>.',
+                'Type each wall’s length and pick which way it turns.',
+                'The closing wall is worked out for you.',
+                'Name it and finish.'],
+        done: 'A room that reads as <b>measured</b>, not scanned — because you typed the numbers yourself.' },
+      { t: 'Undo a corner', where: 'While measuring', tag: FREE,
+        what: 'The button says how many points are down, so you can see it work.',
+        steps: ['Tap <b>Undo 4</b> — the number is how many corners you have placed.',
+                'It becomes <b>Undo 3</b>, and the last dot and line disappear.'],
+        done: 'One fewer dot on the screen and one fewer number along the bottom.' },
+    ],
+  },
+
+  {
+    group: 'The drawing',
+    why: 'What a client sees. Everything on it says where its numbers came from.',
+    cards: [
+      { t: 'Reading the colours', where: 'Plan', tag: FREE,
+        what: 'Every wall is coloured by how its number got there. This is the whole point of the app.',
+        steps: ['<b>Black</b> — measured. A tape has been on it.',
+                '<b>Amber</b> — scanned. The sensor’s own number, never checked.',
+                '<b>Violet</b> — moved by hand. You dragged it. It does <i>not</i> count as measured.',
+                '<b>Grey</b> — no wall here. An open span.',
+                '<b>Red</b> — something was in the way when it was scanned.'],
+        done: 'You can tell at a glance which numbers on the sheet you would defend.' },
+      { t: 'Blueprint and 3D', where: 'Plan → Blueprint / 3D', tag: FREE,
+        what: 'The same room, two ways. Tapping a wall works in both.',
+        steps: ['Tap <b>3D</b> to stand it up.',
+                'Drag to walk around it.',
+                'Walls between you and the room are taken off so you can see in — it says how many.',
+                'Tap <b>Straighten up</b> to get back to square.'],
+        done: 'A picture of the room you can turn, with every wall still tappable.' },
+      { t: 'Furniture on and off', where: 'Plan → Hide what was in the room', tag: FREE,
+        what: 'What the scan found standing in the room, drawn faintly.',
+        steps: ['Tap <b>Hide what was in the room</b> before sending a drawing to a client.',
+                'Tap it again to bring it back.'],
+        done: 'The building on its own — what goes to a client or an adjuster.',
+        warn: 'Taking furniture off moves no number. A scan reports the walls and the objects separately, and no measurement here has ever read a piece of furniture.' },
+      { t: 'Rename the room', where: 'Plan → Rename', tag: FREE,
+        what: 'It arrives called <i>garage.json</i>. Give it the name you would say out loud.',
+        steps: ['Tap <b>Rename</b> at the top of the drawing.',
+                'Type it — “Gilbert’s kitchen”.',
+                'Tap <b>Set</b>.'],
+        done: 'That name heads the drawing, the takeoff, the proposal and the claim.' },
+    ],
+  },
+
+  {
+    group: 'Correcting the room',
+    why: 'A scan is a starting point. This is how it becomes true.',
+    cards: [
+      { t: 'Put a tape on a wall', where: 'Plan → tap a wall → It has had a tape on it', tag: FREE,
+        what: 'The most important thing in the app. Everything else waits on this.',
+        steps: ['Measure the wall properly, with a tape.',
+                'Tap the wall on the drawing.',
+                'Type the reading into <b>It has had a tape on it</b>.',
+                'Tap <b>Set</b>.'],
+        done: 'The wall goes black, says measured, and the whole room re-solves around it.',
+        warn: 'One wall running each way is what the room needs before it will call itself measured. Two tapes, not eight.' },
+      { t: 'Move a wall the scan got wrong', where: 'tap a wall → Move it — without a tape', tag: FREE,
+        what: 'For a wall in the wrong place when you have no tape on you.',
+        steps: ['Tap the wall.',
+                'Type where it should be under <b>Move it — without a tape</b>.',
+                'Tap <b>Move it</b>.'],
+        done: 'The wall goes exactly there and the room gives way around it — in violet, marked <b>moved by hand</b>.',
+        warn: 'Moving every wall in the room still leaves it unmeasured, and the app will still ask for a tape. That is deliberate and it will never change.' },
+      { t: 'Name a wall', where: 'tap a wall → Call it something', tag: FREE,
+        what: '“Behind the washer” beats “wall-1” on every sheet this makes.',
+        steps: ['Tap the wall.',
+                'Type a name under <b>Call it something</b>.',
+                'Tap the button beside it.'],
+        done: 'That name appears on every sheet, and anything marked on the wall moves with it.' },
+      { t: 'Cut a wall in two', where: 'tap a wall → Cut it in two', tag: FREE,
+        what: 'For a pony wall meeting a full-height one, recorded as a single wall.',
+        steps: ['Tap the wall.',
+                'Under <b>Cut it in two</b>, say where to cut it, what to call the second piece, and how high it stands.',
+                'Tap the button.'],
+        done: 'Two walls where there was one, each with its own height.',
+        warn: 'It refuses if your answer makes the two pieces identical. Two walls in line that are alike in every way are one wall written twice.' },
+      { t: 'Notch a corner for an alcove', where: 'tap a wall → Notch the corner after it', tag: FREE,
+        what: 'For the alcove or chimney breast the scanner flattened.',
+        steps: ['Tap the wall before the alcove.',
+                'Under <b>Notch the corner after it</b>, give how deep the step goes, how wide it is, and what to call it.',
+                'Tap the button.'],
+        done: '<b>Two</b> walls appear, not one — a room with square corners always has an even number of sides. The room does not change size.' },
+      { t: 'Take a wall out', where: 'tap a wall → There is no wall here at all', tag: FREE,
+        what: 'For a side the scan invented.',
+        steps: ['Tap the wall.',
+                'Tap <b>There is no wall here at all</b>.'],
+        done: 'The side goes, and the line under the plan names which walls moved and by how far. Undo is one tap.' },
+      { t: 'Doors and windows', where: 'tap a wall → the openings on it', tag: FREE,
+        what: 'Their sizes come off the scan. Measure them and every quantity follows.',
+        steps: ['Tap the wall the opening is in.',
+                'Tap <b>Measure</b> beside the door or window.',
+                'Type its width, its height, and how far it is from the corner.',
+                'For a window, type the sill height off the floor.'],
+        done: 'The baseboard, the wall face and the paint area all move to match — doors taken off, windows left on.' },
+      { t: 'Ceiling height', where: 'Room → How high is the ceiling?', tag: FREE,
+        what: 'The number the wall face is worked out from. Worth a tape.',
+        steps: ['Go to <b>Room</b>.',
+                'Tap a common height, or type the one you measured.'],
+        done: 'Every wall area on the takeoff moves, and the floor area does not.' },
+      { t: 'Wall thickness', where: 'Room → Wall thickness', tag: FREE,
+        what: 'A scan reports every wall as zero thick. Saying what it is unlocks the framing.',
+        steps: ['Go to <b>Room</b>.',
+                'Pick 2x4, 2x6, or type it.'],
+        done: 'Plates, studs and headers appear on the takeoff, and the drawing draws the wall at its real thickness.' },
+      { t: 'What still needs checking', where: 'Room', tag: FREE,
+        what: 'The app’s own list of what it does not yet trust about this room.',
+        steps: ['Go to <b>Room</b> and read down.',
+                'It ranks the walls worth a tape first, by what is at stake.',
+                'The number on the Room tab is how many things are on this list.'],
+        done: 'A list that gets shorter as you correct things, and empties when the room is ready to issue.' },
+    ],
+  },
+
+  {
+    group: 'What the room takes',
+    why: 'Every quantity, worked out from the measurements. This is where the subscription starts.',
+    cards: [
+      { t: 'Reading the takeoff', where: 'Takeoff', tag: PAID,
+        what: 'Floor, ceiling, wall face, baseboard, and the framing once thickness is set.',
+        steps: ['Go to <b>Takeoff</b>.',
+                'Tap <b>Show</b> to see what each line is for and how it was worked out.',
+                'Every door and window is already taken off the wall face.',
+                'A door is taken off the baseboard; a window is not.'],
+        done: 'Numbers you could hand to a supplier, each one traceable to a measurement.' },
+      { t: 'Your trade’s words', where: 'Takeoff', tag: PAID,
+        what: 'A painter sees paint areas. A drywaller sees board areas. Same numbers.',
+        steps: ['Set your trade under <b>Your business</b>.',
+                'The takeoff reorders to lead with the lines you care about.',
+                'Everything else is still there, below them.'],
+        done: 'The sheet reads in your words rather than the app’s.' },
+    ],
+  },
+
+  {
+    group: 'Money',
+    why: 'Your rates against the room’s quantities. Set once, used forever.',
+    cards: [
+      { t: 'Set your rates', where: 'Price → Set your rates', tag: PAID,
+        what: 'What you charge per square foot, per foot, per each.',
+        steps: ['Go to <b>Price</b> and tap <b>Set your rates</b>.',
+                'Type a rate against each line.',
+                'Tap out of the box.'],
+        done: 'The room prices itself, and every room you measure afterwards uses the same rates.' },
+      { t: 'Import a supplier’s price list', where: 'Your business → Your supplier’s prices', tag: PAID,
+        what: 'Price against what you actually pay, not a guess.',
+        steps: ['Get the price file from the supplier — a CSV.',
+                'Tap <b>Your business</b> → <b>Your supplier’s prices</b>.',
+                'Choose the file. It shows you which column it thinks is which.',
+                'Confirm the mapping.'],
+        done: 'Their prices are in your book, beside your own.',
+        warn: 'It handles a file with no heading row, with metric units, or with the columns in any order — it shows you what it read before it uses any of it.' },
+      { t: 'Price a different number', where: 'Price → Price a different number', tag: PAID,
+        what: 'For a diagonal lay, a waste factor, or an order you round up.',
+        steps: ['Tap <b>Price a different number</b> on any line.',
+                'Type the quantity you want to price.',
+                'Type why — it will not take one without a reason.'],
+        done: 'The quote prices your number, and <i>both</i> numbers stay on the line so the client sees the difference and the reason.',
+        warn: 'A quote with a typed number in it stops calling itself measured, even if every wall has had a tape on it.' },
+      { t: 'Mark a job won or lost', where: 'Price → What happened to it', tag: PAID,
+        what: 'How the app learns what your prices actually get accepted at.',
+        steps: ['Once a job is decided, tap <b>Won</b> or <b>Lost</b>.'],
+        done: 'A record that, once there are enough of them, tells you what your own accepted prices look like.' },
+    ],
+  },
+
+  {
+    group: 'Getting it agreed',
+    why: 'The document a homeowner says yes to, and what freezes when they do.',
+    cards: [
+      { t: 'Write a proposal', where: 'Agreement → Write the proposal', tag: PAID,
+        what: 'The work in sentences, a price, what is not included, and somewhere to sign.',
+        steps: ['Set your rates first — it will not write one with an unpriced line in it.',
+                'Go to <b>Agreement</b>.',
+                'Name the option and say in one line what it covers.',
+                'Tap <b>Write the proposal</b>.',
+                'Fill in who it is for, the address, and how long the price holds.'],
+        done: 'A document with your letterhead, the price from the takeoff, and your terms.',
+        warn: 'It refuses to carry a line you have no rate for. A proposal that quietly leaves work out is how a job is won at a loss.' },
+      { t: 'Get it signed', where: 'Agreement → Sign it', tag: PAID,
+        what: 'Signed in the kitchen, with the record that makes it stand up.',
+        steps: ['Tap <b>Take this one</b> on the option they chose.',
+                'Hand them the phone.',
+                'They type their name, tick that they agree to sign electronically, and sign with a finger.',
+                'Tap the black button, which names the option and its price — <b>Agree to</b> Option A — $18,400.'],
+        done: 'The signature, and the evidence written out in plain words — who signed, when, on what, the exact sentence they agreed to, and a fingerprint of the document.',
+        warn: 'This records that somebody signed. It does not verify who they are, and the app never claims it does.' },
+      { t: 'Change orders', where: 'Agreement → What has changed since', tag: PAID,
+        what: 'The reason scope creep stops being an argument.',
+        steps: ['Once it is signed, that scope freezes.',
+                'Change anything — move a wall, add work, change a rate.',
+                'Go back to <b>Agreement</b>.'],
+        done: 'Every difference comes back as a priced line, biggest first, with the signed total beside the new one.',
+        warn: 'If the agreed document is edited instead of a change being raised against it, the app catches it and says so. The signed version is the one that counts.' },
+    ],
+  },
+
+  {
+    group: 'The work',
+    why: 'When it happens, and asking to be paid for it.',
+    cards: [
+      { t: 'Put days in your calendar', where: 'Work → Add to my calendar', tag: PAID,
+        what: 'Your own iPhone calendar. No service, no monthly fee, already on every device you own.',
+        steps: ['Go to <b>Work</b>.',
+                'Pick what kind of day it is — measure, present, work, or other.',
+                'Say what it is, pick the day, and set the times.',
+                'Tap <b>Put it in the calendar</b> to add it to the list.',
+                'Tap <b>Add to my calendar</b> to send them to the phone.'],
+        done: 'A calendar named after your business, which you can switch off on a Sunday without switching off your life.',
+        warn: 'The first time, iOS asks permission. Trueline asks only to <i>add</i> events — it never reads what else is in your calendar.' },
+      { t: 'Send the dates to somebody', where: 'Work → Send it to somebody', tag: PAID,
+        what: 'A file every calendar reads — Apple, Google, Outlook.',
+        steps: ['Add the days first.',
+                'Tap <b>Send it to somebody</b>.',
+                'Choose how to send it.'],
+        done: 'They tap it and it lands in whatever calendar they use.' },
+      { t: 'Write an invoice', where: 'Work → Write the invoice', tag: PAID,
+        what: 'Built from what was signed, never from what the room measures today.',
+        steps: ['The job has to be signed first.',
+                'Pick <b>Deposit</b>, <b>Progress payment</b> or <b>Final payment</b>.',
+                'Type your own invoice number.',
+                'For a deposit, say what per cent of the job it is.',
+                'Say when it is due and how to pay you.'],
+        done: 'An invoice that says what is left on the job, and settles it exactly when it is the last one.',
+        warn: 'The same work cannot be invoiced twice. Ask for more than is left and it refuses and says why.' },
+      { t: 'Send it to QuickBooks', where: 'Work → Send to QuickBooks', tag: PAID,
+        what: 'A file, not an integration — nothing about it stops working on a Tuesday.',
+        steps: ['Write at least one invoice.',
+                'Tap <b>Send to QuickBooks</b>.',
+                'Import the file in QuickBooks, or open it in a spreadsheet first.'],
+        done: 'Your invoices in your books, on Online or Desktop.' },
+    ],
+  },
+
+  {
+    group: 'Insurance work',
+    why: 'A whole second mode, for restoration and claims.',
+    cards: [
+      { t: 'Turn insurance mode on', where: 'Insurance → Turn it on', tag: PAID,
+        what: 'Off by default, because a remodeler does not want a claim number on every kitchen.',
+        steps: ['Go to <b>Insurance</b>.',
+                'Tap <b>Turn it on</b>.',
+                'Fill in the claim number, the date of loss, what caused it, whose property it is, the address and the adjuster.'],
+        done: 'A claim, with what is still missing named — and nothing blocked by it.' },
+      { t: 'Mark the damage', where: 'Plan → tap a wall → + damaged area', tag: PAID,
+        what: 'Marked while you are standing in front of it.',
+        steps: ['Tap the wall the damage is on.',
+                'Tap <b>+ damaged area</b> and pick what caused it.',
+                'Say how far along the wall it runs, and how high it reaches.',
+                'Tap <b>Mark it</b>.'],
+        done: 'A red stretch on the drawing, and the square feet of board and feet of base that actually is — with the openings in it deducted.' },
+      { t: 'Cut heights, moisture and photographs', where: 'the damage you marked', tag: PAID,
+        what: 'What an adjuster asks for, recorded as you go.',
+        steps: ['Say how high you cut the board back to.',
+                'Log a moisture reading each time you take one, with the meter scale.',
+                'Attach a photograph of it.'],
+        done: 'A drying curve, and a photograph attached to the wall it is of.' },
+      { t: 'Send it to the adjuster', where: 'Insurance → Send it to the adjuster', tag: PAID,
+        what: 'One document with the measurements, the areas and the photographs on it.',
+        steps: ['Go to <b>Insurance</b>.',
+                'Tap <b>Send it to the adjuster</b>.',
+                'Choose the PDF, or the ESX for Xactimate.'],
+        done: 'A document you would be happy to be questioned about.',
+        warn: 'The restoration sheet is always kept separate from the room’s takeoff. Two payers, two sheets.' },
+    ],
+  },
+
+  {
+    group: 'Sending things out',
+    why: 'Everything that leaves the phone, and what each one is for.',
+    cards: [
+      { t: 'The drawing', where: 'Files → Send the drawing', tag: PAID,
+        what: 'The plan as a picture, with your letterhead and the caveat on it.',
+        steps: ['Go to <b>Files</b>.',
+                'Tap <b>Send the drawing</b>, or print it.'],
+        done: 'A sheet a client can read, that says plainly whether it has been measured.' },
+      { t: 'The client file', where: 'Files → Send the drawing → client file', tag: PAID,
+        what: 'One file that opens in any browser, with nothing fetched from anywhere.',
+        steps: ['Tap the client file option.',
+                'Send it however you send things.'],
+        done: 'They open it and it works — offline, forever, with the drawing inside it.' },
+      { t: 'CAD, for whoever asks', where: 'Files → CAD', tag: PAID,
+        what: 'A DXF, for an architect or a cabinet shop.',
+        steps: ['Tap the CAD option.',
+                'Send the file.'],
+        done: 'A drawing they can open in their own software.' },
+      { t: 'The field sheet', where: 'Files', tag: PAID,
+        what: 'A list to carry and write on — what to measure, ranked.',
+        steps: ['Tap the field sheet.',
+                'Print it or open it on the phone.'],
+        done: 'A page you can take back to the room with a pencil.' },
+    ],
+  },
+
+  {
+    group: 'The subscription',
+    why: 'What it costs and how to manage it.',
+    cards: [
+      { t: 'Starting it', where: 'Any locked screen', tag: null,
+        what: 'One plan, monthly or yearly. Seven days free first.',
+        steps: ['Tap anything locked — it says what that feature does before it says it is paid.',
+                'Pick monthly or yearly.',
+                'The trial starts immediately and nothing is charged until it ends.'],
+        done: 'Everything opens.' },
+      { t: 'If you already paid', where: 'Paywall → Already paid? Put it back', tag: null,
+        what: 'For a new phone, or a reinstall.',
+        steps: ['Tap <b>Already paid? Put it back</b>.',
+                'It checks with Apple on the Apple ID you are signed in with.'],
+        done: 'Everything opens again, with nothing charged twice.',
+        warn: 'If you paid with a different Apple ID, sign in with that one in Settings first.' },
+      { t: 'Stopping it', where: 'iPhone Settings', tag: null,
+        what: 'In the App Store, not by asking anybody.',
+        steps: ['iPhone Settings → your name → Subscriptions → Trueline → Cancel.'],
+        done: 'It stops renewing. Every room you have measured stays on the phone.' },
+    ],
+  },
+];
+
+/* --------------------------------------------------------------- rendering */
+
+const out = document.getElementById('out');
+const find = document.getElementById('find');
+const count = document.getElementById('count');
+
+function esc(s) { return s; }
+
+function cardHtml(c) {
+  const tag = c.tag === FREE ? '<span class="tag free">Free</span>'
+            : c.tag === PAID ? '<span class="tag paid">Subscription</span>' : '';
+  return `<article class="card">
+    <h3>${esc(c.t)}${tag}</h3>
+    <p class="where">${esc(c.where)}</p>
+    <p class="what">${esc(c.what)}</p>
+    <ol>${c.steps.map((s) => `<li>${s}</li>`).join('')}</ol>
+    ${c.done ? `<p class="done"><b>You will know it worked when</b>${c.done}</p>` : ''}
+    ${c.warn ? `<p class="warn">${c.warn}</p>` : ''}
+  </article>`;
+}
+
+function haystack(c) {
+  return [c.t, c.where, c.what, ...c.steps, c.done ?? '', c.warn ?? '']
+    .join(' ').replace(/<[^>]+>/g, ' ').toLowerCase();
+}
+
+function render(term) {
+  const q = term.trim().toLowerCase();
+  let shown = 0;
+  const html = GUIDE.map((g) => {
+    const cards = g.cards.filter((c) => !q || haystack(c).includes(q));
+    shown += cards.length;
+    if (cards.length === 0) return '';
+    return `<section class="group">
+      <h2>${g.group}</h2>
+      <p class="why">${g.why}</p>
+      <div class="cards">${cards.map(cardHtml).join('')}</div>
+    </section>`;
+  }).join('');
+
+  const total = GUIDE.reduce((n, g) => n + g.cards.length, 0);
+  out.innerHTML = html || `<div class="nothing">
+      <b>Nothing here matches “${term}”.</b>
+      Try a word you would use on a job site — tape, wall, damage, invoice, signature.
+    </div>`;
+  count.textContent = q
+    ? `${shown} of ${total} things match “${term}”`
+    : `${total} things, in ${GUIDE.length} groups`;
+}
+
+let waiting;
+find.addEventListener('input', () => {
+  clearTimeout(waiting);
+  waiting = setTimeout(() => render(find.value), 90);
+});
+render('');
+</script>
