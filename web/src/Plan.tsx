@@ -6,6 +6,12 @@ import { readiness, trustLabel } from '../../core/src/issue.ts';
 import { toRenderModel } from '../../core/src/render.ts';
 import type { Footprint, WallObstruction } from '../../core/src/obstruction.ts';
 import type { NorthOnPlan } from '../../core/src/capture.ts';
+import {
+  type Damage,
+  WATER_CATEGORY,
+  damageOnPlan,
+  damageRunOnPlan,
+} from '../../core/src/damage.ts';
 
 /**
  * The plan, drawn from the render model and nothing else.
@@ -41,6 +47,14 @@ export interface PlanProps {
   readonly obstructions: readonly WallObstruction[];
   /** What the scan found standing in the room. Drawn so "could not see it" has a picture. */
   readonly footprints: readonly Footprint[];
+  /**
+   * What is wrong with this building, drawn on it.
+   *
+   * Empty on every job that is not a claim. A remodeler correcting a kitchen
+   * scan should never see a red stretch of wall, and a restoration contractor
+   * should not have to open a second screen to find out which wall it was.
+   */
+  readonly damages?: readonly Damage[];
   readonly onSelect: (wallId: string | null) => void;
 }
 
@@ -137,7 +151,15 @@ function feet(nm: bigint): number {
   return Number(whole) + Number(rest) / Number(NM_PER_FOOT);
 }
 
-export function Plan({ room, north, selected, obstructions, footprints, onSelect }: PlanProps) {
+export function Plan({
+  room,
+  north,
+  selected,
+  obstructions,
+  footprints,
+  damages = [],
+  onSelect,
+}: PlanProps) {
   const { len, area: showArea, company } = useUnits();
   const model = toRenderModel(room, [], { unit: 'ft' });
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
@@ -382,6 +404,62 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
       ))}
 
       {/*
+        Where the loss is, on the building.
+
+        Drawn on top of the walls and under the title block, so a damaged
+        stretch reads as something happening TO a wall rather than as a
+        different kind of wall. The extent is what is drawn, not a marker in
+        the middle of the wall: what gets ordered and scheduled is how much
+        board comes out, and the room already knows how much that is.
+
+        A pin gets a ring instead, because a pin has no length and drawing it
+        as a stretch would invent one. Floors and ceilings get nothing here —
+        they are the room, and hatching the whole thing red would hide the
+        walls this drawing exists to show.
+      */}
+      {damages.map((damage) => {
+        const run = damageRunOnPlan(room, damage);
+        const label =
+          damage.kind === 'water' && damage.category
+            ? `${damage.kind}, ${WATER_CATEGORY[damage.category].plain} — ${damage.note}`
+            : `${damage.kind} — ${damage.note}`;
+
+        if (run) {
+          return (
+            <g key={damage.id} aria-label={label}>
+              <title>{label}</title>
+              <line
+                x1={px(feet(run.from.x))}
+                y1={scaleY(feet(run.from.y))}
+                x2={px(feet(run.to.x))}
+                y2={scaleY(feet(run.to.y))}
+                stroke="#dc2626"
+                strokeWidth={14}
+                strokeOpacity={0.55}
+                strokeLinecap="butt"
+              />
+            </g>
+          );
+        }
+
+        const at = damageOnPlan(room, damage);
+        if (!at) return null;
+        return (
+          <g key={damage.id} aria-label={label}>
+            <title>{label}</title>
+            <circle
+              cx={px(feet(at.x))}
+              cy={scaleY(feet(at.y))}
+              r={9}
+              fill="#ffffff"
+              stroke="#dc2626"
+              strokeWidth={4}
+            />
+          </g>
+        );
+      })}
+
+      {/*
         The title block: everything a drawing has to say about itself before
         anybody prices off it. Which room, how big, whether anybody stood behind
         it — and whose drawing it is.
@@ -444,11 +522,20 @@ export function Plan({ room, north, selected, obstructions, footprints, onSelect
   );
 }
 
-/** Exported only so the legend and the plan cannot drift apart. */
-export const LEGEND: readonly { label: string; className: string }[] = [
-  { label: 'Measured', className: 'bg-slate-900' },
-  { label: 'Scanned', className: 'bg-amber-700' },
-  { label: 'No wall here', className: 'bg-slate-400' },
-  { label: 'Something in the way', className: 'bg-red-600' },
-  { label: 'What was in the room', className: 'bg-slate-300' },
-];
+/**
+ * Exported only so the legend and the plan cannot drift apart.
+ *
+ * A key entry for something the drawing does not contain is worse than no key
+ * at all — somebody looks for the red on the plan and cannot find it, and then
+ * doubts the rest of the key. So damage is listed only when damage is drawn.
+ */
+export function legendFor(anyDamage: boolean): readonly { label: string; className: string }[] {
+  return [
+    { label: 'Measured', className: 'bg-slate-900' },
+    { label: 'Scanned', className: 'bg-amber-700' },
+    { label: 'No wall here', className: 'bg-slate-400' },
+    { label: 'Something in the way', className: 'bg-red-600' },
+    { label: 'What was in the room', className: 'bg-slate-300' },
+    ...(anyDamage ? [{ label: 'Damaged', className: 'bg-red-600/60' }] : []),
+  ];
+}

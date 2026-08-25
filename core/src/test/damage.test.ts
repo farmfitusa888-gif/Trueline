@@ -9,7 +9,9 @@ import {
   DamageError,
   FLOOD_CUTS,
   affectedPerMille,
+  damageOnPlan,
   damageQuantity,
+  damageRunOnPlan,
   damageTotals,
   drying,
   suggestedCut,
@@ -371,4 +373,57 @@ test('each damage names itself by what it is and which wall it is on', () => {
   const totals = damageTotals(room, [waterline]);
   assert.equal(totals.each[0]!.what, 'water damage to north');
   assert.equal(totals.each[0]!.damageId, 'd-1', 'a quantity has to be traceable to its mark');
+});
+
+/* ---------------------------------------------------------- on the drawing */
+
+test('a patch draws on the plan as the stretch of wall it covers, not a dot', () => {
+  // What gets ordered and scheduled is how much wall comes out. A marker in the
+  // middle of the wall would say something is wrong somewhere along it, which is
+  // exactly the thing the room already knows better than.
+  const run = damageRunOnPlan(room, waterline)!;
+  // North runs from (20', 10') westward, so a foot in is x = 19'.
+  assert.equal(run.from.x, parseLength(`19'`));
+  assert.equal(run.from.y, parseLength(`10'`));
+  assert.equal(run.to.x, parseLength(`10'`));
+  assert.equal(run.to.y, parseLength(`10'`));
+});
+
+test('the stretch is the same whichever way round it was typed', () => {
+  const backwards: Damage = {
+    ...waterline,
+    id: 'd-backwards',
+    shape: { ...(waterline.shape as Patch), fromAlong: parseLength(`10'`), toAlong: parseLength(`1'`) },
+  };
+  assert.deepEqual(damageRunOnPlan(room, backwards), damageRunOnPlan(room, waterline));
+});
+
+test('a whole wall draws corner to corner', () => {
+  const gone: Damage = {
+    ...base,
+    id: 'd-gone',
+    shape: { kind: 'surface', surface: 'wall', wallId: 'north' },
+  };
+  const run = damageRunOnPlan(room, gone)!;
+  assert.equal(run.from.x, parseLength(`20'`));
+  assert.equal(run.to.x, 0n);
+  assert.equal(run.from.y, parseLength(`10'`));
+  assert.equal(run.to.y, parseLength(`10'`));
+});
+
+test('a pin and a floor get no stretch, because they have no length', () => {
+  const pin: Damage = {
+    ...base,
+    id: 'd-pin',
+    shape: { kind: 'pin', at: { x: parseLength(`4'`), y: parseLength(`5'`) } },
+  };
+  const floor: Damage = {
+    ...base,
+    id: 'd-floor',
+    shape: { kind: 'surface', surface: 'floor' },
+  };
+  assert.equal(damageRunOnPlan(room, pin), undefined);
+  assert.equal(damageRunOnPlan(room, floor), undefined);
+  // The pin still has a point, because a point is what it is.
+  assert.deepEqual(damageOnPlan(room, pin), { x: parseLength(`4'`), y: parseLength(`5'`) });
 });

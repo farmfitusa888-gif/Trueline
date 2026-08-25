@@ -553,6 +553,56 @@ export function damageOnPlan(room: Room, damage: Damage): Point | undefined {
   };
 }
 
+/**
+ * The stretch of wall a damage covers, in plan, as two points.
+ *
+ * A marker in the middle of a wall says something is wrong somewhere along it.
+ * What a contractor actually reads off a plan is **how much of that wall has to
+ * come out** — where the cut starts and where it stops — because that is what
+ * gets ordered, scheduled and argued about. So the extent is drawn, not a dot.
+ *
+ * Nothing for a pin (it is a point, and giving it a length would invent one) and
+ * nothing for a floor or a ceiling (they are the room, not a run of it).
+ */
+export function damageRunOnPlan(
+  room: Room,
+  damage: Damage
+): { readonly from: Point; readonly to: Point } | undefined {
+  const shape = damage.shape;
+  if (shape.kind === 'pin') return undefined;
+  if (shape.kind === 'surface' && shape.surface !== 'wall') return undefined;
+  if (!shape.wallId) return undefined;
+
+  const points = corners(room);
+  const { wall, index } = wallOf(room, shape.wallId);
+  const start = points[index]!;
+  const end = points[(index + 1) % points.length]!;
+  const length = runLength(wall);
+  if (length === 0n) return { from: start, to: start };
+
+  // A whole-wall surface is the whole wall. A patch is the span it was marked
+  // over, in the order the plan numbers the wall from — which is the same order
+  // the person typed "from" and "to" in.
+  const lo =
+    shape.kind === 'surface'
+      ? 0n
+      : shape.fromAlong < shape.toAlong
+        ? shape.fromAlong
+        : shape.toAlong;
+  const hi =
+    shape.kind === 'surface'
+      ? length
+      : shape.fromAlong < shape.toAlong
+        ? shape.toAlong
+        : shape.fromAlong;
+
+  const at = (along: Nanometres): Point => ({
+    x: start.x + ((end.x - start.x) * along) / length,
+    y: start.y + ((end.y - start.y) * along) / length,
+  });
+  return { from: at(lo), to: at(hi) };
+}
+
 /** A damage in the words a report uses. */
 export function describeDamage(room: Room, damage: Damage): string {
   const q = damageQuantity(room, damage);

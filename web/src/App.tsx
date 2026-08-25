@@ -6,7 +6,7 @@ import { extent } from '../../core/src/health.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
 import { EMPTY, persist, reduce } from './state.ts';
 import { installBridge } from './bridge.ts';
-import { LEGEND, Plan } from './Plan.tsx';
+import { Plan, legendFor } from './Plan.tsx';
 import { Corrections } from './Corrections.tsx';
 import { FieldSheet } from './FieldSheet.tsx';
 import { Mark } from './Mark.tsx';
@@ -370,10 +370,11 @@ export function App() {
                     selected={state.selected}
                     obstructions={derived.obstructions}
                     footprints={loaded.footprints}
+                    damages={loaded.claim.on ? loaded.damages : []}
                     onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                   />
                   <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-slate-500">
-                    {LEGEND.map((item) => (
+                    {legendFor(loaded.claim.on && loaded.damages.length > 0).map((item) => (
                       <li key={item.label} className="flex items-center gap-1.5">
                         <span className={`inline-block h-2 w-4 rounded-sm ${item.className}`} />
                         {item.label}
