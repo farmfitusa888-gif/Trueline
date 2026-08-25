@@ -57,6 +57,12 @@ say "Your signing team"
 # would be overwritten" and stops — which is exactly what happened. The team is
 # yours and belongs to your Mac, not to the repository, so it is lifted out
 # before the pull and put back after it.
+# Somewhere to put the copy of the project file as git has it, for comparing
+# against the one on disk. Cleaned up however this script ends, including when
+# it stops on a check.
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
 pbx="ios/Trueline.xcodeproj/project.pbxproj"
 
 # An Apple developer team is ten characters, capitals and digits. Nothing else
@@ -74,40 +80,49 @@ if ! git diff --quiet -- "$pbx"; then
   team="$(git diff -U0 -- "$pbx" \
     | sed -n 's/^+[[:space:]]*DEVELOPMENT_TEAM = \(.*\);$/\1/p' \
     | head -1 | tr -d '"')"
-  # Everything Xcode writes into the project file when somebody ticks
-  # "Automatically manage signing" and picks a team. It is more than the team:
+  # What actually changed, by what it MEANS rather than by which lines moved.
   #
-  #   DEVELOPMENT_TEAM                 the team, in the build settings
-  #   DevelopmentTeam                  the same team again, in TargetAttributes
-  #   CODE_SIGN_STYLE / ProvisioningStyle   Automatic, in both places
-  #   CODE_SIGN_IDENTITY               "Apple Development"
-  #   PROVISIONING_PROFILE_SPECIFIER   emptied when signing goes automatic
-  #   LastUpgradeCheck / LastSwiftUpdateCheck   Xcode's own bookkeeping
+  # Opening the project in Xcode rewrites it: the `PBXBuildFile` entries come
+  # back sorted, so `git diff` shows a hundred lines removed and the same
+  # hundred added, identical apart from where they sit. A line-based guard
+  # cannot tell that from somebody adding a file, and this one refused the
+  # pull over it -- correctly by its own rule and wrongly in fact.
   #
-  # The first version of this list knew three of those, so a project file
-  # Xcode had touched exactly as intended was refused as "a real edit" and the
-  # build stopped before the compiler. Anything NOT on this list is still a
-  # real edit and still stops -- adding an entitlements file is how a
-  # capability arrives, and throwing that away silently would be worse than
-  # any amount of stopping.
-  signing='DEVELOPMENT_TEAM|DevelopmentTeam|CODE_SIGN_STYLE|ProvisioningStyle|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE_SPECIFIER|PROVISIONING_PROFILE|LastUpgradeCheck|LastSwiftUpdateCheck'
-  real="$(git diff -U0 -- "$pbx" | grep -E '^[+-][^+-]' | grep -vE "$signing")"
+  # `pbxproj-diff.py` parses both versions and compares the sets: which files
+  # are built, which are referenced, what every setting is. A reorder produces
+  # no output at all. On a shuffled copy of this very project, `git diff`
+  # reported 38 changed lines and it reported none.
+  changed=""
+  if command -v python3 >/dev/null 2>&1; then
+    git show "HEAD:$pbx" > "$scratch/pbx.head" 2>/dev/null
+    changed="$(python3 core/tools/pbxproj-diff.py "$scratch/pbx.head" "$pbx" 2>/dev/null)"
+    real="$(printf '%s\n' "$changed" | grep -v '^$' \
+      | grep -vE '^SETTING  (DEVELOPMENT_TEAM|DevelopmentTeam|CODE_SIGN_STYLE|ProvisioningStyle|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE_SPECIFIER|PROVISIONING_PROFILE|LastUpgradeCheck|LastSwiftUpdateCheck) ')"
+  else
+    # No python3: fall back to the line-based check, which is worse but is not
+    # nothing. It says so rather than pretending it looked properly.
+    warn "No python3, so the project file is compared line by line and a"
+    warn "reordering by Xcode may look like an edit."
+    real="$(git diff -U0 -- "$pbx" | grep -E '^[+-][^+-]' \
+      | grep -vE 'DEVELOPMENT_TEAM|CODE_SIGN_STYLE|LastUpgradeCheck')"
+  fi
+
   if [ -n "$real" ]; then
     bad "The project file has changes that are not just your signing team."
     echo "     That is a real edit and this script will not throw it away."
     echo
-    echo "     Here it is, rather than a command to go and look at it:"
+    echo "     What actually changed, ignoring anything Xcode merely reordered:"
     printf '%s\n' "$real" | sed 's/^/       /' | head -30
     lines="$(printf '%s\n' "$real" | grep -c .)"
-    [ "$lines" -gt 30 ] && echo "       ... and $((lines - 30)) more lines"
+    [ "$lines" -gt 30 ] && echo "       ... and $((lines - 30)) more"
     echo
-    echo "     Keep it:   git stash push -- $pbx     (then re-run this script)"
-    echo "     Drop it:   git checkout -- $pbx       (then re-run this script)"
-    echo
-    echo "     If those lines are only signing, tell me and I will widen the"
-    echo "     list above -- that is a bug in this script, not in your project."
+    echo "     A FILE+ or REF+ line is a file added to the project -- keep it."
+    echo "       git stash push -- $pbx     (then re-run this script)"
+    echo "     Anything you did not mean to do:"
+    echo "       git checkout -- $pbx       (then re-run this script)"
     exit 1
   fi
+
   if [ -n "$team" ] && ! is_team "$team"; then
     # What the project file holds now is the placeholder that points AT the
     # signing file. Copying it into the signing file makes it point at itself.
