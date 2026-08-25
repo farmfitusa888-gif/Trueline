@@ -1,4 +1,4 @@
-import { SP, check, loadScan, open, pick, report } from './lib.mjs';
+import { SP, check, loadScan, open, pick, report, section } from './lib.mjs';
 const { browser, ctx, page } = await open();
 await loadScan(page);
 
@@ -19,8 +19,10 @@ await page.waitForTimeout(400);
 const afterDoor = [];
 for (const l of await page.getByRole('button', { name: /^Wall / }).all()) afterDoor.push(await l.getAttribute('aria-label'));
 check('measuring an opening moves no wall', afterDoor.every((l) => /20'$|21'$/.test(l || '')), afterDoor.join(' | '));
+await section(page, 'Takeoff');
 const t2 = await page.locator('body').innerText();
 check('the baseboard follows the door', t2.includes('79.17 lf'), '82ft less a 2ft10 door = 79.166');
+await section(page, 'Plan');
 
 /* --------------------------------- an opening that will not fit is refused */
 
@@ -46,6 +48,8 @@ if (await undo.count()) {
 
 /* --------------------------------------------------------------- exports */
 
+await section(page, 'Files');
+
 const send = page.locator('section', { has: page.getByRole('heading', { name: 'Send the drawing' }) }).first();
 check('the drawing can be sent', (await send.count()) === 1);
 const names = await send.getByRole('button').allInnerTexts();
@@ -62,6 +66,7 @@ await dxf.saveAs(SP + '/audit-plan.dxf');
 check('a DXF is produced', dxf.suggestedFilename().endsWith('.dxf'), dxf.suggestedFilename());
 
 // The spreadsheet.
+await section(page, 'Takeoff');
 const takeoff = page.locator('section', { has: page.getByRole('heading', { name: 'What this room takes' }) }).first();
 const [csv] = await Promise.all([
   page.waitForEvent('download', { timeout: 30000 }),

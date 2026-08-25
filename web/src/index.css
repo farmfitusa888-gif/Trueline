@@ -36,8 +36,17 @@
        as "not one of the marked ones" rather than as a list of what to hide —
        a list goes stale the moment a card is added, and the failure is a
        client's drawing with the app's controls printed across it. */
+    /* The sections are panels now, and the one being printed is not
+       necessarily the one on screen: a drawing is printed from the Plan tab
+       and the takeoff lives under Takeoff. So every panel is put back before
+       anything is hidden, and the marked cards are looked for inside them. */
+    body.printing-plan [data-panel][hidden] {
+      display: block !important;
+    }
     body.printing-plan header,
-    body.printing-plan .sheet-root > *:not([data-sheet='yes']),
+    body.printing-plan nav,
+    body.printing-plan .sheet-root > *:not([data-panel]):not([data-sheet='yes']),
+    body.printing-plan [data-panel] > *:not([data-sheet='yes']),
     body.printing-plan [data-sheet='yes'] [data-sheet='no'] {
       display: none !important;
     }

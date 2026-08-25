@@ -1,4 +1,4 @@
-import { SP, check, loadScan, open, pick, report } from './lib.mjs';
+import { SP, check, loadScan, open, pick, report, section } from './lib.mjs';
 const { browser, ctx, page } = await open();
 
 /* -------------------------------------------- corrections survive a reload */
@@ -63,9 +63,15 @@ check('a moved wall is violet on the plan', (await page.locator('svg line[stroke
 check('the key names it', (await page.locator('ul.flex-wrap').first().innerText()).includes('Moved by hand'));
 t = await page.locator('body').innerText();
 check('a moved wall never reads as measured', /moved by hand, which is not the same as measured/.test(t));
+// The room's own verdict lives with the checks, a tab away from the drawing.
+// That it is a tab away is the point: a wall dragged on the Plan must not have
+// quietly changed what the Room section says about the whole room.
+await section(page, 'Room');
+const verdict = await page.locator('body').innerText();
 check('and the room still asks for a tape',
-  /Put a tape on one east-west wall|Put a tape on one north-south wall/.test(t),
-  t.split('\n').filter((l) => /tape on one/.test(l)).join(' | '));
+  /Put a tape on one east-west wall|Put a tape on one north-south wall/.test(verdict),
+  verdict.split('\n').filter((l) => /tape on one/.test(l)).join(' | '));
+await section(page, 'Plan');
 
 /* --------------------------------------------------------------- the room name */
 

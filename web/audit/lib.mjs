@@ -65,6 +65,34 @@ export async function pick(page, re) {
   await page.waitForTimeout(200);
 }
 
+/**
+ * Opens one of the room's sections.
+ *
+ * The app used to be a single column: everything was on screen at once and a
+ * script could find any of it by name. It is tabbed now, because on a phone
+ * that column put "Is this an insurance job?" ten screens below the fold and
+ * the feature might as well not have been built. So every part of this audit
+ * has to say which section its subject lives in — the same thing a person now
+ * has to do, which is the point.
+ *
+ * Idempotent, and it waits for the panel to actually be showing rather than
+ * for a timeout, so a slow machine does not fail a passing check.
+ */
+export async function section(page, title) {
+  // Scoped to the bar: "Plan" is also the start of every wall's label on the
+  // drawing, and a badge puts a number inside the tab's own name.
+  const tab = page
+    .getByRole('navigation', { name: 'Parts of this room' })
+    .getByRole('button', { name: new RegExp('^' + title) })
+    .first();
+  await tab.click();
+  const key = {
+    Plan: 'plan', Room: 'room', Takeoff: 'takeoff',
+    Price: 'price', Insurance: 'claim', Files: 'files',
+  }[title];
+  await page.waitForSelector(`[data-panel="${key}"]:not([hidden])`, { timeout: 5000 });
+}
+
 export async function loadScan(page, file = 'garage.json') {
   await page.setInputFiles('input[type=file][accept="application/json,.json"]', `${SP}/${file}`);
   await page.waitForTimeout(500);

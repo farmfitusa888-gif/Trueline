@@ -1,9 +1,10 @@
-import { SP, check, loadScan, open, pick, report } from './lib.mjs';
+import { SP, check, loadScan, open, pick, report, section } from './lib.mjs';
 const { browser, ctx, page } = await open();
 await loadScan(page);
 
 /* ------------------------------------------------------- insurance is off */
 
+await section(page, 'Insurance');
 let t = await page.locator('body').innerText();
 check('insurance mode is off by default', t.includes('Is this an insurance job?'));
 check('nothing restoration-shaped is on a normal job',
@@ -27,6 +28,9 @@ await page.waitForTimeout(300);
 check('the missing list clears as it is filled', !(await claim.innerText()).includes('Still to fill in'));
 
 /* -------------------------------------------------------------- the damage */
+
+// Marking damage is done on the drawing: you point at the wall it is on.
+await section(page, 'Plan');
 
 await pick(page, /^Wall wall-1,/);
 await page.getByRole('button', { name: '+ damaged area' }).click();
@@ -69,6 +73,8 @@ check('and it says plainly it is not backed up in a browser',
   (await page.locator('body').innerText()).includes('On this browser only'));
 
 /* --------------------------------------------------------------- the scope */
+
+await section(page, 'Insurance');
 
 const scope = page.locator('section', { has: page.getByRole('heading', { name: 'What the damage takes' }) }).first();
 check('the damage has its own sheet', (await scope.count()) === 1);

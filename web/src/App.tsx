@@ -6,6 +6,7 @@ import { useUnits } from './units.tsx';
 import { readiness } from '../../core/src/issue.ts';
 import { extent } from '../../core/src/health.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
+import { missingFromClaim } from '../../core/src/claim.ts';
 import { EMPTY, persist, reduce } from './state.ts';
 import { installBridge } from './bridge.ts';
 import { Plan, legendFor } from './Plan.tsx';
@@ -17,6 +18,7 @@ import { Takeoff } from './Takeoff.tsx';
 import { Thickness } from './Thickness.tsx';
 import { Measure } from './Measure.tsx';
 import { planThumbnail } from './sheet.ts';
+import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Sections.tsx';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
@@ -152,6 +154,7 @@ export function App() {
   // Plan or room. The same model, the same selection, the same tape box under
   // both — switching view never changes what is being measured.
   const [look, setLook] = useState<'plan' | 'room'>('plan');
+  const [section, setSection] = useState<SectionKey>('plan');
   const [drawing, setDrawing] = useState(false);
   const [settings, setSettings] = useState(false);
   // One room, or all of them. The floor is a view over the rooms already saved
@@ -241,18 +244,30 @@ export function App() {
     };
   }, [loaded]);
 
+  /// What each section is waiting on, counted from the same functions the
+  /// sections themselves use. A number on a tab is the only way a part of the
+  /// app nobody has opened can ask to be opened — and every one of these is a
+  /// thing a person has to do, never a complaint about the app.
+  const sectionFlags = useMemo<SectionFlags>(() => {
+    if (!loaded || !derived) return {};
+    return {
+      room: derived.state.blocking.length + derived.punchList.length,
+      claim: loaded.claim.on ? missingFromClaim(loaded.claim).length : 0,
+    };
+  }, [loaded, derived]);
+
   const selectedWall = loaded && state.selected ? loaded.room.walls.find((w) => w.id === state.selected) : undefined;
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-24 pt-6">
-      <header className="mb-5 flex items-baseline justify-between gap-3">
+      <header className="mb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900">
           <Mark className="h-7 w-auto text-slate-900" />
           <span>
             True<span className="text-[#B8590A]">line</span>
           </span>
         </h1>
-        <span className="flex shrink-0 items-baseline gap-4">
+        <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           {loaded && (
             <button
               type="button"
@@ -344,303 +359,317 @@ export function App() {
       ) : (
         derived && (
           <div className="space-y-5 sheet-root">
-            <div data-sheet="yes" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div data-sheet="no" className="mb-2 flex items-baseline justify-between gap-3 px-1">
-                <h2 className="text-base font-semibold text-slate-900">{loaded.room.name}</h2>
-                <p className="text-sm tabular-nums text-slate-600">
-                  {len(derived.extent.x)} × {len(derived.extent.y)} ·{' '}
-                  {showArea(derived.area.value)}
-                </p>
-              </div>
+            <SectionBar active={section} flags={sectionFlags} onPick={setSection} />
 
-              {/* Out of the importer the name is a file name, and "garage.json"
-                  at the head of a document going to an insurer reads as a
-                  machine's output rather than a contractor's. */}
-              <div data-sheet="no" className="mb-3 px-1">
-                <RenameRoom
-                  room={loaded.room}
-                  onRename={(name) => dispatch({ type: 'renameRoom', name })}
-                />
-              </div>
+            <Panel section="plan" active={section}>
+              <div data-sheet="yes" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div data-sheet="no" className="mb-2 flex items-baseline justify-between gap-3 px-1">
+                  <h2 className="text-base font-semibold text-slate-900">{loaded.room.name}</h2>
+                  <p className="text-sm tabular-nums text-slate-600">
+                    {len(derived.extent.x)} × {len(derived.extent.y)} ·{' '}
+                    {showArea(derived.area.value)}
+                  </p>
+                </div>
 
-              <div
-                role="tablist"
-                data-sheet="no"
-                aria-label="How to look at this room"
-                className="mb-3 flex gap-1 rounded-lg bg-slate-100 p-1"
-              >
-                {(['plan', 'room'] as const).map((which) => (
-                  <button
-                    key={which}
-                    type="button"
-                    role="tab"
-                    aria-selected={look === which}
-                    onClick={() => setLook(which)}
-                    className={`min-h-11 flex-1 rounded-md px-4 font-medium ${
-                      look === which
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-600 active:bg-slate-200'
-                    }`}
-                  >
-                    {which === 'plan' ? 'Blueprint' : '3D'}
-                  </button>
-                ))}
-              </div>
-
-              {look === 'plan' ? (
-                <>
-                  <Plan
+                {/* Out of the importer the name is a file name, and "garage.json"
+                    at the head of a document going to an insurer reads as a
+                    machine's output rather than a contractor's. */}
+                <div data-sheet="no" className="mb-3 px-1">
+                  <RenameRoom
                     room={loaded.room}
-                    north={loaded.north}
+                    onRename={(name) => dispatch({ type: 'renameRoom', name })}
+                  />
+                </div>
+
+                <div
+                  role="tablist"
+                  data-sheet="no"
+                  aria-label="How to look at this room"
+                  className="mb-3 flex gap-1 rounded-lg bg-slate-100 p-1"
+                >
+                  {(['plan', 'room'] as const).map((which) => (
+                    <button
+                      key={which}
+                      type="button"
+                      role="tab"
+                      aria-selected={look === which}
+                      onClick={() => setLook(which)}
+                      className={`min-h-11 flex-1 rounded-md px-4 font-medium ${
+                        look === which
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 active:bg-slate-200'
+                      }`}
+                    >
+                      {which === 'plan' ? 'Blueprint' : '3D'}
+                    </button>
+                  ))}
+                </div>
+
+                {look === 'plan' ? (
+                  <>
+                    <Plan
+                      room={loaded.room}
+                      north={loaded.north}
+                      selected={state.selected}
+                      obstructions={derived.obstructions}
+                      footprints={loaded.footprints}
+                      damages={loaded.claim.on ? loaded.damages : []}
+                      onSelect={(wallId) => dispatch({ type: 'select', wallId })}
+                    />
+                    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-slate-500">
+                      {legendFor(
+                        loaded.claim.on && loaded.damages.length > 0,
+                        loaded.room.walls.some((wall) => isAdjusted(wall.length))
+                      ).map((item) => (
+                        <li key={item.label} className="flex items-center gap-1.5">
+                          <span className={`inline-block h-2 w-4 rounded-sm ${item.className}`} />
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <Room3D
+                    room={loaded.room}
                     selected={state.selected}
-                    obstructions={derived.obstructions}
-                    footprints={loaded.footprints}
-                    damages={loaded.claim.on ? loaded.damages : []}
                     onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                   />
-                  <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-slate-500">
-                    {legendFor(
-                      loaded.claim.on && loaded.damages.length > 0,
-                      loaded.room.walls.some((wall) => isAdjusted(wall.length))
-                    ).map((item) => (
-                      <li key={item.label} className="flex items-center gap-1.5">
-                        <span className={`inline-block h-2 w-4 rounded-sm ${item.className}`} />
-                        {item.label}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <Room3D
-                  room={loaded.room}
-                  selected={state.selected}
-                  onSelect={(wallId) => dispatch({ type: 'select', wallId })}
-                />
-              )}
-            </div>
-
-            {selectedWall && (
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h2 className="font-semibold text-slate-900">
-                    {len(runLength(selectedWall))}
-                    {selectedWall.open ? ' — no wall here' : ''}
-                    {isDiagonal(selectedWall.heading) ? ' — angled' : ''}
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: 'select', wallId: null })}
-                    className="text-sm text-slate-500 underline underline-offset-4"
-                  >
-                    Done
-                  </button>
-                </div>
-                <p className="mt-1 mb-3 text-sm text-slate-600">
-                  Put a tape on it and type what it really is. Every other wall moves to fit, and
-                  this one never moves again.
-                </p>
-                <Measure
-                  name={`the length of ${selectedWall.id}`}
-                  label={`e.g. ${len(runLength(selectedWall))}`}
-                  onSubmit={(text) =>
-                    dispatch({
-                      type: 'verify',
-                      wallId: selectedWall.id,
-                      text,
-                      by: 'me',
-                      at: new Date().toISOString(),
-                    })
-                  }
-                />
-                <Openings
-                  room={loaded.room}
-                  wall={selectedWall}
-                  onSet={(openingId, field, text) =>
-                    dispatch({
-                      type: 'opening',
-                      wallId: selectedWall.id,
-                      openingId,
-                      field,
-                      text,
-                      by: 'me',
-                      at: new Date().toISOString(),
-                    })
-                  }
-                  onAdd={(kind, where) =>
-                    dispatch({
-                      type: 'addOpening',
-                      wallId: selectedWall.id,
-                      kind,
-                      width: kind === 'cased' ? `4'` : kind === 'door' ? `3'` : `3'`,
-                      height: kind === 'window' ? `4'` : `6'8"`,
-                      offsetFromStart: where,
-                      ...(kind === 'window' ? { sillHeight: `2'6"` } : {}),
-                      by: 'me',
-                      at: new Date().toISOString(),
-                    })
-                  }
-                  onRemove={(openingId) =>
-                    dispatch({ type: 'removeOpening', wallId: selectedWall.id, openingId })
-                  }
-                />
-
-                {!selectedWall.open && (
-                  <Elevation room={loaded.room} wall={selectedWall} damages={loaded.damages} />
                 )}
+              </div>
 
-                {loaded.claim.on && (
-                  <DamageOnWall
-                    room={loaded.room}
-                    wall={selectedWall}
-                    damages={loaded.damages}
-                    scanName={loaded.fileName}
-                    onMark={(damage) => dispatch({ type: 'mark', damage })}
-                    onUnmark={(damageId) => dispatch({ type: 'unmark', damageId })}
-                    onCutTo={(damageId, text) => dispatch({ type: 'cutTo', damageId, text })}
-                    onReading={(damageId, reading) =>
-                      dispatch({ type: 'reading', damageId, reading })
-                    }
-                    onPhotos={(damageId, photos) =>
-                      dispatch({ type: 'damagePhotos', damageId, photos })
+              {selectedWall && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h2 className="font-semibold text-slate-900">
+                      {len(runLength(selectedWall))}
+                      {selectedWall.open ? ' — no wall here' : ''}
+                      {isDiagonal(selectedWall.heading) ? ' — angled' : ''}
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => dispatch({ type: 'select', wallId: null })}
+                      className="text-sm text-slate-500 underline underline-offset-4"
+                    >
+                      Done
+                    </button>
+                  </div>
+                  <p className="mt-1 mb-3 text-sm text-slate-600">
+                    Put a tape on it and type what it really is. Every other wall moves to fit, and
+                    this one never moves again.
+                  </p>
+                  <Measure
+                    name={`the length of ${selectedWall.id}`}
+                    label={`e.g. ${len(runLength(selectedWall))}`}
+                    onSubmit={(text) =>
+                      dispatch({
+                        type: 'verify',
+                        wallId: selectedWall.id,
+                        text,
+                        by: 'me',
+                        at: new Date().toISOString(),
+                      })
                     }
                   />
-                )}
+                  <Openings
+                    room={loaded.room}
+                    wall={selectedWall}
+                    onSet={(openingId, field, text) =>
+                      dispatch({
+                        type: 'opening',
+                        wallId: selectedWall.id,
+                        openingId,
+                        field,
+                        text,
+                        by: 'me',
+                        at: new Date().toISOString(),
+                      })
+                    }
+                    onAdd={(kind, where) =>
+                      dispatch({
+                        type: 'addOpening',
+                        wallId: selectedWall.id,
+                        kind,
+                        width: kind === 'cased' ? `4'` : kind === 'door' ? `3'` : `3'`,
+                        height: kind === 'window' ? `4'` : `6'8"`,
+                        offsetFromStart: where,
+                        ...(kind === 'window' ? { sillHeight: `2'6"` } : {}),
+                        by: 'me',
+                        at: new Date().toISOString(),
+                      })
+                    }
+                    onRemove={(openingId) =>
+                      dispatch({ type: 'removeOpening', wallId: selectedWall.id, openingId })
+                    }
+                  />
 
-                <EditWall
-                  room={loaded.room}
-                  wall={selectedWall}
-                  onRename={(name) =>
-                    dispatch({ type: 'renameWall', wallId: selectedWall.id, name })
-                  }
-                  onDrag={(text) =>
-                    dispatch({
-                      type: 'drag',
-                      wallId: selectedWall.id,
-                      text,
-                      by: 'me',
-                      at: new Date().toISOString(),
-                    })
-                  }
-                  onUnverify={() => dispatch({ type: 'unverify', wallId: selectedWall.id })}
-                  onSplit={(at, newId, height) =>
-                    dispatch({
-                      type: 'split',
-                      wallId: selectedWall.id,
-                      at,
-                      newId,
-                      height,
-                      by: 'me',
-                      when: new Date().toISOString(),
-                    })
-                  }
-                  onDelete={() => dispatch({ type: 'deleteWall', wallId: selectedWall.id })}
-                  onNotch={(out, along, outId, alongId) =>
-                    dispatch({
-                      type: 'notch',
-                      wallId: selectedWall.id,
-                      out,
-                      along,
-                      outId,
-                      alongId,
-                      by: 'me',
-                      at: new Date().toISOString(),
-                    })
-                  }
-                />
+                  {!selectedWall.open && (
+                    <Elevation room={loaded.room} wall={selectedWall} damages={loaded.damages} />
+                  )}
 
-                <WallPhotos room={loaded.room} wallId={selectedWall.id} photos={loaded.photos} />
+                  {loaded.claim.on && (
+                    <DamageOnWall
+                      room={loaded.room}
+                      wall={selectedWall}
+                      damages={loaded.damages}
+                      scanName={loaded.fileName}
+                      onMark={(damage) => dispatch({ type: 'mark', damage })}
+                      onUnmark={(damageId) => dispatch({ type: 'unmark', damageId })}
+                      onCutTo={(damageId, text) => dispatch({ type: 'cutTo', damageId, text })}
+                      onReading={(damageId, reading) =>
+                        dispatch({ type: 'reading', damageId, reading })
+                      }
+                      onPhotos={(damageId, photos) =>
+                        dispatch({ type: 'damagePhotos', damageId, photos })
+                      }
+                    />
+                  )}
 
-                {!selectedWall.open && (
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: 'make', wallId: selectedWall.id, as: 'open' })}
-                    className="mt-3 text-sm text-slate-600 underline underline-offset-4"
-                  >
-                    There is no wall here
-                  </button>
-                )}
-              </div>
-            )}
+                  <EditWall
+                    room={loaded.room}
+                    wall={selectedWall}
+                    onRename={(name) =>
+                      dispatch({ type: 'renameWall', wallId: selectedWall.id, name })
+                    }
+                    onDrag={(text) =>
+                      dispatch({
+                        type: 'drag',
+                        wallId: selectedWall.id,
+                        text,
+                        by: 'me',
+                        at: new Date().toISOString(),
+                      })
+                    }
+                    onUnverify={() => dispatch({ type: 'unverify', wallId: selectedWall.id })}
+                    onSplit={(at, newId, height) =>
+                      dispatch({
+                        type: 'split',
+                        wallId: selectedWall.id,
+                        at,
+                        newId,
+                        height,
+                        by: 'me',
+                        when: new Date().toISOString(),
+                      })
+                    }
+                    onDelete={() => dispatch({ type: 'deleteWall', wallId: selectedWall.id })}
+                    onNotch={(out, along, outId, alongId) =>
+                      dispatch({
+                        type: 'notch',
+                        wallId: selectedWall.id,
+                        out,
+                        along,
+                        outId,
+                        alongId,
+                        by: 'me',
+                        at: new Date().toISOString(),
+                      })
+                    }
+                  />
 
-            {(loaded.lastEdit || loaded.undo.length > 0) && (
-              <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-100 px-4 py-3 text-sm">
-                <p className="text-slate-700">{loaded.lastEdit}</p>
-                {loaded.undo.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: 'undo' })}
-                    className="min-h-11 shrink-0 rounded-md border border-slate-300 bg-white px-4 font-medium active:bg-slate-200"
-                  >
-                    Undo
-                  </button>
-                )}
-              </div>
-            )}
+                  <WallPhotos room={loaded.room} wallId={selectedWall.id} photos={loaded.photos} />
 
-            <Ceiling
-              room={loaded.room}
-              onSet={(text, how) =>
-                dispatch({ type: 'ceiling', text, how, by: 'me', at: new Date().toISOString() })
-              }
-            />
+                  {!selectedWall.open && (
+                    <button
+                      type="button"
+                      onClick={() => dispatch({ type: 'make', wallId: selectedWall.id, as: 'open' })}
+                      className="mt-3 text-sm text-slate-600 underline underline-offset-4"
+                    >
+                      There is no wall here
+                    </button>
+                  )}
+                </div>
+              )}
 
-            <Thickness
-              room={loaded.room}
-              selected={state.selected}
-              onSet={(wallId, text, how) =>
-                dispatch({ type: 'thickness', wallId, text, how, by: 'me', at: new Date().toISOString() })
-              }
-            />
+              {(loaded.lastEdit || loaded.undo.length > 0) && (
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-100 px-4 py-3 text-sm">
+                  <p className="text-slate-700">{loaded.lastEdit}</p>
+                  {loaded.undo.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => dispatch({ type: 'undo' })}
+                      className="min-h-11 shrink-0 rounded-md border border-slate-300 bg-white px-4 font-medium active:bg-slate-200"
+                    >
+                      Undo
+                    </button>
+                  )}
+                </div>
+              )}
+            </Panel>
 
-            <div data-sheet="yes">
-              <Takeoff room={loaded.room} readiness={derived.state} />
-            </div>
-
-            <Claim
-              room={loaded.room}
-              damages={loaded.damages}
-              claim={loaded.claim}
-              onChange={(claim) => dispatch({ type: 'claim', claim })}
-            />
-
-            {/* The restoration sheet, only on a job that is one, and never
-                folded into the takeoff above it. Two payers, two sheets. */}
-            {loaded.claim.on && <Scope room={loaded.room} damages={loaded.damages} />}
-
-            {loaded.claim.on && (
-              <ClaimSend
+            <Panel section="room" active={section}>
+              <Ceiling
                 room={loaded.room}
-                fileName={loaded.fileName}
+                onSet={(text, how) =>
+                  dispatch({ type: 'ceiling', text, how, by: 'me', at: new Date().toISOString() })
+                }
+              />
+
+              <Thickness
+                room={loaded.room}
+                selected={state.selected}
+                onSet={(wallId, text, how) =>
+                  dispatch({ type: 'thickness', wallId, text, how, by: 'me', at: new Date().toISOString() })
+                }
+              />
+
+              <Corrections
+                room={loaded.room}
+                report={loaded.report}
+                readiness={derived.state}
+                obstructions={derived.obstructions}
+                punchList={derived.punchList}
+                photos={loaded.photos}
+                rejectedPhotos={loaded.rejectedPhotos}
+                selected={state.selected}
+                onSelect={(wallId) => dispatch({ type: 'select', wallId })}
+                onMake={(wallId, as) => dispatch({ type: 'make', wallId, as })}
+              />
+            </Panel>
+
+            <Panel section="takeoff" active={section}>
+              <div data-sheet="yes">
+                <Takeoff room={loaded.room} readiness={derived.state} />
+              </div>
+            </Panel>
+
+            <Panel section="price" active={section}>
+              <Price
+                room={loaded.room}
+                overrides={loaded.overrides}
+                onOverride={(override) => dispatch({ type: 'override', override })}
+                onClearOverride={(item, unit) => dispatch({ type: 'clearOverride', item, unit })}
+              />
+
+              <JobStatus room={loaded.room} fileName={loaded.fileName} />
+            </Panel>
+
+            <Panel section="claim" active={section}>
+              <Claim
+                room={loaded.room}
                 damages={loaded.damages}
                 claim={loaded.claim}
+                onChange={(claim) => dispatch({ type: 'claim', claim })}
               />
-            )}
 
-            <Price
-              room={loaded.room}
-              overrides={loaded.overrides}
-              onOverride={(override) => dispatch({ type: 'override', override })}
-              onClearOverride={(item, unit) => dispatch({ type: 'clearOverride', item, unit })}
-            />
+              {/* The restoration sheet, only on a job that is one, and never
+                  folded into the takeoff above it. Two payers, two sheets. */}
+              {loaded.claim.on && <Scope room={loaded.room} damages={loaded.damages} />}
 
-            <JobStatus room={loaded.room} fileName={loaded.fileName} />
+              {loaded.claim.on && (
+                <ClaimSend
+                  room={loaded.room}
+                  fileName={loaded.fileName}
+                  damages={loaded.damages}
+                  claim={loaded.claim}
+                />
+              )}
+            </Panel>
 
-            <Sheet room={loaded.room} photos={loaded.photos} overrides={loaded.overrides} />
+            <Panel section="files" active={section}>
+              <Sheet room={loaded.room} photos={loaded.photos} overrides={loaded.overrides} />
 
-            <FieldSheet room={loaded.room} footprints={loaded.footprints} />
-
-            <Corrections
-              room={loaded.room}
-              report={loaded.report}
-              readiness={derived.state}
-              obstructions={derived.obstructions}
-              punchList={derived.punchList}
-              photos={loaded.photos}
-              rejectedPhotos={loaded.rejectedPhotos}
-              selected={state.selected}
-              onSelect={(wallId) => dispatch({ type: 'select', wallId })}
-              onMake={(wallId, as) => dispatch({ type: 'make', wallId, as })}
-            />
+              <FieldSheet room={loaded.room} footprints={loaded.footprints} />
+            </Panel>
 
             <p className="px-1 text-xs text-slate-400 print:hidden">
               {loaded.fileName} · imported from RoomPlan v{loaded.report.sourceVersion ?? '?'} ·

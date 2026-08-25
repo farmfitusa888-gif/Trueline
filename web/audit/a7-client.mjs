@@ -1,9 +1,10 @@
-import { SP, check, loadScan, noise, open, pick, report } from './lib.mjs';
+import { SP, check, loadScan, noise, open, pick, report, section } from './lib.mjs';
 const { browser, ctx, page } = await open();
 await loadScan(page);
 
 /* ------------------------------------------------------------ the findings */
 
+await section(page, 'Room');
 let t = await page.locator('body').innerText();
 check('the room closing perfectly is called out as meaningless', /closes perfectly, and that means nothing yet/i.test(t));
 check('the punch list ranks walls worth a tape', /Measure these first/i.test(t));
@@ -12,10 +13,14 @@ check('every dimension is listed with where it came from', /Every dimension, and
 
 /* --------------------------------------------------------------- the field sheet */
 
+await section(page, 'Files');
+t = await page.locator('body').innerText();
+
 check('a field sheet exists to carry and write on', /Take this list with you/i.test(t), t.slice(-800));
 
 /* ------------------------------------------------- override travels to the client */
 
+await section(page, 'Price');
 const price = page.locator('section', { has: page.getByRole('heading', { name: 'What it comes to' }) }).first();
 await price.getByRole('button', { name: /Set your rates|Your rates/ }).click();
 await page.waitForTimeout(300);
@@ -43,6 +48,7 @@ check('and both numbers stay on the line', /not the 420\.0 sq ft this room measu
 
 /* -------------------------------------------------------------- client file */
 
+await section(page, 'Files');
 const send = page.locator('section', { has: page.getByRole('heading', { name: 'Send the drawing' }) }).first();
 const [file] = await Promise.all([
   page.waitForEvent('download', { timeout: 30000 }),

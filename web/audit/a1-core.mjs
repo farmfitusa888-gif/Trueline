@@ -1,4 +1,4 @@
-import { SP, check, loadScan, noise, open, pick, report } from './lib.mjs';
+import { SP, check, loadScan, noise, open, pick, report, section } from './lib.mjs';
 
 const { browser, page } = await open();
 
@@ -42,6 +42,8 @@ check('back to the blueprint', (await page.locator('svg[aria-label^="Plan of"]')
 
 /* ---------------------------------------------------------------- the takeoff */
 
+await section(page, 'Takeoff');
+
 const takeoff = await page.locator('body').innerText();
 check('floor area on the takeoff', takeoff.includes('420.0 sq ft'));
 check('wall face on the takeoff', takeoff.includes('702.0 sq ft'), 'expected 82ft perimeter x 9ft less 36 sq ft of openings');
@@ -49,8 +51,11 @@ check('baseboard on the takeoff', takeoff.includes('79.00 lf'), 'expected 82ft l
 
 /* ------------------------------------------------------------ ceiling height */
 
+await section(page, 'Room');
+
 await page.getByRole('button', { name: "10'", exact: true }).first().click();
 await page.waitForTimeout(400);
+await section(page, 'Takeoff');
 const tall = await page.locator('body').innerText();
 // 82 ft of perimeter at 10 ft is 820 sq ft, less a 3x6'8" door (20) and a
 // 4x4 window (16) = 784. Checked on paper.
@@ -59,14 +64,17 @@ check('setting the ceiling leaves the floor alone', tall.includes('420.0 sq ft')
 
 /* --------------------------------------------------------------- wall thickness */
 
+await section(page, 'Room');
 await page.getByRole('button', { name: '2x6', exact: true }).first().click();
 await page.waitForTimeout(400);
+await section(page, 'Takeoff');
 const thick = await page.locator('body').innerText();
 check('thickness unlocks the framing block', /Plates|Studs/.test(thick), thick.slice(0, 400));
 check('thickness gives the jamb size', /6 9\/16|6\.5625/.test(thick), 'a 2x6 jamb is 6 9/16 inches');
 
 /* -------------------------------------------------------------- verify a wall */
 
+await section(page, 'Plan');
 await pick(page, /^Wall wall-1,/);
 const box = page.getByRole('textbox', { name: 'the length of wall-1' });
 check('the wall length box is named for its wall', (await box.count()) === 1, `${await box.count()} boxes`);

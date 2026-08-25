@@ -1,4 +1,4 @@
-import { SP, check, loadScan, open, report } from './lib.mjs';
+import { SP, check, loadScan, open, report, section } from './lib.mjs';
 const { browser, page } = await open();
 
 /* ------------------------------------------------------------ the business */
@@ -55,6 +55,8 @@ t = await page.locator('body').innerText();
 check('switching back gives feet and inches', t.includes('420.0 sq ft'), t.slice(0, 250));
 
 /* ------------------------------------------------------------- job status */
+
+await section(page, 'Price');
 
 // It hides itself until there are rates, which is right: nobody can mark a job
 // won at a price they never set. So set one.
