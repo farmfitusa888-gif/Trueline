@@ -59,7 +59,7 @@ export function ClaimSend({
   readonly claim: Claim;
 }) {
   const { company } = useUnits();
-  const [busy, setBusy] = useState<'html' | 'pdf' | null>(null);
+  const [busy, setBusy] = useState<'html' | 'pdf' | 'job' | null>(null);
   const [told, setTold] = useState<string | null>(null);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
 
@@ -151,6 +151,79 @@ export function ClaimSend({
         new Blob([pdf as BlobPart], { type: 'application/pdf' }),
         fileNameFor(claim.claimNumber?.trim() || room.name, 'pdf', 'claim'),
         claim.claimNumber ? `Claim ${claim.claimNumber}` : `${room.name} — claim`
+      );
+      if (said) setTold(said);
+    } catch (error) {
+      setTold(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * The whole job in one archive.
+   *
+   * Six things that would otherwise be six attachments and a seventh somebody
+   * forgets. Not an .esx — see `core/src/job-file.ts` — and it says so inside
+   * itself, because a file that quietly is not an ESX is a file somebody sends
+   * expecting Xactimate to open it.
+   */
+  async function sendJob() {
+    setBusy('job');
+    setTold(null);
+    try {
+      const parts = await gatherRooms();
+      const first = parts[0]!;
+      const at = new Date().toLocaleDateString();
+
+      const html = claimFile({ rooms: parts, claim, company, at });
+
+      // Photographs as bytes rather than data URLs: an archive should carry the
+      // picture, not a base64 spelling of it a third larger.
+      const bytes = new Map<string, Uint8Array>();
+      for (const [name, url] of first.photos) {
+        const comma = url.indexOf(',');
+        if (comma === -1) continue;
+        const binary = atob(url.slice(comma + 1));
+        const out = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
+        bytes.set(name, out);
+      }
+
+      let pdf: Uint8Array | undefined;
+      try {
+        const { claimPdf } = await import('./claimPdf.ts');
+        const byDamage = new Map(first.damages.map((d) => [d.id, d.photos]));
+        pdf = await claimPdf({
+          report: claimReport(first.room, first.damages, claim, at, {
+            len: (v) => showLength(v, company.units),
+            area: (a) => showArea(a, company.units),
+          }),
+          company,
+          photos: byDamage,
+          bytes,
+          at,
+        });
+      } catch {
+        // An archive without the PDF is still the archive. The manifest lists
+        // what is actually in it rather than what was meant to be.
+      }
+
+      const { jobFile } = await import('./jobFile.ts');
+      const zip = await jobFile({
+        room: first.room,
+        damages: first.damages,
+        claim,
+        company,
+        html,
+        ...(pdf ? { pdf } : {}),
+        photos: bytes,
+        at,
+      });
+      const said = await sendFile(
+        zip,
+        fileNameFor(claim.claimNumber?.trim() || room.name, 'zip', 'job'),
+        claim.claimNumber ? `Claim ${claim.claimNumber}` : `${room.name} — the job`
       );
       if (said) setTold(said);
     } catch (error) {
@@ -273,6 +346,24 @@ export function ClaimSend({
         picture of one, and it opens on anything. Send the PDF when the carrier&rsquo;s system
         wants one, which most of them do. It is this room only: a claim system takes a document
         per room, and one file covering four is a file somebody splits by hand.
+      </p>
+
+      <button
+        type="button"
+        disabled={busy !== null}
+        onClick={() => void sendJob()}
+        className="mt-3 min-h-11 w-full rounded-md border border-slate-300 px-4 text-sm
+                   font-medium text-slate-700 active:bg-slate-100 disabled:opacity-60"
+      >
+        {busy === 'job' ? 'Packing it…' : 'Everything, in one archive'}
+      </button>
+      <p className="mt-1 text-xs text-slate-500">
+        The claim both ways, the drawing as CAD, the room&rsquo;s takeoff and the damage scope as
+        spreadsheets, and the photographs as they were taken — with a plain list inside saying
+        what each thing is for.{' '}
+        <strong>It is not an .esx and Xactimate will not open it.</strong> ESX is Verisk&rsquo;s
+        own format and every tool that writes one has a partnership with them to do it; this
+        carries the same things in formats anything can read.
       </p>
 
       <p className="mt-2 text-xs text-slate-500">
