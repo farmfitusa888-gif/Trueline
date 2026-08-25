@@ -273,3 +273,111 @@ test('the wall schedule says which walls were measured and which were guessed', 
   assert.equal(schedule.split('\n').length, plain.walls.length);
   for (const line of schedule.split('\n')) assert.match(line, /scanned ±/);
 });
+
+/* ------------------------------------------------ what wall thickness adds */
+
+const stated = (text: string) => verified(parseLength(text), 'sam', T0, 'stated');
+
+test('with no thickness anywhere, the sheet is exactly what it always was', () => {
+  // Thickness is additive. A room nobody has told about its walls must produce
+  // the same four lines it produced before any of this existed.
+  const t = takeoff(plain, '2026-08-24 18:19');
+  assert.deepEqual(
+    t.lines.map((l) => l.what),
+    ['Floor', 'Ceiling', 'Wall face', 'Baseboard']
+  );
+  assert.deepEqual(t.withoutThickness, ['south', 'east', 'north', 'west']);
+});
+
+test('the walls with no thickness are named on the sheet, not silently dropped', () => {
+  const half: Room = {
+    ...plain,
+    walls: [{ ...plain.walls[0]!, thickness: stated(`4 1/2"`) }, ...plain.walls.slice(1)],
+  };
+  const t = takeoff(half, '2026-08-24 18:19');
+  assert.deepEqual(t.withoutThickness, ['east', 'north', 'west']);
+  assert.match(t.text, /No thickness given for east, north, west/);
+  // And the framing counts only the wall that has one: 20 ft x 3.
+  const plates = t.lines.find((l) => l.what === 'Plates')!;
+  assert.equal(plates.quantity, '60.00');
+});
+
+test('a room with one thickness gets one jamb, and its outside dimensions', () => {
+  const framed: Room = {
+    ...plain,
+    wallThickness: stated(`4 1/2"`),
+    walls: [
+      { ...plain.walls[0]!, openings: [opening('d1', 'door', `3'`, `6' 8"`, `5'`)] },
+      ...plain.walls.slice(1),
+    ],
+  };
+  const t = takeoff(framed, '2026-08-24 18:19');
+  const jamb = t.lines.find((l) => l.what === 'Jamb')!;
+  assert.equal(jamb.quantity, '4.5625', 'the 4 9/16" that comes off the shelf');
+  assert.equal(jamb.unit, 'in');
+
+  // 20 x 10 inside, in 4 1/2 inch walls, is 20' 9" x 10' 9" outside.
+  const outside = t.lines.find((l) => l.what === 'Outside footprint')!;
+  assert.equal(outside.quantity, '223.1');
+  assert.equal(t.withoutThickness.length, 0);
+  assert.doesNotMatch(t.text, /No thickness given/);
+});
+
+test('two thicknesses give two jamb lines, each naming its own walls', () => {
+  const mixed: Room = {
+    ...plain,
+    walls: [
+      { ...plain.walls[0]!, thickness: stated(`6 1/2"`), openings: [opening('w1', 'window', `4'`, `3'`, `8'`)] },
+      { ...plain.walls[1]!, thickness: stated(`6 1/2"`) },
+      { ...plain.walls[2]!, thickness: stated(`4 1/2"`), openings: [opening('d1', 'door', `3'`, `6' 8"`, `5'`)] },
+      { ...plain.walls[3]!, thickness: stated(`4 1/2"`) },
+    ],
+  };
+  const t = takeoff(mixed, '2026-08-24 18:19');
+  const jambs = t.lines.filter((l) => l.what.startsWith('Jamb'));
+  assert.deepEqual(
+    jambs.map((l) => [l.what, l.quantity]),
+    [
+      ['Jamb — 2x4', '4.5625'],
+      ['Jamb — 2x6', '6.5625'],
+    ]
+  );
+  assert.match(jambs[0]!.workings, /north, west/);
+  assert.match(jambs[1]!.workings, /south, east/);
+
+  // Outside dimensions need one thickness the whole way round, so there are none.
+  assert.equal(t.lines.find((l) => l.what === 'Outside footprint'), undefined);
+});
+
+test('the framing block is kept apart in the text and flat in the csv', () => {
+  const framed: Room = { ...plain, wallThickness: stated(`4 1/2"`) };
+  const t = takeoff(framed, '2026-08-24 18:19');
+  assert.match(t.text, /Openings and framing/);
+  // A spreadsheet groups by filtering a column; a heading row in the middle of
+  // the data is a row it has to be told to skip.
+  for (const row of t.csv.split('\n').slice(1)) {
+    assert.equal(parseCsv(row).length, parseCsv(t.csv.split('\n')[0]!).length, row);
+  }
+  assert.doesNotMatch(t.csv, /Openings and framing/);
+});
+
+test('a stated thickness is not a measured one, and the jamb line says so', () => {
+  const withDoor = [{ ...plain.walls[0]!, openings: [opening('d1', 'door', `3'`, `6' 8"`, `5'`)] }, ...plain.walls.slice(1)];
+  const assumed: Room = { ...plain, walls: withDoor, wallThickness: stated(`4 1/2"`) };
+  const taped: Room = {
+    ...plain,
+    walls: withDoor,
+    wallThickness: verified(parseLength(`4 1/2"`), 'sam', T0, 'tape'),
+  };
+  assert.equal(takeoff(assumed, T0).lines.find((l) => l.what === 'Jamb')!.provenance, 'scanned');
+  assert.equal(takeoff(taped, T0).lines.find((l) => l.what === 'Jamb')!.provenance, 'measured');
+});
+
+test('studs follow the spacing the job is framed at', () => {
+  const framed: Room = { ...plain, wallThickness: stated(`4 1/2"`) };
+  const sixteen = takeoff(framed, T0).lines.find((l) => l.what === 'Studs')!;
+  const twentyfour = takeoff(framed, T0, { spacing: 24 }).lines.find((l) => l.what === 'Studs')!;
+  assert.equal(sixteen.quantity, '48');
+  assert.equal(twentyfour.quantity, '34');
+  assert.match(twentyfour.workings, /24 in on centre/);
+});

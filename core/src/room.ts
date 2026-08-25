@@ -204,6 +204,27 @@ export interface Wall {
   readonly height?: Measurement;
   readonly openings?: readonly Opening[];
   /**
+   * How thick the wall is, finished face to finished face.
+   *
+   * **Never scanned.** RoomPlan's export carries a third dimension for every
+   * surface and it is zero in every wall of both of Sam's captures — the
+   * scanner sees one face of a wall and has no way to know what is behind it.
+   * So a thickness in this model was always declared by a person, and it
+   * carries `verified` provenance with the method they used: `stated` when they
+   * said "that's a 2x4 wall", `tape` when they put a tape through a door
+   * opening, `plans` when they read it off a drawing.
+   *
+   * Left unset, the room's `wallThickness` applies. Left unset there too, the
+   * wall has no thickness at all — and the takeoff says which walls those are
+   * rather than assuming four and a half inches.
+   *
+   * Nothing already on the plan moves when this is set. The polygon the scanner
+   * produces is the *interior* face of the room, which is what flooring, paint
+   * and baseboard are priced off, so floor area, wall face and baseboard run are
+   * all unchanged by it. See `thickness.ts` for what it does add.
+   */
+  readonly thickness?: Measurement;
+  /**
    * True when this side of the room has no wall across it.
    *
    * A garage door opening. A span into the next room too wide for a scanner to
@@ -224,6 +245,14 @@ export interface Room {
   readonly name: string;
   readonly walls: readonly Wall[];
   readonly ceilingHeight: Measurement;
+  /**
+   * What the walls are, unless a wall says otherwise.
+   *
+   * How a contractor actually thinks about it: "it's all 2x4 except the two
+   * outside walls." So the default lives on the room and a wall overrides it,
+   * rather than the same number being typed six times.
+   */
+  readonly wallThickness?: Measurement;
 }
 
 export interface Point {
@@ -273,6 +302,12 @@ export class ClosureConflict extends RoomError {
 /* -------------------------------------------------------------- validation */
 
 export function validate(room: Room): void {
+  if (room.wallThickness !== undefined && room.wallThickness.value <= 0n) {
+    throw new RoomError(
+      `"${room.name}" says its walls are ${formatFeetInches(room.wallThickness.value)} thick. ` +
+        `Leave it unset rather than setting it to nothing.`
+    );
+  }
   if (room.walls.length < 4) {
     throw new RoomError(`A closed room needs at least four walls; "${room.name}" has ${room.walls.length}.`);
   }
@@ -282,6 +317,18 @@ export function validate(room: Room): void {
     seen.add(wall.id);
     if (wall.length.value <= 0n) {
       throw new RoomError(`Wall "${wall.id}" has a length of ${wall.length.value}nm. Walls run positive.`);
+    }
+    if (wall.thickness !== undefined && wall.thickness.value <= 0n) {
+      throw new RoomError(
+        `Wall "${wall.id}" is ${formatFeetInches(wall.thickness.value)} thick. A wall that is ` +
+          `zero or less thick is not a wall; leave it unset if nobody has measured it.`
+      );
+    }
+    if (wall.open && wall.thickness !== undefined) {
+      throw new RoomError(
+        `"${wall.id}" is an open span and has been given a thickness of ` +
+          `${formatFeetInches(wall.thickness.value)}. There is no wall there to be thick.`
+      );
     }
     if (wall.open && (wall.openings?.length ?? 0) > 0) {
       throw new RoomError(

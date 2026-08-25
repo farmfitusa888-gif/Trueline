@@ -1,8 +1,17 @@
-import { type Nanometres, NM_PER_FOOT, formatFeetInches } from './length.ts';
+import { type Nanometres, NM_PER_FOOT, NM_PER_INCH, add, formatFeetInches } from './length.ts';
 import { isVerified, toleranceOf } from './measurement.ts';
 import { type Room, formatSquareFeet, runLength } from './room.ts';
 import { type Quantities, roomQuantities } from './zone.ts';
 import { readiness, trustLabel } from './issue.ts';
+import {
+  type Spacing,
+  footprint,
+  footprintObstacle,
+  framing,
+  openingReturns,
+  thicknessGroups,
+  withoutThickness,
+} from './thickness.ts';
 
 /**
  * The takeoff, in something you can send.
@@ -30,8 +39,16 @@ export interface TakeoffLine {
   readonly what: string;
   /** The number, exact, in the unit named beside it. */
   readonly quantity: string;
-  /** `sq ft`, `lf`, `ea` — never left to be inferred from context. */
-  readonly unit: 'sq ft' | 'lf' | 'ea';
+  /** `sq ft`, `lf`, `ea`, `in` — never left to be inferred from context. */
+  readonly unit: 'sq ft' | 'lf' | 'ea' | 'in';
+  /**
+   * Which block of the sheet this belongs under.
+   *
+   * Only the text and the screen use it; the CSV keeps every line in one flat
+   * table, because a spreadsheet groups by filtering a column and would rather
+   * not be handed a heading row in the middle of its data.
+   */
+  readonly group?: string;
   /** Which trades price off this line. */
   readonly prices: string;
   /** What comes off it, so nobody has to reverse-engineer the arithmetic. */
@@ -47,6 +64,14 @@ export interface Takeoff {
   readonly text: string;
   /** Ready to open in a spreadsheet. */
   readonly csv: string;
+  /**
+   * Built walls with no thickness against them.
+   *
+   * Empty means every wall has one. Anything else is the list of walls whose
+   * framing, jambs and opening returns are simply not in this sheet — named,
+   * because a takeoff that quietly left them out would still add up.
+   */
+  readonly withoutThickness: readonly string[];
 }
 
 const SQ_FT = NM_PER_FOOT * NM_PER_FOOT;
@@ -100,7 +125,133 @@ function countOpenings(room: Room, kind: 'door' | 'window' | 'cased'): number {
   );
 }
 
-export function takeoff(room: Room, at: string): Takeoff {
+/** Inches as a decimal, for the column a spreadsheet will do arithmetic on. */
+function inches(value: Nanometres): string {
+  return decimals(value, NM_PER_INCH, 4).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+export interface TakeoffOptions {
+  /** Where studs land. 16 in on centre unless the job says otherwise. */
+  readonly spacing?: Spacing;
+}
+
+/**
+ * The lines wall thickness adds, and nothing when nobody has given one.
+ *
+ * These are the numbers you cannot order against without knowing how thick the
+ * wall is, which is every one of them: the jamb a door is cut for, the drywall
+ * wrapped round a window's reveal, the plates and studs behind it, and what the
+ * building measures on the ground rather than on the inside face.
+ *
+ * A wall with no thickness contributes to none of them, and `withoutThickness`
+ * on the sheet names it. Defaulting to four and a half inches would let a block
+ * garage be priced as stud framing, and the sheet would reconcile perfectly.
+ */
+function thicknessLines(
+  room: Room,
+  spacing: Spacing,
+  roomProvenance: 'measured' | 'scanned'
+): TakeoffLine[] {
+  const groups = thicknessGroups(room);
+  if (groups.length === 0) return [];
+  const lines: TakeoffLine[] = [];
+  const group = 'Openings and framing';
+
+  for (const g of groups) {
+    if (g.openings === 0) continue;
+    // One jamb size per wall thickness. A room-wide average would be right for
+    // some of the openings and send the wrong pre-hung unit for the rest.
+    const which = g.assembly ? g.assembly.short : formatFeetInches(g.thickness);
+    lines.push({
+      what: groups.filter((x) => x.openings > 0).length > 1 ? `Jamb — ${which}` : 'Jamb',
+      quantity: inches(g.jamb),
+      unit: 'in',
+      prices: 'pre-hung doors, jamb stock, extension jambs',
+      workings:
+        `${formatFeetInches(g.jamb)} — ${formatFeetInches(g.thickness)} of wall (${g.how}) plus ` +
+        `a sixteenth, for ${g.openings} opening${g.openings === 1 ? '' : 's'} in ` +
+        `${g.wallIds.join(', ')}`,
+      // The wall runs have nothing to do with this one: a jamb is the thickness
+      // and a sixteenth, and the thickness came from a person or it is not here.
+      provenance: g.verified && g.how === 'tape' ? 'measured' : 'scanned',
+      group,
+    });
+  }
+
+  const returns = openingReturns(room);
+  if (returns.length > 0) {
+    lines.push({
+      what: 'Opening wrap',
+      quantity: fromSquares(returns.reduce((total, r) => total + r.area, 0n)),
+      unit: 'sq ft',
+      prices: 'drywall return, plaster, reveal trim',
+      workings: 'the reveal round each opening, through the wall it sits in',
+      provenance: 'scanned',
+      group,
+    });
+    lines.push({
+      what: 'Reveal run',
+      quantity: linearFeet(add(...returns.map((r) => r.run))),
+      unit: 'lf',
+      prices: 'corner bead, extension jamb stock',
+      workings: 'two jambs and a head on every opening; a sill as well on a window',
+      provenance: 'scanned',
+      group,
+    });
+  }
+
+  const f = framing(room, spacing);
+  if (f.wallIds.length > 0) {
+    lines.push({
+      what: 'Plates',
+      quantity: linearFeet(f.plateRun),
+      unit: 'lf',
+      prices: 'plate stock',
+      workings: `three times ${formatFeetInches(f.framedRun)} of framed wall — one bottom, two top`,
+      provenance: roomProvenance,
+      group,
+    });
+    lines.push({
+      what: 'Studs',
+      quantity: String(f.studs),
+      unit: 'ea',
+      prices: 'stud stock',
+      workings:
+        `field studs at ${f.spacing} in on centre, one at each end of each wall. Corners, ` +
+        `channels, kings, jacks and cripples are not counted — how many depends on how it is framed`,
+      provenance: roomProvenance,
+      group,
+    });
+    if (f.headers > 0) {
+      lines.push({
+        what: 'Headers',
+        quantity: String(f.headers),
+        unit: 'ea',
+        prices: 'header stock',
+        workings: 'one over each opening in a framed wall; sized on site',
+        provenance: 'scanned',
+        group,
+      });
+    }
+  }
+
+  if (footprintObstacle(room) === undefined) {
+    const print = footprint(room);
+    lines.push({
+      what: 'Outside footprint',
+      quantity: fromHalfSquares(print.outside),
+      unit: 'sq ft',
+      prices: 'slab, roof, siding, permit sketch',
+      workings: `inside area plus ${formatFeetInches(print.thickness)} of wall all the way round`,
+      provenance: roomProvenance,
+      group,
+    });
+  }
+
+  return lines;
+}
+
+export function takeoff(room: Room, at: string, options: TakeoffOptions = {}): Takeoff {
   const q: Quantities = roomQuantities(room);
   const state = readiness(room);
   // One word for the whole takeoff: every line is derived from the same walls,
@@ -168,9 +319,29 @@ export function takeoff(room: Room, at: string): Takeoff {
     });
   }
 
+  lines.push(...thicknessLines(room, options.spacing ?? 16, provenance));
+
+  const bare = withoutThickness(room);
+
   const width = Math.max(...lines.map((l) => l.what.length));
-  const body = lines
-    .map((l) => `${l.what.padEnd(width)}  ${l.quantity.padStart(8)} ${l.unit}`)
+  const rule = '-'.repeat(width + 14);
+  const row = (l: TakeoffLine) =>
+    `${l.what.padEnd(width)}  ${l.quantity.padStart(8)} ${l.unit.padEnd(5)}`.trimEnd();
+
+  // Grouped in the text and flat in the CSV, on purpose. A person reads down a
+  // sheet and wants the framing kept apart from the finishes; a spreadsheet
+  // groups by filtering a column and a heading row in the middle of the data is
+  // a row it has to be told to skip.
+  const groups: string[] = [];
+  for (const line of lines) {
+    const name = line.group ?? '';
+    if (!groups.includes(name)) groups.push(name);
+  }
+  const body = groups
+    .map((name) => {
+      const rows = lines.filter((l) => (l.group ?? '') === name).map(row).join('\n');
+      return name === '' ? rows : `\n${name}\n${'·'.repeat(name.length)}\n${rows}`;
+    })
     .join('\n');
 
   const caveat =
@@ -179,13 +350,22 @@ export function takeoff(room: Room, at: string): Takeoff {
       : 'THESE ARE THE SCANNER’S NUMBERS. No wall behind them has had a tape on it, ' +
         'and they will move when one does.';
 
+  // Named rather than defaulted. A takeoff missing the framing for three walls
+  // adds up perfectly and is short by three walls.
+  const thicknessNote =
+    bare.length === 0
+      ? ''
+      : `\nNo thickness given for ${bare.join(', ')} — no jamb, wrap, plate or stud above ` +
+        `counts ${bare.length === 1 ? 'it' : 'them'}.\n`;
+
   const text =
     `${room.name} — takeoff\n` +
-    `${'-'.repeat(width + 14)}\n` +
+    `${rule}\n` +
     `${body}\n` +
-    `${'-'.repeat(width + 14)}\n` +
+    `${rule}\n` +
     `${trustLabel(state.trust)}.\n` +
     `${caveat}\n` +
+    thicknessNote +
     `Taken off ${at} by Trueline.`;
 
   const header = 'item,quantity,unit,prices,workings,provenance,room,taken_off';
@@ -198,7 +378,7 @@ export function takeoff(room: Room, at: string): Takeoff {
     ),
   ].join('\n');
 
-  return { room: room.name, lines, text, csv };
+  return { room: room.name, lines, text, csv, withoutThickness: bare };
 }
 
 /**

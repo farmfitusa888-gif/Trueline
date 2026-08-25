@@ -7,6 +7,7 @@
 | `build/diagrams.py` | The seven SVG diagrams. Edit here. |
 | `build/build_card.py` | Composes the card and finds a layout that fits. Edit here. |
 | `market-research.html` | What the field already does, and where the gap is. |
+| `on-the-phone.md` | Pulling the current build onto an iPhone, and the ordered list of what to test on it. |
 
 ## Rebuilding the card
 

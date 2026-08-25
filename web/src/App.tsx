@@ -12,6 +12,7 @@ import { FieldSheet } from './FieldSheet.tsx';
 import { Mark } from './Mark.tsx';
 import { Room3D } from './Room3D.tsx';
 import { Takeoff } from './Takeoff.tsx';
+import { Thickness } from './Thickness.tsx';
 
 /**
  * The first screen of Trueline: correct an imported scan.
@@ -378,6 +379,14 @@ export function App() {
                 )}
               </div>
             )}
+
+            <Thickness
+              room={loaded.room}
+              selected={state.selected}
+              onSet={(wallId, text, how) =>
+                dispatch({ type: 'thickness', wallId, text, how, by: 'me', at: new Date().toISOString() })
+              }
+            />
 
             <Takeoff room={loaded.room} readiness={derived.state} />
 

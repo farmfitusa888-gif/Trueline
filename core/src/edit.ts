@@ -284,3 +284,58 @@ export function verifyWall(
   const solved = solve({ ...room, walls });
   return { room: solved.room, adjustments: solved.adjustments };
 }
+
+/* ------------------------------------------------------------- thickness */
+
+/**
+ * How thick the walls are, said once for the room.
+ *
+ * The scanner cannot know this — RoomPlan's third dimension on every surface is
+ * zero — so it is always somebody saying it, and the method says how they knew:
+ * `stated` for "that's a 2x4 wall", `tape` for a tape held through a doorway,
+ * `plans` for a number off a drawing.
+ *
+ * It changes nothing already on the plan. The outline the scanner produced is
+ * the room's inside face, which is what flooring, drywall, paint and baseboard
+ * are priced off, so no length, area or quantity already on screen moves. What
+ * it adds is in `thickness.ts`: the jamb, the wrap round each opening, the
+ * plates and studs, and what the building measures outside.
+ */
+export function setRoomThickness(room: Room, thickness: Measurement): Room {
+  if (thickness.value <= 0n) {
+    throw new EditError(`A wall ${formatFeetInches(thickness.value)} thick is not a wall.`);
+  }
+  const next: Room = { ...room, wallThickness: thickness };
+  validate(next);
+  return next;
+}
+
+/**
+ * How thick one wall is, when it is not like the others.
+ *
+ * Most houses are two thicknesses: the outside walls and the partitions. Pass
+ * `undefined` to take the override off again, so the wall goes back to whatever
+ * the room says.
+ */
+export function setWallThickness(
+  room: Room,
+  wallId: string,
+  thickness: Measurement | undefined
+): Room {
+  const { wall, index } = find(room, wallId);
+  if (wall.open) {
+    throw new EditError(
+      `"${wallId}" is an open span — there is nothing built across it to be thick. If there ` +
+        `really is a wall there, make it one first.`
+    );
+  }
+  if (thickness !== undefined && thickness.value <= 0n) {
+    throw new EditError(`A wall ${formatFeetInches(thickness.value)} thick is not a wall.`);
+  }
+  const walls = [...room.walls];
+  const { thickness: _dropped, ...bare } = wall;
+  walls[index] = thickness === undefined ? bare : { ...wall, thickness };
+  const next: Room = { ...room, walls };
+  validate(next);
+  return next;
+}

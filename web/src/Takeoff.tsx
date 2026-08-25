@@ -98,6 +98,11 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
     );
   }
 
+  // The lines wall thickness unlocks — jamb, wrap, plates, studs, footprint —
+  // kept in their own block rather than mixed into the finishes, because they
+  // are a different trade reading a different column.
+  const extras = sheet.lines.filter((line) => line.group !== undefined);
+
   const rows = [
     { what: 'Floor', value: formatSquareFeet(q.it.floorArea), prices: 'flooring, tile, underlay' },
     { what: 'Ceiling', value: formatSquareFeet(q.it.ceilingArea), prices: 'ceiling drywall and paint' },
@@ -146,6 +151,34 @@ export function Takeoff({ room, readiness }: { readonly room: Room; readonly rea
           </div>
         ))}
       </dl>
+
+      {extras.length > 0 && (
+        <>
+          <h3 className="mt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            {extras[0]!.group}
+          </h3>
+          <dl className="divide-y divide-slate-100">
+            {extras.map((line) => (
+              <div key={line.what} className="flex items-baseline justify-between gap-4 py-3">
+                <dt className="text-slate-700">
+                  {line.what}
+                  {open && <span className="block text-xs text-slate-500">{line.workings}</span>}
+                </dt>
+                <dd className="shrink-0 font-semibold tabular-nums text-slate-900">
+                  {line.quantity} {line.unit}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
+
+      {sheet.withoutThickness.length > 0 && (
+        <p className="mt-2 text-sm text-slate-600">
+          Nothing above counts {sheet.withoutThickness.join(', ')} — no thickness has been given
+          for {sheet.withoutThickness.length === 1 ? 'it' : 'them'}.
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2 print:hidden">
         <button

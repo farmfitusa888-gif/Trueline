@@ -1,11 +1,18 @@
-import { fromJSON, parseLength } from '../../core/src/length.ts';
-import { scanned } from '../../core/src/measurement.ts';
+import { formatFeetInches, fromJSON, parseLength } from '../../core/src/length.ts';
+import { scanned, verified } from '../../core/src/measurement.ts';
 import { type TracedCorner, roomFromCorners } from '../../core/src/trace.ts';
 import type { Room } from '../../core/src/room.ts';
 import type { ImportReport } from '../../core/src/import-roomplan.ts';
 import { importRoomPlan } from '../../core/src/import-roomplan.ts';
 import type { Footprint } from '../../core/src/obstruction.ts';
-import { makeCased, makeOpen, makeWall, verifyWall } from '../../core/src/edit.ts';
+import {
+  makeCased,
+  makeOpen,
+  makeWall,
+  setRoomThickness,
+  setWallThickness,
+  verifyWall,
+} from '../../core/src/edit.ts';
 import { loadProject, saveProject } from '../../core/src/persist.ts';
 import {
   type NorthOnPlan,
@@ -93,6 +100,22 @@ export type Action =
   | { type: 'select'; wallId: string | null }
   | { type: 'make'; wallId: string; as: 'wall' | 'open' | 'cased' }
   | { type: 'verify'; wallId: string; text: string; by: string; at: string }
+  /**
+   * How thick the walls are. `wallId: null` means the whole room; a wall id
+   * means that wall only. `text: null` takes a wall's override off again.
+   *
+   * `how` is not decoration. A thickness somebody taped through a doorway and a
+   * thickness somebody assumed off the framing are different claims, and the
+   * takeoff prints which one it is running on.
+   */
+  | {
+      type: 'thickness';
+      wallId: string | null;
+      text: string | null;
+      how: 'stated' | 'tape' | 'plans';
+      by: string;
+      at: string;
+    }
   | { type: 'undo' }
   | { type: 'dismissError' }
   | { type: 'close' };
@@ -362,6 +385,45 @@ export function reduce(state: State, action: Action): State {
                 ? `, and ${beyond.length} moved further than the scanner's own tolerance — worth a tape.`
                 : '.');
         return edited(state, loaded, room, note);
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'thickness': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        // Inches, not feet. Nobody says a wall is "four and a half feet thick",
+        // and a bare 4.5 here meaning feet would be a four-and-a-half-foot wall
+        // that nothing downstream would question.
+        const measure =
+          action.text === null
+            ? undefined
+            : verified(
+                parseLength(action.text, { defaultUnit: 'in' }),
+                action.by,
+                action.at,
+                action.how
+              );
+
+        if (action.wallId === null) {
+          if (measure === undefined) return state;
+          return edited(
+            state,
+            loaded,
+            setRoomThickness(loaded.room, measure),
+            `Walls are ${formatFeetInches(measure.value)} thick.`
+          );
+        }
+        return edited(
+          state,
+          loaded,
+          setWallThickness(loaded.room, action.wallId, measure),
+          measure === undefined
+            ? `${action.wallId} is back to the room's thickness.`
+            : `${action.wallId} is ${formatFeetInches(measure.value)} thick.`
+        );
       } catch (error) {
         return { ...state, error: message(error) };
       }
