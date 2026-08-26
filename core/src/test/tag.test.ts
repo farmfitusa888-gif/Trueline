@@ -8,6 +8,7 @@ import {
   CONDITIONS,
   TagError,
   describeTag,
+  readConditions,
   tagAt,
   tagCounts,
   tagsInTheOpen,
@@ -45,7 +46,7 @@ const room: Room = {
 function base(over: Record<string, unknown> = {}) {
   return {
     id: 't1',
-    condition: 'framing' as const,
+    conditions: ['framing'] as const,
     at: { x: 10n * NM_PER_FOOT, y: NM_PER_FOOT / 2n },
     note: '2x10 joists east to west, 16 in centres',
     recordedAt: T0,
@@ -103,14 +104,14 @@ test('a tag starts with no photographs rather than a fake one', () => {
 test('a tag says where it is, not only what it is', () => {
   // Nine tags all reading "Electrical" is the same bug the dimension list had:
   // a list where every row is identical and none of them can be told apart.
-  const tag = tagAt(room, base({ condition: 'electrical', height: 7n * NM_PER_FOOT,
+  const tag = tagAt(room, base({ conditions: ['electrical'], height: 7n * NM_PER_FOOT,
     note: 'knob and tube, live' }));
   assert.equal(describeTag(tag), "Electrical on south, 7' up — knob and tube, live");
 });
 
 test('one with no wall says so plainly rather than leaving a gap', () => {
   const tag = tagAt(room, base({ at: { x: 10n * NM_PER_FOOT, y: 5n * NM_PER_FOOT },
-    condition: 'plumbing', note: 'floor drain' }));
+    conditions: ['plumbing'], note: 'floor drain' }));
   assert.equal(describeTag(tag), 'Plumbing in the open — floor drain');
 });
 
@@ -136,9 +137,9 @@ test('what is on a wall comes back in the order it was found', () => {
 
 test('the only summary is a count, and it is a count of things not of feet', () => {
   const tags = [
-    tagAt(room, base({ id: 'a', condition: 'plumbing' })),
-    tagAt(room, base({ id: 'b', condition: 'framing' })),
-    tagAt(room, base({ id: 'c', condition: 'plumbing' })),
+    tagAt(room, base({ id: 'a', conditions: ['plumbing'] })),
+    tagAt(room, base({ id: 'b', conditions: ['framing'] })),
+    tagAt(room, base({ id: 'c', conditions: ['plumbing'] })),
   ];
   // In CONDITIONS order rather than in first-seen order, so the same room
   // always reads the same way.
@@ -157,4 +158,71 @@ test('nothing in this module returns a quantity, and that is the point', async (
     /quantit|area|total|price|cost|sum/i.test(name)
   );
   assert.deepEqual(banned, []);
+});
+
+/* ------------------------------------------- more than one thing in a bay */
+
+test('a tag keeps every one of the things found in the same bay', () => {
+  // The report this exists for: an open wall is not one thing. A bay with 2x10
+  // joists, a waste stack and a run of Romex in it is normal, and the screen
+  // made you pick which of the three to write down. The other two were lost for
+  // good, because the wall gets closed.
+  const tag = tagAt(room, base({ conditions: ['plumbing', 'framing', 'electrical'] }));
+  assert.deepEqual(tag.conditions, ['framing', 'plumbing', 'electrical']);
+});
+
+test('they come out in the list’s own order, whatever order they were ticked', () => {
+  const a = tagAt(room, base({ conditions: ['electrical', 'framing'] }));
+  const b = tagAt(room, base({ conditions: ['framing', 'electrical'] }));
+  assert.deepEqual(a.conditions, b.conditions);
+});
+
+test('each one is written once', () => {
+  const tag = tagAt(room, base({ conditions: ['gas', 'gas', 'gas'] }));
+  assert.deepEqual(tag.conditions, ['gas']);
+});
+
+test('a tag that says nothing was found is refused, like one with no words', () => {
+  assert.throws(() => tagAt(room, base({ conditions: [] })), TagError);
+});
+
+test('the sentence says all of them, as one finding rather than three', () => {
+  const tag = tagAt(room, base({ conditions: ['framing', 'plumbing'] }));
+  assert.ok(
+    describeTag(tag).startsWith('Framing + Plumbing'),
+    `it said: ${describeTag(tag)}`
+  );
+});
+
+test('a tag counts under every one of the things on it', () => {
+  const tags = [
+    tagAt(room, base({ id: 'a', conditions: ['framing', 'plumbing'] })),
+    tagAt(room, base({ id: 'b', conditions: ['plumbing'] })),
+  ];
+  assert.deepEqual(tagCounts(tags), [
+    { condition: 'framing', count: 1 },
+    { condition: 'plumbing', count: 2 },
+  ]);
+});
+
+/* --------------------------------------------- rooms saved before all this */
+
+test('a tag saved with one condition still opens', () => {
+  // On phones and in iCloud right now. A reader that only knew the new shape
+  // would give every one of them no conditions at all, tagAt would refuse it,
+  // and the whole room would fail to open — somebody's morning of pinning what
+  // was behind a wall, gone because a field was renamed.
+  assert.deepEqual(readConditions({ condition: 'plumbing' }), ['plumbing']);
+});
+
+test('a tag saved with several is read as it was written', () => {
+  assert.deepEqual(readConditions({ conditions: ['electrical', 'framing'] }), [
+    'framing',
+    'electrical',
+  ]);
+});
+
+test('nothing readable gives nothing back, rather than a guess', () => {
+  assert.deepEqual(readConditions({}), []);
+  assert.deepEqual(readConditions({ condition: 'not a category' }), []);
 });

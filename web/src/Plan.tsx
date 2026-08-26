@@ -735,7 +735,10 @@ export function Plan({
             fontWeight={700}
             fill="rgb(var(--c-focus))"
           >
-            {CONDITION[tag.condition].plain.slice(0, 1)}
+            {/* The first letter of the first thing on it. A pin is a few
+                millimetres across; "F+P+E" on one is a smudge. What all of them
+                are is in the tag's own line underneath the plan. */}
+            {CONDITION[tag.conditions[0]!].plain.slice(0, 1)}
           </text>
         </g>
       ))}

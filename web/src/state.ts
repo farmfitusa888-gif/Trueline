@@ -38,7 +38,7 @@ import {
 import type { Photo } from '../../core/src/photo.ts';
 import type { Damage, Reading } from '../../core/src/damage.ts';
 import { type PinImport, type PinManifest, importPins } from '../../core/src/pins.ts';
-import { type Tag, CONDITION, tagAt } from '../../core/src/tag.ts';
+import { type Tag, CONDITION, readConditions, tagAt } from '../../core/src/tag.ts';
 import { type Boundary, splitByBoundary } from '../../core/src/zone.ts';
 import { validateDamage } from '../../core/src/damage.ts';
 import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
@@ -301,7 +301,7 @@ export type Action =
   | {
       type: 'tag';
       id: string;
-      condition: Tag['condition'];
+      conditions: Tag['conditions'];
       at: Point;
       height?: bigint;
       note: string;
@@ -409,7 +409,14 @@ function restored(saved: SavedProject, note: string): State {
       north: (extras.north as NorthOnPlan | undefined) ?? null,
       frame: extras.frame ?? NO_SCAN_FRAME,
       damages: extras.damages ?? [],
-      tags: extras.tags ?? [],
+      // Read rather than taken as-is: a tag saved before 2026-08-26 carries a
+      // single `condition`, and every one of those is on somebody's phone. See
+      // `readConditions` — without this they would come back with no
+      // conditions at all and the room would refuse to open.
+      tags: (extras.tags ?? []).map((tag) => ({
+        ...tag,
+        conditions: readConditions(tag),
+      })),
       divide: extras.divide ?? null,
       overrides: extras.overrides ?? [],
       claim: extras.claim ?? NO_CLAIM,
@@ -1206,7 +1213,7 @@ export function reduce(state: State, action: Action): State {
       try {
         const tag = tagAt(loaded.room, {
           id: action.id,
-          condition: action.condition,
+          conditions: action.conditions,
           at: action.at,
           ...(action.height !== undefined ? { height: action.height } : {}),
           note: action.note,
@@ -1219,7 +1226,7 @@ export function reduce(state: State, action: Action): State {
           loaded: {
             ...loaded,
             tags: [...loaded.tags.filter((t) => t.id !== tag.id), tag],
-            lastEdit: `Pinned ${CONDITION[tag.condition].plain.toLowerCase()}.`,
+            lastEdit: `Pinned ${tag.conditions.map((c) => CONDITION[c].plain.toLowerCase()).join(' + ')}.`,
           },
         };
       } catch (error) {

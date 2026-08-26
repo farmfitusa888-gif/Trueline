@@ -207,13 +207,20 @@ def swiftNames(bench: Bench) -> None:
     bench.restore(rel)
 
     # 5. `dismiss()` with no @Environment declaring it.
-    rel = 'ios/Trueline/ScanScreen.swift'
+    #
+    #    This used to point at `ScanScreen`, which is where the bug happened.
+    #    ScanScreen does not call `dismiss()` any more: it is the root of a tab
+    #    now, where dismissing is silently nothing, and Close takes an `onClose`
+    #    from whoever put it on screen. `DeadCaptureScreen` is genuinely pushed
+    #    and genuinely dismisses, so the case moved with the behaviour rather
+    #    than being deleted for being inconvenient.
+    rel = 'ios/Trueline/DeadCaptureScreen.swift'
     was = bench.read(rel)
     stripped = '\n'.join(
         line for line in was.split('\n') if '@Environment(\\.dismiss)' not in line
     )
     if stripped == was:
-        failures.append('ScanScreen no longer declares @Environment(\\.dismiss)')
+        failures.append('DeadCaptureScreen no longer declares @Environment(\\.dismiss)')
         print(f'  {RED}✗{OFF} dismiss() with nothing declaring it (nothing to remove)')
     else:
         bench.write(rel, stripped)

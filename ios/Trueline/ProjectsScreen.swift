@@ -210,7 +210,15 @@ struct ProjectsScreen: View {
         .navigationDestination(for: Route.self) { route in
             switch route {
             case .newScan:
-                ScanScreen(store: store, backup: backup, onFinished: show)
+                // Pushed, from "scan it again" on a capture with no walls in
+                // it. Here there really is something to close, and closing it
+                // is a pop back to this list.
+                ScanScreen(
+                    store: store,
+                    backup: backup,
+                    onFinished: show,
+                    onClose: { path = [] }
+                )
             case .newMeasure:
                 ARMeasureScreen(store: store, backup: backup, onFinished: show)
             case .open(let entry):

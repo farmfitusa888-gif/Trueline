@@ -30,6 +30,7 @@ import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
 import { Settings } from './Settings.tsx';
 import { PriceList } from './PriceList.tsx';
+import { RateBook } from './Rates.tsx';
 import { Trouble } from './Trouble.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Price } from './Price.tsx';
@@ -233,33 +234,12 @@ export function App() {
   // A capture handed over at start-up wins: somebody who has just finished
   // walking a room wants that room, not the one they were looking at yesterday.
   useEffect(() => {
-    const waiting = installBridge(dispatch);
-    // A room the app kept outranks the capture it was made from: it is the same
-    // room with somebody's tape readings already in it.
-    if (waiting?.saved) {
-      dispatch({ type: 'openSaved', project: waiting.saved });
-      return;
-    }
-    if (waiting?.trace) {
-      dispatch({
-        type: 'openTrace',
-        trace: waiting.trace,
-        fileName: waiting.fileName ?? 'room walked on this device',
-        at: new Date().toISOString(),
-      });
-      return;
-    }
-    if (waiting?.room) {
-      dispatch({
-        type: 'open',
-        json: waiting.room,
-        photos: waiting.photos,
-        fileName: waiting.fileName ?? 'scan from this device',
-        at: new Date().toISOString(),
-      });
-      return;
-    }
-    dispatch({ type: 'restore' });
+    // Everything the app has to say, live or parked, in one place. What order
+    // it is applied in lives in `installBridge`'s own `take` and nowhere else
+    // -- it used to be half here and half there, and the half that was here
+    // knew nothing about the subscription, which is why every paid screen on
+    // the phone drew itself as a blank rectangle.
+    installBridge(dispatch);
   }, []);
 
   // And write it back after every change. Ten minutes of correcting a scan on a
@@ -422,6 +402,16 @@ export function App() {
               nothing behind it to go back to, and a Done that closed it would
               leave somebody looking at a blank page. */}
           <Settings {...(openedOn === 'business' ? {} : { onClose: () => setSettings(false) })} />
+          {/* What you charge, before any room exists.
+              > "AND WHERES THE AREA THE CONTRACTOR CAN SET THEIR OWN RATES FOR
+              >  EACH TYPE OF JOB?"
+              It was inside a room, behind the subscription, on a screen that
+              was rendering blank. The rates were never part of a room -- they
+              save to this profile and are the same book on every job -- so
+              they belong here, next to the licence number, where somebody
+              types them once before the first scan. Still under Price → Your
+              rates as well: same component, same book. */}
+          {openedOn === 'business' && <RateBook />}
           {/* Beside the profile rather than beside a room: a price list belongs
               to the business, not to the job somebody happens to have open. */}
           <PriceList />
@@ -825,7 +815,7 @@ export function App() {
                   dispatch({
                     type: 'tag',
                     id: `tag-${Date.now()}`,
-                    condition: input.condition,
+                    conditions: input.conditions,
                     at: input.at,
                     ...(input.height !== undefined ? { height: input.height } : {}),
                     note: input.note,

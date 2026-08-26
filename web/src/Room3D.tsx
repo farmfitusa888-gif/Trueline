@@ -10,6 +10,7 @@ import {
   standingInside,
 } from '../../core/src/project.ts';
 import type { Room } from '../../core/src/room.ts';
+import { wallLabels } from '../../core/src/wallLabel.ts';
 import { useUnits } from './units.tsx';
 
 /**
@@ -146,6 +147,12 @@ export function Room3D({
     );
   }
 
+  // Below the early return, and that is deliberate rather than lazy: there is
+  // nothing to label when there is no projection, and computing labels for a
+  // view that will not be drawn is work done to be thrown away. It is a walk
+  // over a few dozen facets, not a hook, so its place in the body is free.
+  const labels = wallLabels(view.projection.facets, SIZE);
+
   const start = (x: number, y: number) => {
     drag.current = { x, y, from: camera, standing: inside, moved: false };
   };
@@ -242,6 +249,56 @@ export function Room3D({
             />
           );
         })}
+
+        {/*
+            Which wall you are looking at, said on the wall.
+
+            > "WHEN IN 3D MODE, AND YOU ARE INSIDE THE MODEL, THERE SHOULD BE
+            >  LABELING ON THE WALLS WITH THE WALL # OR WHICH WALL IT IS"
+
+            Right, and worse than a missing convenience: the claim this view
+            makes over a scanner's mesh, written at the top of this file, is
+            that every face still knows which wall it is. It then drew four
+            identical grey slabs and made you tap each one to find out.
+
+            After the polygons, so a label is never painted over by a nearer
+            wall. Where each one goes is `wallLabel.ts` -- one per wall on its
+            biggest piece, slivers dropped -- and it reads no dimension and can
+            move no number.
+        */}
+        {labels.map((label) => (
+          <text
+            key={label.wallId}
+            x={label.x}
+            y={label.y}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            // In the projection's own 1000-unit box, which renders about 345
+            // CSS pixels wide on a phone -- so 44 here is roughly 15px on
+            // screen. Sized by measuring the render rather than by picking a
+            // number: 30 looked right in the file and came out at ten pixels,
+            // which is a label a person on a ladder cannot read.
+            fontSize={inside ? 44 : 36}
+            fontWeight={600}
+            fill="rgb(var(--c-ink))"
+            // A halo of the page's own ground, drawn under the letters rather
+            // than over them. A wall's fill shades with its angle to the light,
+            // so there is no one colour that a label is legible on -- and a
+            // drop shadow would be a second thing to keep in step with the
+            // theme.
+            stroke="rgb(var(--c-ground))"
+            strokeWidth={inside ? 10 : 8}
+            paintOrder="stroke"
+            strokeLinejoin="round"
+            className="pointer-events-none select-none"
+            // The polygon underneath is what answers a tap. This is a caption
+            // on it, and a caption that ate the tap would make the biggest part
+            // of every wall unselectable.
+            aria-hidden="true"
+          >
+            {label.text}
+          </text>
+        ))}
       </svg>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">

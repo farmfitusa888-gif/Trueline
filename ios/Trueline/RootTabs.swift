@@ -75,7 +75,16 @@ struct RootTabs: View {
             // to the Rooms tab and switches to it, so nobody is left holding a
             // finished room on top of a live camera.
             NavigationStack {
-                ScanScreen(store: store, backup: backup, onFinished: finished)
+                // Close on a tab means "I am done here, show me my rooms" --
+                // the same place finishing a scan lands. `dismiss()` was what
+                // it used to mean, back when this screen was pushed, and on
+                // the root of a tab's stack that is silently nothing.
+                ScanScreen(
+                    store: store,
+                    backup: backup,
+                    onFinished: finished,
+                    onClose: { tab = .rooms }
+                )
             }
             .tabItem { Label("Scan", systemImage: "camera.viewfinder") }
             .tag(Tab.scan)

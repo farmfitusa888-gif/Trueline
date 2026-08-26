@@ -53,7 +53,7 @@ export function Tags({
   readonly room: Room;
   readonly tags: readonly Tag[];
   readonly onAdd: (input: {
-    condition: Condition;
+    conditions: readonly Condition[];
     at: Point;
     height?: bigint;
     note: string;
@@ -61,7 +61,20 @@ export function Tags({
   readonly onRemove: (tagId: string) => void;
 }) {
   const { len } = useUnits();
-  const [condition, setCondition] = useState<Condition>('framing');
+  /**
+   * What was found in this one opening — one thing or several.
+   *
+   * > "WHAT IF YOU FIND MORE THEN ONE OPTION, BUT CAN ONLY PICK ONE"
+   *
+   * A bay with 2x10 joists, a waste stack and a run of Romex in it is normal,
+   * and this made you choose. Whichever you chose, the other two were gone —
+   * and they cannot be gone back for, because the wall gets closed.
+   *
+   * Framing to start with, because it is what somebody who opens a wall looks
+   * at first, and because a set that starts empty makes the first tap feel
+   * like a correction rather than a choice.
+   */
+  const [picked, setPicked] = useState<readonly Condition[]>(['framing']);
   const [wallId, setWallId] = useState<string>(room.walls[0]?.id ?? '');
   const [along, setAlong] = useState('');
   const [high, setHigh] = useState('');
@@ -122,7 +135,7 @@ export function Tags({
       return;
     }
     setWants(null);
-    onAdd({ condition, at, ...(height !== undefined ? { height } : {}), note: note.trim() });
+    onAdd({ conditions: picked, at, ...(height !== undefined ? { height } : {}), note: note.trim() });
     setAlong('');
     setHigh('');
     setNote('');
@@ -156,15 +169,28 @@ export function Tags({
           <span className="text-sm font-medium text-slate-700">What did you find?</span>
           <div className="mt-1 grid gap-2 sm:grid-cols-3">
             {CONDITIONS.map((c) => {
-              const picked = condition === c;
+              const on = picked.includes(c);
               return (
                 <button
                   key={c}
                   type="button"
-                  onClick={() => setCondition(c)}
-                  aria-pressed={picked}
+                  // Ticking, not choosing. The last one cannot be turned off:
+                  // a tag with nothing on it is a dot on a drawing, which
+                  // `tagAt` refuses — and finding that out by pressing Pin it
+                  // is worse than the button simply staying on.
+                  onClick={() => {
+                    setWants(null);
+                    setPicked((was) =>
+                      was.includes(c)
+                        ? was.length === 1
+                          ? was
+                          : was.filter((k) => k !== c)
+                        : CONDITIONS.filter((k) => k === c || was.includes(k))
+                    );
+                  }}
+                  aria-pressed={on}
                   className={`min-h-11 rounded-md px-3 text-left text-sm ${
-                    picked
+                    on
                       ? 'bg-slate-900 text-white'
                       : 'border border-slate-300 text-slate-700 active:bg-slate-100'
                   }`}
@@ -174,7 +200,18 @@ export function Tags({
               );
             })}
           </div>
-          <p className="mt-1 text-xs text-slate-500">{CONDITION[condition].why}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Tick everything you found in the one opening — an open wall is
+            rarely one thing.
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {picked.map((c) => (
+              <li key={c} className="text-xs text-slate-500">
+                <span className="font-medium text-slate-700">{CONDITION[c].plain}</span>{' '}
+                {CONDITION[c].why}
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="flex flex-wrap gap-2">

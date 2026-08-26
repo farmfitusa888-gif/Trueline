@@ -63,6 +63,48 @@
   }
 
   /*
+     What a text field looks like, in both themes, in one place.
+
+     ## The bug
+
+     > "CANT SEE THE WRITING MUCH WHEN ITS TYPED IN"
+
+     And it was invisible, not faint. Every input in this app was written as
+     `border border-slate-300` with no background and no text colour, which
+     leaves both to the browser -- and WebKit paints a form control's
+     background from `color-scheme`, which nothing here declared. So on a phone
+     in dark mode the field got WebKit's light default, a near-white box, while
+     the text inside it inherited the page's dark-theme `--c-ink`, which is
+     near-white too. White on white.
+
+     It was every text field in the app: the room name, the licence number, the
+     company address, the tape readings, the rates, the tag positions. Only one
+     of them was photographed.
+
+     ## The fix, and why it is here
+
+     `color-scheme` first, so WebKit paints its own furniture -- the caret, the
+     selection, the spinner on a number field, the scrollbars inside a select
+     -- to match the theme instead of against it. Then the background and text
+     from the tokens, so it never depends on a browser default again.
+
+     In the base layer and on the element, deliberately: twenty class strings
+     that each have to remember `bg-raise text-ink` is twenty chances to forget,
+     and the twenty-first field somebody adds will forget. A utility class on a
+     specific field still wins -- this is `@layer base`, which every Tailwind
+     utility outranks.
+  */
+  :root {
+    color-scheme: light dark;
+  }
+  input, select, textarea {
+    @apply bg-raise text-ink;
+  }
+  input::placeholder, textarea::placeholder {
+    @apply text-faint;
+  }
+
+  /*
      Every figure in the app is monospaced and tabular, without exception.
 
      `tabular-nums` was already on most of them, one class at a time, and

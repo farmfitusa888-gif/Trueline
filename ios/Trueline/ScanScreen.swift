@@ -14,19 +14,29 @@ import UIKit
 struct ScanScreen: View {
 
     @StateObject private var model: ScanModel
-    /// The way out when the scan is over and nothing was saved.
-    ///
-    /// This was being *called* without being declared, which is a compile
-    /// error rather than a subtle one: "cannot find 'dismiss' in scope". The
-    /// Swift parse check in `core/tools/check-swift.py` cannot see it -- the
-    /// file parses perfectly, it just names something that does not exist --
-    /// which is a good reminder that a parser is not a compiler.
-    @Environment(\.dismiss) private var dismiss
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
     /// Handed the finished scan, so the screen holding the stack can put the
     /// review in this screen's place rather than on top of it.
     let onFinished: (SavedScan) -> Void
+
+    /// What Close means here.
+    ///
+    /// ## The bug
+    ///
+    /// > "CLOSE LINK/BUTTON DOESNT WORK"
+    ///
+    /// And it did not, because `dismiss()` has nothing to dismiss. This screen
+    /// used to be *pushed* -- Rooms → New scan -- and dismissing popped back to
+    /// the list. It is the root of the Scan tab's own navigation stack now, and
+    /// dismissing the root of a stack inside a `TabView` does nothing at all:
+    /// no error, no animation, no movement. A button that looks like a button
+    /// and answers nothing.
+    ///
+    /// It is still pushed from `DeadCaptureScreen` -- "scan it again" -- where
+    /// dismissing is exactly right. So what Close does cannot be decided here.
+    /// Whoever put this screen on screen knows the way back out, and says so.
+    let onClose: () -> Void
 
     init(store: ProjectStore, backup: Backup, onFinished: @escaping (SavedScan) -> Void) {
         self.store = store
@@ -220,7 +230,7 @@ struct ScanScreen: View {
                 if model.session.isRunning {
                     model.finish()
                 } else {
-                    dismiss()
+                    onClose()
                 }
             }
             .font(.headline)

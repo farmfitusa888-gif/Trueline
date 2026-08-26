@@ -21,6 +21,37 @@ import { STORAGE_PREFIX } from './state.ts';
  * around it never sees this hook fire, and the file picker is what opens a scan.
  */
 
+/**
+ * Everything the app hands over at start-up.
+ *
+ * Every field is optional because every one of them is genuinely absent
+ * sometimes: the Floor tab has no room, the Business tab has no rooms, a phone
+ * that has never crashed has no reports, and a browser has none of it.
+ */
+export interface HandOver {
+  /** The contractor's own details, as `company.ts` writes them. */
+  company?: string;
+  /** Whether StoreKit says this person has paid. */
+  subscribed?: boolean;
+  /** What has gone wrong on this phone, as `Diagnostics.asJSON` writes it. */
+  reports?: string;
+  /** Every corrected room on the phone, for the floor. */
+  rooms?: readonly string[];
+  /** A corrected room. Outranks `trace` and `room` — it is the same room with
+   *  somebody's tape readings already in it. */
+  saved?: string;
+  /** A room walked with AR or traced off a drawing. */
+  trace?: unknown;
+  /** RoomPlan's own JSON. */
+  room?: unknown;
+  /** The photo manifest taken alongside a scan. */
+  photos?: unknown;
+  /** What somebody pointed at while walking. */
+  pins?: unknown;
+  /** What to call it. */
+  fileName?: string;
+}
+
 export interface TruelineBridge {
   /**
    * Called by the native scanner when a capture is finished.
@@ -83,6 +114,40 @@ export interface TruelineBridge {
    * builds it; nothing here can produce one.
    */
   openReports(reports: string): void;
+  /**
+   * Everything the app has to say, in one call.
+   *
+   * ## Why this exists, and it is not tidiness
+   *
+   * The app used to make five separate calls on `didFinish`, each guarded like
+   * this:
+   *
+   *     if (window.trueline && window.trueline.setSubscribed) { ... }
+   *
+   * `open` and `openSaved` had an `else` that parked the payload on
+   * `window.truelinePayload` for the page to pick up when it was ready.
+   * **`setSubscribed`, `openCompany`, `putRooms` and `openReports` had no
+   * `else` at all** — if the page was not ready, they were dropped silently and
+   * for good.
+   *
+   * The bundle is served through a `WKURLSchemeHandler`, and `didFinish` can
+   * fire before a module fetched through that handler has run. So on a real
+   * phone `setSubscribed` never landed, `waiting()` stayed true forever, and
+   * every gated screen — Takeoff, Price, Agreement, Work, Insurance — drew
+   * itself as **nothing at all**. Not a paywall, not an error. A blank panel.
+   * Which is exactly how it looked to the first person who ever used this app:
+   *
+   * > "WHAT IS TAKEOFF? WHAT DOES IT DO?"
+   * > "AND HOW ARE JOBS COSTED OUT WHEN THERES NO PRICING ANYWHERE?"
+   *
+   * The pricing was there. It had been there for weeks. It was behind a
+   * component returning `null`.
+   *
+   * So there is one call now, with one fallback, and one function that knows
+   * what order to apply things in — used both when the page is ready and when
+   * it drains what was parked. Two copies of that order was the bug.
+   */
+  take(payload: HandOver): void;
   /** Version of this contract, so a mismatched app build can say so. */
   readonly version: 1;
 }
@@ -269,17 +334,13 @@ declare global {
   interface Window {
     trueline?: TruelineBridge;
     /**
-     * Set by the native app before the page loads, for a capture that is ready
-     * at start-up rather than arriving later. Read once and then forgotten.
+     * What the app had to say before this page was ready to hear it.
+     *
+     * Parked here by the native side when `window.trueline` does not exist
+     * yet, and drained by `installBridge` through the same `take` the live
+     * call uses. One order, one place.
      */
-    truelinePayload?: {
-      room?: unknown;
-      photos?: unknown;
-      trace?: unknown;
-      fileName?: string;
-      /** A corrected room the app kept. Outranks the capture it came from. */
-      saved?: string;
-    };
+    truelinePayload?: HandOver;
   }
 }
 
@@ -415,13 +476,15 @@ export function putRooms(projects: readonly string[]): number {
 }
 
 /**
- * Wires the hook up, and hands back whatever was already waiting.
+ * Wires the hook up, and applies whatever the app already said.
  *
- * Returns the payload the app left on the window before the page loaded, if
- * there was one, so a capture handed over at start-up is not missed in the gap
- * between the script running and React mounting.
+ * It used to hand the parked payload back for `App.tsx` to unpack, which meant
+ * the order things are applied in lived in two places -- here for the live
+ * call, there for the parked one -- and only one of them knew about the
+ * profile, the subscription, the reports and the rooms. `take` is now the only
+ * one that knows, and both paths go through it.
  */
-export function installBridge(dispatch: (action: Action) => void): Window['truelinePayload'] {
+export function installBridge(dispatch: (action: Action) => void): void {
   const open = (room: unknown, photos?: unknown, fileName?: string, pins?: unknown) => {
     dispatch({
       type: 'open',
@@ -482,6 +545,56 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     setEntitlement(paid === true);
   };
 
+  /**
+   * Everything the app has to say, applied in the one order that is correct.
+   *
+   * The order is the whole content of this function and every line of it was
+   * paid for by a bug:
+   *
+   * - **The profile first**, so the letterhead is on the drawing the moment it
+   *   appears rather than a frame later.
+   * - **Then whether anything is paid for**, before the room. A screen that
+   *   draws itself locked and unlocks a frame later has shown a paywall to
+   *   somebody who has already paid, which is the worst thing this app can do
+   *   to the person funding it.
+   * - **Then the reports and every room**, both of which write to storage.
+   * - **Then the one room being looked at, last**, so it is the one on screen.
+   *   A corrected room outranks a walked one outranks a scanned one: they are
+   *   the same room with progressively more of somebody's work in it, and
+   *   opening the earlier one would throw the later away.
+   */
+  const take = (payload: HandOver) => {
+    if (typeof payload.company === 'string' && payload.company !== '') {
+      openCompany(payload.company);
+    }
+    if (typeof payload.subscribed === 'boolean') {
+      setSubscribed(payload.subscribed);
+    }
+    if (typeof payload.reports === 'string') {
+      openReports(payload.reports);
+    }
+    if (Array.isArray(payload.rooms) && payload.rooms.length > 0) {
+      putRooms(payload.rooms);
+    }
+
+    if (typeof payload.saved === 'string' && payload.saved !== '') {
+      openSaved(payload.saved);
+      return;
+    }
+    if (payload.trace !== undefined && payload.trace !== null) {
+      openTrace(payload.trace, payload.fileName);
+      return;
+    }
+    if (payload.room !== undefined && payload.room !== null) {
+      open(payload.room, payload.photos, payload.fileName, payload.pins);
+      return;
+    }
+    // Nothing being looked at -- the Floor and Business tabs, and a browser
+    // opened with no capture. Whatever this page had last time is what to
+    // show, and `restore` is a no-op when there is nothing.
+    dispatch({ type: 'restore' });
+  };
+
   window.trueline = {
     open,
     openTrace,
@@ -490,10 +603,14 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     openReports,
     putRooms,
     setSubscribed,
+    take,
     version: BRIDGE_VERSION,
   };
 
-  const waiting = window.truelinePayload;
+  // Whatever the app said before this page could hear it. Through the same
+  // `take`, because two copies of that order is what caused the bug it exists
+  // to fix.
+  const parked = window.truelinePayload;
   delete window.truelinePayload;
-  return waiting;
+  take(parked ?? {});
 }

@@ -352,153 +352,96 @@ struct CorrectView: UIViewRepresentable {
         /// the classic way this breaks, on the first room somebody names with an
         /// apostrophe in it.
         private func hand(over webView: WKWebView) {
-            // The profile first, so the letterhead is on the drawing the moment
-            // it appears rather than a frame later.
-            if !parent.companyJSON.isEmpty,
-               let company = String(data: parent.companyJSON, encoding: .utf8) {
-                run(
-                    on: webView,
-                    """
-                    (function () {
-                      var company = \(quoted(company));
-                      if (window.trueline && window.trueline.openCompany) {
-                        window.trueline.openCompany(company);
-                      }
-                    })();
-                    """
-                )
-            }
-
-            // What has gone wrong on this phone, for the Business screen.
-            // Before the room, like the profile: the section is at the bottom
-            // of a screen somebody may already be scrolled to.
-            if !parent.reportsJSON.isEmpty,
-               let reports = String(data: parent.reportsJSON, encoding: .utf8) {
-                run(
-                    on: webView,
-                    """
-                    (function () {
-                      var reports = \(quoted(reports));
-                      if (window.trueline && window.trueline.openReports) {
-                        window.trueline.openReports(reports);
-                      }
-                    })();
-                    """
-                )
-            }
-
-            // Then whether anything is paid for, before the room: a screen that
-            // draws itself locked and then unlocks a frame later has shown
-            // somebody who paid a paywall, which is the worst thing this app
-            // can do to the person funding it.
-            run(
-                on: webView,
-                """
-                (function () {
-                  if (window.trueline && window.trueline.setSubscribed) {
-                    window.trueline.setSubscribed(\(parent.subscribed ? "true" : "false"));
-                  }
-                })();
-                """
-            )
-
-            // Every corrected room on the phone, for the floor to draw.
+            // Everything, in one call, with one fallback.
             //
-            // Before anything else that touches storage, and before the early
-            // returns below -- the floor reads storage when it mounts and the
-            // page has already mounted by the time any of this runs, so the
-            // far side raises a listener rather than relying on order. What
-            // matters here is that it happens at all, on the one tab that
-            // needs it, and that the room being CORRECTED (below) is handed
-            // over afterwards so it is the one on screen.
+            // ## The bug this replaced
+            //
+            // There were five calls here, each guarded like this:
+            //
+            //     if (window.trueline && window.trueline.setSubscribed) { ... }
+            //
+            // `open` and `openSaved` had an `else` that parked the payload on
+            // `window.truelinePayload` for the page to pick up when it was
+            // ready. `setSubscribed`, `openCompany`, `putRooms` and
+            // `openReports` had no `else` at all -- if the page was not ready,
+            // they were dropped silently and permanently.
+            //
+            // The bundle is served through `WebBundle`, a `WKURLSchemeHandler`,
+            // and `didFinish` can fire before a module fetched through that
+            // handler has run. So on a real phone `setSubscribed` never landed,
+            // the web side's `waiting()` stayed true forever, and every gated
+            // screen -- Takeoff, Price, Agreement, Work, Insurance -- drew
+            // itself as a blank panel. Not a paywall. Nothing.
+            //
+            // Reproduced in a browser on 2026-08-26 by installing the message
+            // handlers and never calling `setSubscribed`: the Takeoff panel
+            // came back with `innerText` of `""`, which is exactly what the
+            // first person to use this app photographed and sent back.
+            //
+            // So: one payload, one `else`, and the order it is applied in lives
+            // on the far side in `installBridge`'s `take` -- one copy, used by
+            // both the live call and the drained one. Two copies of that order
+            // was the bug.
+            var payload: [String: String] = [:]
+
+            if let company = String(data: parent.companyJSON, encoding: .utf8), !company.isEmpty {
+                payload["company"] = quoted(company)
+            }
+            payload["subscribed"] = parent.subscribed ? "true" : "false"
+            if let reports = String(data: parent.reportsJSON, encoding: .utf8), !reports.isEmpty {
+                payload["reports"] = quoted(reports)
+            }
             if !parent.everyRoom.isEmpty {
                 let rooms = parent.everyRoom
                     .compactMap { String(data: $0, encoding: .utf8) }
                     .map { quoted($0) }
                     .joined(separator: ", ")
-                run(
-                    on: webView,
-                    """
-                    (function () {
-                      var rooms = [\(rooms)];
-                      if (window.trueline && window.trueline.putRooms) {
-                        window.trueline.putRooms(rooms);
-                      }
-                    })();
-                    """
-                )
+                payload["rooms"] = "[\(rooms)]"
             }
 
-            // A walked room and a scanned room go across the same hook and come
-            // out the same on the other side. Which one this is, is the only
-            // difference, and it stops here.
-            // A corrected room outranks the capture it was made from: it is the
-            // same room with somebody's tape readings already in it, and opening
-            // the capture instead would silently throw them away.
-            if !parent.correctedJSON.isEmpty,
-               let saved = String(data: parent.correctedJSON, encoding: .utf8) {
-                run(
-                    on: webView,
-                    """
-                    (function () {
-                      var saved = \(quoted(saved));
-                      if (window.trueline && window.trueline.openSaved) {
-                        window.trueline.openSaved(saved);
-                      } else {
-                        window.truelinePayload = { saved: saved };
-                      }
-                    })();
-                    """
-                )
-                return
+            // Which room, if any. A corrected one outranks a walked one
+            // outranks a scanned one: the same room with progressively more of
+            // somebody's work in it, and opening an earlier one would throw the
+            // later work away.
+            payload["fileName"] = quoted(parent.title)
+            if let saved = String(data: parent.correctedJSON, encoding: .utf8), !saved.isEmpty {
+                payload["saved"] = quoted(saved)
+            } else if let trace = String(data: parent.traceJSON, encoding: .utf8), !trace.isEmpty {
+                payload["trace"] = "JSON.parse(\(quoted(trace)))"
+            } else if let room = String(data: parent.roomJSON, encoding: .utf8), !room.isEmpty {
+                payload["room"] = "JSON.parse(\(quoted(room)))"
+                if let photos = String(data: parent.photosJSON, encoding: .utf8), !photos.isEmpty {
+                    payload["photos"] = "JSON.parse(\(quoted(photos)))"
+                }
+                // `pins` is simply absent when nothing was marked, which is the
+                // truth for most scans and needs no special case on the far
+                // side.
+                if let pins = String(data: parent.pinsJSON, encoding: .utf8), !pins.isEmpty {
+                    payload["pins"] = "JSON.parse(\(quoted(pins)))"
+                }
             }
 
-            if !parent.traceJSON.isEmpty {
-                guard let trace = String(data: parent.traceJSON, encoding: .utf8) else { return }
-                run(
-                    on: webView,
-                    """
-                    (function () {
-                      var trace = JSON.parse(\(quoted(trace)));
-                      var name = \(quoted(parent.title));
-                      if (window.trueline && window.trueline.openTrace) {
-                        window.trueline.openTrace(trace, name);
-                      } else {
-                        window.truelinePayload = { trace: trace, fileName: name };
-                      }
-                    })();
-                    """
-                )
-                return
-            }
+            // Sorted so the script is the same bytes for the same payload,
+            // which makes it something a person can read in a log and compare.
+            let fields = payload.keys.sorted()
+                .map { "  \($0): \(payload[$0]!)" }
+                .joined(separator: ",\n")
 
-            guard
-                let room = String(data: parent.roomJSON, encoding: .utf8),
-                let photos = String(data: parent.photosJSON, encoding: .utf8)
-            else { return }
-
-            // `null` rather than an omitted argument when nothing was marked:
-            // the far side reads a missing `pins` as "nothing was marked",
-            // which is the truth for most scans and needs no special case.
-            let pins = String(data: parent.pinsJSON, encoding: .utf8)
-            let pinsLiteral = pins.map { "JSON.parse(\(quoted($0)))" } ?? "null"
-
-            let script = """
-            (function () {
-              var room = JSON.parse(\(quoted(room)));
-              var photos = JSON.parse(\(quoted(photos)));
-              var pins = \(pinsLiteral);
-              var name = \(quoted(parent.title));
-              if (window.trueline && window.trueline.open) {
-                window.trueline.open(room, photos, name, pins);
-              } else {
-                window.truelinePayload = {
-                  room: room, photos: photos, pins: pins, fileName: name
-                };
-              }
-            })();
-            """
-            run(on: webView, script)
+            run(
+                on: webView,
+                """
+                (function () {
+                  var payload = {
+                \(fields)
+                  };
+                  if (window.trueline && window.trueline.take) {
+                    window.trueline.take(payload);
+                  } else {
+                    window.truelinePayload = payload;
+                  }
+                })();
+                """
+            )
         }
 
         private func run(on webView: WKWebView, _ script: String) {

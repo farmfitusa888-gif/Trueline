@@ -108,7 +108,24 @@ export class TagError extends RoomError {}
  */
 export interface Tag {
   readonly id: string;
-  readonly condition: Condition;
+  /**
+   * What was found there — one thing or several.
+   *
+   * ## Why this is a list
+   *
+   * > "WHAT IF YOU FIND MORE THEN ONE OPTION, BUT CAN ONLY PICK ONE"
+   *
+   * Because an open wall is not one thing. A bay with 2x10 joists, a waste
+   * stack and a run of Romex in it is normal, and the screen made you pick
+   * which of the three to write down. Whichever you picked, the other two were
+   * lost — and they cannot be gone back for, because the wall gets closed.
+   *
+   * Never empty: a tag that says nothing was found is a dot on a drawing, which
+   * is the thing `tagAt` exists to refuse. Kept in `CONDITIONS` order and
+   * deduplicated, so two tags listing the same three things read the same way
+   * on every sheet.
+   */
+  readonly conditions: readonly Condition[];
   readonly at: Point;
   /** Above the finished floor, when it is known. */
   readonly height?: Nanometres;
@@ -139,7 +156,7 @@ export function tagAt(
   room: Room,
   input: {
     readonly id: string;
-    readonly condition: Condition;
+    readonly conditions: readonly Condition[];
     readonly at: Point;
     readonly height?: Nanometres;
     readonly note: string;
@@ -148,6 +165,17 @@ export function tagAt(
     readonly recordedBy: string;
   }
 ): Tag {
+  // In the list's own order and each one once, however they were ticked. The
+  // order a person taps three buttons in is not information, and letting it
+  // through would make two identical findings read differently on a sheet.
+  const conditions = CONDITIONS.filter((c) => input.conditions.includes(c));
+  if (conditions.length === 0) {
+    throw new TagError(
+      'A tag has to say what was found. Tick at least one — framing, plumbing, ' +
+        'electrical, or whatever it actually was.'
+    );
+  }
+
   const note = input.note.trim();
   if (note === '') {
     throw new TagError(
@@ -164,7 +192,7 @@ export function tagAt(
   const near = wallNear(input.at, room);
   return {
     id: input.id,
-    condition: input.condition,
+    conditions,
     at: input.at,
     ...(input.height !== undefined ? { height: input.height } : {}),
     ...(near ?? {}),
@@ -197,7 +225,11 @@ export function tagsInTheOpen(tags: readonly Tag[]): Tag[] {
 export function describeTag(tag: Tag): string {
   const where = tag.wallId ? ` on ${tag.wallId}` : ' in the open';
   const high = tag.height !== undefined ? `, ${formatFeetInches(tag.height)} up` : '';
-  return `${CONDITION[tag.condition].plain}${where}${high} — ${tag.note}`;
+  // "Framing + Plumbing + Electrical", because that is one opening in the wall
+  // with three things in it, and listing them as three findings would read as
+  // three places on the sheet.
+  const what = tag.conditions.map((c) => CONDITION[c].plain).join(' + ');
+  return `${what}${where}${high} — ${tag.note}`;
 }
 
 /**
@@ -211,9 +243,38 @@ export function describeTag(tag: Tag): string {
  */
 export function tagCounts(tags: readonly Tag[]): { condition: Condition; count: number }[] {
   const counts = new Map<Condition, number>();
-  for (const tag of tags) counts.set(tag.condition, (counts.get(tag.condition) ?? 0) + 1);
+  // A tag listing three things counts once under each, so "how many walls have
+  // plumbing in them" is answerable. It is still a count of findings and not of
+  // anything measurable -- see the note above this function.
+  for (const tag of tags) {
+    for (const c of tag.conditions) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
   return CONDITIONS.filter((c) => counts.has(c)).map((condition) => ({
     condition,
     count: counts.get(condition)!,
   }));
+}
+
+
+/**
+ * A tag out of a saved file, whichever version wrote it.
+ *
+ * Tags carried a single `condition` until 2026-08-26. Rooms saved before that
+ * are on people's phones and in their iCloud, and a reader that only understood
+ * the new shape would turn every one of them into a tag with no conditions at
+ * all -- which `tagAt` correctly refuses, so the whole room would fail to open.
+ * Somebody's morning of pinning what was behind a wall, gone because a field
+ * was renamed.
+ *
+ * So both are read. The old one becomes a list of one, which is exactly what it
+ * meant.
+ */
+export function readConditions(raw: unknown): readonly Condition[] {
+  const source = raw as { conditions?: unknown; condition?: unknown };
+  const listed = Array.isArray(source.conditions)
+    ? source.conditions
+    : source.condition !== undefined
+      ? [source.condition]
+      : [];
+  return CONDITIONS.filter((c) => listed.includes(c));
 }

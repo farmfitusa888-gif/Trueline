@@ -47,6 +47,24 @@ export function Locked({ feature }: { readonly feature: Feature }) {
  * locked and then unlocks a frame later, which shows a paywall to somebody who
  * has already paid.
  */
+/**
+ * How long to wait for the app to say, before saying something anyway.
+ *
+ * The waiting state is right and it stays. What was wrong was that it had no
+ * end: `pending` returns true until the app calls `setSubscribed`, and when
+ * that call was silently dropped -- which it was, on every phone, see
+ * `bridge.ts` -- five screens drew themselves as nothing at all, for good. A
+ * screen that can render permanently blank with no explanation is a defect
+ * whatever caused it, so the wait is bounded now.
+ *
+ * Three seconds because the answer normally arrives in the same frame as the
+ * room. Anything that has not come in three seconds is not coming, and the
+ * description of a feature plus "this is part of the subscription" is a far
+ * better answer than an empty rectangle. If it does turn up late, this
+ * re-renders and unlocks.
+ */
+const WAIT_MS = 3000;
+
 export function Gate({
   feature,
   children,
@@ -55,6 +73,14 @@ export function Gate({
   readonly children: React.ReactNode;
 }) {
   const { open, pending } = useUnlocked();
-  if (pending) return null;
+  const [waitedLongEnough, setWaited] = useState(false);
+
+  useEffect(() => {
+    if (!pending) return;
+    const timer = window.setTimeout(() => setWaited(true), WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [pending]);
+
+  if (pending && !waitedLongEnough) return null;
   return open ? <>{children}</> : <Locked feature={feature} />;
 }
