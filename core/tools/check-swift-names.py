@@ -288,6 +288,95 @@ def memberwise(source: str) -> dict[str, list[str]]:
     return found
 
 
+def handWritten(source: str) -> dict[str, list[str]]:
+    """Each struct that writes its own `init`, and exactly what that one takes.
+
+    ## Why this is separate from `memberwise`
+
+    `memberwise` describes the initialiser Swift *generates*, and it correctly
+    gives up on a struct that declares its own -- a hand-written `init` replaces
+    the generated one entirely, so the property list says nothing about what a
+    call may pass.
+
+    Giving up meant such a struct was checked against nothing at all.
+    `ScanScreen` builds its `@StateObject` from `store`, which a generated
+    initialiser cannot do, so it writes its own -- and when `onClose` was added
+    as a stored property the hand-written `init` did not grow a parameter for
+    it. Xcode, on 2026-08-26:
+
+        RootTabs.swift:86:30: error: extra argument 'onClose' in call
+
+    The file parsed. Every name in it was declared. The argument order was
+    right, because order was all anything looked at. Nothing here could see it,
+    and it cost a whole build.
+
+    So a hand-written `init`'s own labels are read, and a call that passes one it
+    does not take is an error -- a stronger check than the memberwise one,
+    because a hand-written signature is exact.
+    """
+    found: dict[str, list[str]] = {}
+    for match in re.finditer(r'^(?:\w+\s+)*struct\s+(\w+)[^{\n]*\{', source, re.M):
+        body = bodyOf(source, match.start())
+        if body is None:
+            continue
+
+        # The struct's own `init`, at its own depth. A nested class's is not it --
+        # the same trap `memberwise` documents above.
+        depth = 0
+        at = None
+        lines = body.split('\n')
+        for i, line in enumerate(lines):
+            if depth == 0 and re.match(
+                r'\s*(?:public\s+|private\s+|internal\s+|fileprivate\s+)?init\s*\(', line
+            ):
+                at = i
+                break
+            depth += line.count('{') - line.count('}')
+        if at is None:
+            continue
+
+        rest = '\n'.join(lines[at:])
+        opened = rest.index('(')
+        depth = 0
+        closed = None
+        for i in range(opened, len(rest)):
+            if rest[i] in '([{':
+                depth += 1
+            elif rest[i] in ')]}':
+                depth -= 1
+                if depth == 0:
+                    closed = i
+                    break
+        if closed is None:
+            continue
+
+        pieces = []
+        piece = ''
+        depth = 0
+        for ch in rest[opened + 1:closed]:
+            if ch in '([{':
+                depth += 1
+            elif ch in ')]}':
+                depth -= 1
+            if ch == ',' and depth == 0:
+                pieces.append(piece)
+                piece = ''
+            else:
+                piece += ch
+        pieces.append(piece)
+
+        names = []
+        for one in pieces:
+            # `label name: Type`, `name: Type`, or `_ name: Type`. The label is
+            # what a caller writes; `_` means it writes nothing.
+            label = re.match(r'\s*([\w_]+)(?:\s+[\w_]+)?\s*:', one)
+            if label and label.group(1) != '_':
+                names.append(label.group(1))
+        if names:
+            found[match.group(1)] = names
+    return found
+
+
 def callsTo(source: str, name: str) -> list[tuple[int, list[str]]]:
     """Every `Name(...)` call, as (line number, the labels it passes)."""
     calls = []
@@ -540,9 +629,17 @@ def main(argv: list[str]) -> int:
     # Every struct in the project, so a call in one file can be checked against
     # a declaration in another -- which is where the bug was.
     shapes: dict[str, tuple[list[str], str]] = {}
+    # Structs that declare their own `init`. Kept apart from `shapes` because
+    # the rule is different: a generated initialiser forgives an omission, and a
+    # hand-written signature forgives nothing it did not name.
+    written: dict[str, tuple[list[str], str]] = {}
     for path in sorted((ROOT / 'ios').rglob('*.swift')):
-        for name, labels in memberwise(strip(path.read_text(encoding='utf-8'))).items():
+        text = strip(path.read_text(encoding='utf-8'))
+        for name, labels in memberwise(text).items():
             shapes[name] = (labels, os.path.relpath(path, ROOT))
+        # And the ones that write their own, whose signature is exact.
+        for name, labels in handWritten(text).items():
+            written[name] = (labels, os.path.relpath(path, ROOT))
 
     # Every protocol in the project, so a `weak var` in one file can be checked
     # against a declaration in another.
@@ -612,6 +709,19 @@ def main(argv: list[str]) -> int:
             print(f'    Xcode will say: main actor-isolated member of \'{kind}\' can not be '
                   'referenced from a nonisolated context')
             print(f'    Fix: take @MainActor off {kind}, or make {func} async and await it')
+
+        # Hand-written initialisers, which take exactly what they say.
+        for name, (labels, declaredIn) in written.items():
+            for line, passed in callsTo(source, name):
+                extra = [p for p in passed if p not in labels]
+                if not extra:
+                    continue
+                bad += 1
+                print(f'{rel}:{line}: {name}(...) passes {extra[0]!r}, and the '
+                      f'init in {declaredIn} does not take it')
+                print(f"    Xcode will say: extra argument '{extra[0]}' in call")
+                print(f'    Fix: add it to {name}\'s own init, or stop passing it. '
+                      f'That init takes: {", ".join(labels)}')
 
         # Memberwise initialisers, in the order they insist on.
         for name, (labels, declaredIn) in shapes.items():

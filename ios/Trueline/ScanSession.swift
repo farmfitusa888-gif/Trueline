@@ -60,7 +60,9 @@ final class ScanSession: NSObject, ObservableObject {
 
     let captureView: RoomCaptureView
     private var captureSession: RoomCaptureSession { captureView.captureSession }
-    private let recorder: PhotoRecorder
+    /// Where photographs go. Replaced by `take(_:)` between scans, so a second
+    /// room's pictures never land in the first room's folder.
+    private var recorder: PhotoRecorder
     /// What was marked while walking. Kept beside the photographs rather than
     /// inside them: a pin is evidence about a place, a photograph is evidence
     /// about a moment, and they are written to the capture as two files.
@@ -101,6 +103,34 @@ final class ScanSession: NSObject, ObservableObject {
         captureSession.stop()
         compass.stop()
         isRunning = false
+    }
+
+    /// Everything about the last scan, forgotten.
+    ///
+    /// `finished` is the one that mattered. `capturedRoom` reads it, and
+    /// `ScanModel.finish()` waits for it to appear — so with the previous
+    /// room still sitting in it, a second scan on the same tab "finished"
+    /// instantly, with the first room's walls, before the phone had built
+    /// anything at all.
+    ///
+    /// The pins and the instruction go with it: a mark made in one room has no
+    /// business appearing in the next, and "Move closer to the wall" left over
+    /// from a finished scan is an instruction about a room nobody is standing
+    /// in.
+    func reset() {
+        stop()
+        finished = nil
+        failure = nil
+        instruction = nil
+        pinTrouble = nil
+        pins.forgetEverything()
+        pinCount = 0
+        pending = nil
+    }
+
+    /// Where the next scan's photographs go.
+    func take(_ next: PhotoRecorder) {
+        recorder = next
     }
 
     /// Clears a refusal once it has been read.

@@ -16,11 +16,38 @@ final class ScanModel: ObservableObject {
     @Published var finished: SavedScan?
     @Published var name: String = "Room"
 
+    /// What the app is doing between the last frame and a room on disk.
+    ///
+    /// RoomPlan does not hand back a room when the session stops. It hands back
+    /// raw data, and `RoomBuilder` turns that into walls, doors and windows —
+    /// which for a living room walked with a hundred photographs takes a good
+    /// while longer than it does for a bathroom.
+    ///
+    /// This used to be a silent eight-second wait that then **saved whatever
+    /// was there, including nothing**. So a big room produced a folder with no
+    /// room in it, the list said "Nothing to show for this one", and a
+    /// completely successful scan looked like a failed one:
+    ///
+    /// > "AFTER THE SCAN, ITLL FLASH THE 3D SCAN AND THEN GO AWAY, AND AFTER
+    /// >  THAT I DIDNT SEE ANY BLUEPRINTS OR 3D SCAN"
+    ///
+    /// It waits as long as it takes now, says so on screen, and if the build
+    /// genuinely fails it says that instead of writing an empty folder.
+    enum Stage: Equatable {
+        case walking
+        case building
+        case failed(String)
+    }
+
+    @Published private(set) var stage: Stage = .walking
+
     let session: ScanSession
     private let store: ProjectStore
-    private let recorder: PhotoRecorder
-    private let startedAt = Date()
-    private let scratch: URL
+    /// All four are remade by `reset`, so a second scan on the same tab is a
+    /// genuinely new scan rather than the last one written over.
+    private var recorder: PhotoRecorder
+    private var startedAt = Date()
+    private var scratch: URL
     private var relay: AnyCancellable?
     private var begun = false
 
@@ -38,13 +65,44 @@ final class ScanModel: ObservableObject {
     /// One subscription fixes all of it.
     init(store: ProjectStore) {
         self.store = store
-        self.scratch = FileManager.default.temporaryDirectory
+        let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("scan-\(UUID().uuidString)", isDirectory: true)
-        self.recorder = PhotoRecorder(directory: scratch.appendingPathComponent("photos"))
+        self.scratch = folder
+        self.recorder = PhotoRecorder(directory: folder.appendingPathComponent("photos"))
         self.session = ScanSession(recorder: recorder)
         relay = session.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
+    }
+
+    /// Ready for the next room.
+    ///
+    /// ## The report this answers
+    ///
+    /// > "THE SCAN SCREEN DOESNT EVER CLOSE OUT TRULY AFTER A SCAN... WHEN YOU
+    /// >  GO BACK INTO SCAN IT GOES BACK INTO THE SAME PROJECT"
+    ///
+    /// And it did, because nothing ever put this back. Scan is a **tab** now,
+    /// so its `@StateObject` lives for as long as the app does: `finished`
+    /// stayed set from the last scan, `begun` stayed true so `begin()` returned
+    /// without starting the camera — a black screen that only closing the app
+    /// could clear — and `name` still said what the last room was called.
+    ///
+    /// Everything that belongs to one scan is remade here: a fresh scratch
+    /// folder, a fresh photo recorder, a fresh start time (which is what the
+    /// folder is named after, so the old one cannot be written over), and a
+    /// session that has not been stopped.
+    func reset() {
+        session.reset()
+        stage = .walking
+        finished = nil
+        name = "Room"
+        begun = false
+        startedAt = Date()
+        scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scan-\(UUID().uuidString)", isDirectory: true)
+        recorder = PhotoRecorder(directory: scratch.appendingPathComponent("photos"))
+        session.take(recorder)
     }
 
     var showingFailure: Binding<Bool> {
@@ -54,14 +112,45 @@ final class ScanModel: ObservableObject {
         )
     }
 
+    /// The camera, on and ready to walk a room.
+    ///
+    /// ## What `begun` used to mean, and why it broke the tab
+    ///
+    /// It meant "this model has ever started a session", and it was never put
+    /// back. That was right when Scan was a screen you pushed and popped: the
+    /// model died with the screen. It is a **tab** now, so the model lives as
+    /// long as the app — and the second time anybody opened Scan this returned
+    /// without starting anything:
+    ///
+    /// > "THE SCANNER DOESNT ALWAYS LOAD, NEEDING TO CLOSE THE APP AND GO BACK
+    /// >  INTO IT"
+    ///
+    /// Closing the app was the only way, because that was the only thing that
+    /// built a new model.
+    ///
+    /// It means "a session is up right now" instead. Which is the question that
+    /// was actually being asked, and it answers itself correctly however many
+    /// times somebody comes back.
     func begin() {
-        // Coming back from the review screen fires `onAppear` again, and
-        // starting again reuses the same scratch folder and the same started-at
-        // stamp — which means the same folder name, written over the scan that
-        // was just saved.
-        guard !begun else { return }
+        guard !session.isRunning, stage == .walking, finished == nil else { return }
         begun = true
         session.start()
+    }
+
+    /// Switching to another tab.
+    ///
+    /// The camera goes off, because a LiDAR session running behind the Rooms
+    /// list is a phone that gets hot and flat while somebody reads a takeoff.
+    ///
+    /// And the half-built room goes with it. `captureSession.stop()` makes
+    /// RoomPlan deliver whatever it has, so without this the session sat
+    /// holding a room from an interrupted walk — and the next press of Done
+    /// would have found it instantly and saved *that*, with none of the walls
+    /// somebody had just walked.
+    func stepAway() {
+        guard stage == .walking, finished == nil else { return }
+        session.reset()
+        begun = false
     }
 
     /// Stop, wait for the room, write it down.
@@ -70,11 +159,32 @@ final class ScanModel: ObservableObject {
     /// there the instant the button is pressed. Waiting for it is not a spinner
     /// for the sake of one — the room genuinely does not exist yet.
     func finish() {
+        stage = .building
         session.stop()
         Task {
-            for _ in 0..<40 {                       // up to about eight seconds
-                if session.capturedRoom != nil { break }
-                try? await Task.sleep(for: .milliseconds(200))
+            // Until it is there, or until RoomPlan says it cannot be done.
+            //
+            // Not a deadline. There was an eight-second one, and what it did
+            // when it ran out was call `save()` anyway -- with
+            // `session.capturedRoom` still nil, which wrote a folder with no
+            // room in it. A living room walked with a hundred photographs takes
+            // longer than eight seconds to build, so the bigger the scan the
+            // more certain it was to be thrown away.
+            //
+            // There is nothing to guard against by giving up: `didEndWith` is
+            // called exactly once by RoomPlan after `stop()`, and it either
+            // sets the room or sets a failure. Waiting for one of those two is
+            // waiting for an answer that is coming.
+            while session.capturedRoom == nil && session.failure == nil {
+                try? await Task.sleep(for: .milliseconds(150))
+            }
+            guard session.capturedRoom != nil else {
+                // RoomPlan itself could not make a room of it. The photographs
+                // are still in the scratch folder and the message says so --
+                // this is the one case where there is genuinely nothing to
+                // write, and it must not be written as if there were.
+                stage = .failed(session.failure ?? "The scan could not be turned into a room.")
+                return
             }
             save()
         }
@@ -106,6 +216,7 @@ final class ScanModel: ObservableObject {
                 pinsJSON: written.pinsJSON
             )
         } catch {
+            stage = .failed(error.localizedDescription)
             session.reportFailure(error.localizedDescription)
         }
     }

@@ -38,10 +38,23 @@ struct ScanScreen: View {
     /// Whoever put this screen on screen knows the way back out, and says so.
     let onClose: () -> Void
 
-    init(store: ProjectStore, backup: Backup, onFinished: @escaping (SavedScan) -> Void) {
+    /// Written out rather than generated, because `model` has to be built from
+    /// `store` and a memberwise initialiser cannot do that.
+    ///
+    /// Which is exactly how `onClose` came to be an "extra argument in call":
+    /// adding a stored property to a struct that declares its own `init` adds
+    /// nothing to that `init`, and nothing in this repository was checking the
+    /// arguments of a hand-written one. `check-swift-names.py` does now.
+    init(
+        store: ProjectStore,
+        backup: Backup,
+        onFinished: @escaping (SavedScan) -> Void,
+        onClose: @escaping () -> Void
+    ) {
         self.store = store
         self.backup = backup
         self.onFinished = onFinished
+        self.onClose = onClose
         _model = StateObject(wrappedValue: ScanModel(store: store))
     }
 
@@ -95,6 +108,52 @@ struct ScanScreen: View {
                 .accessibilityLabel("Point at the damage and tap")
             }
 
+            // Between the last frame and a room on disk. RoomPlan builds the
+            // room after the session stops, and on a big room that takes a
+            // while -- it used to be an eight-second silence that then saved
+            // an empty folder.
+            if model.stage != .walking {
+                Color.black.opacity(0.72).ignoresSafeArea()
+                VStack(spacing: 14) {
+                    if case .failed(let why) = model.stage {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundStyle(Ink.scanned)
+                        Text("That scan could not be turned into a room")
+                            .font(.headline)
+                        Text(why)
+                            .font(.footnote)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                        Text(
+                            "Your photographs are still here. Walk it again, or measure it by "
+                            + "hand on the Measure tab — that needs no LiDAR."
+                        )
+                        .font(.footnote)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                        Button("Try again") { model.reset() }
+                            .buttonStyle(.borderedProminent)
+                    } else {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("Building the room from your scan")
+                            .font(.headline)
+                        Text(
+                            "The phone is turning what you walked into walls, doors and "
+                            + "windows. A big room takes longer than a small one — this is "
+                            + "the part that used to be given up on."
+                        )
+                        .font(.footnote)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(28)
+                .foregroundStyle(.white)
+                .transition(.opacity)
+            }
+
             VStack(spacing: 0) {
                 if let instruction = model.session.instruction, model.session.isRunning {
                     Text(instruction)
@@ -136,10 +195,20 @@ struct ScanScreen: View {
         }
         .navigationBarBackButtonHidden(model.session.isRunning)
         .onAppear { model.begin() }
-        .onDisappear { model.session.stop() }
+        // Off while somebody is on another tab: a LiDAR session running behind
+        // the Rooms list is a phone that gets hot and flat. Coming back starts
+        // a fresh one -- which is new, and is the whole of "the scanner doesn't
+        // always load". It used to stop here and then refuse to start again,
+        // and only closing the app cleared it.
+        .onDisappear { model.stepAway() }
         .onChange(of: model.finished) { _, scan in
             guard let scan else { return }
+            // Hand it over first, so the room is on screen in Rooms, and only
+            // then put this tab back to a fresh scan. Both halves, always:
+            // handing over without resetting is what left the same project on
+            // the Scan tab, with the camera off and Mark dead.
             onFinished(scan)
+            model.reset()
         }
     }
 
@@ -224,6 +293,12 @@ struct ScanScreen: View {
                 .foregroundStyle(marking ? .red : .primary)
             }
             .accessibilityLabel(marking ? "Stop marking damage" : "Mark damage")
+            // Only while there is a live session to cast a ray through. It used
+            // to be dead for a second reason as well: on a tab, `begin()` had
+            // already run once and refused to run again, so the session was
+            // never started and every control that gates on `isRunning` was
+            // permanently off. `reset()` is what fixes that; this line was
+            // always right.
             .disabled(!model.session.isRunning)
 
             Button(model.session.isRunning ? "Done" : "Close") {

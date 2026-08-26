@@ -99,7 +99,7 @@ def expect(what: str, code: int, output: str, *, fires: bool, saying: str = '') 
 # ---------------------------------------------------------------- swift names
 
 def swiftNames(bench: Bench) -> None:
-    print('check-swift-names.py — the six things it claims to find')
+    print('check-swift-names.py — the seven things it claims to find')
 
     code, out = bench.run('check-swift-names.py')
     expect('says nothing about the repository as it stands', code, out, fires=False)
@@ -185,6 +185,37 @@ def swiftNames(bench: Bench) -> None:
         code, out = bench.run('check-swift-names.py')
         expect('overlapping accesses inside an inout closure', code, out,
                fires=True, saying='overlapping accesses')
+        bench.restore(rel)
+
+    # 2d. An argument a hand-written `init` does not take.
+    #
+    #     Xcode, on 2026-08-26, on the very build that was meant to carry six
+    #     fixes to a phone:
+    #
+    #         RootTabs.swift:86:30: error: extra argument 'onClose' in call
+    #
+    #     `ScanScreen` builds its @StateObject from `store`, so it writes its own
+    #     init -- and a struct that writes its own gets no memberwise one, so
+    #     adding a stored property adds no parameter. The file parsed, every name
+    #     was declared, the argument order was right, and nothing here looked at
+    #     what a hand-written signature actually takes.
+    rel = 'ios/Trueline/ScanScreen.swift'
+    was = bench.read(rel)
+    broken = was.replace(
+        """        onFinished: @escaping (SavedScan) -> Void,
+        onClose: @escaping () -> Void
+    ) {""",
+        """        onFinished: @escaping (SavedScan) -> Void
+    ) {""",
+    ).replace('        self.onClose = onClose\n', '')
+    if broken == was:
+        failures.append('ScanScreen no longer writes its own init taking onClose')
+        print(f'  {RED}✗{OFF} an argument a hand-written init does not take (nothing to break)')
+    else:
+        bench.write(rel, broken)
+        code, out = bench.run('check-swift-names.py')
+        expect('an argument a hand-written init does not take', code, out,
+               fires=True, saying='extra argument')
         bench.restore(rel)
 
     # 3. `weak` on a protocol with no class bound -- the first error a real

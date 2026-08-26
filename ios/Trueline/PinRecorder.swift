@@ -113,6 +113,15 @@ final class PinRecorder {
     }
 
     /// Throws away the last pin. For the one that went on the wrong wall.
+    /// Everything marked, forgotten — between one room and the next.
+    ///
+    /// A pin is a place in the room that was being walked. Carrying one into
+    /// the next scan would put a mark somewhere nobody stood, on a wall that
+    /// does not exist, in a room it says nothing true about.
+    func forgetEverything() {
+        records.removeAll()
+    }
+
     func undo() {
         guard !records.isEmpty else { return }
         records.removeLast()
