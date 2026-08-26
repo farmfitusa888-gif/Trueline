@@ -90,6 +90,10 @@ section { margin-top: 68px; }
 .tag--built { color: var(--measured); background: color-mix(in srgb, var(--measured) 14%, transparent); }
 .tag--guess { color: var(--scanned); background: color-mix(in srgb, var(--scanned) 16%, transparent); }
 .tag--risk  { color: var(--refuse);  background: color-mix(in srgb, var(--refuse) 14%, transparent); }
+/* A risk that has been half retired. Its own tone rather than reusing "built":
+   the crash half is fixed and the churn half never will be, and colouring it
+   green would be the page telling a nicer story than the text under it. */
+.tag--half { background: color-mix(in srgb, var(--scanned) 14%, transparent); color: var(--scanned); }
 
 /* ---------------------------------------------------------------- tables */
 .scroll { overflow-x: auto; margin: 0 -22px; padding: 0 22px; }
@@ -244,10 +248,17 @@ footer { margin-top: 84px; padding-top: 20px; border-top: 1px solid var(--rule);
       contractors pay for it.</p>
     </div>
     <div class="card">
+      <h4>Crash and error reporting <span class="tag tag--built">built</span></h4>
+      <p>Apple&rsquo;s own <b>MetricKit</b> for native crashes and hangs, and
+      <code>window.onerror</code> for everything the web screens throw &mdash; which MetricKit
+      cannot see at all, and which is most of this app.</p>
+      <p>Both written to a folder on the phone. Nothing is sent until somebody taps
+      <b>Send them</b>. No server, no third-party SDK, nothing about the job.</p>
+    </div>
+    <div class="card">
       <h4>Never been sold <span class="tag tag--risk">unproven</span></h4>
-      <p>Zero customers. Zero App Store listing. Zero telemetry &mdash; there is no analytics
-      and no crash reporting anywhere in the codebase, which is a consequence of the
-      privacy architecture and a real cost. See section 08.</p>
+      <p>Zero customers. Zero App Store listing. Zero analytics &mdash; deliberately, and
+      permanently: that is what &ldquo;nothing leaves the device&rdquo; costs. See section 06.</p>
     </div>
   </div>
 </section>
@@ -479,11 +490,13 @@ footer { margin-top: 84px; padding-top: 20px; border-top: 1px solid var(--rule);
       <p><b>The tell:</b> gross adds healthy, net adds near zero by month four.</p>
     </div>
     <div class="card">
-      <h4>4 &middot; You are blind <span class="tag tag--risk">certain</span></h4>
-      <p>There is no analytics and no crash reporting in the codebase. When somebody stops using
-      it you will not know they stopped, when it crashes you will not know it crashed, and when a
-      scan fails you will hear about it only if they bother to email.</p>
-      <p><b>This one is not a risk, it is the current state.</b> See section 08.</p>
+      <h4>4 &middot; You are half blind <span class="tag tag--half">was certain</span></h4>
+      <p>When it <b>breaks</b> you will now hear about it: MetricKit for crashes and hangs, and
+      the web half catching everything these screens throw, both written to the phone with one
+      tap to send them. Fixed 26 August 2026.</p>
+      <p>When somebody <b>stops using it</b> you still will not, and never will &mdash; there is
+      no analytics and there is not going to be, because that is the price of the privacy
+      promise. <b>There is no tell for this one.</b> Test 4 in section 09 is the substitute.</p>
     </div>
   </div>
 
@@ -547,11 +560,12 @@ footer { margin-top: 84px; padding-top: 20px; border-top: 1px solid var(--rule);
       <thead><tr><th class="num">At</th><th>What breaks</th><th>What it costs to fix</th></tr></thead>
       <tbody>
         <tr><td class="num">1</td>
-          <td><b>You cannot see anything.</b> No analytics, no crash reporting. A scan that fails
-          on a customer&rsquo;s phone is invisible to you.</td>
-          <td>Apple&rsquo;s own <b>MetricKit</b> ships with iOS, sends crash and hang reports to
-          App Store Connect, and collects nothing personal. It costs an afternoon and does not
-          break the privacy promise.</td></tr>
+          <td><s><b>You cannot see anything.</b> No analytics, no crash reporting. A scan that
+          fails on a customer&rsquo;s phone is invisible to you.</s></td>
+          <td><b>Done, 26 August 2026.</b> MetricKit for native crashes and hangs,
+          <code>window.onerror</code> for the web half MetricKit cannot see, both written to
+          <code>Documents/Reports</code> and sent only on a tap. Apple collects nothing personal
+          and neither does this.</td></tr>
         <tr><td class="num">10</td>
           <td><b>Support is your inbox.</b> Fine, and worth doing by hand for a long time &mdash;
           the first fifty conversations are the product research.</td>

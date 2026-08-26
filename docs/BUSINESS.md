@@ -26,7 +26,8 @@ ran on a phone in August 2026.
 | **The measurement engine** — exact integer arithmetic end to end, lengths in nanometres, areas in doubled square-nanometres, money in cents. No float ever touches a measurement. Every dimension carries whether it was `scanned`, `measured`, `derived` or `adjusted`, and the app refuses to call a room measured until a tape has been on one wall running each way. | Built |
 | **The business half** — takeoff, price book, proposal with e-signature and audit trail, signed baseline, change orders, scheduling into the phone's calendar, invoicing, QuickBooks export. | Built |
 | **Insurance restoration** — damage pins dropped live during a scan, photographs with the camera pose attached, the claim document as a real PDF, and ESX export for Xactimate. | Built |
-| **Never been sold** | Zero customers. Zero App Store listing. Zero telemetry — see §8. |
+| **Crash and error reporting** | MetricKit for native crashes and hangs, `window.onerror` for everything the web screens throw, both written to the phone and sent only when somebody taps Send them. No server, no third-party SDK, nothing collected about the job. | Built |
+| **Never been sold** | Zero customers. Zero App Store listing. Zero analytics, on purpose — see §6. |
 
 ## 2. Where it sits
 
@@ -146,10 +147,15 @@ Ranked by likelihood, not by severity.
    Every month is spent replacing the people who left, and the count never moves
    however good the product is.
    *The tell:* gross adds healthy, net adds near zero by month four.
-4. **You are blind.** *(Certain — this is the current state, not a risk.)* Until
-   §8 lands there is no analytics and no crash reporting anywhere in the
-   codebase. When somebody stops using it you will not know they stopped; when it
-   crashes you will not know it crashed.
+4. **You are half blind.** *(Was certain. Now half of it is fixed.)* As of
+   2026-08-26 the app subscribes to Apple's MetricKit for crashes and hangs, and
+   catches everything the web screens throw — both written to a folder on the
+   phone with one tap to send them (`ios/Trueline/Diagnostics.swift`,
+   `web/src/Trouble.tsx`). So when it **breaks** you will hear about it.
+   When somebody **stops using it** you still will not: there is no analytics and
+   deliberately never will be, because that is what "nothing leaves the device"
+   costs. The only churn signal is somebody cancelling, and it arrives late.
+   *The tell:* you cannot have one. §9 test 4 is the substitute.
 
 **The honest summary.** The product is unusually good and unusually far along
 for a business with zero customers. That is the trap. Every remaining risk is
@@ -186,7 +192,7 @@ Each gate blocks the next. Several are waiting rather than work.
 
 | At | What breaks | What it costs to fix |
 |---|---|---|
-| 1 | **You cannot see anything.** No analytics, no crash reporting. A scan that fails on a customer's phone is invisible. | Apple's own **MetricKit** ships with iOS, sends crash and hang reports to App Store Connect, and collects nothing personal. An afternoon, and it does not break the privacy promise. **Done — see `ios/Trueline/Diagnostics.swift`.** |
+| 1 | **You cannot see anything.** ~~No analytics, no crash reporting. A scan that fails on a customer's phone is invisible.~~ | **Done, 2026-08-26.** MetricKit for native crashes and hangs, `window.onerror` for the web half that MetricKit cannot see, both written to `Documents/Reports` and sent only on a tap. `ios/Trueline/Diagnostics.swift`, `web/src/Trouble.tsx`. |
 | 10 | **Support is your inbox.** | Nothing. Do it by hand on purpose — the first fifty conversations are the product research. |
 | 50 | **No way to help somebody whose data is wrong.** Everything is on their phone in their iCloud. You cannot look, cannot repair, cannot restore. | A one-tap "send me this scan" that shares the folder. The share sheet is already built; this is a button and a mail template. |
 | 500 | **One person cannot answer the email.** Every hour on support is an hour not building. | The handbook is already written and ships inside the app. Point at it, and add the three questions everyone asks to a real FAQ. |
