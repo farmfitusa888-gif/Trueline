@@ -13,7 +13,11 @@
 | `market-research.html` | What the field already does, and where the gap is. |
 | `what-trueline-should-cost.html` | The price, argued against what the competition charges. |
 | `the-trueline-wedge.html` | Why this app exists in a market with six scanners in it. |
+| `BUSINESS.md` | **The business case.** Why $78, what has to be true, and the four ways it fails. Sourced. |
+| `business.html` | The same case with live dials — move price, churn and customer count and watch it break. |
+| `first-build.md` | **Start here on a new Mac.** Xcode, clone, signing once, then `build.sh`. Assumes nothing is installed. |
 | `on-the-phone.md` | Pulling the current build onto an iPhone, and the ordered list of what to test on it. |
+| `first-six-tests.md` | The six of those twenty-two that gate everything else. Any room with four walls. |
 | `give-it-to-gilbert.md` | Getting the app onto somebody else's phone — TestFlight, and the two alternatives. |
 | `icloud-setup.md` | The three console steps that turn the backup on. One of them fails silently if skipped. |
 | `where-the-data-lives.md` | Why the backup is the user's own iCloud rather than a server. |

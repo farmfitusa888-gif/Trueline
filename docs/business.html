@@ -1,0 +1,687 @@
+<title>Trueline Business Case</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+/* The company's own palette, out of core/src/design.ts. This is a document
+   about Trueline and it may as well be dressed in Trueline. */
+:root {
+  --ground: #F5F7F8; --raise: #FFFFFF; --sunk: #EDF0F2;
+  --ink: #14181B; --quiet: #4B545B; --faint: #6B747B;
+  --rule: #DFE3E6; --hair: #E9ECEE;
+  --scanned: #8F4408; --measured: #1F7A4D; --refuse: #A31212;
+  --accent: #B8590A; --on-accent: #FFFFFF;
+  --shadow: 0 1px 2px rgba(20,24,27,.05), 0 8px 24px rgba(20,24,27,.07);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0F1316; --raise: #1B2126; --sunk: #171C20;
+    --ink: #E4E7E9; --quiet: #A9B3BA; --faint: #79838B;
+    --rule: #2B3238; --hair: #232A2F;
+    --scanned: #F0A85C; --measured: #6FD39C; --refuse: #F08A8A;
+    --accent: #D06A12; --on-accent: #FFFFFF;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0F1316; --raise: #1B2126; --sunk: #171C20;
+  --ink: #E4E7E9; --quiet: #A9B3BA; --faint: #79838B;
+  --rule: #2B3238; --hair: #232A2F;
+  --scanned: #F0A85C; --measured: #6FD39C; --refuse: #F08A8A;
+  --accent: #D06A12; --on-accent: #FFFFFF;
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.4);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font-family: Archivo, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 940px; margin: 0 auto; padding: 0 22px 110px; }
+.mono, code { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+              font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------- head */
+header { padding: 66px 0 0; display: flex; flex-direction: column; gap: 16px; }
+.eyebrow {
+  font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 500;
+  letter-spacing: .17em; text-transform: uppercase; color: var(--faint); margin: 0;
+}
+h1 { font-size: clamp(32px, 6vw, 54px); line-height: 1.04; margin: 0;
+     font-weight: 700; letter-spacing: -.028em; text-wrap: balance; max-width: 16ch; }
+.lede { margin: 0; max-width: 64ch; font-size: 17.5px; color: var(--quiet); }
+.lede strong { color: var(--ink); font-weight: 600; }
+
+h2 {
+  font-size: clamp(23px, 3.2vw, 31px); font-weight: 700; letter-spacing: -.02em;
+  margin: 0 0 6px; text-wrap: balance;
+}
+h3 { font-size: 17px; font-weight: 600; margin: 26px 0 6px; letter-spacing: -.01em; }
+p { margin: 0 0 12px; }
+section { margin-top: 68px; }
+.section-lede { margin: 0 0 20px; max-width: 62ch; color: var(--quiet); }
+
+.n {
+  font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600;
+  letter-spacing: .16em; color: var(--accent); display: block; margin-bottom: 6px;
+}
+
+/* ------------------------------------------------------------------ cards */
+.card {
+  background: var(--raise); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 18px; box-shadow: var(--shadow);
+}
+.cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+/* Four cards in a three-wide grid leaves two dead slots. Give the fours a
+   wider minimum so they land two-by-two, and one-up on a phone. */
+.cards.four { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+.card h4 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.card p { margin: 0; font-size: 14.5px; color: var(--quiet); }
+.card p + p { margin-top: 8px; }
+
+/* --------------------------------------------------------------- evidence */
+.tag {
+  font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; padding: 2px 6px; border-radius: 2px;
+  white-space: nowrap;
+}
+.tag--built { color: var(--measured); background: color-mix(in srgb, var(--measured) 14%, transparent); }
+.tag--guess { color: var(--scanned); background: color-mix(in srgb, var(--scanned) 16%, transparent); }
+.tag--risk  { color: var(--refuse);  background: color-mix(in srgb, var(--refuse) 14%, transparent); }
+
+/* ---------------------------------------------------------------- tables */
+.scroll { overflow-x: auto; margin: 0 -22px; padding: 0 22px; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 540px; }
+th, td { text-align: left; padding: 9px 12px 9px 0; border-bottom: 1px solid var(--hair);
+         vertical-align: top; }
+th {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+  border-bottom: 1px solid var(--rule); white-space: nowrap;
+}
+td.num, th.num { text-align: right; font-family: "IBM Plex Mono", monospace;
+                 font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.us td { background: color-mix(in srgb, var(--accent) 7%, transparent); font-weight: 600; }
+.src { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--faint); }
+
+/* -------------------------------------------------------------- the model */
+.model { background: var(--raise); border: 1px solid var(--rule); border-radius: 6px; padding: 20px; }
+.dials { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.dial label {
+  display: block; font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+  font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--faint); margin-bottom: 5px;
+}
+.dial output {
+  display: block; font-family: "IBM Plex Mono", monospace; font-size: 24px;
+  font-weight: 500; color: var(--ink); margin-bottom: 3px;
+}
+/* accent-color colours the filled half but leaves the empty half the browser's
+   own white, which glares in dark. Paint the track from the tokens instead. */
+input[type=range] { -webkit-appearance: none; appearance: none;
+  width: 100%; min-height: 44px; background: transparent; accent-color: var(--accent); }
+input[type=range]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px; background: var(--rule); }
+input[type=range]::-moz-range-track {
+  height: 4px; border-radius: 2px; background: var(--rule); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+  width: 22px; height: 22px; margin-top: -9px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--raise);
+  box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+input[type=range]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--raise);
+  box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.dial small { display: block; font-size: 12px; color: var(--faint); line-height: 1.4; }
+
+.out { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--rule);
+       display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.fig span:first-child {
+  display: block; font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+  font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+}
+.fig b {
+  display: block; font-family: "IBM Plex Mono", monospace; font-size: 27px;
+  font-weight: 600; letter-spacing: -.01em; margin-top: 2px;
+}
+.fig small { display: block; font-size: 12px; color: var(--faint); margin-top: 2px; line-height: 1.4; }
+.verdict {
+  margin-top: 18px; padding: 12px 14px; border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-size: 14.5px; line-height: 1.55;
+}
+.verdict b { font-weight: 600; }
+
+/* --------------------------------------------------------------- callouts */
+.hard {
+  border-left: 3px solid var(--refuse);
+  background: color-mix(in srgb, var(--refuse) 7%, transparent);
+  padding: 14px 16px; border-radius: 0 4px 4px 0;
+}
+.hard h3 { margin-top: 0; color: var(--refuse); }
+.hard p:last-child { margin-bottom: 0; }
+
+ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0;
+           display: flex; flex-direction: column; gap: 2px; }
+ol.steps > li {
+  counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--hair);
+}
+ol.steps > li::before {
+  content: counter(s, decimal-leading-zero);
+  font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 600;
+  color: var(--accent); padding-top: 3px;
+}
+ol.steps h4 { margin: 0 0 3px; font-size: 15.5px; font-weight: 600; }
+ol.steps p { margin: 0; font-size: 14.5px; color: var(--quiet); }
+ol.steps code { font-size: 13px; background: var(--sunk); padding: 1px 5px; border-radius: 3px; }
+
+ul.plain { list-style: none; padding: 0; margin: 0; }
+ul.plain > li { padding: 11px 0; border-bottom: 1px solid var(--hair);
+                display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+ul.plain b { font-weight: 600; }
+ul.plain p { margin: 3px 0 0; font-size: 14.5px; color: var(--quiet); }
+
+footer { margin-top: 84px; padding-top: 20px; border-top: 1px solid var(--rule);
+         font-family: "IBM Plex Mono", monospace; font-size: 11px;
+         letter-spacing: .05em; color: var(--faint);
+         display: flex; flex-wrap: wrap; gap: 8px 26px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 640px) { .wrap { padding: 0 16px 84px; } header { padding-top: 42px; }
+  .scroll { margin: 0 -16px; padding: 0 16px; } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Trueline &middot; business case &middot; 26 August 2026</p>
+  <h1>What it takes to make this a business</h1>
+  <p class="lede">
+    Every competitor price, feature and user complaint on this page is
+    <strong>sourced from <code>MARKET-RESEARCH.md</code></strong>, which was researched on
+    2026-08-19 and labels its own provenance. Everything about the product is read out of the
+    code. Everything else &mdash; conversion, churn, what a customer costs to get &mdash; is an
+    <strong>assumption, marked as one</strong>, because nobody has sold this to anybody yet.
+  </p>
+  <p class="lede">
+    You asked for the version that shows where it fails. That is section 05, and the dials
+    are live: move them until it stops working and you will see how little has to go wrong.
+  </p>
+</header>
+
+<!-- ==================================================================== 01 -->
+<section>
+  <span class="n">01</span>
+  <h2>What is actually built</h2>
+  <p class="section-lede">
+    Not a roadmap. This is what compiles, passes 761 tests and 17 audit parts, and ran on a
+    phone this week.
+  </p>
+  <div class="cards four">
+    <div class="card">
+      <h4>The measurement engine <span class="tag tag--built">built</span></h4>
+      <p>Exact integer arithmetic end to end &mdash; lengths in nanometres, areas in doubled
+      square-nanometres, money in cents. No float ever touches a measurement.</p>
+      <p>Every dimension carries whether it was <b>scanned</b>, <b>measured</b>, <b>derived</b>
+      or <b>adjusted</b>, and the app refuses to call a room measured until a tape has been on
+      one wall running each way.</p>
+    </div>
+    <div class="card">
+      <h4>The business half <span class="tag tag--built">built</span></h4>
+      <p>Takeoff, price book, proposal with e-signature and audit trail, signed baseline,
+      change orders, scheduling into the phone's calendar, invoicing, QuickBooks export.</p>
+      <p>This is the half magicplan does not have, and it is the whole pricing argument.</p>
+    </div>
+    <div class="card">
+      <h4>Insurance restoration <span class="tag tag--built">built</span></h4>
+      <p>Damage pins dropped live during a scan, photographs with the camera pose attached,
+      the claim document as a real PDF, and <b>ESX export for Xactimate</b>.</p>
+      <p>The research names ESX as magicplan's strongest moat and the reason restoration
+      contractors pay for it.</p>
+    </div>
+    <div class="card">
+      <h4>Never been sold <span class="tag tag--risk">unproven</span></h4>
+      <p>Zero customers. Zero App Store listing. Zero telemetry &mdash; there is no analytics
+      and no crash reporting anywhere in the codebase, which is a consequence of the
+      privacy architecture and a real cost. See section 08.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================================================================== 02 -->
+<section>
+  <span class="n">02</span>
+  <h2>Where you actually sit</h2>
+  <p class="section-lede">
+    Every figure below is from the research doc, with its provenance. <span class="src">[vendor]</span>
+    means read off the company's own page; <span class="src">[review]</span> means a third-party
+    review site and not independently confirmed.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Product</th><th>What it is</th><th class="num">Price</th><th>Aimed at</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>magicplan</b></td><td>LiDAR + sketch, floor plans, estimates, <b>ESX to Xactimate</b></td>
+            <td class="num">~$33.33/mo <span class="src">[review]</span></td><td>Restoration &amp; insurance</td></tr>
+        <tr><td><b>Polycam</b></td><td>LiDAR + photogrammetry, 3D mesh</td>
+            <td class="num">~$150/yr Basic<br>$36/mo Business <span class="src">[review]</span></td><td>General 3D capture</td></tr>
+        <tr><td><b>CubiCasa</b></td><td>Walk-through to floor plan</td>
+            <td class="num">$22.99&ndash;$29.99/scan<br>up to $460&ndash;600/scan <span class="src">[review]</span></td><td>Real-estate volume</td></tr>
+        <tr><td><b>Matterport</b></td><td>Hosted 3D tour, AI floor plan</td>
+            <td class="num">$65&ndash;$309/mo<br>+$350&ndash;1,000/home <span class="src">[review]</span></td><td>Marketing tours</td></tr>
+        <tr><td><b>Hover</b></td><td>Photos to exterior model + takeoff</td>
+            <td class="num">$99/mo + $29&ndash;139/project <span class="src">[review]</span></td><td>Roofing, siding</td></tr>
+        <tr class="us"><td><b>Trueline</b></td><td>Measured interior + takeoff + proposal + claim, one seat</td>
+            <td class="num">$78/mo &middot; $780/yr<br><span class="src">not yet configured</span></td><td>Restoration, then remodelers</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The one thing the research proves you own</h3>
+  <p>
+    Nobody sells <b>interiors + accuracy + estimating in one product</b>. Hover owns exteriors.
+    magicplan owns insurance restoration. Polycam owns raw 3D. CubiCasa owns real-estate volume.
+    The remodeler doing interior as-builts to price a job is served by pieces of all of them and
+    the whole of none.
+  </p>
+  <p>
+    And Matterport &mdash; the most famous name in the category &mdash; explicitly says its
+    floor plans are <b>&ldquo;not CAD-accurate drawings and should not be used for construction
+    or renovation planning.&rdquo;</b> The category leader disclaims your use case in writing.
+  </p>
+</section>
+
+<!-- ==================================================================== 03 -->
+<section>
+  <span class="n">03</span>
+  <h2>The price, and the argument against it</h2>
+  <div class="hard">
+    <h3>You are asking 2.4&times; magicplan with no brand and no track record</h3>
+    <p>
+      magicplan is <b>~$33.33/mo flat</b> and already does LiDAR scanning, floor plans,
+      estimates and ESX export to Xactimate. It has years of restoration contractors using it.
+      You are proposing <b>$78/mo</b> with zero customers and no name.
+    </p>
+    <p>
+      If your pitch is &ldquo;a better scanner,&rdquo; you lose this argument on the first call.
+      Nobody pays 2.4&times; for a better version of the thing they already have.
+    </p>
+  </div>
+
+  <h3>The argument that does work</h3>
+  <p>
+    You are not selling a scanner. You are selling <b>a scanner plus the job-management half</b>,
+    and that half is normally a second subscription. Jobber &mdash; scheduling, quoting,
+    invoicing &mdash; is a separate product a contractor buys alongside magicplan.
+  </p>
+  <p>
+    So the honest comparison is not $78 against $33. It is $78 against
+    <b>magicplan plus a job-management tool</b>, bought separately, that do not share a number
+    between them &mdash; where every quantity gets retyped from one into the other, by hand, at
+    eleven at night.
+  </p>
+  <p>
+    <b>That retyping is your actual product.</b> The takeoff, the proposal, the change order and
+    the invoice all come off the same measured walls, and when a tape moves a wall, every one of
+    them moves with it. That cannot be replicated by two products next to each other at any price.
+  </p>
+
+  <h3>What that means for how you sell it</h3>
+  <ul class="plain">
+    <li><span class="tag tag--built">do</span><div><b>Lead with the change order.</b>
+      <p>A wall moved, the proposal was signed, and the app produced a priced change order off
+      the difference. That is a sentence a restoration contractor feels in his stomach, because
+      unbilled change orders are where his money goes.</p></div></li>
+    <li><span class="tag tag--built">do</span><div><b>Lead with the refusal.</b>
+      <p>Show it saying <i>these are the scanner&rsquo;s numbers, not measurements</i>. Every
+      competitor hands over a number with no provenance. Yours is the only one that admits what
+      it does not know, and an adjuster is the exact person who cares.</p></div></li>
+    <li><span class="tag tag--risk">never</span><div><b>Never lead with accuracy.</b>
+      <p>You have no measured accuracy figure. The research doc says so in writing: no accuracy
+      claim in it was produced on a device you own. Claiming one is the fastest way to be caught.</p></div></li>
+  </ul>
+</section>
+
+<!-- ==================================================================== 04 -->
+<section>
+  <span class="n">04</span>
+  <h2>The gate, as it is built</h2>
+  <p class="section-lede">
+    Read out of <code>core/src/entitlement.ts</code>, which generates the Swift gate as well, so
+    both halves of the app agree on it.
+  </p>
+  <div class="cards">
+    <div class="card">
+      <h4>Free, forever</h4>
+      <p class="mono" style="font-size:13.5px;color:var(--measured)">
+        scan &middot; measure &middot; plan &middot; 3D &middot; edit &middot; dimensions<br>
+        + 2 rooms kept at once
+      </p>
+      <p style="margin-top:10px">The entire measurement product. Somebody who only wants a floor
+      plan never has to pay, and never will.</p>
+    </div>
+    <div class="card">
+      <h4>Paid</h4>
+      <p class="mono" style="font-size:13.5px;color:var(--scanned)">
+        takeoff &middot; pricing &middot; proposal &middot; signature<br>
+        change orders &middot; insurance &middot; exports<br>
+        price list &middot; unlimited rooms
+      </p>
+      <p style="margin-top:10px">Everything that turns a drawing into money.</p>
+    </div>
+  </div>
+  <div class="hard" style="margin-top:16px">
+    <h3>The risk in that line, said plainly</h3>
+    <p>
+      The free tier is the whole reason a remodeler tells another remodeler about it &mdash; which
+      is the distribution you are counting on. It is also the reason most of them never pay: a
+      one-man shop who wants a floor plan for a bathroom has everything he needs, free, forever.
+    </p>
+    <p>
+      That is a deliberate trade and it is the right one. But it means <b>your conversion rate is
+      not a funnel number you can optimise</b> &mdash; it is the fraction of your users who
+      actually write proposals and file claims. Set expectations there accordingly.
+    </p>
+  </div>
+</section>
+
+<!-- ==================================================================== 05 -->
+<section>
+  <span class="n">05</span>
+  <h2>The money, with the dials live</h2>
+  <p class="section-lede">
+    Two things here are facts: <b>Apple takes 15%</b> under the Small Business Program (under $1M
+    a year), and <b>your marginal cost per customer is zero</b> &mdash; there is no server, storage
+    is the customer&rsquo;s own iCloud, and the AI provider is off by default. Everything else is a
+    dial. Move them.
+  </p>
+
+  <div class="model">
+    <div class="dials">
+      <div class="dial">
+        <label for="price">Price a month</label>
+        <output id="priceOut" class="mono">$78</output>
+        <input type="range" id="price" min="19" max="199" step="1" value="78">
+        <small>magicplan is ~$33. Jobber-style tools run $29&ndash;$129.</small>
+      </div>
+      <div class="dial">
+        <label for="churn">Monthly churn</label>
+        <output id="churnOut" class="mono">5%</output>
+        <input type="range" id="churn" min="1" max="15" step="0.5" value="5">
+        <small>Unknown. Contractor tools bought on impulse commonly run high.</small>
+      </div>
+      <div class="dial">
+        <label for="count">Paying customers</label>
+        <output id="countOut" class="mono">100</output>
+        <input type="range" id="count" min="5" max="600" step="5" value="100">
+        <small>The founding rate is capped at the first 100, in the paywall copy.</small>
+      </div>
+      <div class="dial">
+        <label for="need">What you need a month</label>
+        <output id="needOut" class="mono">$6,000</output>
+        <input type="range" id="need" min="1000" max="20000" step="250" value="6000">
+        <small>Your own draw. The business has almost no other costs.</small>
+      </div>
+    </div>
+
+    <div class="out">
+      <div class="fig"><span>Net a month</span><b id="net">—</b>
+        <small>after Apple&rsquo;s 15%</small></div>
+      <div class="fig"><span>To hold that count</span><b id="add">—</b>
+        <small>new customers a month, just to stand still</small></div>
+      <div class="fig"><span>A customer is worth</span><b id="ltv">—</b>
+        <small>net, over their whole life</small></div>
+      <div class="fig"><span>Break even at</span><b id="breakeven">—</b>
+        <small>customers, for what you need</small></div>
+    </div>
+
+    <p class="verdict" id="verdict">—</p>
+  </div>
+
+  <h3>What those numbers are and are not</h3>
+  <p>
+    <b>Net a month</b> and <b>a customer is worth</b> are arithmetic on your inputs, not forecasts.
+    <b>Churn</b> is the one number that decides whether this is a business, and you do not have it
+    and cannot get it until people have been paying for six months. Everything downstream of it is
+    a guess wearing a decimal point.
+  </p>
+</section>
+
+<!-- ==================================================================== 06 -->
+<section>
+  <span class="n">06</span>
+  <h2>The case where it fails</h2>
+  <p class="section-lede">You asked for this one. It is not the tail risk; it is the base rate.</p>
+
+  <div class="cards four">
+    <div class="card">
+      <h4>1 &middot; The free tier is the product <span class="tag tag--risk">most likely</span></h4>
+      <p>Remodelers love it, tell each other about it, and never pay &mdash; because a floor plan
+      is all they wanted. You get a thousand users, a great App Store rating, and $400 a month.</p>
+      <p><b>The tell:</b> installs climbing while paid conversions stay flat for two months.</p>
+    </div>
+    <div class="card">
+      <h4>2 &middot; Restoration will not switch <span class="tag tag--risk">plausible</span></h4>
+      <p>They already have magicplan, it already does ESX, and their Xactimate workflow works.
+      Switching costs a busy contractor a week he does not have, to save nothing he can name.</p>
+      <p><b>The tell:</b> demos go well and nobody buys. &ldquo;Send me something&rdquo; twice.</p>
+    </div>
+    <div class="card">
+      <h4>3 &middot; Churn eats it <span class="tag tag--risk">plausible</span></h4>
+      <p>At 10% a month, a customer lasts ten months. You spend every month replacing the people
+      who left, and the count never moves no matter how good the product is.</p>
+      <p><b>The tell:</b> gross adds healthy, net adds near zero by month four.</p>
+    </div>
+    <div class="card">
+      <h4>4 &middot; You are blind <span class="tag tag--risk">certain</span></h4>
+      <p>There is no analytics and no crash reporting in the codebase. When somebody stops using
+      it you will not know they stopped, when it crashes you will not know it crashed, and when a
+      scan fails you will hear about it only if they bother to email.</p>
+      <p><b>This one is not a risk, it is the current state.</b> See section 08.</p>
+    </div>
+  </div>
+
+  <div class="hard" style="margin-top:16px">
+    <h3>The honest summary</h3>
+    <p>
+      The product is unusually good and unusually far along for a business with zero customers.
+      That is the trap. <b>Every remaining risk is commercial, and none of it is fixed by more
+      building</b> &mdash; which is the thing you are good at and the thing that will feel
+      productive.
+    </p>
+    <p>
+      The cheapest way to find out whether this is a business is to try to charge one restoration
+      contractor $78 before you write another feature.
+    </p>
+  </div>
+</section>
+
+<!-- ==================================================================== 07 -->
+<section>
+  <span class="n">07</span>
+  <h2>Launch, gate by gate</h2>
+  <p class="section-lede">
+    In order. Each one blocks the next; none of them is optional; several take days of waiting
+    rather than work.
+  </p>
+  <ol class="steps">
+    <li><div><h4>Walk Gilbert&rsquo;s kitchen</h4>
+      <p>Before anything else on this list. <code>docs/on-the-phone.md</code> has 22 tests and not
+      one has been run on a phone. If the scan is wrong in a real kitchen, nothing below matters.</p></div></li>
+    <li><div><h4>Buy the identity you need on trueline.tools</h4>
+      <p>Apple's listing requires a <b>support URL</b> and a <b>privacy policy URL</b>, both live
+      before submission. Two pages. Changing them later means a new review.</p></div></li>
+    <li><div><h4>Set the products in App Store Connect</h4>
+      <p>The prices are <b>not in the code</b> &mdash; StoreKit reads them from App Store Connect,
+      which is correct. <code>com.sunnyacres.trueline.pro.monthly</code> and
+      <code>.pro.yearly</code> have to be created, priced at $78 and $780, and submitted. Both
+      need a screenshot and a review note.</p></div></li>
+    <li><div><h4>TestFlight, with Gilbert on it</h4>
+      <p>Internal first, then Gilbert externally. External TestFlight needs its own review, which
+      is usually a day but is not instant.</p></div></li>
+    <li><div><h4>The privacy nutrition label</h4>
+      <p>Yours is the easy version and it is a genuine asset: no data collected, nothing leaves
+      the device. Say it exactly, because it is unusual and it is true.</p></div></li>
+    <li><div><h4>Screenshots that show the refusal</h4>
+      <p>Six screens. Make one of them the app saying <i>these are the scanner&rsquo;s numbers,
+      not measurements</i>. Nobody else&rsquo;s store page can show that.</p></div></li>
+    <li><div><h4>Submit, and expect one rejection</h4>
+      <p>Subscription apps are commonly rejected first time over paywall clarity: the price, the
+      period, and what auto-renews have to be visible on the paywall itself. Yours already says
+      the founding terms out loud, which helps.</p></div></li>
+  </ol>
+</section>
+
+<!-- ==================================================================== 08 -->
+<section>
+  <span class="n">08</span>
+  <h2>What breaks as it grows</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th class="num">At</th><th>What breaks</th><th>What it costs to fix</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td>
+          <td><b>You cannot see anything.</b> No analytics, no crash reporting. A scan that fails
+          on a customer&rsquo;s phone is invisible to you.</td>
+          <td>Apple&rsquo;s own <b>MetricKit</b> ships with iOS, sends crash and hang reports to
+          App Store Connect, and collects nothing personal. It costs an afternoon and does not
+          break the privacy promise.</td></tr>
+        <tr><td class="num">10</td>
+          <td><b>Support is your inbox.</b> Fine, and worth doing by hand for a long time &mdash;
+          the first fifty conversations are the product research.</td>
+          <td>Nothing. Do it manually on purpose.</td></tr>
+        <tr><td class="num">50</td>
+          <td><b>No way to help somebody whose data is wrong.</b> Everything is on their phone in
+          their iCloud. You cannot look, cannot repair, cannot restore.</td>
+          <td>A one-tap &ldquo;send me this scan&rdquo; that shares the folder. The share sheet is
+          already built; this is a button and a mail template.</td></tr>
+        <tr><td class="num">500</td>
+          <td><b>One person cannot answer the email.</b> And every hour on support is an hour not
+          building.</td>
+          <td>The handbook is already written and ships inside the app. Point at it, and add the
+          three questions everyone asks to a real FAQ.</td></tr>
+        <tr><td class="num">5,000</td>
+          <td><b>Android.</b> The research is explicit: ARCore has no RoomPlan equivalent and there
+          is an open feature request with no ship date.</td>
+          <td>Wall-plane fitting, corner solving and opening detection from scratch. Its own
+          project, months not weeks. The data format is already designed for it to arrive later.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ==================================================================== 09 -->
+<section>
+  <span class="n">09</span>
+  <h2>What has to be true</h2>
+  <p class="section-lede">
+    Each of these is falsifiable and cheap to test. In this order, because each one makes the next
+    worth doing.
+  </p>
+  <ul class="plain">
+    <li><span class="tag tag--guess">test 1</span><div><b>The scan is right in a real kitchen.</b>
+      <p>Gilbert&rsquo;s. Tape four walls yourself and compare. One afternoon. If this fails
+      nothing else on this page is worth reading.</p></div></li>
+    <li><span class="tag tag--guess">test 2</span><div><b>A restoration contractor will sit through the change-order demo.</b>
+      <p>Not buy &mdash; watch. If you cannot hold five minutes of attention on the strongest thing
+      the product does, the positioning is wrong, not the price.</p></div></li>
+    <li><span class="tag tag--guess">test 3</span><div><b>One of them will pay $78 before the App Store listing exists.</b>
+      <p>Invoice them directly. If somebody will pay for a TestFlight build with no store page and
+      no reviews, you have a business. If nobody will, the store page will not change that.</p></div></li>
+    <li><span class="tag tag--guess">test 4</span><div><b>They are still paying in month three.</b>
+      <p>The only churn number you will ever have that is not a guess. Everything in section 05
+      hangs on it.</p></div></li>
+  </ul>
+</section>
+
+<!-- ==================================================================== 10 -->
+<section>
+  <span class="n">10</span>
+  <h2>The next thirty days</h2>
+  <ol class="steps">
+    <li><div><h4>Days 1&ndash;2 &mdash; Gilbert&rsquo;s kitchen</h4>
+      <p>Build to the phone, walk it, run tests 2 and 20. Fix whatever the real room breaks.</p></div></li>
+    <li><div><h4>Days 3&ndash;5 &mdash; two web pages on trueline.tools</h4>
+      <p>Support and privacy. They gate the submission and they take an afternoon.</p></div></li>
+    <li><div><h4>Days 6&ndash;10 &mdash; App Store Connect</h4>
+      <p>Products at $78 and $780, screenshots, privacy label, TestFlight to Gilbert.</p></div></li>
+    <li><div><h4>Days 10&ndash;20 &mdash; five restoration contractors</h4>
+      <p>Not a launch. Five conversations, in person, with the change-order demo. Ask each of them
+      to pay. Write down the exact words they use when they say no.</p></div></li>
+    <li><div><h4>Days 20&ndash;30 &mdash; act on what they said</h4>
+      <p>If three of five said the same thing, that is your roadmap and it beats everything either
+      of us has guessed on this page.</p></div></li>
+  </ol>
+</section>
+
+<footer>
+  <span>Competitor figures: MARKET-RESEARCH.md, researched 2026-08-19</span>
+  <span>Product facts: read from the code, 26 Aug 2026</span>
+  <span>Everything commercial: assumption, marked</span>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  const el = (id) => document.getElementById(id);
+  const price = el('price'), churn = el('churn'), count = el('count'), need = el('need');
+  const APPLE = 0.15; // Small Business Program, under $1M a year.
+
+  const money = (n) => '$' + Math.round(n).toLocaleString('en-US');
+
+  function draw() {
+    const p = Number(price.value);
+    const c = Number(churn.value) / 100;
+    const n = Number(count.value);
+    const want = Number(need.value);
+
+    const net = p * (1 - APPLE);          // per customer, per month
+    const monthly = net * n;
+    const life = 1 / c;                    // months, at a steady churn rate
+    const ltv = net * life;
+    const replace = Math.ceil(n * c);
+    const breakeven = Math.ceil(want / net);
+
+    el('priceOut').textContent = money(p);
+    el('churnOut').textContent = Number(churn.value) + '%';
+    el('countOut').textContent = n;
+    el('needOut').textContent = money(want);
+
+    el('net').textContent = money(monthly);
+    el('add').textContent = replace + '/mo';
+    el('ltv').textContent = money(ltv);
+    el('breakeven').textContent = breakeven;
+
+    const short = want - monthly;
+    const years = (life / 12);
+    let verdict;
+    if (short > 0) {
+      verdict = '<b style="color:var(--refuse)">Short by ' + money(short) + ' a month.</b> At ' + money(p) +
+        ' you need <b>' + breakeven + '</b> paying customers, not ' + n + ' — and at ' +
+        Number(churn.value) + '% churn you must sign <b>' + Math.ceil(breakeven * c) +
+        ' every month</b> after that just to stay there.';
+    } else {
+      verdict = '<b>Covered, with ' + money(-short) + ' a month over.</b> It holds only while you ' +
+        'replace <b>' + replace + ' customers a month</b> — at ' + Number(churn.value) +
+        '% churn the average one stays ' + life.toFixed(1) + ' months' +
+        (years >= 1 ? ' (' + years.toFixed(1) + ' years)' : '') + '.';
+    }
+    if (c >= 0.10) {
+      verdict += ' <b style="color:var(--refuse)">At ' + Number(churn.value) +
+        '% you are running a treadmill, not a business:</b> you replace the whole base every ' +
+        life.toFixed(0) + ' months.';
+    }
+    el('verdict').innerHTML = verdict;
+  }
+
+  [price, churn, count, need].forEach((d) => d.addEventListener('input', draw));
+  draw();
+})();
+</script>
