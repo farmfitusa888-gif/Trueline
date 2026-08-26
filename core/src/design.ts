@@ -178,19 +178,46 @@ export const SIZE = {
 } as const;
 
 /**
- * Spacing, in pixels, on a four-grid.
+ * Spacing, in pixels.
  *
- * Four rather than eight, because a phone screen with a tape reading on it is
- * dense by nature and an eight-grid rounds every tight thing up to loose.
+ * ## Why these are tighter than a normal app's
+ *
+ * The first pass put the palette and the faces in and moved no layout, and
+ * seeing it on a phone made the next thing obvious: there was too much air in
+ * it for a tool. A consumer app is read; an instrument is SCANNED, standing up,
+ * one-handed, with a tape in the other hand — and every pixel of padding is a
+ * row of the wall schedule that fell off the bottom of the screen.
+ *
+ * So the scale is about a quarter tighter than the stock one it replaces:
+ * a card's padding goes 16 to 12, the gap between panels 20 to 15, a row's
+ * breathing room 12 to 9. Nothing was re-laid-out to get there. Tailwind's
+ * numeric steps are pointed at these names, so 898 spacing classes across forty
+ * files tightened at once — the same trick the colours use.
+ *
+ * ## What does NOT move
+ *
+ * `TOUCH` below. Every control in this app is at least 44 pixels tall and the
+ * ones that take a tape reading are 48, and density is never allowed to buy
+ * itself out of that: a screen you can read and cannot hit is worse than one
+ * that scrolls.
  */
 export const SPACE = {
+  /** Between two things that are one thing. */
   hair: 2,
+  /** Inside a chip, between an icon and its word. */
   tight: 4,
-  snug: 8,
-  step: 12,
-  room: 16,
-  wide: 24,
-  gap: 32,
+  /** Between rows of a list. */
+  snug: 6,
+  /** Around a row, inside a control. */
+  step: 9,
+  /** Inside a card. */
+  room: 12,
+  /** Between cards. */
+  apart: 15,
+  /** Between the parts of a screen. */
+  wide: 18,
+  /** Between one screen's worth of content and the next. */
+  gap: 24,
 } as const;
 
 /**

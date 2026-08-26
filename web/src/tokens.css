@@ -52,11 +52,12 @@
 
   --space-hair: 2px;
   --space-tight: 4px;
-  --space-snug: 8px;
-  --space-step: 12px;
-  --space-room: 16px;
-  --space-wide: 24px;
-  --space-gap: 32px;
+  --space-snug: 6px;
+  --space-step: 9px;
+  --space-room: 12px;
+  --space-apart: 15px;
+  --space-wide: 18px;
+  --space-gap: 24px;
 
   --radius-chip: 2px;
   --radius-control: 4px;

@@ -351,7 +351,7 @@ export function App() {
               // names share a phrase are two controls a screen reader user, and
               // anything driving this app by name, cannot tell apart.
               aria-label="Home"
-              className="flex items-center gap-2"
+              className="flex min-h-11 items-center gap-2"
             >
               <Mark className="h-7 w-auto text-slate-900" />
               <span>
@@ -372,7 +372,7 @@ export function App() {
             <button
               type="button"
               onClick={() => dispatch({ type: 'close' })}
-              className="text-sm text-slate-500 underline underline-offset-4"
+              className="inline-flex min-h-11 items-center text-sm text-slate-500 underline underline-offset-4"
             >
               Open another
             </button>
@@ -381,7 +381,7 @@ export function App() {
             type="button"
             onClick={() => setShowing(showing === 'floor' ? 'room' : 'floor')}
             aria-label={showing === 'floor' ? 'Back to this room' : 'The whole floor'}
-            className="text-sm text-slate-500 underline underline-offset-4"
+            className="inline-flex min-h-11 items-center text-sm text-slate-500 underline underline-offset-4"
           >
             {showing === 'floor' ? 'This room' : 'The floor'}
           </button>
@@ -393,7 +393,7 @@ export function App() {
               exactly where it was left. */}
           <a
             href="./handbook.html"
-            className="text-sm text-slate-500 underline underline-offset-4"
+            className="inline-flex min-h-11 items-center text-sm text-slate-500 underline underline-offset-4"
           >
             How to use it
           </a>
@@ -407,7 +407,7 @@ export function App() {
             // closed the business screen rather than opening it.
             aria-label={settings ? 'Close your business details' : 'Your business'}
             aria-expanded={settings}
-            className="text-sm text-slate-500 underline underline-offset-4"
+            className="inline-flex min-h-11 items-center text-sm text-slate-500 underline underline-offset-4"
           >
             {settings ? 'Close' : 'Your business'}
           </button>
@@ -620,7 +620,7 @@ export function App() {
                     <button
                       type="button"
                       onClick={() => dispatch({ type: 'select', wallId: null })}
-                      className="text-sm text-slate-500 underline underline-offset-4"
+                      className="inline-flex min-h-11 items-center text-sm text-slate-500 underline underline-offset-4"
                     >
                       Done
                     </button>

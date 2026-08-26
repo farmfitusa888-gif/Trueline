@@ -38,6 +38,23 @@ import { type Tag, CONDITION, describeTag } from '../../core/src/tag.ts';
 const PAD = 190;
 
 /**
+ * And how much above and below it.
+ *
+ * Not the same number, which is the whole point. `PAD` has to hold a WHOLE
+ * dimension label lying on its side beside a vertical wall -- about 180 units
+ * for `21' 3 13/16"` -- because the label is centred on the wall and pushed
+ * outward. Above a horizontal wall the same label is only its own height: the
+ * dimension line sits 30 units off, the number 22 above that, and the number is
+ * 30 tall. A hundred clears it with room for the halo.
+ *
+ * Squaring the two put 190 units of empty sheet above and below every drawing,
+ * which on a phone is about 83 pixels at each end of the one thing on the
+ * screen somebody came to look at. A drawing has margins; it does not have
+ * that.
+ */
+const PAD_Y = 110;
+
+/**
  * Which way an SVG arc goes, from one angle to another, for a quarter turn.
  *
  * Returns the sweep flag. Both ends of a door's arc are a right angle apart, so
@@ -229,7 +246,7 @@ export function Plan({
   const insetX = (SIDE - width * scale) / 2;
   const insetY = (SIDE - height * scale) / 2;
   const px = (x: number) => PAD + insetX + (x - minX) * scale;
-  const scaleY = (y: number) => PAD + insetY + (maxY - y) * scale;
+  const scaleY = (y: number) => PAD_Y + insetY + (maxY - y) * scale;
 
   const viewWidth = SIDE + PAD * 2;
   // Room for a title block under the drawing. It is part of this SVG rather
@@ -242,7 +259,7 @@ export function Plan({
   // white on a profile with only a name in it; computed, and it fits.
   const head = letterhead(company);
   const BLOCK = 132 + Math.max(head.length, 1) * 26;
-  const viewHeight = SIDE + PAD * 2 + BLOCK;
+  const viewHeight = SIDE + PAD_Y * 2 + BLOCK;
 
   // The middle of the room in screen units, so every dimension can be pushed
   // *away* from it. A label centred on its own wall sits on top of the line and,
@@ -283,7 +300,7 @@ export function Plan({
       */}
       {north && (
         <g
-          transform={`translate(${viewWidth - PAD - 8} ${PAD + 12})`}
+          transform={`translate(${viewWidth - PAD - 8} ${PAD_Y + 12})`}
           aria-label={`North, give or take ${Math.round(north.accuracy)} degrees`}
         >
           <line
@@ -733,7 +750,7 @@ export function Plan({
         contractor's name through the middle of the most important sentence on
         the sheet.
       */}
-      <g transform={`translate(0 ${SIDE + PAD * 2 - 18})`}>
+      <g transform={`translate(0 ${SIDE + PAD_Y * 2 - 18})`}>
         <line x1={PAD / 2} y1={0} x2={viewWidth - PAD / 2} y2={0} stroke="rgb(var(--c-ink))" strokeWidth={2} />
         <text x={PAD / 2} y={38} fontSize={30} fontWeight={600} fill="rgb(var(--c-ink))">
           {room.name}

@@ -247,11 +247,12 @@ enum Size {
 enum Space {
     static let hair: CGFloat = 2
     static let tight: CGFloat = 4
-    static let snug: CGFloat = 8
-    static let step: CGFloat = 12
-    static let room: CGFloat = 16
-    static let wide: CGFloat = 24
-    static let gap: CGFloat = 32
+    static let snug: CGFloat = 6
+    static let step: CGFloat = 9
+    static let room: CGFloat = 12
+    static let apart: CGFloat = 15
+    static let wide: CGFloat = 18
+    static let gap: CGFloat = 24
 }
 
 /// Corner radii. Small, deliberately: nothing on a measuring instrument is

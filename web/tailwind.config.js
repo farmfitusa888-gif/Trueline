@@ -103,6 +103,33 @@ export default {
         refuse: token('refuse'),
         focus: token('focus'),
       },
+      spacing: {
+        // Tailwind's numeric steps, pointed at the token scale.
+        //
+        // 898 spacing classes across forty files, and 873 of them are steps 1
+        // to 5 -- which is to say all the air in the app is in five numbers.
+        // Compressing those here tightens every screen at once without a
+        // component being touched, exactly as the colours are remapped above.
+        //
+        // 11 and 12 are NOT part of that. They are `min-h-11` and `min-h-12`,
+        // used 160 times, and they are the touch targets: 44 pixels for
+        // anything you press and 48 for anything you press with a tape in the
+        // other hand. Density never gets to buy itself out of those, so they
+        // are pinned to the touch tokens by name rather than left on a scale
+        // that something else might tighten later.
+        '0.5': 'var(--space-hair)',
+        '1': 'var(--space-tight)',
+        '1.5': '5px',
+        '2': 'var(--space-snug)',
+        '2.5': '8px',
+        '3': 'var(--space-step)',
+        '4': 'var(--space-room)',
+        '5': 'var(--space-apart)',
+        '6': 'var(--space-wide)',
+        '8': 'var(--space-gap)',
+        '11': 'var(--touch-least)',
+        '12': 'var(--touch-comfortable)',
+      },
       borderRadius: {
         // Small, deliberately. Nothing on a measuring instrument is rounded,
         // and the generous radius that reads as friendly on a consumer app
