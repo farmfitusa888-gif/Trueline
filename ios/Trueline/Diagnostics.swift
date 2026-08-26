@@ -372,10 +372,24 @@ final class Diagnostics: NSObject, ObservableObject, MXMetricManagerSubscriber {
     static let device: String = {
         var info = utsname()
         uname(&info)
-        let machine = withUnsafePointer(to: &info.machine) { pointer in
-            pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: info.machine)) {
-                String(cString: $0)
-            }
+        // `withUnsafeBytes(of:)` by value, and NOT `withUnsafePointer(to: &...)`.
+        //
+        // The inout form opens an exclusive access to `info.machine` for as long
+        // as the closure runs, and the first version of this read
+        // `MemoryLayout.size(ofValue: info.machine)` from inside that closure --
+        // a second access to the same storage while the first is still open.
+        // Xcode, on 2026-08-26: "overlapping accesses to 'info.machine', but
+        // modification requires exclusive access". It is a compile error, not a
+        // warning, and no grammar check can see it.
+        //
+        // The by-value overload takes a copy, so there is no access to overlap
+        // with and no capacity to work out: the buffer knows its own length.
+        let machine = withUnsafeBytes(of: info.machine) { bytes in
+            // Up to the first NUL. `utsname.machine` is a fixed 256-byte field
+            // and the model identifier is a dozen characters, so the rest is
+            // zeroes -- decoding the whole field would give a string with 240
+            // NULs on the end of it.
+            String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
         }
         return machine.isEmpty ? "unknown iPhone" : machine
     }()

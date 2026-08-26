@@ -99,7 +99,7 @@ def expect(what: str, code: int, output: str, *, fires: bool, saying: str = '') 
 # ---------------------------------------------------------------- swift names
 
 def swiftNames(bench: Bench) -> None:
-    print('check-swift-names.py — the five things it claims to find')
+    print('check-swift-names.py — the six things it claims to find')
 
     code, out = bench.run('check-swift-names.py')
     expect('says nothing about the repository as it stands', code, out, fires=False)
@@ -156,6 +156,35 @@ def swiftNames(bench: Bench) -> None:
         code, out = bench.run('check-swift-names.py')
         expect('two defaulted arguments out of order', code, out,
                fires=True, saying='out of order')
+        bench.restore(rel)
+
+    # 2c. Overlapping exclusive access -- the error Xcode gave on 2026-08-26,
+    #     restored exactly as it was written.
+    #
+    #     `withUnsafePointer(to: &info.machine)` whose closure then reads
+    #     `MemoryLayout.size(ofValue: info.machine)`. The file parses, every
+    #     name in it is declared, the argument order is right, and it does not
+    #     compile. Nothing else in this repository could see it.
+    rel = 'ios/Trueline/Diagnostics.swift'
+    was = bench.read(rel)
+    broken = was.replace(
+        """        let machine = withUnsafeBytes(of: info.machine) { bytes in""",
+        """        let machine = withUnsafePointer(to: &info.machine) { pointer in
+            pointer.withMemoryRebound(
+                to: CChar.self,
+                capacity: MemoryLayout.size(ofValue: info.machine)
+            ) { String(cString: $0) }
+        }
+        let unused = withUnsafeBytes(of: info.machine) { bytes in""",
+    )
+    if broken == was:
+        failures.append('Diagnostics.swift no longer reads utsname the safe way')
+        print(f'  {RED}✗{OFF} overlapping accesses inside an inout closure (nothing to break)')
+    else:
+        bench.write(rel, broken)
+        code, out = bench.run('check-swift-names.py')
+        expect('overlapping accesses inside an inout closure', code, out,
+               fires=True, saying='overlapping accesses')
         bench.restore(rel)
 
     # 3. `weak` on a protocol with no class bound -- the first error a real

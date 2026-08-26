@@ -363,6 +363,45 @@ def classBound(source: str, name: str) -> bool | None:
     return bool(re.search(r'\b(AnyObject|class)\b', inherits))
 
 
+def overlappingAccess(source: str) -> list[tuple[int, str]]:
+    """`withUnsafePointer(to: &x)` whose closure reads `x` again.
+
+    Xcode's own words, on `Diagnostics.swift` on 2026-08-26:
+
+        error: overlapping accesses to 'info.machine', but modification
+        requires exclusive access; consider copying to a local variable
+
+    The inout argument opens an exclusive access to that storage for as long as
+    the closure runs. Anything inside it that names the same storage is a second
+    access while the first is still open, and Swift refuses it. The classic way
+    to write this bug is the standard `utsname` incantation that every project
+    copies off the internet, where the capacity argument reads the very field
+    the pointer was taken of.
+
+    It is a compile error and nothing else in this repository can see it: the
+    file parses perfectly, every name in it is declared, and the argument order
+    is right. It cost a whole build on Sam's Mac.
+
+    The fix, in both senses: `withUnsafeBytes(of: value)` by value, which takes a
+    copy and has nothing to overlap with.
+    """
+    found = []
+    for match in re.finditer(r'withUnsafe(?:Pointer|Bytes|MutablePointer|MutableBytes)'
+                             r'\s*\(\s*(?:to|of)\s*:\s*&\s*([\w.]+)', source):
+        held = match.group(1)
+        body = bodyOf(source, match.end())
+        if body is None:
+            continue
+        # The same storage, or anything rooted at it: `info` and `info.machine`
+        # are the same access as far as exclusivity is concerned.
+        root = held.split('.')[0]
+        for again in re.finditer(r'(?<![\w.])' + re.escape(root) + r'(?![\w])', body):
+            # `$0` and the closure's own parameter are the copy, not the source.
+            found.append((source[:match.start()].count('\n') + 1, held))
+            break
+    return found
+
+
 def weakOnAStruct(source: str, everywhere: str) -> list[tuple[int, str]]:
     """Every `weak var` whose type is a protocol with no class bound."""
     bad = []
@@ -549,6 +588,15 @@ def main(argv: list[str]) -> int:
             bad += 1
             print(f'{rel}: uses `{said}` without importing {wants}')
             print(f'    Xcode will say: cannot find \'{said}\' in scope')
+
+        for line, held in overlappingAccess(source):
+            bad += 1
+            print(f'{rel}:{line}: the closure reads `{held}` while `&{held}` is '
+                  f'still borrowed')
+            print(f'    Xcode will say: overlapping accesses to \'{held}\', but '
+                  'modification requires exclusive access')
+            print('    Fix: withUnsafeBytes(of: value) by value, or copy what you '
+                  'need into a local first')
 
         for line, kind in weakOnAStruct(source, everywhere):
             bad += 1
