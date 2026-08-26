@@ -9,8 +9,8 @@ import {
   projectFrom,
   standingInside,
 } from '../../core/src/project.ts';
-import type { Room } from '../../core/src/room.ts';
-import { wallLabels } from '../../core/src/wallLabel.ts';
+import { type Room, runLength } from '../../core/src/room.ts';
+import { fitInside, openingLabels, wallLabels } from '../../core/src/wallLabel.ts';
 import { useUnits } from './units.tsx';
 
 /**
@@ -157,6 +157,47 @@ export function Room3D({
   // view that will not be drawn is work done to be thrown away. It is a walk
   // over a few dozen facets, not a hook, so its place in the body is free.
   const labels = wallLabels(view.projection.facets, SIZE);
+  // Every wall's length, by its id, so a label can carry the measurement as
+  // well as the name. Formatted by `len`, which is the app's units and not this
+  // file's business -- nothing here reads a nanometre.
+  const lengthOf = new Map(room.walls.map((w) => [w.id, len(runLength(w))]));
+  // And every opening's size, for the hole it is drawn as. Looked up by the id
+  // the projection carries rather than matched by geometry: a size printed on
+  // the wrong window is worse than no size at all.
+  const sizeOf = new Map(
+    room.walls.flatMap((w) =>
+      (w.openings ?? []).map((o) => [o.id, `${len(o.width.value)} × ${len(o.height.value)}`])
+    )
+  );
+  const openings = openingLabels(view.projection.facets, SIZE);
+
+  /**
+   * Where a label of this many characters actually fits.
+   *
+   * `wallLabels` puts the point in the middle of the visible part of a face,
+   * which is right — and not enough. Text is centred on its point and runs half
+   * its width either way, so a wall at the edge of the picture had its name's
+   * middle on screen and both ends cut off. "Wall 1" came out as "Wall 1" with
+   * the 1 missing and a door's size as "3' × 6'".
+   *
+   * The width is estimated rather than measured: measuring means rendering the
+   * text, reading it back and re-rendering, once per label, every frame of a
+   * drag. 0.58 em per character is close enough for a bold sans face, and being
+   * a few pixels generous only ever pulls a label further inside.
+   */
+  const place = (
+    at: { x: number; y: number },
+    face: { left: number; right: number; top: number; bottom: number },
+    text: string,
+    fontSize: number,
+    lines: number
+  ) =>
+    fitInside(
+      at,
+      face,
+      { width: (text.length * fontSize * 0.58) / 2, height: (fontSize * 1.2 * lines) / 2 },
+      SIZE
+    );
 
   const start = (x: number, y: number, pointer: number, svg: SVGSVGElement) => {
     drag.current = { x, y, from: camera, standing: inside, moved: false, pointer, svg };
@@ -299,11 +340,21 @@ export function Room3D({
             biggest piece, slivers dropped -- and it reads no dimension and can
             move no number.
         */}
-        {labels.map((label) => (
+        {labels.map((label) => {
+          const length = lengthOf.get(label.wallId) ?? '';
+          const size = inside ? 44 : 36;
+          const at = place(
+            label,
+            label,
+            label.text.length > length.length ? label.text : length,
+            size,
+            length ? 2 : 1
+          );
+          return (
           <text
             key={label.wallId}
-            x={label.x}
-            y={label.y}
+            x={at.x}
+            y={at.y}
             textAnchor="middle"
             dominantBaseline="middle"
             // In the projection's own 1000-unit box, which renders about 345
@@ -311,7 +362,7 @@ export function Room3D({
             // screen. Sized by measuring the render rather than by picking a
             // number: 30 looked right in the file and came out at ten pixels,
             // which is a label a person on a ladder cannot read.
-            fontSize={inside ? 44 : 36}
+            fontSize={size}
             fontWeight={600}
             fill="rgb(var(--c-ink))"
             // A halo of the page's own ground, drawn under the letters rather
@@ -329,9 +380,59 @@ export function Room3D({
             // of every wall unselectable.
             aria-hidden="true"
           >
-            {label.text}
+            <tspan x={at.x} dy="0">{label.text}</tspan>
+            {/* The measurement under the name, so the room can be read without
+                switching to the blueprint. Same face, one line down. */}
+            {length && (
+              <tspan x={at.x} dy={inside ? 46 : 38} fontSize={size - 8} fontWeight={500}>
+                {length}
+              </tspan>
+            )}
           </text>
-        ))}
+          );
+        })}
+
+        {/* Doors and windows, with what they measure printed on them. They are
+            already drawn as real holes; this is the size an estimator needs to
+            read off one without opening another screen. */}
+        {openings.map((hole) => {
+          const what =
+            hole.kind === 'window' ? 'Window' : hole.kind === 'cased' ? 'Opening' : 'Door';
+          const measured = sizeOf.get(hole.openingId) ?? '';
+          const size = inside ? 34 : 28;
+          const at = place(
+            hole,
+            hole,
+            what.length > measured.length ? what : measured,
+            size,
+            measured ? 2 : 1
+          );
+          return (
+          <text
+            key={hole.openingId}
+            x={at.x}
+            y={at.y}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={size}
+            fontWeight={600}
+            fill="rgb(var(--c-ink))"
+            stroke="rgb(var(--c-ground))"
+            strokeWidth={inside ? 8 : 7}
+            paintOrder="stroke"
+            strokeLinejoin="round"
+            className="pointer-events-none select-none"
+            aria-hidden="true"
+          >
+            <tspan x={at.x} dy="0">{what}</tspan>
+            {measured && (
+              <tspan x={at.x} dy={inside ? 36 : 30} fontSize={size - 4} fontWeight={500}>
+                {measured}
+              </tspan>
+            )}
+          </text>
+          );
+        })}
       </svg>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
@@ -339,6 +440,13 @@ export function Room3D({
           {inside
             ? 'Drag to look around. Tap a wall to measure it.'
             : 'Drag to walk around it. Tap a wall to measure it.'}
+          {' '}
+          {/* The one dimension that is nowhere else on this view, and that
+              every wall's area is multiplied by. Read off the room rather than
+              worked out here. */}
+          <span className="font-mono tabular-nums">
+            Ceiling {len(room.ceilingHeight.value)}.
+          </span>
         </p>
         <div className="flex flex-wrap gap-2">
           <button

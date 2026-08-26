@@ -41,22 +41,72 @@ under Containers → type `iCloud.com.sunnyacres.trueline`.
 If Xcode says the container does not exist, click the refresh arrow beside the
 container list — it creates it against your developer account.
 
-## 2. CloudKit console — the one index
+## 2. CloudKit console — the two indexes
 
-Go to **icloud.developer.apple.com** → sign in → pick the
-**iCloud.com.sunnyacres.trueline** container.
+This is the step the app complains about on the scan list:
 
-CloudKit invents its own schema the first time the app saves a record, so
-**run the app once and correct one measurement first**. That creates the `Scan`
-record type. Then:
+> iCloud refused the query. In the CloudKit console, mark recordName Queryable
+> on the Scan record type and the scan field Queryable on DamagePhoto, then
+> deploy the schema.
 
-**Schema → Indexes → `Scan` → Add Index → `recordName` → Queryable → Save.**
+It is not a bug and there is nothing to fix in code. CloudKit will store records
+it will not let you *search* for, and searching is what a second phone does when
+it asks "what is in here?". Here is exactly what to click.
 
-Why this matters: CloudKit will happily store records it will not let you
-search for. Without that index the app backs everything up correctly and a
-second device asking "what is in here?" gets nothing back — and the app cannot
-tell that apart from an empty account. The app names this exact step if
-CloudKit refuses the query, but it is faster to do it now.
+### First: make the record types exist
+
+CloudKit invents its schema the first time the app saves something, so there is
+nothing to index until the app has saved. On the phone, with iCloud signed in:
+
+1. Open Trueline, open a room, and **type one tape reading**. That writes a
+   `Scan` record.
+2. If you use insurance mode, **take one damage photograph** as well. That
+   writes a `DamagePhoto` record. If you skip this, `DamagePhoto` will not be in
+   the list yet and you can come back for it.
+
+### Then: the console
+
+1. Go to **https://icloud.developer.apple.com/dashboard/** and sign in with the
+   Apple ID that owns the developer account.
+2. Click **CloudKit Database**.
+3. Top left, the container dropdown — choose **iCloud.com.sunnyacres.trueline**.
+4. Beside it, the environment dropdown — make sure it says **Development**.
+   (Production comes in step 3 below.)
+5. In the left sidebar, under **Schema**, click **Indexes**.
+
+**Index one — so a second phone can list your scans:**
+
+6. In the record-type list, click **Scan**.
+7. Click **Add Index**.
+8. Field: **recordName**. Index type: **QUERYABLE**.
+9. Click **Save Changes**.
+
+**Index two — so a room's damage photographs can be found:**
+
+10. In the record-type list, click **DamagePhoto**.
+11. Click **Add Index**.
+12. Field: **scan**. Index type: **QUERYABLE**.
+13. Click **Save Changes**.
+
+That is both. `Company` needs nothing — the app fetches it by a fixed record id
+rather than searching for it.
+
+### Why those two exactly
+
+| The app asks | In code | What it needs |
+|---|---|---|
+| "every scan in this account" | `CKQuery(recordType: "Scan", predicate: NSPredicate(value: true))` | `recordName` QUERYABLE on **Scan** |
+| "the damage photographs belonging to this scan" | `CKQuery(recordType: "DamagePhoto", predicate: NSPredicate(format: "scan == %@", name))` | the **`scan`** field QUERYABLE on **DamagePhoto** |
+
+Both are in `ios/Trueline/Backup.swift`. If either index is missing, the query
+comes back refused rather than empty — which is why the app can print that
+sentence at all instead of quietly showing you nothing.
+
+### Checking it worked
+
+Back on the phone, pull the Rooms list down to refresh, or close and reopen the
+app. The amber iCloud line should be gone and the line at the bottom should say
+how many scans are copied.
 
 ## 3. Before the App Store — deploy the schema
 
@@ -64,7 +114,12 @@ A container has **two** schemas, development and production, and they are
 separate. Your Xcode builds talk to development. Anything from TestFlight or
 the App Store talks to production.
 
-**Schema → Deploy Schema Changes → Deploy.**
+In the same console: left sidebar → **Schema** → **Deploy Schema Changes** →
+read what it lists → **Deploy**.
+
+Both indexes from step 2 have to exist in Development *before* you deploy, or
+you will deploy a schema without them and TestFlight will hit the same refusal
+you just fixed.
 
 Skip this and the app works perfectly for you and does nothing at all for
 Gilbert. Do it again any time the record shape changes.

@@ -580,6 +580,17 @@ export function App() {
                       furniture={furniture}
                       onSelect={(wallId) => dispatch({ type: 'select', wallId })}
                     />
+                    {/* "WHERE IS THE FURNITURE TOGGLE?" — here, and it has always been
+                        here, but only when the scan found something standing in
+                        the room. A control that is sometimes absent with no
+                        explanation reads as a control that is missing. */}
+                    {loaded.footprints.length === 0 && (
+                      <p data-sheet="no" className="mt-2 px-1 text-xs text-slate-500">
+                        This scan found nothing standing in the room, so there is no
+                        furniture to show or hide. A scan that finds something gets a
+                        button here.
+                      </p>
+                    )}
                     {loaded.footprints.length > 0 && (
                       <div data-sheet="no" className="mt-2 px-1">
                         <button

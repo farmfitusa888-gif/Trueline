@@ -43,6 +43,16 @@ export interface Facet {
   readonly kind: 'wall' | 'floor' | 'opening' | 'object';
   /** For an opening, which one — so a door can be told from a window. */
   readonly openingKind?: Opening['kind'];
+  /**
+   * Which opening, by its own id.
+   *
+   * `openingKind` says "a window"; this says *which* window, so a caller can
+   * look its width and height up on the wall and print them on the hole. There
+   * is no other honest way to do it — matching a drawn hole back to an opening
+   * by comparing its corners would guess, and a size printed on the wrong
+   * opening is worse than no size.
+   */
+  readonly openingId?: string;
   /** Screen coordinates, in the box the projection was asked for. */
   readonly points: readonly { readonly x: number; readonly y: number }[];
   /**
@@ -205,6 +215,7 @@ export function project(
     wallId: string;
     kind: Facet['kind'];
     openingKind?: Opening['kind'];
+    openingId?: string;
     points: { x: number; y: number }[];
     depth: number;
     shade: number;
@@ -288,6 +299,7 @@ export function project(
         wallId: wall.id,
         kind: 'opening',
         openingKind: opening.kind,
+        openingId: opening.id,
         points: hole.map((v) => ({ x: v.x, y: v.y })),
         // Nudged toward the viewer so it lands on its own wall rather than
         // fighting it for the same depth.
@@ -376,6 +388,7 @@ export function project(
     wallId: f.wallId,
     kind: f.kind,
     ...(f.openingKind ? { openingKind: f.openingKind } : {}),
+    ...(f.openingId ? { openingId: f.openingId } : {}),
     points: f.points.map((p) => ({
       x: offsetX + (p.x - minX) * scale,
       y: offsetY + (p.y - minY) * scale,
@@ -564,6 +577,7 @@ export function projectFrom(
     wallId: string;
     kind: Facet['kind'];
     openingKind?: Opening['kind'];
+    openingId?: string;
     points: { x: number; y: number }[];
     depth: number;
     shade: number;
@@ -578,7 +592,8 @@ export function projectFrom(
     corners3d: readonly Seen[],
     shade: number,
     nudge = 0,
-    openingKind?: Opening['kind']
+    openingKind?: Opening['kind'],
+    openingId?: string
   ): boolean => {
     const clipped = clipToFront(corners3d);
     if (clipped.length < 3) return false;
@@ -586,6 +601,7 @@ export function projectFrom(
       wallId,
       kind,
       ...(openingKind ? { openingKind } : {}),
+      ...(openingId ? { openingId } : {}),
       points: clipped.map(flatten),
       depth: clipped.reduce((sum, v) => sum + v.ahead, 0) / clipped.length + nudge,
       shade,
@@ -643,7 +659,8 @@ export function projectFrom(
         // Toward the eye, so it lands on its own wall rather than fighting it
         // for the same depth. Same reason as the orbit view's nudge.
         -0.01,
-        opening.kind
+        opening.kind,
+        opening.id
       );
     }
   });
@@ -691,6 +708,7 @@ export function projectFrom(
       wallId: f.wallId,
       kind: f.kind,
       ...(f.openingKind ? { openingKind: f.openingKind } : {}),
+      ...(f.openingId ? { openingId: f.openingId } : {}),
       points: f.points,
       depth: f.depth,
       shade: f.shade,

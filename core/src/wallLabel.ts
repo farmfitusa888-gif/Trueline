@@ -41,6 +41,99 @@ export interface WallLabel {
   readonly y: number;
   /** How big this face is on screen, so a caller can drop the slivers. */
   readonly area: number;
+  /**
+   * The visible part of the face, as a box.
+   *
+   * So a caller can keep the whole label inside it. The centre being in the
+   * picture is not enough: text is centred on its point and runs half its width
+   * either way, so a label on a wall at the edge of the screen has its middle
+   * inside and its ends cut off — which is what happened to "Wall 1" and to a
+   * door's size the first time this ran.
+   *
+   * Only the view knows how wide a label is, because only the view knows the
+   * font and the words. So this hands over where it may go and lets it decide.
+   */
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/** Where a door or window's size goes, and which opening it belongs to. */
+export interface OpeningLabel {
+  /** The opening's own id, so the caller can look its size up on the wall. */
+  readonly openingId: string;
+  /** The wall it is in. */
+  readonly wallId: string;
+  readonly kind: 'door' | 'window' | 'cased';
+  readonly x: number;
+  readonly y: number;
+  readonly area: number;
+  /** The visible part of the hole, as a box. See `WallLabel`. */
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/** The box a set of points sits in. */
+function boundsOf(points: readonly { readonly x: number; readonly y: number }[]): {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+} {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  return {
+    left: Math.min(...xs),
+    right: Math.max(...xs),
+    top: Math.min(...ys),
+    bottom: Math.max(...ys),
+  };
+}
+
+/**
+ * A size on every door and window that is big enough to carry one.
+ *
+ * Same rule as the walls and for the same reason: the hole is clipped to the
+ * picture first, so a doorway you are standing in the middle of gets its label
+ * where you can see it rather than four feet off the side of the screen.
+ *
+ * `smallest` is larger here than for a wall. A wall label sits on a face the
+ * size of a wall; a door label is two numbers and a cross on something the size
+ * of a door, and below a certain size that is a smudge rather than a
+ * measurement. Which is worse than nothing on a drawing somebody prices from.
+ */
+export function openingLabels(
+  facets: readonly Facet[],
+  size: number,
+  smallest = 0.012
+): readonly OpeningLabel[] {
+  const floor = size * size * smallest;
+  const best = new Map<string, OpeningLabel>();
+
+  for (const facet of facets) {
+    if (facet.kind !== 'opening') continue;
+    if (!facet.openingId || !facet.openingKind) continue;
+    const shown = insideTheBox(facet.points, size);
+    if (shown.length < 3) continue;
+    const { x, y, area } = centreOf(shown);
+    if (area < floor) continue;
+    const already = best.get(facet.openingId);
+    if (already && already.area >= area) continue;
+    best.set(facet.openingId, {
+      openingId: facet.openingId,
+      wallId: facet.wallId,
+      kind: facet.openingKind,
+      x,
+      y,
+      area,
+      ...boundsOf(shown),
+    });
+  }
+
+  return [...best.values()].sort((a, b) => b.area - a.area);
 }
 
 /**
@@ -203,10 +296,52 @@ export function wallLabels(
     if (area < floor) continue;
     const already = best.get(facet.wallId);
     if (already && already.area >= area) continue;
-    best.set(facet.wallId, { wallId: facet.wallId, text: nameOf(facet.wallId), x, y, area });
+    best.set(facet.wallId, {
+      wallId: facet.wallId,
+      text: nameOf(facet.wallId),
+      x,
+      y,
+      area,
+      ...boundsOf(shown),
+    });
   }
 
   // Biggest first, so a caller drawing a bounded number of them keeps the ones
   // somebody is actually looking at.
   return [...best.values()].sort((a, b) => b.area - a.area);
+}
+
+
+/**
+ * Where a label of this width may actually sit.
+ *
+ * Kept inside the picture first, because a label off the edge of the screen is
+ * not a label. Then inside its own face where there is room, because a label
+ * that has wandered onto the wall next door is worse than one that is slightly
+ * off-centre — it names the wrong thing.
+ *
+ * When the face is narrower than the label the two cannot both be satisfied.
+ * The picture wins: staying on screen is what makes it readable at all, and a
+ * caller that minds can drop the label by comparing the width it asked for
+ * against `right - left`.
+ */
+export function fitInside(
+  at: { readonly x: number; readonly y: number },
+  face: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number },
+  half: { readonly width: number; readonly height: number },
+  size: number
+): { readonly x: number; readonly y: number } {
+  const clamp = (value: number, low: number, high: number) =>
+    low > high ? (low + high) / 2 : Math.min(Math.max(value, low), high);
+
+  // Its own face, where the face is big enough to hold it.
+  const onFace = {
+    x: clamp(at.x, face.left + half.width, face.right - half.width),
+    y: clamp(at.y, face.top + half.height, face.bottom - half.height),
+  };
+  // And the picture, always.
+  return {
+    x: clamp(onFace.x, half.width, size - half.width),
+    y: clamp(onFace.y, half.height, size - half.height),
+  };
 }

@@ -1,7 +1,14 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 import type { Facet } from '../project.ts';
-import { centreOf, insideTheBox, nameOf, wallLabels } from '../wallLabel.ts';
+import {
+  centreOf,
+  fitInside,
+  insideTheBox,
+  nameOf,
+  openingLabels,
+  wallLabels,
+} from '../wallLabel.ts';
 
 function wall(id: string, x: number, y: number, w: number, h: number): Facet {
   return {
@@ -238,5 +245,91 @@ describe('the part of a wall that is actually in the picture', () => {
         `${label.text} at ${Math.round(label.x)}, ${Math.round(label.y)}`
       );
     }
+  });
+});
+
+describe('a label has to fit, not just be centred somewhere real', () => {
+  const SIZE = 1000;
+  const whole = { left: 0, right: SIZE, top: 0, bottom: SIZE };
+
+  it('leaves a label that already fits alone', () => {
+    const at = fitInside({ x: 500, y: 500 }, whole, { width: 60, height: 20 }, SIZE);
+    deepStrictEqual(at, { x: 500, y: 500 });
+  });
+
+  it('pulls one back off the right edge', () => {
+    // The bug: "Wall 1" and a door's size had their middles on screen and both
+    // ends cut off, because text is centred on its point and runs half its
+    // width either way.
+    const at = fitInside({ x: 985, y: 500 }, whole, { width: 60, height: 20 }, SIZE);
+    strictEqual(at.x, SIZE - 60);
+  });
+
+  it('and off the left, the top and the bottom', () => {
+    strictEqual(fitInside({ x: 5, y: 500 }, whole, { width: 60, height: 20 }, SIZE).x, 60);
+    strictEqual(fitInside({ x: 500, y: 2 }, whole, { width: 60, height: 20 }, SIZE).y, 20);
+    strictEqual(fitInside({ x: 500, y: 999 }, whole, { width: 60, height: 20 }, SIZE).y, SIZE - 20);
+  });
+
+  it('keeps it on its own face when the face has room', () => {
+    // A label that wandered onto the wall next door names the wrong thing,
+    // which is worse than one slightly off-centre.
+    const face = { left: 100, right: 300, top: 100, bottom: 300 };
+    const at = fitInside({ x: 295, y: 200 }, face, { width: 40, height: 12 }, SIZE);
+    strictEqual(at.x, 260);
+    ok(at.x >= face.left && at.x <= face.right, `${at.x} is off its own face`);
+  });
+
+  it('when the face is narrower than the label, staying on screen wins', () => {
+    // The two cannot both be had. Off the edge is unreadable; slightly over a
+    // neighbour is not, and the area floor drops theslivers anyway.
+    const sliver = { left: 980, right: 1000, top: 400, bottom: 600 };
+    const at = fitInside({ x: 990, y: 500 }, sliver, { width: 80, height: 20 }, SIZE);
+    strictEqual(at.x, SIZE - 80);
+  });
+});
+
+describe('doors and windows carry their size', () => {
+  const SIZE = 1000;
+  const hole = (id: string, kind: 'door' | 'window' | 'cased', x: number, w: number) => ({
+    wallId: 'wall-1',
+    kind: 'opening' as const,
+    openingKind: kind,
+    openingId: id,
+    points: [
+      { x, y: 300 },
+      { x: x + w, y: 300 },
+      { x: x + w, y: 700 },
+      { x, y: 700 },
+    ],
+    depth: 1,
+    shade: 0.9,
+  });
+
+  it('labels each opening once, by its own id', () => {
+    const found = openingLabels([hole('d1', 'door', 100, 300), hole('w1', 'window', 500, 300)], SIZE);
+    deepStrictEqual(
+      found.map((f) => [f.openingId, f.kind]).sort(),
+      [['d1', 'door'], ['w1', 'window']]
+    );
+  });
+
+  it('drops one too small to print a measurement on', () => {
+    // Two numbers and a cross on something the size of a stamp is a smudge,
+    // and a smudge on a drawing somebody prices from is worse than nothing.
+    deepStrictEqual(openingLabels([hole('d1', 'door', 100, 8)], SIZE), []);
+  });
+
+  it('never labels a wall, a floor or a piece of furniture', () => {
+    const notAHole = { ...hole('d1', 'door', 100, 300), kind: 'wall' as const };
+    deepStrictEqual(openingLabels([notAHole], SIZE), []);
+  });
+
+  it('carries where it may sit, so the view can keep it on screen', () => {
+    const [found] = openingLabels([hole('d1', 'door', 100, 300)], SIZE);
+    strictEqual(found!.left, 100);
+    strictEqual(found!.right, 400);
+    strictEqual(found!.top, 300);
+    strictEqual(found!.bottom, 700);
   });
 });

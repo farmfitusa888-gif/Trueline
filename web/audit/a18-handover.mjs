@@ -186,8 +186,10 @@ async function nothingIsBlank(page, state) {
 
   const orbit = await page.evaluate(() =>
     [...document.querySelectorAll('svg text')].map((t) => t.textContent));
+  // `Wall 2` then its length, as two lines of one label -- `innerText` runs
+  // them together, so the test reads the beginning rather than the whole.
   check('walking around it, the walls are named',
-    orbit.length > 0 && orbit.every((t) => /^Wall \d+$/.test(t)),
+    orbit.length > 0 && orbit.every((t) => /^Wall \d+/.test(t)),
     JSON.stringify(orbit));
 
   await page.getByRole('button', { name: 'Stand inside' }).click();
@@ -195,7 +197,7 @@ async function nothingIsBlank(page, state) {
   const inside = await page.evaluate(() =>
     [...document.querySelectorAll('svg text')].map((t) => t.textContent));
   check('standing in it, the walls are named',
-    inside.length > 0 && inside.every((t) => /^Wall \d+$/.test(t)),
+    inside.length > 0 && inside.every((t) => /^Wall \d+/.test(t)),
     JSON.stringify(inside));
   check('one label per wall, not one per piece of wall',
     new Set(inside).size === inside.length, JSON.stringify(inside));
@@ -283,6 +285,62 @@ async function nothingIsBlank(page, state) {
   check('and a drag still turns it, rather than being read as a tap',
     (await svg.locator('polygon').first().getAttribute('points')) !== before,
     'the view did not move');
+
+  // What the 3D view has to say without switching to the blueprint.
+  await page.getByRole('button', { name: 'Stand inside' }).click();
+  await page.waitForTimeout(400);
+
+  const roomView = page.locator('svg[aria-label*="Standing in"]');
+  const box2 = await roomView.boundingBox();
+  const readOut = () => page.evaluate(() => {
+    const s = document.querySelector('svg[aria-label*="Standing in"]');
+    const r = s.getBoundingClientRect();
+    return [...s.querySelectorAll('text')].map((t) => {
+      const b = t.getBoundingClientRect();
+      return {
+        text: t.textContent,
+        fits:
+          b.left >= r.left - 1 && b.right <= r.right + 1 &&
+          b.top >= r.top - 1 && b.bottom <= r.bottom + 1,
+      };
+    });
+  });
+
+  // All the way round, because a label is only ever cut off at one angle. The
+  // first version of this feature had two of three labels thousands of pixels
+  // off the side, and the fix for that left the text itself running past the
+  // edge -- a middle on screen and both ends gone.
+  const clipped = [];
+  const kinds = new Set();
+  for (let turn = 0; turn < 10; turn += 1) {
+    for (const seen of await readOut()) {
+      if (!seen.fits) clipped.push(seen.text);
+      if (/^Wall \d+/.test(seen.text)) kinds.add('wall');
+      if (/^(Door|Window|Opening)/.test(seen.text)) kinds.add('opening');
+      if (/\d+['\u2032]/.test(seen.text)) kinds.add('length');
+    }
+    await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i += 1) {
+      await page.mouse.move(box2.x + box2.width / 2 - i * 15, box2.y + box2.height / 2);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(180);
+  }
+
+  check('every label stays inside the picture, at every angle',
+    clipped.length === 0, `cut off: ${JSON.stringify(clipped.slice(0, 6))}`);
+  check('the walls carry their length as well as their name',
+    kinds.has('wall') && kinds.has('length'), JSON.stringify([...kinds]));
+  check('and the doors and windows carry their size',
+    kinds.has('opening'), JSON.stringify([...kinds]));
+
+  const caption = await page.locator('[data-panel="plan"]').innerText();
+  check('the ceiling height is on the 3D view, since every wall area uses it',
+    /Ceiling \d/.test(caption), caption.slice(0, 300));
+  check('and the furniture toggle says why it is absent rather than being absent',
+    /no furniture to show or hide|Hide what was in the room|Show what was in the room/.test(caption),
+    caption.slice(0, 400));
 
   check('3D: no console or page errors', noise().length === 0, noise().join(' | '));
   await ctx.close();
