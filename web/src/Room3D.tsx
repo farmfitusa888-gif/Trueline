@@ -81,6 +81,28 @@ export function Room3D({
   readonly furniture?: boolean;
 }) {
   const [camera, setCamera] = useState<Camera>(DEFAULT_CAMERA);
+  /**
+   * How much of the drawing is on screen, as an SVG `viewBox`.
+   *
+   * ## Why zooming lives here and not in the projection
+   *
+   * > "PIC 4: MAKE IT EASIER TO NAVIGATE INSIDE THE 3D MODEL ON THE PHONE AND
+   * >  DESKTOP"
+   *
+   * Until now the only thing a finger could do to this picture was turn it.
+   * There was no zoom at all — on a phone, on a desktop, inside or outside —
+   * so a wall label two rooms away was unreadable and there was nothing to do
+   * about it.
+   *
+   * The fix does **not** touch `project()`. That function turns a measured room
+   * into screen coordinates and it is tested against those coordinates; putting
+   * a zoom factor inside it would make every one of those tests a test of the
+   * zoom as well. A `viewBox` is the SVG-native way to say "show me this part
+   * of the same drawing", it costs nothing to animate, and — the point — it
+   * cannot move a number, because it is applied after every number has been
+   * worked out.
+   */
+  const [box, setBox] = useState({ x: 0, y: 0, size: SIZE });
   const [inside, setInside] = useState<Standing | null>(null);
   /** Where the plane sits, or nothing for the whole room. */
   const [plane, setPlane] = useState<bigint | null>(null);
@@ -199,11 +221,84 @@ export function Room3D({
       SIZE
     );
 
+  /**
+   * Zooms about a point, keeping whatever is under it under it.
+   *
+   * `at` is in the svg's own units. Clamped both ways: 1x is the whole drawing
+   * and there is never a reason to see less than that, and 8x is the point
+   * where a wall label fills the screen.
+   */
+  const zoomAbout = (factor: number, at: { x: number; y: number }) => {
+    setBox((was) => {
+      const size = Math.max(SIZE / 8, Math.min(SIZE, was.size / factor));
+      if (size === was.size) return was;
+      // The fraction of the box the point sits at has to survive the change.
+      const fx = (at.x - was.x) / was.size;
+      const fy = (at.y - was.y) / was.size;
+      const x = at.x - fx * size;
+      const y = at.y - fy * size;
+      const limit = SIZE - size;
+      return {
+        size,
+        x: Math.max(Math.min(x, limit), 0),
+        y: Math.max(Math.min(y, limit), 0),
+      };
+    });
+  };
+
+  /** Where a client point lands in the svg's own units, at the current zoom. */
+  const inSvg = (svg: SVGSVGElement, x: number, y: number) => {
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: box.x + ((x - rect.left) / rect.width) * box.size,
+      y: box.y + ((y - rect.top) / rect.height) * box.size,
+    };
+  };
+
+  /**
+   * Every finger currently down, so two of them can be told from one.
+   *
+   * One finger turns the room, which is what it has always done. Two pinch and
+   * pan, which is what every other picture on a phone does and what this one
+   * could not.
+   */
+  const fingers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ gap: number; at: { x: number; y: number } } | null>(null);
+
+  const spanOf = () => {
+    const [a, b] = [...fingers.current.values()];
+    if (!a || !b) return null;
+    return {
+      gap: Math.hypot(a.x - b.x, a.y - b.y),
+      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+    };
+  };
+
   const start = (x: number, y: number, pointer: number, svg: SVGSVGElement) => {
+    fingers.current.set(pointer, { x, y });
+    if (fingers.current.size >= 2) {
+      // A second finger ends the turn that the first one started, so a pinch
+      // does not also spin the room.
+      drag.current = null;
+      const span = spanOf();
+      if (span) pinch.current = { gap: span.gap, at: inSvg(svg, span.mid.x, span.mid.y) };
+      return;
+    }
     drag.current = { x, y, from: camera, standing: inside, moved: false, pointer, svg };
   };
 
-  const move = (x: number, y: number) => {
+  const move = (x: number, y: number, pointer?: number) => {
+    if (pointer !== undefined && fingers.current.has(pointer)) {
+      fingers.current.set(pointer, { x, y });
+    }
+    if (pinch.current && fingers.current.size >= 2) {
+      const span = spanOf();
+      if (span && span.gap > 0 && pinch.current.gap > 0) {
+        zoomAbout(span.gap / pinch.current.gap, pinch.current.at);
+        pinch.current = { gap: span.gap, at: pinch.current.at };
+      }
+      return;
+    }
     const at = drag.current;
     if (!at) return;
     const dx = x - at.x;
@@ -241,7 +336,9 @@ export function Room3D({
     });
   };
 
-  const end = () => {
+  const end = (pointer?: number) => {
+    if (pointer !== undefined) fingers.current.delete(pointer);
+    if (fingers.current.size < 2) pinch.current = null;
     const at = drag.current;
     wasDrag.current = at?.moved ?? false;
     // Handed back, so the next tap is hit-tested against the polygons again
@@ -262,7 +359,7 @@ export function Room3D({
   return (
     <div className="select-none">
       <svg
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        viewBox={`${box.x} ${box.y} ${box.size} ${box.size}`}
         className="w-full touch-none"
         role="img"
         aria-label={
@@ -278,9 +375,19 @@ export function Room3D({
           // this screen has existed.
           start(event.clientX, event.clientY, event.pointerId, event.currentTarget);
         }}
-        onPointerMove={(event) => move(event.clientX, event.clientY)}
-        onPointerUp={end}
-        onPointerCancel={end}
+        onPointerMove={(event) => move(event.clientX, event.clientY, event.pointerId)}
+        onPointerUp={(event) => end(event.pointerId)}
+        onPointerCancel={(event) => end(event.pointerId)}
+        // A mouse wheel and a trackpad pinch both arrive here, which is the
+        // whole of "and desktop". `passive` cannot be set through React, so the
+        // page-scroll it would otherwise cause is stopped the ordinary way and
+        // the container below has `overscroll-contain` so the page does not
+        // rubber-band behind it.
+        onWheel={(event) => {
+          event.preventDefault();
+          const at = inSvg(event.currentTarget, event.clientX, event.clientY);
+          zoomAbout(event.deltaY < 0 ? 1.12 : 1 / 1.12, at);
+        }}
       >
         {view.projection.facets.map((facet, i) => {
           const isWall = facet.kind !== 'floor' && facet.kind !== 'object';
@@ -438,8 +545,8 @@ export function Room3D({
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
         <p>
           {inside
-            ? 'Drag to look around. Tap a wall to measure it.'
-            : 'Drag to walk around it. Tap a wall to measure it.'}
+            ? 'Drag to look around. Pinch or scroll to zoom. Tap a wall to measure it.'
+            : 'Drag to walk around it. Pinch or scroll to zoom. Tap a wall to measure it.'}
           {' '}
           {/* The one dimension that is nowhere else on this view, and that
               every wall's area is multiplied by. Read off the room rather than
@@ -461,9 +568,36 @@ export function Room3D({
           >
             {inside ? 'Back outside' : 'Stand inside'}
           </button>
+          {/* Buttons as well as the gesture, because a gesture nobody is told
+              about is a feature nobody has. These zoom about the middle, which
+              is where somebody looking at a label has already put it. */}
           <button
             type="button"
-            onClick={() => (inside ? setInside(standingInside(room)) : setCamera(DEFAULT_CAMERA))}
+            onClick={() => zoomAbout(1.4, { x: box.x + box.size / 2, y: box.y + box.size / 2 })}
+            disabled={box.size <= SIZE / 8}
+            className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700
+                       active:bg-slate-100 disabled:opacity-40"
+          >
+            Closer
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomAbout(1 / 1.4, { x: box.x + box.size / 2, y: box.y + box.size / 2 })}
+            disabled={box.size >= SIZE}
+            className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700
+                       active:bg-slate-100 disabled:opacity-40"
+          >
+            Further out
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              // The zoom goes back with the angle. Straightening the view and
+              // leaving it magnified eight times is not straightening it.
+              setBox({ x: 0, y: 0, size: SIZE });
+              if (inside) setInside(standingInside(room));
+              else setCamera(DEFAULT_CAMERA);
+            }}
             className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700 active:bg-slate-100"
           >
             Straighten up

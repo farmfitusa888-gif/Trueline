@@ -175,11 +175,26 @@ def imported(source: str) -> set[str]:
 
 
 def missingFrameworks(source: str) -> list[tuple[str, str]]:
-    """(what was used, what would have to be imported), for each one missing."""
+    """(what was used, what would have to be imported), for each one missing.
+
+    The two halves read different text, and they have to:
+
+      * **imports** come off the raw file, because a commented-out import is not
+        an import and stripping leaves the line looking like nothing at all;
+      * **uses** come off the stripped file, because a doc comment explaining
+        that `@StateObject` on a tab lives as long as the app is prose about
+        SwiftUI, not a use of it.
+
+    Reading both off the raw file reported `ARMeasureSession.swift` as missing
+    `import SwiftUI` for a sentence in a comment — a compile error the compiler
+    would never have, which is exactly the kind of false positive that gets a
+    whole check switched off.
+    """
     have = imported(source)
+    uses = strip(source)
     found = []
     for pattern, said, providers in NEEDS_IMPORT:
-        if re.search(pattern, source) and not (have & providers):
+        if re.search(pattern, uses) and not (have & providers):
             found.append((said, ' or '.join(sorted(providers))))
     return found
 

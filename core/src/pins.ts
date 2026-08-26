@@ -47,20 +47,13 @@ export const PIN_MANIFEST_SCHEMA = 'trueline.pins.v1';
 /**
  * How the phone found the point under the finger.
  *
- * These are ARKit's own three answers, kept in its words rather than translated
- * into a scale this module invented, because they are not equally good and a
- * claim should be able to say which it had.
- *
- *   - `planeGeometry` — the ray hit a surface the phone has actually mapped.
- *     The point is on something real that was seen.
- *   - `planeInfinite` — it hit the *plane* of a mapped surface, out past the
- *     part that was seen. The plane is real; how far along it the point is, is
- *     an extrapolation. Kept, and recorded as what it is.
- *   - `estimated` — no surface at all, only a guess from feature points.
- *     Refused below rather than drawn somewhere plausible, because a pin whose
- *     distance is a guess is a pin at the wrong end of the room.
+ * Declared beside `Damage`, because the damage is what carries it onto a
+ * document somebody reads and a type is best owned by the thing that outlives
+ * it. Re-exported here so a manifest reader still imports it from the module
+ * that reads manifests.
  */
-export type HowFound = 'planeGeometry' | 'planeInfinite' | 'estimated';
+export type { HowFound } from './damage.ts';
+import type { HowFound } from './damage.ts';
 
 /** One tap, as the phone wrote it down, in the scanner's own metres. */
 export interface CapturedPin {
@@ -155,21 +148,33 @@ export const REACHES: Nanometres = 304_800_000n;
 /**
  * Turns one tap into a damage the room model can draw and the claim can carry.
  *
- * Refuses rather than guesses in three cases, each of which is a pin that would
+ * Refuses rather than guesses in two cases, each of which is a pin that would
  * otherwise be drawn somewhere it is not:
  *
- *   - ARKit only estimated the point, so there is no surface under it;
  *   - it is below the floor, which means the two coordinate frames disagree and
  *     nothing about the pin can be trusted;
  *   - the person typed nothing, so there is no evidence, only a dot.
+ *
+ * ## The third refusal, and why it is gone
+ *
+ * A pin whose ray hit no mapped surface — `found: 'estimated'` — used to be
+ * refused here as well. The reasoning was that its distance was a guess. The
+ * consequence was that Mark never worked:
+ *
+ * > "MARK STILL DOES NOT WORK DURING THE SCAN."
+ *
+ * RoomPlan maps walls and floors and does not map ceilings, so every attempt to
+ * mark a water stain on a ceiling — the single most common thing an adjuster is
+ * shown — came back "the phone has not mapped that surface yet", forever, with
+ * nothing the person could do about it. A refusal with no way past it is not
+ * caution; it is a feature that does not exist.
+ *
+ * So the pin lands, and it carries `found` onto the damage and from there onto
+ * the claim document, where `certainty()` puts it in words. The uncertainty is
+ * still recorded — it is recorded where somebody reading the claim can see it,
+ * instead of in an error message that stopped them recording anything at all.
  */
 export function toDamage(captured: CapturedPin, frame: RoomFrame, room: Room): Damage {
-  if (captured.found === 'estimated') {
-    throw new CaptureError(
-      `The pin "${captured.id}" was dropped where the phone could not find a surface, so there ` +
-        'is no telling how far away it is. Point at the wall and mark it again.'
-    );
-  }
   const note = captured.note.trim();
   if (note === '') {
     throw new CaptureError(
@@ -197,6 +202,7 @@ export function toDamage(captured: CapturedPin, frame: RoomFrame, room: Room): D
     kind: captured.kind,
     shape,
     note,
+    found: captured.found,
     recordedAt: captured.droppedAt,
     recordedBy: 'me',
     photos: captured.photoId ? [captured.photoId] : [],

@@ -166,6 +166,68 @@ export interface Damage {
    * scope says which it used.
    */
   readonly cutTo?: Nanometres;
+  /**
+   * How well the phone knew where this was, when it came off a tap in AR.
+   *
+   * Absent on damage drawn by hand on the plan, where the question does not
+   * arise: somebody put it there.
+   *
+   * ## Why a pin is allowed to be uncertain at all
+   *
+   * A mark used to be **refused** unless the ray hit a surface ARKit had
+   * already mapped. That sounded careful and in practice meant Mark never
+   * worked:
+   *
+   * > "MARK STILL DOES NOT WORK DURING THE SCAN."
+   *
+   * RoomPlan maps walls and floors. It does not map ceilings, and a water stain
+   * on a ceiling is the single most common thing an adjuster is shown. So the
+   * one surface the feature exists for was the one surface it refused.
+   *
+   * The fix is not to pretend the estimate is a measurement. It is to let the
+   * pin land and carry **which kind of hit it was**, all the way onto the claim
+   * document, so the difference between "the phone had mapped that wall" and
+   * "the phone worked it out from depth" is on the paper the adjuster reads
+   * rather than lost in a refusal nobody could get past.
+   */
+  readonly found?: HowFound;
+}
+
+/**
+ * How the phone found the point under a finger, when a damage came off a tap.
+ *
+ * ARKit's own three answers, kept in its words rather than translated into a
+ * scale this module invented, because they are not equally good and a claim
+ * should be able to say which it had.
+ *
+ *   - `planeGeometry` — the ray hit a surface the phone has actually mapped.
+ *     The point is on something real that was seen.
+ *   - `planeInfinite` — it hit the *plane* of a mapped surface, out past the
+ *     part that was seen. The plane is real; how far along it the point is, is
+ *     an extrapolation.
+ *   - `estimated` — no mapped surface, only what the depth data says. On a
+ *     LiDAR phone that is a measured distance rather than a guess; on one
+ *     without, it is feature points. Either way it is the only answer available
+ *     for a ceiling, because RoomPlan does not map ceilings.
+ */
+export type HowFound = 'planeGeometry' | 'planeInfinite' | 'estimated';
+
+/**
+ * What to call each kind of hit, on a document somebody else reads.
+ *
+ * Not the raw word: `planeGeometry` means nothing to an adjuster. These are
+ * the sentences, and they are deliberately about evidence rather than about
+ * ARKit.
+ */
+export function certainty(found: HowFound): string {
+  switch (found) {
+    case 'planeGeometry':
+      return 'on a surface the phone had mapped';
+    case 'planeInfinite':
+      return 'on the line of a mapped surface, past its edge';
+    case 'estimated':
+      return 'from depth alone — no mapped surface under it';
+  }
 }
 
 /* --------------------------------------------------------------- checking */

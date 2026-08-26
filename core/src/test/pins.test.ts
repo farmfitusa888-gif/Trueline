@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { type RoomFrame, CaptureError } from '../capture.ts';
 import { NM_PER_FOOT, NM_PER_METRE, parseLength } from '../length.ts';
 import { scanned, verified } from '../measurement.ts';
+import { certainty } from '../damage.ts';
 import type { Heading, Room, Wall } from '../room.ts';
 import {
   type CapturedPin,
@@ -182,11 +183,29 @@ test('a pin out past the mapped part of a wall is kept, and says so', () => {
   assert.equal(damage.shape.kind, 'pin');
 });
 
-test('a pin the phone only guessed at is refused', () => {
-  assert.throws(
-    () => toDamage(pin({ found: 'estimated' }), PLAIN, room),
-    (error: unknown) => error instanceof CaptureError && /could not find a surface/.test(error.message)
-  );
+test('a pin the phone only had depth for lands, and says so', () => {
+  // It used to be refused. That was the whole of "MARK STILL DOES NOT WORK
+  // DURING THE SCAN": RoomPlan maps walls and floors and not ceilings, so a
+  // water stain on a ceiling -- the thing an adjuster is shown most often --
+  // could never be marked at all, and there was nothing the person could do
+  // about it.
+  //
+  // The uncertainty did not go away, it moved somewhere useful: onto the damage
+  // and from there onto the claim document.
+  const damage = toDamage(pin({ found: 'estimated' }), PLAIN, room);
+  assert.equal(damage.shape.kind, 'pin');
+  assert.equal(damage.found, 'estimated');
+  assert.match(certainty('estimated'), /no mapped surface/);
+});
+
+test('and every kind of hit is put in words a stranger can read', () => {
+  // The raw words are ARKit's. `planeGeometry` on a claim document tells an
+  // adjuster nothing, and this is the one place that is fixed.
+  for (const found of ['planeGeometry', 'planeInfinite', 'estimated'] as const) {
+    const said = certainty(found);
+    assert.ok(said.length > 10, `${found} said "${said}"`);
+    assert.ok(!said.includes('plane') || !said.includes('Geometry'), said);
+  }
 });
 
 test('the photograph taken at the moment of the tap comes with it', () => {
@@ -209,10 +228,13 @@ function manifest(pins: CapturedPin[]): PinManifest {
 }
 
 test('one bad pin does not lose the rest, and is not dropped quietly', () => {
+  // `b` says nothing, and a pin with no words is a dot on a drawing rather than
+  // evidence. That refusal stays. It used to be a pin the phone had only depth
+  // for, which is no longer refused -- see the test above.
   const result = importPins(
     manifest([
       pin({ id: 'a' }),
-      pin({ id: 'b', found: 'estimated' }),
+      pin({ id: 'b', note: '   ' }),
       pin({ id: 'c', at: [3, 1, -1] }),
     ]),
     PLAIN,

@@ -120,11 +120,17 @@ export function SectionBar({
                 // out loud, and it is what a screen reader announces.
                 aria-label={s.title}
                 title={s.what}
-                className={`relative flex min-h-14 w-full flex-col items-center justify-center
+                // Slimmer than it was, because on a phone this row now sits
+                // directly on top of the app's own tab bar and two full-height
+                // bars is a lot of chrome for a screen somebody is reading
+                // numbers off. 44pt is Apple's minimum tap target and this is
+                // exactly that -- smaller would be a control that is hard to
+                // hit, which is not a trade worth making for eight pixels.
+                className={`relative flex min-h-11 w-full flex-col items-center justify-center
                             gap-0.5 px-0.5 ${on ? 'text-slate-900' : 'text-slate-400'}`}
               >
                 <Glyph of={s.key} />
-                <span className={`text-[10px] leading-none ${on ? 'font-bold' : 'font-medium'}`}>
+                <span className={`text-[9px] leading-none ${on ? 'font-bold' : 'font-medium'}`}>
                   {s.short}
                 </span>
                 {count > 0 && (

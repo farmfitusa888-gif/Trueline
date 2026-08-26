@@ -332,7 +332,10 @@ export function App() {
   const native = insideApp();
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+    // The bottom padding clears the room's own bar and nothing more. It was
+    // 6.5rem for a 3.5rem bar, which left an inch of empty page under every
+    // short panel -- visible under the takeoff in the report that started this.
+    <main className="mx-auto max-w-3xl px-4 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom))]">
       {/* Hidden inside the iOS app, where the tab bar along the bottom and the
           navigation bar along the top are the real chrome and this row was a
           second, different-looking copy of both. It was the complaint: "the

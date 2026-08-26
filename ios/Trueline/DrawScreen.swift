@@ -106,7 +106,22 @@ struct DrawScreen: View {
                 diagnostics.record(webError: message, at: place, stack: stack)
             }
         )
-        .ignoresSafeArea(.container, edges: .bottom)
+        // Deliberately NOT `.ignoresSafeArea(.container, edges: .bottom)`.
+        //
+        // It used to be, and that is what put a strip of nothing between the
+        // room's own bar and the phone's tab bar. Extending the web view
+        // under the tab bar does not tell the PAGE the tab bar is there:
+        // inside a web view `env(safe-area-inset-bottom)` reports the home
+        // indicator, 34pt, and the tab bar is about 83pt. So the page put
+        // its bar 34pt up from the bottom of a view that ran 83pt lower
+        // than the visible area, and the 49pt difference was the gap.
+        //
+        // > "AND PIC 2: FIX THE SPACING BETWEEN THE BOTTOM BAR AND THE
+        // >  SMALL ONE."
+        //
+        // Ending the web view where the tab bar starts makes the page's own
+        // bottom the tab bar's top, and the two sit flush with no arithmetic
+        // shared between Swift and CSS.
         .navigationTitle("Draw a room")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { HandbookButton() }

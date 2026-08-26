@@ -449,6 +449,22 @@ def xcscheme(bench: Bench) -> None:
                  blocks=True, saying='LaunchAction')
 
 
+    # 8. And the other way round: a framework named in PROSE is not a use.
+    #
+    #    `ARMeasureSession.swift` explains, in a doc comment, that a
+    #    `@StateObject` on a tab lives as long as the app -- which is why the
+    #    camera never came back. The check read imports and uses off the same
+    #    raw text and reported the file as missing `import SwiftUI`: a compile
+    #    error the compiler would never have. A false positive is how a check
+    #    gets switched off, so it is worth a case of its own.
+    rel = 'ios/Trueline/PinRecorder.swift'
+    was = bench.read(rel)
+    bench.write(rel, '/// A note about @StateObject and @ObservedObject on a tab.\n' + was)
+    code, out = bench.run('check-swift-names.py')
+    expect('SwiftUI named in a comment is not a use of it', code, out, fires=False)
+    bench.restore(rel)
+
+
 # ---------------------------------------------------------------------- doors
 
 def doors(bench: Bench) -> None:

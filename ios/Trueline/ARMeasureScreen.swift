@@ -66,7 +66,10 @@ struct ARMeasureScreen: View {
             Text(model.session.failure ?? "")
         }
         .onAppear { model.begin() }
-        .onDisappear { model.session.stop() }
+        // Through the model, like the Scan tab, so there is one place that
+        // knows what leaving a tab means. Coming back resumes rather than
+        // restarting: see `ARMeasureSession.resume()`.
+        .onDisappear { model.stepAway() }
         .onChange(of: model.finished) { _, scan in
             guard let scan else { return }
             onFinished(scan)

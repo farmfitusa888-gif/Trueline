@@ -132,8 +132,20 @@ struct ScanScreen: View {
                         .font(.footnote)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
-                        Button("Try again") { model.reset() }
-                            .buttonStyle(.borderedProminent)
+                        HStack(spacing: 12) {
+                            Button("Try again") { model.reset() }
+                                .buttonStyle(.borderedProminent)
+                            // The other way out, on the overlay itself. It used
+                            // to be only on the bar underneath -- and the bar was
+                            // drawn over this, so Close was visible and Try
+                            // again was not. Both are here now and the bar is
+                            // gone while this is up.
+                            Button("Close") {
+                                model.reset()
+                                onClose()
+                            }
+                            .buttonStyle(.bordered)
+                        }
                     } else {
                         ProgressView()
                             .controlSize(.large)
@@ -154,6 +166,17 @@ struct ScanScreen: View {
                 .transition(.opacity)
             }
 
+            // Only while somebody is still walking. Once the scan is over this
+            // whole bar sat ON TOP of the overlay above -- a shutter, a Mark and
+            // a photo count over "That scan could not be turned into a room",
+            // with **Try again covered up by it**. The only control anybody
+            // could see was Close, so a failed scan looked like a dead app:
+            //
+            // > "PIC 3: THIS MESSED EVERYTHING UP"
+            // > "SEEMS LIKE THE APP GETS CONFUSED AND FROZEN OR STUCK"
+            //
+            // It was not stuck. The way out was underneath the bar.
+            if model.stage == .walking {
             VStack(spacing: 0) {
                 if let instruction = model.session.instruction, model.session.isRunning {
                     Text(instruction)
@@ -185,6 +208,7 @@ struct ScanScreen: View {
                 Spacer()
                 measurements
                 controls
+            }
             }
         }
         .sheet(isPresented: sayingWhatItIs) { whatIsIt }

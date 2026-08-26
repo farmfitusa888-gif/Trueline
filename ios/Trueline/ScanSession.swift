@@ -194,12 +194,29 @@ final class ScanSession: NSObject, ObservableObject {
             pinTrouble = "Nothing there yet. Point at a wall the phone has already covered."
             return
         }
+        // A hit with no mapped surface behind it used to be REFUSED here, and
+        // on the far side as well. It sounded careful and it meant Mark never
+        // worked:
+        //
+        // > "MARK STILL DOES NOT WORK DURING THE SCAN."
+        //
+        // RoomPlan maps walls and floors. It does not map ceilings, and a water
+        // stain on a ceiling is the most common thing an adjuster is ever
+        // shown -- so the one surface this feature exists for was the one
+        // surface it turned down, every time, with nothing the person could do
+        // about it.
+        //
+        // The pin lands now and carries WHICH kind of hit it was, all the way
+        // through `pins.json` to `Damage.found` and onto the claim document,
+        // where `certainty()` puts it in a sentence an adjuster can read. The
+        // uncertainty is still recorded; it is recorded somewhere useful rather
+        // than in a refusal that stopped anything being recorded at all.
+        //
+        // The note under the reticle says so at the moment of the tap, so
+        // somebody who can walk two steps and get a better hit still can.
         if landed.found == .estimated {
-            // Refused here as well as on the far side, because here is where the
-            // person can do something about it -- they are still standing in
-            // front of the thing they were trying to mark.
-            pinTrouble = "The phone has not mapped that surface yet. Scan across it and mark it again."
-            return
+            pinTrouble = "Marked from depth — the phone has not mapped that surface. "
+                + "Good enough for a ceiling; scan across it first if you want it on the plan."
         }
 
         // The evidence. A pin without a photograph is a dot with a note on it;

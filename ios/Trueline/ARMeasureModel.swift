@@ -15,7 +15,6 @@ final class ARMeasureModel: ObservableObject {
     private let store: ProjectStore
     private let startedAt = Date()
     private var relay: AnyCancellable?
-    private var begun = false
 
     /// Passes the session's changes on as our own.
     ///
@@ -54,7 +53,21 @@ final class ARMeasureModel: ObservableObject {
         // A finger on a corner is the most specific thing happening, so it is
         // what the sentence is about while it lasts.
         if session.held != nil { return "Moving that corner — let go to drop it" }
-        if let note = session.trackingNote { return note }
+        // The camera being off is the reason nothing else is happening, and it
+        // outranks every other sentence. Before this the screen went on saying
+        // "touch the foot of a corner" over a black rectangle.
+        if !session.running { return "The camera is off. Leave this tab and come back to it." }
+        if let note = session.trackingNote {
+            // A corner placed before an interruption is a position in a world
+            // the phone is still looking for. Saying so is the difference
+            // between a pause and a measurement quietly moving.
+            if session.trackingNote == "Finding where it is again — hold still a moment",
+               !session.corners.isEmpty {
+                return "Finding where it is again — hold still. The corners already "
+                    + "placed move with it."
+            }
+            return note
+        }
 
         if session.mode == .distance {
             if !session.floorFound {
@@ -100,13 +113,35 @@ final class ARMeasureModel: ObservableObject {
 
 
 
+    /// Turns the camera on, whether this is the first visit or the fifth.
+    ///
+    /// It used to be `guard !begun else { return }`, which was right about the
+    /// danger and wrong about the fix: starting again with `.resetTracking`
+    /// *would* move every corner already placed, so the guard stopped it -- and
+    /// on a tab bar the guard never lifts, because a `@StateObject` on a tab
+    /// lives as long as the app. The screen paused the session every time it
+    /// went away and could never start one again. Second visit onwards, Measure
+    /// was a black rectangle with a crosshair on it, Set floor refused because
+    /// there was no camera frame to read, and Undo and Done sat disabled
+    /// because nothing could be placed. Only killing the app cleared it, which
+    /// is what makes a new `@StateObject`.
+    ///
+    /// `ARMeasureSession.resume()` is the honest version of both halves: the
+    /// first visit runs the session, later visits continue the one that is
+    /// already there, so the world -- and everything placed in it -- survives.
     func begin() {
-        // `onAppear` fires again when somebody comes back from the review
-        // screen, and starting again resets the world origin underneath corners
-        // that are already placed — every one of them silently moves.
-        guard !begun else { return }
-        begun = true
-        session.start()
+        session.resume()
+    }
+
+    /// Off while somebody is on another tab.
+    ///
+    /// A world-tracking session running behind the Rooms list is a phone that
+    /// gets hot and flat, and iOS gives the camera to one AR session at a time
+    /// -- so leaving this one running is also what takes the picture off the
+    /// Scan tab. Coming back calls `begin()`, which resumes rather than
+    /// restarts.
+    func stepAway() {
+        session.stop()
     }
 
     /// Writes the walk out in the same shape a scan produces.

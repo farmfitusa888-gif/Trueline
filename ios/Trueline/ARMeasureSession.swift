@@ -98,6 +98,17 @@ final class ARMeasureSession: NSObject, ObservableObject {
     /// mean, with no closing gap and so no tolerance on anything in it.
     var canClose: Bool { corners.count >= 4 }
 
+    /// Whether the camera is live right now.
+    ///
+    /// Published, because everything on the screen is a lie while it is false:
+    /// a reticle over a black rectangle, an Undo that undoes nothing, a Set
+    /// floor that cannot read a camera transform.
+    @Published private(set) var running = false
+
+    /// Whether it has ever been run, so coming back can resume rather than
+    /// restart. The difference is every corner already placed.
+    private var everRan = false
+
     func start() {
         guard ARWorldTrackingConfiguration.isSupported else {
             failure = "This device cannot track its position well enough to measure a room."
@@ -116,10 +127,66 @@ final class ARMeasureSession: NSObject, ObservableObject {
         configuration.worldAlignment = .gravityAndHeading
         session.delegate = self
         session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+        everRan = true
+        running = true
+    }
+
+    /// Puts the camera back on after the screen has been away.
+    ///
+    /// ## The bug this is the whole of
+    ///
+    /// > "PIC 2: CAMERA AND SCAN DOESNT ALWAYS WORK"
+    /// > "ONCE THE FLOOR IS FOUND, IT WONT LET YOU SET IT YOURSELF. DONE AND
+    /// >  UNDO DOESNT WORK."
+    /// > "SEEMS LIKE THE APP GETS CONFUSED AND FROZEN OR STUCK"
+    ///
+    /// All one thing. `ARMeasureScreen` paused the session on `onDisappear` and
+    /// called `begin()` on `onAppear`, and `begin()` was `guard !begun else {
+    /// return }`. On a tab bar that guard is permanent: a `@StateObject` on a
+    /// tab lives as long as the app, so the *second* visit to Measure — and
+    /// every visit after it — got a paused session and no way to start one.
+    ///
+    /// What that looks like on a phone is exactly the two screenshots: a black
+    /// picture where the camera should be, a crosshair that never fills in,
+    /// Set floor that refuses because `currentFrame` is nil, and Undo and Done
+    /// disabled because nothing can be placed. Nothing is frozen — the camera
+    /// is simply off, and only killing the app cleared it, because that is what
+    /// makes a new `@StateObject`.
+    ///
+    /// The Scan tab hit this first and was fixed with `reset()`. The Measure
+    /// tab was not, and this is that fix.
+    ///
+    /// ## Why it resumes rather than restarts
+    ///
+    /// `run(configuration)` with **no options** continues the same session:
+    /// the world origin stays where it was and ARKit relocalizes against the
+    /// map it already built. That matters because corners already placed are
+    /// positions in that world — a `.resetTracking` here would move every one
+    /// of them silently, which is the reason the old guard existed at all.
+    ///
+    /// Relocalizing takes a moment and can fail, and `trackingNote` says so
+    /// while it does. A corner placed before an interruption is only as good as
+    /// the relocalization, and the screen says that rather than assuming it.
+    func resume() {
+        guard everRan else {
+            start()
+            return
+        }
+        guard !running else { return }
+        guard ARWorldTrackingConfiguration.isSupported else { return }
+        let configuration = ARWorldTrackingConfiguration()
+        configuration.planeDetection = [.horizontal]
+        configuration.environmentTexturing = .none
+        configuration.worldAlignment = .gravityAndHeading
+        session.delegate = self
+        // No options. See above: the options are what would move the corners.
+        session.run(configuration)
+        running = true
     }
 
     func stop() {
         session.pause()
+        running = false
     }
 
     /// The floor is where the phone is, because somebody put it there.

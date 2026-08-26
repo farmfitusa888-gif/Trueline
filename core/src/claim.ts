@@ -4,6 +4,7 @@ import { readiness, trustLabel } from './issue.ts';
 import { roomQuantities } from './zone.ts';
 import {
   type Damage,
+  certainty,
   WATER_CATEGORY,
   damageTotals,
   drying,
@@ -216,7 +217,16 @@ export function claimReport(
       return {
         id: damage.id,
         headline: `${quantity.what}${category}`,
-        workings: quantity.workings,
+        // How it was measured, and — for anything marked by pointing a phone at
+        // it — how well the phone knew where it was. That second half used to
+        // be a refusal instead: a mark the phone had only depth for was thrown
+        // away, which meant no ceiling could ever be marked, because RoomPlan
+        // maps walls and floors and not ceilings. The uncertainty belongs on
+        // the paper an adjuster reads, not in an error that stops the evidence
+        // being recorded.
+        workings: damage.found
+          ? `${quantity.workings} Marked ${certainty(damage.found)}.`
+          : quantity.workings,
         note: damage.note,
         photos: damage.photos,
         readings: curve.readings.map((r) => ({

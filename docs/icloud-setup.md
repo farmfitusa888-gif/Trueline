@@ -74,6 +74,12 @@ nothing to index until the app has saved. On the phone, with iCloud signed in:
    (Production comes in step 3 below.)
 5. In the left sidebar, under **Schema**, click **Indexes**.
 
+> **If the console says "This index already exists"** — that is index one,
+> already done. The dialog's **Record Type** is the thing to change, not the
+> field: go to **DamagePhoto** and index its **scan** field. Naming an index
+> `DAMAGE` on the **Scan** record type asks for the index that is already
+> there, and the console is right to refuse it.
+
 **Index one — so a second phone can list your scans:**
 
 6. In the record-type list, click **Scan**.
