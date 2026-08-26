@@ -49,14 +49,14 @@ struct DeadCaptureScreen: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Label("Nothing was captured", systemImage: "exclamationmark.triangle")
                         .font(.headline)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Ink.scanned)
                     Text(
                         "This scan stopped before the phone had found a single wall, so the "
                         + "folder holds no room. Nothing in it can be recovered — there is no "
                         + "partial room in there to rescue."
                     )
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Ink.quiet)
                     Text(
                         "It usually means the capture was ended early, or the room was too dark "
                         + "for the phone to see where the walls met the floor. Walking it again "
@@ -64,7 +64,7 @@ struct DeadCaptureScreen: View {
                         + "fixes it."
                     )
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Ink.quiet)
                 }
                 .padding(.vertical, 4)
             }
@@ -93,7 +93,7 @@ struct DeadCaptureScreen: View {
                             + "it is measured from the first keystroke."
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Ink.quiet)
                     }
                 }
 
@@ -111,9 +111,11 @@ struct DeadCaptureScreen: View {
                     + "before it goes."
                 )
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Ink.quiet)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Ink.ground)
         .navigationTitle(entry.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { HandbookButton() }

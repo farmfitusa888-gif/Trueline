@@ -214,8 +214,8 @@ export function Room3D({
                   // Drawn paler than the floor so a room seen from inside does
                   // not read as two identical slabs.
                   ? facet.wallId === 'ceiling'
-                    ? '#F4F7F8'
-                    : '#E8EDEF'
+                    ? 'rgb(var(--c-sunk))'
+                    : 'rgb(var(--c-sunk))'
                   : facet.kind === 'object'
                     // Warm and pale against the room's cool slate, so a box
                     // reads as something standing in the room rather than as
@@ -223,12 +223,12 @@ export function Room3D({
                     ? `hsl(28 24% ${Math.round(52 + facet.shade * 34)}%)`
                     : facet.kind === 'opening'
                       ? facet.openingKind === 'window'
-                        ? '#7FB2DA'
-                        : '#F4F6F7'
+                        ? 'rgb(var(--c-glass))'
+                        : 'rgb(var(--c-sunk))'
                       : ink(facet.shade, isSelected)
               }
               stroke={
-                isSelected ? '#B8590A' : facet.kind === 'object' ? '#8A6A4A' : '#0F172A'
+                isSelected ? 'rgb(var(--c-accent))' : facet.kind === 'object' ? 'rgb(var(--c-scannedEdge))' : 'rgb(var(--c-ink))'
               }
               strokeWidth={isSelected ? 6 : facet.kind === 'object' ? 1 : 1.5}
               strokeLinejoin="round"
@@ -299,7 +299,7 @@ export function Room3D({
             </button>
             {plane !== null && (
               <span className="text-sm text-slate-700">
-                Cut at <strong className="tabular-nums">{len(plane)}</strong>, looking down
+                Cut at <strong className="font-mono tabular-nums">{len(plane)}</strong>, looking down
               </span>
             )}
           </div>
@@ -314,7 +314,7 @@ export function Room3D({
                     onClick={() => setPlane(height)}
                     aria-pressed={height === plane}
                     aria-label={`Cut at ${len(height)}`}
-                    className={`min-h-11 rounded-md px-2.5 text-sm tabular-nums ${
+                    className={`min-h-11 rounded-md px-2.5 text-sm font-mono tabular-nums ${
                       height === plane
                         ? 'bg-sky-700 font-semibold text-white'
                         : 'border border-slate-300 text-slate-700 active:bg-slate-100'
@@ -327,7 +327,7 @@ export function Room3D({
               <p className="mt-2 text-xs leading-relaxed text-slate-500">
                 Every height here is somewhere in this room — the top of a wall that
                 stops short, a window sill, a door head — and{' '}
-                <span className="tabular-nums">{len(CONVENTIONAL_CUT_HEIGHT)}</span>, which is
+                <span className="font-mono tabular-nums">{len(CONVENTIONAL_CUT_HEIGHT)}</span>, which is
                 where a drawing is cut by convention: above the counters, below the door heads.
                 {view.section && view.section.needsSillHeight.length > 0 && (
                   <>

@@ -44,7 +44,12 @@ await page.waitForTimeout(400);
 t = await page.locator('body').innerText();
 // 9 ft of wall 18 in high is 13.5 sq ft; a 3 ft door in that run takes 4.5 off.
 check('the mark deducts the openings in it', t.includes('9.0 sq ft'), t.slice(t.indexOf('mark on this wall'), t.indexOf('mark on this wall') + 200));
-check('the damaged run is drawn on the plan', (await page.locator('svg line[stroke="#dc2626"][stroke-width="14"]').count()) === 1);
+// Asserted on the TOKEN rather than on a hex. The colour a refusal is drawn
+// in now lives in `core/src/design.ts` and follows the phone, so a literal
+// `#dc2626` here would be testing the old spelling of the meaning rather than
+// the meaning -- and it would have to be edited every time the palette moved.
+check('the damaged run is drawn on the plan',
+  (await page.locator('svg line[stroke="rgb(var(--c-refuse))"][stroke-width="14"]').count()) === 1);
 check('the key names damage only when there is damage',
   (await page.locator('ul.flex-wrap').first().innerText()).includes('Damaged'));
 
@@ -102,7 +107,8 @@ check('the claim document opens offline with nothing fetched', asks.length === 0
 check('no prices are on it', !html.includes('$'), (html.match(/\$[\d,.]+/g) || []).join(' '));
 check('the evidence is on it', /12\.0 sq ft/.test(html) && /Drying: 28 down to 14/.test(html));
 check('the photograph is full size on it', (await doc.locator('figure img').count()) === 1);
-check('the drawing carries the damage', (await doc.locator('svg line[stroke="#dc2626"]').count()) >= 1);
+check('the drawing carries the damage',
+  (await doc.locator('svg line[stroke="rgb(var(--c-refuse))"]').count()) >= 1);
 check('the caveat travels', /THESE ARE A SCANNER/.test(html));
 
 /* ------------------------------------------ turning it off puts it all away */

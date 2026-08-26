@@ -75,7 +75,7 @@ export function Elevation({
         role="img"
         aria-label={`${wall.id} seen straight on`}
       >
-        <rect x="0" y="0" width={viewWidth} height={viewHeight} fill="#ffffff" />
+        <rect x="0" y="0" width={viewWidth} height={viewHeight} fill="rgb(var(--c-raise))" />
 
         {/* The wall face. Amber when nobody has put a tape on its length,
             matching the plan, so the two drawings never say different things
@@ -85,8 +85,8 @@ export function Elevation({
           y={PAD}
           width={SIDE}
           height={drawnHeight}
-          fill="#f8fafc"
-          stroke={isVerified(wall.length) ? '#0f172a' : '#b45309'}
+          fill="rgb(var(--c-raise))"
+          stroke={isVerified(wall.length) ? 'rgb(var(--c-ink))' : 'rgb(var(--c-scanned))'}
           strokeWidth={4}
         />
 
@@ -98,7 +98,7 @@ export function Elevation({
           y1={PAD + drawnHeight}
           x2={PAD + SIDE + 18}
           y2={PAD + drawnHeight}
-          stroke="#0f172a"
+          stroke="rgb(var(--c-ink))"
           strokeWidth={6}
         />
 
@@ -124,9 +124,9 @@ export function Elevation({
                 y={PAD}
                 width={SIDE}
                 height={drawnHeight}
-                fill="#dc2626"
+                fill="rgb(var(--c-refuse))"
                 fillOpacity={0.16}
-                stroke="#dc2626"
+                stroke="rgb(var(--c-refuse))"
                 strokeWidth={3}
               />
             );
@@ -155,9 +155,9 @@ export function Elevation({
                   y={cutTop}
                   width={width}
                   height={bottom - cutTop}
-                  fill="#dc2626"
+                  fill="rgb(var(--c-refuse))"
                   fillOpacity={0.08}
-                  stroke="#dc2626"
+                  stroke="rgb(var(--c-refuse))"
                   strokeWidth={2}
                   strokeDasharray="10 6"
                 />
@@ -167,9 +167,9 @@ export function Elevation({
                 y={seenTop}
                 width={width}
                 height={bottom - seenTop}
-                fill="#dc2626"
+                fill="rgb(var(--c-refuse))"
                 fillOpacity={0.18}
-                stroke="#dc2626"
+                stroke="rgb(var(--c-refuse))"
                 strokeWidth={3}
               />
               <Label
@@ -179,7 +179,7 @@ export function Elevation({
                 anchor="middle"
                 size={20}
                 weight={600}
-                fill="#b91c1c"
+                fill="rgb(var(--c-refuse))"
                 halo={7}
               >
                 {damage.kind}
@@ -195,7 +195,7 @@ export function Elevation({
           const top = y(sill + opening.height.value);
           const drawn = Number(opening.height.value) * scale;
           const sure = isVerified(opening.width) && isVerified(opening.height);
-          const stroke = sure ? '#0f172a' : '#b45309';
+          const stroke = sure ? 'rgb(var(--c-ink))' : 'rgb(var(--c-scanned))';
           const guessedSill = opening.kind === 'window' && opening.sillHeight === undefined;
 
           return (
@@ -205,7 +205,7 @@ export function Elevation({
                 y={top}
                 width={width}
                 height={drawn}
-                fill={opening.kind === 'window' ? '#e0f2fe' : '#ffffff'}
+                fill={opening.kind === 'window' ? 'rgb(var(--c-focusSoft))' : 'rgb(var(--c-raise))'}
                 stroke={stroke}
                 strokeWidth={3}
                 strokeDasharray={guessedSill ? '10 6' : undefined}
@@ -229,7 +229,7 @@ export function Elevation({
                     y1={top + drawn}
                     x2={left + width / 2}
                     y2={PAD + drawnHeight}
-                    stroke={guessedSill ? '#b45309' : '#64748b'}
+                    stroke={guessedSill ? 'rgb(var(--c-scanned))' : 'rgb(var(--c-derived))'}
                     strokeWidth={2}
                     strokeDasharray="6 4"
                   />
@@ -249,7 +249,7 @@ export function Elevation({
                         : PAD + drawnHeight + 30
                     }
                     fontSize={19}
-                    fill={guessedSill ? '#b45309' : '#64748b'}
+                    fill={guessedSill ? 'rgb(var(--c-scanned))' : 'rgb(var(--c-derived))'}
                   >
                     {guessedSill ? 'sill not known' : `${len(sill)} off the floor`}
                   </text>
@@ -267,7 +267,7 @@ export function Elevation({
           textAnchor="middle"
           fontSize={26}
           fontWeight={600}
-          fill={isVerified(wall.length) ? '#0f172a' : '#b45309'}
+          fill={isVerified(wall.length) ? 'rgb(var(--c-ink))' : 'rgb(var(--c-scanned))'}
         >
           {len(length)}
         </text>
@@ -277,7 +277,7 @@ export function Elevation({
           textAnchor="middle"
           fontSize={22}
           fontWeight={600}
-          fill="#0f172a"
+          fill="rgb(var(--c-ink))"
           transform={`rotate(-90 ${PAD - 20} ${PAD + drawnHeight / 2})`}
         >
           {len(height)}

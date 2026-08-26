@@ -169,7 +169,7 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
           <h2 className="text-base font-semibold text-slate-900">
             {drawn.length} room{drawn.length === 1 ? '' : 's'}
           </h2>
-          <p className="text-sm tabular-nums text-slate-600">
+          <p className="text-sm font-mono tabular-nums text-slate-600">
             {len(extent.x)} × {len(extent.y)} · {area(placedArea(plan.it))}
           </p>
         </div>
@@ -179,25 +179,25 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
                          text-sm sm:grid-cols-4">
             <div className="flex justify-between gap-2 sm:block">
               <dt className="text-slate-600">Flooring</dt>
-              <dd className="font-semibold tabular-nums text-slate-900">
+              <dd className="font-semibold font-mono tabular-nums text-slate-900">
                 {area(totals.floorArea)}
               </dd>
             </div>
             <div className="flex justify-between gap-2 sm:block">
               <dt className="text-slate-600">Ceiling</dt>
-              <dd className="font-semibold tabular-nums text-slate-900">
+              <dd className="font-semibold font-mono tabular-nums text-slate-900">
                 {area(totals.ceilingArea)}
               </dd>
             </div>
             <div className="flex justify-between gap-2 sm:block">
               <dt className="text-slate-600">Wall face</dt>
-              <dd className="font-semibold tabular-nums text-slate-900">
+              <dd className="font-semibold font-mono tabular-nums text-slate-900">
                 {area(totals.wallFaceArea * 2n)}
               </dd>
             </div>
             <div className="flex justify-between gap-2 sm:block">
               <dt className="text-slate-600">Baseboard</dt>
-              <dd className="font-semibold tabular-nums text-slate-900">
+              <dd className="font-semibold font-mono tabular-nums text-slate-900">
                 {len(totals.baseboardRun)}
               </dd>
             </div>
@@ -251,7 +251,7 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
           role="img"
           aria-label="The floor"
         >
-          <rect x="0" y="0" width={box} height={box} fill="#ffffff" />
+          <rect x="0" y="0" width={box} height={box} fill="rgb(var(--c-raise))" />
 
           {drawn.map((room) => (
             <polygon
@@ -261,8 +261,8 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
               // it reads as waiting rather than as part of the building. It has
               // to be drawn at all, because joining is two taps and a room that
               // is not on the screen has no door to tap.
-              fill={room.placed ? '#f1f5f9' : '#fffbeb'}
-              stroke={room.placed ? '#cbd5e1' : '#fcd34d'}
+              fill={room.placed ? 'rgb(var(--c-sunk))' : 'rgb(var(--c-scannedSoft))'}
+              stroke={room.placed ? 'rgb(var(--c-rule))' : 'rgb(var(--c-scannedEdge))'}
               strokeWidth={room.placed ? 1 : 2}
               strokeDasharray={room.placed ? undefined : '8 6'}
             />
@@ -275,7 +275,7 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
               y1={py(wall.from.y)}
               x2={px(wall.to.x)}
               y2={py(wall.to.y)}
-              stroke={wall.open ? '#94a3b8' : wall.measured ? '#0f172a' : '#b45309'}
+              stroke={wall.open ? 'rgb(var(--c-faint))' : wall.measured ? 'rgb(var(--c-ink))' : 'rgb(var(--c-scanned))'}
               strokeWidth={wall.open ? 3 : 6}
               strokeLinecap="round"
               strokeDasharray={wall.open ? '2 10' : undefined}
@@ -290,11 +290,11 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
                 textAnchor="middle"
                 fontSize={26}
                 fontWeight={600}
-                fill="#0f172a"
+                fill="rgb(var(--c-ink))"
               >
                 {room.name}
               </text>
-              <text x={px(room.at.x)} y={py(room.at.y) + 26} textAnchor="middle" fontSize={20} fill="#64748b">
+              <text x={px(room.at.x)} y={py(room.at.y) + 26} textAnchor="middle" fontSize={20} fill="rgb(var(--c-derived))">
                 {area(room.area)}
               </text>
               {!room.placed && (
@@ -303,7 +303,7 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
                   y={py(room.at.y) + 52}
                   textAnchor="middle"
                   fontSize={19}
-                  fill="#b45309"
+                  fill="rgb(var(--c-scanned))"
                 >
                   not joined yet
                 </text>
@@ -326,8 +326,8 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
                   cx={px(opening.at.x)}
                   cy={py(opening.at.y)}
                   r={chosen ? 15 : 10}
-                  fill={chosen ? '#0ea5e9' : opening.joined ? '#0f172a' : '#ffffff'}
-                  stroke={chosen ? '#0ea5e9' : opening.joined ? '#0f172a' : '#b45309'}
+                  fill={chosen ? 'rgb(var(--c-focus))' : opening.joined ? 'rgb(var(--c-ink))' : 'rgb(var(--c-raise))'}
+                  stroke={chosen ? 'rgb(var(--c-focus))' : opening.joined ? 'rgb(var(--c-ink))' : 'rgb(var(--c-scanned))'}
                   strokeWidth={4}
                 />
               </g>
@@ -365,7 +365,7 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
               <li key={note.what} className="text-sm text-slate-700">
                 {note.what}
                 {note.by > 0n && (
-                  <span className="ml-1 font-semibold tabular-nums">{len(note.by)}</span>
+                  <span className="ml-1 font-semibold font-mono tabular-nums">{len(note.by)}</span>
                 )}
               </li>
             ))}

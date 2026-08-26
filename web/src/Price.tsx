@@ -143,7 +143,7 @@ export function Price({
                     placeholder="—"
                     aria-label={`${item} rate`}
                     className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 text-right
-                               tabular-nums focus:border-sky-500 focus:outline-none"
+                               font-mono tabular-nums focus:border-sky-500 focus:outline-none"
                   />
                   <span className="w-12 text-sm text-slate-500">/ {unit}</span>
                 </dd>
@@ -167,7 +167,7 @@ export function Price({
               }}
               inputMode="decimal"
               className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 text-right
-                         tabular-nums focus:border-sky-500 focus:outline-none"
+                         font-mono tabular-nums focus:border-sky-500 focus:outline-none"
             />
             <span className="text-sm text-slate-500">%</span>
           </span>
@@ -252,7 +252,7 @@ export function Price({
                       </span>
                     </dt>
                     <dd className="flex shrink-0 items-baseline gap-3">
-                      <span className="font-semibold tabular-nums text-slate-900">
+                      <span className="font-semibold font-mono tabular-nums text-slate-900">
                         {money(line.total)}
                       </span>
                       <button
@@ -279,7 +279,7 @@ export function Price({
                     <div className="mt-2 rounded-md bg-slate-50 p-3">
                       <p className="text-xs text-slate-600">
                         This room measures{' '}
-                        <strong className="tabular-nums">
+                        <strong className="font-mono tabular-nums">
                           {over ? over.was : line.quantity} {line.unit}
                         </strong>
                         . Price something else and both numbers stay on the sheet — the one the
@@ -294,7 +294,7 @@ export function Price({
                           placeholder={over ? over.was : line.quantity}
                           aria-label={`Price this many ${line.unit} of ${line.item}`}
                           className="min-h-12 w-28 shrink-0 rounded-md border border-slate-300 px-2 py-2
-                                     text-right tabular-nums focus:border-sky-500 focus:outline-none"
+                                     text-right font-mono tabular-nums focus:border-sky-500 focus:outline-none"
                         />
                         <input
                           value={why}
@@ -358,17 +358,17 @@ export function Price({
               <>
                 <div className="flex items-baseline justify-between gap-4 py-1 text-sm text-slate-600">
                   <span>Subtotal</span>
-                  <span className="tabular-nums">{money(priced.subtotal)}</span>
+                  <span className="font-mono tabular-nums">{money(priced.subtotal)}</span>
                 </div>
                 <div className="flex items-baseline justify-between gap-4 py-1 text-sm text-slate-600">
                   <span>Mark-up {(book.marginBasisPoints ?? 0) / 100}%</span>
-                  <span className="tabular-nums">{money(priced.margin)}</span>
+                  <span className="font-mono tabular-nums">{money(priced.margin)}</span>
                 </div>
               </>
             )}
             <div className="flex items-baseline justify-between gap-4 py-1">
               <span className="font-semibold text-slate-900">Total</span>
-              <span className="text-lg font-semibold tabular-nums text-slate-900">
+              <span className="text-lg font-semibold font-mono tabular-nums text-slate-900">
                 {money(priced.total)}
               </span>
             </div>

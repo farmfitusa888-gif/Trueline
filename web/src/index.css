@@ -1,3 +1,45 @@
+/* The tokens first, so every Tailwind colour below resolves against them.
+   Generated from core/src/design.ts -- see core/tools/gen-design.mjs. */
+@import './tokens.css';
+
+/*
+   The faces, shipped inside the app rather than fetched.
+
+   Not a preference. This app is used in basements with no signal, and the
+   handbook linked Google Fonts until today -- which means it had never once
+   rendered in Archivo on the phone it was written for. Four files, 72 kB, and
+   the app now looks the same with the radio off.
+
+   `font-display: block` rather than `swap`: these are local files that load in
+   a few milliseconds, and a flash of a fallback metric on a screen full of
+   tabular dimensions is worse than one frame of nothing.
+*/
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plex-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: block;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plex-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: block;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plex-mono-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: block;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,13 +51,29 @@
     touch-action: manipulation;
   }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-ground text-ink antialiased;
+    font-family: var(--font-sans);
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
       env(safe-area-inset-left);
   }
   /* Never smaller than 16px on an input: iOS zooms the page if it is. */
   input, select, button, textarea {
     font-size: max(16px, 1rem);
+    font-family: inherit;
+  }
+
+  /*
+     Every figure in the app is monospaced and tabular, without exception.
+
+     `tabular-nums` was already on most of them, one class at a time, and
+     "most" is the problem: a column where three rows line up and the fourth
+     does not is worse than a column where none of them do. `.tabular-nums` is
+     Tailwind's own class and stays working; this makes the mono face carry the
+     rule so a number can never be written without it.
+  */
+  .font-mono, code, kbd, samp, pre {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 }
 

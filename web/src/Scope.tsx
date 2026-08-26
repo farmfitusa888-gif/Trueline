@@ -121,7 +121,7 @@ export function Scope({
                     placeholder="—"
                     aria-label={`${item} rate`}
                     className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 text-right
-                               tabular-nums focus:border-sky-500 focus:outline-none"
+                               font-mono tabular-nums focus:border-sky-500 focus:outline-none"
                   />
                   <span className="w-12 text-sm text-slate-500">/ {unit}</span>
                 </dd>
@@ -160,7 +160,7 @@ export function Scope({
       {damages.length > 0 && (
         <p className="mt-2 text-sm text-slate-600">
           The damage covers{' '}
-          <strong className="tabular-nums">{Number(affected) / 10}%</strong> of this room's wall
+          <strong className="font-mono tabular-nums">{Number(affected) / 10}%</strong> of this room's wall
           face.{' '}
           {affected >= 500n
             ? 'Over half of it — this is a gut rather than a patch, and it is worth saying so on the estimate.'
@@ -183,7 +183,7 @@ export function Scope({
                   <div key={`${l.damageId}-${l.what}-${n}`} className="py-2">
                     <div className="flex items-baseline justify-between gap-3">
                       <dt className="text-slate-800">{l.what}</dt>
-                      <dd className="shrink-0 text-right tabular-nums text-slate-900">
+                      <dd className="shrink-0 text-right font-mono tabular-nums text-slate-900">
                         {l.quantity} {l.unit}
                         {cost && (
                           <span className="ml-3 font-semibold">{money(cost.total)}</span>
@@ -206,19 +206,19 @@ export function Scope({
         <dl className="mt-4 divide-y divide-slate-200 border-t-2 border-slate-300">
           <div className="flex items-baseline justify-between gap-3 py-2">
             <dt className="text-slate-700">Priced so far</dt>
-            <dd className="shrink-0 font-semibold tabular-nums text-slate-900">
+            <dd className="shrink-0 font-semibold font-mono tabular-nums text-slate-900">
               {money(priced.subtotal)}
             </dd>
           </div>
           {priced.margin !== 0n && (
             <div className="flex items-baseline justify-between gap-3 py-2">
               <dt className="text-slate-700">Mark-up</dt>
-              <dd className="shrink-0 tabular-nums text-slate-900">{money(priced.margin)}</dd>
+              <dd className="shrink-0 font-mono tabular-nums text-slate-900">{money(priced.margin)}</dd>
             </div>
           )}
           <div className="flex items-baseline justify-between gap-3 py-2">
             <dt className="font-semibold text-slate-900">Total</dt>
-            <dd className="shrink-0 text-lg font-semibold tabular-nums text-slate-900">
+            <dd className="shrink-0 text-lg font-semibold font-mono tabular-nums text-slate-900">
               {money(priced.total)}
             </dd>
           </div>

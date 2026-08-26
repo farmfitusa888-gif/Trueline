@@ -188,7 +188,7 @@ export function EditWall({
               placeholder={len(runLength(wall))}
               inputMode="decimal"
               aria-label="Move this wall to"
-              className="min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 tabular-nums
+              className="min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 font-mono tabular-nums
                          focus:border-sky-500 focus:outline-none"
             />
             <button
@@ -232,7 +232,7 @@ export function EditWall({
             spellCheck={false}
             placeholder={len((wall.height ?? room.ceilingHeight).value)}
             aria-label="How high this wall stands"
-            className="min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 tabular-nums
+            className="min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 font-mono tabular-nums
                        focus:border-sky-500 focus:outline-none"
           />
           <button
@@ -280,7 +280,7 @@ export function EditWall({
               placeholder="at"
               inputMode="decimal"
               aria-label="Cut this wall at"
-              className="min-h-12 rounded-md border border-slate-300 px-2 py-2 tabular-nums
+              className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
                          focus:border-sky-500 focus:outline-none"
             />
             <input
@@ -297,7 +297,7 @@ export function EditWall({
               placeholder="how high"
               inputMode="decimal"
               aria-label="How high the second piece stands"
-              className="min-h-12 rounded-md border border-slate-300 px-2 py-2 tabular-nums
+              className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
                          focus:border-sky-500 focus:outline-none"
             />
           </div>
@@ -342,7 +342,7 @@ export function EditWall({
             placeholder="how deep"
             inputMode="decimal"
             aria-label="How deep the step goes"
-            className="min-h-12 rounded-md border border-slate-300 px-2 py-2 tabular-nums
+            className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
                        focus:border-sky-500 focus:outline-none"
           />
           <input
@@ -351,7 +351,7 @@ export function EditWall({
             placeholder="how wide"
             inputMode="decimal"
             aria-label="How wide the step is"
-            className="min-h-12 rounded-md border border-slate-300 px-2 py-2 tabular-nums
+            className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
                        focus:border-sky-500 focus:outline-none"
           />
           <input

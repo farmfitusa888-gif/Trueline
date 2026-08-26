@@ -1,0 +1,38 @@
+{
+  "colors": [
+    {
+      "color": {
+        "color-space": "srgb",
+        "components": {
+          "alpha": "1.000",
+          "red": "0.961",
+          "green": "0.969",
+          "blue": "0.973"
+        }
+      },
+      "idiom": "universal"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "color": {
+        "color-space": "srgb",
+        "components": {
+          "alpha": "1.000",
+          "red": "0.059",
+          "green": "0.075",
+          "blue": "0.086"
+        }
+      },
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "trueline",
+    "version": 1
+  }
+}

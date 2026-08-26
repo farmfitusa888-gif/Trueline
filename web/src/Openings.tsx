@@ -51,7 +51,7 @@ function Row({
     <div className="py-2">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm text-slate-700">{label}</span>
-        <span className="shrink-0 text-sm tabular-nums text-slate-900">
+        <span className="shrink-0 text-sm font-mono tabular-nums text-slate-900">
           {value} <span className="text-xs text-slate-500">{note}</span>
         </span>
       </div>
@@ -184,7 +184,7 @@ export function Openings({
                     {len(o.offsetFromStart.value)} from the corner
                   </span>
                 </span>
-                <span className="shrink-0 tabular-nums text-slate-900">
+                <span className="shrink-0 font-mono tabular-nums text-slate-900">
                   {len(o.width.value)} × {len(o.height.value)}
                   <span className="ml-2 text-xs text-slate-500 underline underline-offset-4">
                     {showing ? 'Done' : 'Measure'}

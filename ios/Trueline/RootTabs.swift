@@ -92,6 +92,38 @@ struct RootTabs: View {
             .tabItem { Label("Business", systemImage: "building.2") }
             .tag(Tab.business)
         }
+        // The same amber the web screens use for a control that acts, out of
+        // the same generated token file. Before this the tab bar was iOS blue
+        // and the room inside it was Trueline amber, which is the seam this
+        // whole pass exists to close.
+        .tint(Ink.accent)
+        .onAppear(perform: Self.dressTheBars)
+    }
+
+    /// The bars, painted from the tokens.
+    ///
+    /// `UITabBar` and `UINavigationBar` are UIKit underneath and SwiftUI's
+    /// modifiers reach only part of them, so their appearance is set once,
+    /// here, from the same values everything else reads. `UIColor` closures
+    /// rather than fixed colours: these resolve per trait, so the bars follow
+    /// the phone from a driveway into a basement like the rest of the app.
+    private static func dressTheBars() {
+        let ground = UIColor { $0.userInterfaceStyle == .dark
+            ? UIColor(red: 27/255, green: 33/255, blue: 38/255, alpha: 1)
+            : UIColor(red: 1, green: 1, blue: 1, alpha: 1) }
+
+        let tabs = UITabBarAppearance()
+        tabs.configureWithOpaqueBackground()
+        tabs.backgroundColor = ground
+        UITabBar.appearance().standardAppearance = tabs
+        UITabBar.appearance().scrollEdgeAppearance = tabs
+
+        let bar = UINavigationBarAppearance()
+        bar.configureWithOpaqueBackground()
+        bar.backgroundColor = ground
+        UINavigationBar.appearance().standardAppearance = bar
+        UINavigationBar.appearance().scrollEdgeAppearance = bar
+        UINavigationBar.appearance().compactAppearance = bar
     }
 
     /// A finished capture goes to the Rooms tab, and the app goes with it.

@@ -220,7 +220,7 @@ export function PriceList() {
                         ? ` · covers ${row[mapping.coverage]}`
                         : ''}
                     </td>
-                    <td className="py-2 text-right tabular-nums text-slate-900">
+                    <td className="py-2 text-right font-mono tabular-nums text-slate-900">
                       {mapping.price === undefined ? '—' : row[mapping.price]}
                     </td>
                   </tr>
@@ -272,7 +272,7 @@ export function PriceList() {
               <ul className="mt-1 space-y-1">
                 {done.converted.map((c) => (
                   <li key={`${c.line}-${c.item}`} className="text-sm text-slate-600">
-                    {c.item}: <span className="tabular-nums">{c.workings}</span>
+                    {c.item}: <span className="font-mono tabular-nums">{c.workings}</span>
                   </li>
                 ))}
               </ul>
@@ -292,7 +292,7 @@ export function PriceList() {
               <ul className="mt-1 space-y-1">
                 {done.refused.map((r) => (
                   <li key={r.line} className="text-sm text-slate-600">
-                    <span className="tabular-nums text-slate-500">line {r.line}</span> — {r.what}:{' '}
+                    <span className="font-mono tabular-nums text-slate-500">line {r.line}</span> — {r.what}:{' '}
                     {r.why}
                   </li>
                 ))}

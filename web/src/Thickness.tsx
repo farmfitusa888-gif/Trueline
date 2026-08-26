@@ -74,7 +74,7 @@ export function Thickness({
           {target ? `How thick is ${target.id}?` : 'How thick are the walls?'}
         </h2>
         {current && (
-          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+          <span className="shrink-0 font-semibold font-mono tabular-nums text-slate-900">
             {len(current.value)}
           </span>
         )}
@@ -136,7 +136,7 @@ export function Thickness({
               type="button"
               title={a.label}
               onClick={() => onSet(scope, exact(a.thickness), 'stated')}
-              className={`min-h-12 rounded-md px-4 font-semibold tabular-nums ${
+              className={`min-h-12 rounded-md px-4 font-semibold font-mono tabular-nums ${
                 on
                   ? 'bg-slate-900 text-white'
                   : 'border border-slate-300 text-slate-700 active:bg-slate-100'
@@ -172,7 +172,7 @@ export function Thickness({
           spellCheck={false}
           placeholder="or measure it through a doorway"
           aria-label="Wall thickness"
-          className="min-h-12 flex-1 rounded-md border border-slate-300 px-3 py-2 tabular-nums
+          className="min-h-12 flex-1 rounded-md border border-slate-300 px-3 py-2 font-mono tabular-nums
                      focus:border-sky-500 focus:outline-none"
         />
         <button
@@ -212,7 +212,7 @@ export function Thickness({
                   {g.wallIds.join(', ')} · {g.how}
                 </span>
               </dt>
-              <dd className="shrink-0 text-sm tabular-nums text-slate-900">
+              <dd className="shrink-0 text-sm font-mono tabular-nums text-slate-900">
                 {len(g.jamb)} jamb
               </dd>
             </div>

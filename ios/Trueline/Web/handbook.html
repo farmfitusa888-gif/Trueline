@@ -22,6 +22,56 @@
 
 <title>The Trueline Handbook</title>
 <style>
+/*
+   The faces, out of the app's own bundle rather than off the network.
+
+   This file ships INSIDE the app, and the person who needs it is standing in an
+   unfinished basement with no signal -- which means that until today it had
+   never once rendered in the faces it was designed in. It linked Google Fonts,
+   and on the one device it was written for that link has never resolved.
+
+   Paths are relative, so this works both from the app (trueline://app/) and
+   from the docs folder on a laptop.
+*/
+@font-face {
+  font-family: "Archivo";
+  src: url("fonts/archivo-variable.woff2") format("woff2-variations"),
+       url("../web/public/fonts/archivo-variable.woff2") format("woff2-variations");
+  font-weight: 100 900; font-display: block;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("fonts/plex-mono-400.woff2") format("woff2"),
+       url("../web/public/fonts/plex-mono-400.woff2") format("woff2");
+  font-weight: 400; font-display: block;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("fonts/plex-mono-500.woff2") format("woff2"),
+       url("../web/public/fonts/plex-mono-500.woff2") format("woff2");
+  font-weight: 500; font-display: block;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("fonts/plex-mono-600.woff2") format("woff2"),
+       url("../web/public/fonts/plex-mono-600.woff2") format("woff2");
+  font-weight: 600; font-display: block;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("fonts/source-serif-4.woff2") format("woff2"),
+       url("../web/public/fonts/source-serif-4.woff2") format("woff2");
+  font-weight: 200 900; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("fonts/source-serif-4-italic.woff2") format("woff2"),
+       url("../web/public/fonts/source-serif-4-italic.woff2") format("woff2");
+  font-weight: 200 900; font-style: italic; font-display: block;
+}
+</style>
+
+<style>
   :root {
     --ground:#F6F7F8; --sheet:#FFFFFF; --ink:#14181B; --ink-2:#4A5459; --ink-3:#6E787E;
     --rule:#C9D0D5; --rule-soft:#E3E8EA; --amber:#B8590A; --amber-wash:#FBF3EA;

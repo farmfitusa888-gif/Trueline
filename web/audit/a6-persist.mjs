@@ -59,7 +59,11 @@ await page.waitForTimeout(500);
 const moved = [];
 for (const l of await page.getByRole('button', { name: /^Wall / }).all()) moved.push(await l.getAttribute('aria-label'));
 check('a moved wall goes where it was put', moved.some((l) => /behind the washer, 22'/.test(l || '')), moved.join(' | '));
-check('a moved wall is violet on the plan', (await page.locator('svg line[stroke="#7c3aed"]').count()) === 1);
+// "Moved by hand" is a provenance of its own now -- `adjusted` in the token
+// source -- rather than a violet somebody picked. The claim is the same: a wall
+// somebody dragged is drawn as neither scanned nor measured.
+check('a wall moved by hand is drawn as neither scanned nor measured',
+  (await page.locator('svg line[stroke="rgb(var(--c-adjusted))"]').count()) === 1);
 check('the key names it', (await page.locator('ul.flex-wrap').first().innerText()).includes('Moved by hand'));
 t = await page.locator('body').innerText();
 check('a moved wall never reads as measured', /moved by hand, which is not the same as measured/.test(t));

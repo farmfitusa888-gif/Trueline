@@ -205,7 +205,7 @@ export function DamageOnWall({
                     {damage.category ? ` — ${WATER_CATEGORY[damage.category].plain}` : ''}
                     <span className="block text-xs text-slate-500">{damage.note}</span>
                   </span>
-                  <span className="shrink-0 text-right tabular-nums text-slate-900">
+                  <span className="shrink-0 text-right font-mono tabular-nums text-slate-900">
                     {q.faceArea > 0n ? area(2n * q.faceArea) : '—'}
                     <span className="ml-2 text-xs text-slate-500 underline underline-offset-4">
                       {showing ? 'Done' : 'Open'}
@@ -270,7 +270,7 @@ export function DamageOnWall({
                               className="flex items-baseline justify-between gap-3 text-sm text-slate-700"
                             >
                               <span>{r.at.slice(0, 10)}</span>
-                              <span className="tabular-nums">
+                              <span className="font-mono tabular-nums">
                                 {r.value} {r.scale}
                               </span>
                             </li>
@@ -370,7 +370,7 @@ export function DamageOnWall({
                   onChange={(event) => setFrom(event.target.value)}
                   placeholder="from"
                   aria-label="From along the wall"
-                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 tabular-nums
+                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
                              focus:border-sky-500 focus:outline-none"
                 />
                 <input
@@ -378,7 +378,7 @@ export function DamageOnWall({
                   onChange={(event) => setTo(event.target.value)}
                   placeholder="to"
                   aria-label="To along the wall"
-                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 tabular-nums
+                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
                              focus:border-sky-500 focus:outline-none"
                 />
                 <input
@@ -386,7 +386,7 @@ export function DamageOnWall({
                   onChange={(event) => setHigh(event.target.value)}
                   placeholder="up to"
                   aria-label="How high the damage reaches"
-                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 tabular-nums
+                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
                              focus:border-sky-500 focus:outline-none"
                 />
               </div>
@@ -497,7 +497,7 @@ function ReadingBox({ onAdd }: { readonly onAdd: (reading: Reading) => void }) {
         inputMode="decimal"
         placeholder="reading"
         aria-label="Moisture reading"
-        className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 tabular-nums
+        className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 font-mono tabular-nums
                    focus:border-sky-500 focus:outline-none"
       />
       <select

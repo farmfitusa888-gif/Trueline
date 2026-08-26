@@ -202,7 +202,7 @@ export function Tags({
               autoCorrect="off"
               spellCheck={false}
               placeholder={`e.g. 6'`}
-              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 tabular-nums
+              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 font-mono tabular-nums
                          focus:border-sky-500 focus:outline-none"
             />
           </label>
@@ -216,7 +216,7 @@ export function Tags({
               autoCorrect="off"
               spellCheck={false}
               placeholder={`e.g. 7' 6"`}
-              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 tabular-nums
+              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 font-mono tabular-nums
                          focus:border-sky-500 focus:outline-none"
             />
           </label>

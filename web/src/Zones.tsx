@@ -155,15 +155,15 @@ export function Zones({
                 <p className="font-semibold text-slate-900">{zone.name}</p>
                 <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-700">
                   <dt>Floor</dt>
-                  <dd className="tabular-nums text-right">{area(quantities.floorArea)}</dd>
+                  <dd className="font-mono tabular-nums text-right">{area(quantities.floorArea)}</dd>
                   <dt>Wall face</dt>
-                  <dd className="tabular-nums text-right">{area(quantities.wallFaceArea * 2n)}</dd>
+                  <dd className="font-mono tabular-nums text-right">{area(quantities.wallFaceArea * 2n)}</dd>
                   <dt>Baseboard</dt>
-                  <dd className="tabular-nums text-right">{len(quantities.baseboardRun)}</dd>
+                  <dd className="font-mono tabular-nums text-right">{len(quantities.baseboardRun)}</dd>
                   {quantities.virtualRun > 0n && (
                     <>
                       <dt className="text-slate-500">Open to the other side</dt>
-                      <dd className="tabular-nums text-right text-slate-500">
+                      <dd className="font-mono tabular-nums text-right text-slate-500">
                         {len(quantities.virtualRun)}
                       </dd>
                     </>
@@ -239,7 +239,7 @@ export function Zones({
                   spellCheck={false}
                   placeholder={`e.g. 12'`}
                   className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2
-                             tabular-nums focus:border-sky-500 focus:outline-none"
+                             font-mono tabular-nums focus:border-sky-500 focus:outline-none"
                 />
               </label>
             </div>

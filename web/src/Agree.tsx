@@ -105,7 +105,7 @@ function SignaturePad({
     context.lineWidth = 2.5;
     context.lineCap = 'round';
     context.lineJoin = 'round';
-    context.strokeStyle = '#0f172a';
+    context.strokeStyle = 'rgb(var(--c-ink))';
     for (const stroke of strokes.current) {
       if (stroke.length < 2) continue;
       context.beginPath();

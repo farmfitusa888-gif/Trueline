@@ -285,7 +285,7 @@ export function Settings({ onClose }: { readonly onClose?: () => void }) {
               autoCorrect="off"
               spellCheck={false}
               aria-label="Default ceiling height"
-              className="min-h-12 w-40 rounded-md border border-slate-300 px-3 py-2 tabular-nums
+              className="min-h-12 w-40 rounded-md border border-slate-300 px-3 py-2 font-mono tabular-nums
                          focus:border-sky-500 focus:outline-none"
             />
             {ceilingReads && (
@@ -316,7 +316,7 @@ export function Settings({ onClose }: { readonly onClose?: () => void }) {
                 type="button"
                 title={a.label}
                 onClick={() => set('defaultAssembly', a.id)}
-                className={`min-h-12 rounded-md px-4 font-semibold tabular-nums ${
+                className={`min-h-12 rounded-md px-4 font-semibold font-mono tabular-nums ${
                   draft.defaultAssembly === a.id
                     ? 'bg-slate-900 text-white'
                     : 'border border-slate-300 text-slate-700 active:bg-slate-100'

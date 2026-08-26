@@ -132,7 +132,7 @@ export function SectionBar({
                     aria-label={`${count} to do`}
                     className="absolute right-[18%] top-1.5 flex h-4 min-w-4 items-center
                                justify-center rounded-full bg-amber-500 px-1 text-[10px]
-                               font-bold tabular-nums text-white"
+                               font-bold font-mono tabular-nums text-white"
                   >
                     {count}
                   </span>

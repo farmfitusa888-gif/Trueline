@@ -47,7 +47,7 @@ struct ProjectsScreen: View {
                               + "room measured that way is measured from the first keystroke."
                         )
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Ink.quiet)
                     }
                     .padding(.vertical, 4)
                 }
@@ -88,11 +88,11 @@ struct ProjectsScreen: View {
                                         // by the screen that draws it. Say so
                                         // with an outline rather than a gap.
                                         Image(systemName: "square.dashed")
-                                            .foregroundStyle(.tertiary)
+                                            .foregroundStyle(Ink.faint)
                                     }
                                 }
                                 .frame(width: 56, height: 56)
-                                .background(Color(UIColor.secondarySystemBackground))
+                                .background(Ink.sunk)
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
                                 VStack(alignment: .leading, spacing: 2) {
@@ -100,7 +100,7 @@ struct ProjectsScreen: View {
                                     if entry.hasRoom {
                                         Text(entry.kind)
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(Ink.quiet)
                                     } else {
                                         Text(
                                             "No walls in this one — the capture did not "
@@ -108,7 +108,7 @@ struct ProjectsScreen: View {
                                             + "again."
                                         )
                                         .font(.caption)
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(Ink.scanned)
                                     }
                                 }
                             }
@@ -170,19 +170,19 @@ struct ProjectsScreen: View {
                         systemImage: "checkmark.icloud"
                     )
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Ink.quiet)
                 case .working:
                     Label("Copying to your iCloud…", systemImage: "arrow.clockwise.icloud")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Ink.quiet)
                 case .unavailable(let why):
                     Label(why, systemImage: "exclamationmark.icloud")
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Ink.scanned)
                 case .failed(let why):
                     Label(why, systemImage: "exclamationmark.icloud")
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Ink.scanned)
                 case .unknown:
                     EmptyView()
                 }
@@ -194,9 +194,11 @@ struct ProjectsScreen: View {
                     + "Every scan is in the Files app under Trueline if you want to copy one off."
                 )
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Ink.quiet)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Ink.ground)
         .navigationTitle("Trueline")
         // One tap from the first screen of the app. It used to be a text link
         // at the top of a ROOM's page, so reading how to use the app required

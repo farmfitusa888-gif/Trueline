@@ -111,7 +111,7 @@ export function Measure({
         spellCheck={false}
         placeholder={label}
         aria-label={name}
-        className="min-h-12 flex-1 rounded-md border border-slate-300 px-3 py-2 tabular-nums
+        className="min-h-12 flex-1 rounded-md border border-slate-300 px-3 py-2 font-mono tabular-nums
                    focus:border-sky-500 focus:outline-none"
       />
       <button
@@ -129,7 +129,7 @@ export function Measure({
         >
           {read.good ? (
             <>
-              <span className="tabular-nums">Reads as {read.as}</span>
+              <span className="font-mono tabular-nums">Reads as {read.as}</span>
               {read.warn && <span className="text-amber-700"> — {read.warn}</span>}
             </>
           ) : (

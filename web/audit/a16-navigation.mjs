@@ -137,7 +137,7 @@ check('and it draws the floor with the roof off', (await house.count()) === 1);
 const drawn = await house.evaluate((svg) =>
   [...svg.querySelectorAll('polygon')].map((p) => p.getAttribute('fill'))
 );
-const floors = drawn.filter((fill) => fill === '#E8EDEF').length;
+const floors = drawn.filter((fill) => fill === 'rgb(var(--c-sunk))').length;
 const walls = drawn.filter((fill) => fill.startsWith('hsl(214')).length;
 check('one floor is drawn for the room', floors === 1, drawn.join(' '));
 check(

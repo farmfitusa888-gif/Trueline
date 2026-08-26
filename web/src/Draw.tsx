@@ -147,7 +147,7 @@ export function Draw({
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
-              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 tabular-nums
+              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2 font-mono tabular-nums
                          focus:border-sky-500 focus:outline-none"
             />
           </label>
@@ -199,7 +199,7 @@ export function Draw({
                   {wall.id} — {wall.heading}
                 </span>
                 <span className="flex items-baseline gap-3">
-                  <span className="tabular-nums font-semibold text-slate-900">
+                  <span className="font-mono tabular-nums font-semibold text-slate-900">
                     {len(wall.length.value)}
                   </span>
                   {/* Fixing a wall already entered.
@@ -246,7 +246,7 @@ export function Draw({
                     placeholder={len(wall.length.value)}
                     aria-label={`What ${wall.id} really is`}
                     className="min-h-12 flex-1 rounded-md border border-slate-300 px-3 py-2
-                               tabular-nums focus:border-sky-500 focus:outline-none"
+                               font-mono tabular-nums focus:border-sky-500 focus:outline-none"
                   />
                   <button
                     type="button"
@@ -296,7 +296,7 @@ export function Draw({
         <div className="mt-3 rounded-lg bg-slate-100 p-3">
           <p className="text-sm text-slate-700">
             The last wall has to run <strong>{closing.heading}</strong> for{' '}
-            <strong className="tabular-nums">{len(closing.length)}</strong>. The other
+            <strong className="font-mono tabular-nums">{len(closing.length)}</strong>. The other
             walls decide it, so there is nothing to measure.
           </p>
           <button

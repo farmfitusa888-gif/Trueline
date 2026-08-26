@@ -32,7 +32,21 @@
 		<false/>
 	</dict>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<!-- The launch screen, out of the asset catalogue so it follows the
+		     phone: LaunchGround and LaunchMark each carry a light value and a
+		     dark one, generated from core/src/design.ts by
+		     core/tools/gen-art.mjs. Before this it was an empty dict, which
+		     gives a plain system-white screen, and half a second of white in a
+		     basement in front of a graphite app is the worst frame the app
+		     has. -->
+		<key>UIColorName</key>
+		<string>LaunchGround</string>
+		<key>UIImageName</key>
+		<string>LaunchMark</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<true/>
+	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arkit</string>

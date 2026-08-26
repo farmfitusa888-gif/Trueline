@@ -37,7 +37,7 @@ export function Ceiling({
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="font-semibold text-slate-900">How high is the ceiling?</h2>
-        <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+        <span className="shrink-0 font-semibold font-mono tabular-nums text-slate-900">
           {len(height.value)}
         </span>
       </div>
@@ -69,7 +69,7 @@ export function Ceiling({
               key={text}
               type="button"
               onClick={() => onSet(text, 'stated')}
-              className="min-h-11 rounded-md border border-slate-300 px-3 font-medium tabular-nums
+              className="min-h-11 rounded-md border border-slate-300 px-3 font-medium font-mono tabular-nums
                          text-slate-700 active:bg-slate-100"
             >
               {text}

@@ -129,7 +129,7 @@ export function WallPhotos({
                         style={turned(photo.upright).style}
                       />
                     </span>
-                    <span className="mt-1 block text-center text-xs tabular-nums text-slate-500">
+                    <span className="mt-1 block text-center text-xs font-mono tabular-nums text-slate-500">
                       {len(inFrame.visibleLength)}
                     </span>
                   </button>

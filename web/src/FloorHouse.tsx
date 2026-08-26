@@ -116,7 +116,7 @@ export function FloorHouse({
         onPointerUp={end}
         onPointerCancel={end}
       >
-        <rect x="0" y="0" width={SIZE} height={SIZE} fill="#ffffff" />
+        <rect x="0" y="0" width={SIZE} height={SIZE} fill="rgb(var(--c-raise))" />
 
         {facets.map((facet, i) => (
           <polygon
@@ -124,14 +124,14 @@ export function FloorHouse({
             points={facet.points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
             fill={
               facet.kind === 'floor'
-                ? facet.placed ? '#E8EDEF' : '#FEF6E7'
+                ? facet.placed ? 'rgb(var(--c-sunk))' : 'rgb(var(--c-scannedSoft))'
                 : facet.kind === 'opening'
                   ? facet.openingKind === 'window'
-                    ? '#7FB2DA'
-                    : '#F4F6F7'
+                    ? 'rgb(var(--c-glass))'
+                    : 'rgb(var(--c-sunk))'
                   : ink(facet.shade, !facet.placed)
             }
-            stroke={facet.placed ? '#0F172A' : '#B45309'}
+            stroke={facet.placed ? 'rgb(var(--c-ink))' : 'rgb(var(--c-scanned))'}
             strokeWidth={1.5}
             strokeLinejoin="round"
             className="cursor-pointer"
@@ -155,8 +155,8 @@ export function FloorHouse({
               textAnchor="middle"
               fontSize={30}
               fontWeight={700}
-              fill="#ffffff"
-              stroke="#0F172A"
+              fill="rgb(var(--c-raise))"
+              stroke="rgb(var(--c-ink))"
               strokeWidth={7}
               paintOrder="stroke"
             >
@@ -169,8 +169,8 @@ export function FloorHouse({
                 textAnchor="middle"
                 fontSize={22}
                 fontWeight={600}
-                fill="#ffffff"
-                stroke="#B45309"
+                fill="rgb(var(--c-raise))"
+                stroke="rgb(var(--c-scanned))"
                 strokeWidth={6}
                 paintOrder="stroke"
               >
@@ -183,7 +183,7 @@ export function FloorHouse({
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
         <p>Drag to walk around it. Tap a room to open it.</p>
-        <p className="tabular-nums">
+        <p className="font-mono tabular-nums">
           {Math.round(((camera.turn % 360) + 360) % 360)}° round, {Math.round(camera.tilt)}° up
         </p>
       </div>

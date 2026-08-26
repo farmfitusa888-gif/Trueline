@@ -481,7 +481,7 @@ export function App() {
               <div data-sheet="yes" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                 <div data-sheet="no" className="mb-2 flex items-baseline justify-between gap-3 px-1">
                   <h2 className="text-base font-semibold text-slate-900">{loaded.room.name}</h2>
-                  <p className="text-sm tabular-nums text-slate-600">
+                  <p className="text-sm font-mono tabular-nums text-slate-600">
                     {len(derived.extent.x)} × {len(derived.extent.y)} ·{' '}
                     {showArea(derived.area.value)}
                   </p>

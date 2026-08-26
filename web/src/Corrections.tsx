@@ -166,7 +166,7 @@ export function Corrections({
               say this since trace.ts was written and nothing asked it. */}
           {doubt > 0n && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
-              <strong className="tabular-nums">{showArea(doubt)}</strong> of floor is in doubt
+              <strong className="font-mono tabular-nums">{showArea(doubt)}</strong> of floor is in doubt
               across this room as it stands. Two minutes with a tape on the walls below takes most
               of that to nothing.
             </p>
@@ -311,7 +311,7 @@ export function Corrections({
               >
                 <span className="flex min-w-0 items-baseline gap-2">
                   <span className="truncate text-slate-500">{wall.id}</span>
-                  <span className="tabular-nums">{len(runLength(wall))}</span>
+                  <span className="font-mono tabular-nums">{len(runLength(wall))}</span>
                 </span>
                 <span className="text-xs text-slate-500">
                   <span className="uppercase tracking-wide">

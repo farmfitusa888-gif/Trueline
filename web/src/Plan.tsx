@@ -59,7 +59,7 @@ const DIM_OFFSET = 30;
 /** Half the length of the 45-degree slash that terminates it. */
 const DIM_TICK = 5;
 /** Dimension lines are thin and grey: they are notation, not building. */
-const DIM_INK = '#64748b';
+const DIM_INK = 'rgb(var(--c-derived))';
 
 export interface PlanProps {
   readonly room: Room;
@@ -176,7 +176,7 @@ export function Label({
         {...common}
         aria-hidden="true"
         fill="none"
-        stroke="#ffffff"
+        stroke="rgb(var(--c-raise))"
         strokeWidth={halo}
         strokeLinejoin="round"
       >
@@ -273,7 +273,7 @@ export function Plan({
       aria-label={`Plan of ${room.name}`}
       onClick={() => onSelect(null)}
     >
-      <rect x="0" y="0" width={viewWidth} height={viewHeight} fill="#ffffff" />
+      <rect x="0" y="0" width={viewWidth} height={viewHeight} fill="rgb(var(--c-raise))" />
 
       {/*
         North, when the phone knew it — and its doubt beside it, always.
@@ -291,22 +291,22 @@ export function Plan({
             y1={0}
             x2={north.x * 34}
             y2={-north.y * 34}
-            stroke="#0f172a"
+            stroke="rgb(var(--c-ink))"
             strokeWidth={5}
             strokeLinecap="round"
           />
-          <circle cx={north.x * 34} cy={-north.y * 34} r={7} fill="#0f172a" />
+          <circle cx={north.x * 34} cy={-north.y * 34} r={7} fill="rgb(var(--c-ink))" />
           <text
             x={0}
             y={54}
             textAnchor="middle"
             fontSize={22}
             fontWeight={600}
-            fill="#0f172a"
+            fill="rgb(var(--c-ink))"
           >
             N
           </text>
-          <text x={0} y={76} textAnchor="middle" fontSize={17} fill="#64748b">
+          <text x={0} y={76} textAnchor="middle" fontSize={17} fill="rgb(var(--c-derived))">
             ±{Math.round(north.accuracy)}°
           </text>
         </g>
@@ -315,7 +315,7 @@ export function Plan({
       {/* The floor, so the inside of the room reads as inside. */}
       <polygon
         points={model.walls.map((w) => `${px(w.start.x)},${scaleY(w.start.y)}`).join(' ')}
-        fill="#f1f5f9"
+        fill="rgb(var(--c-sunk))"
       />
 
       {/* Whatever was standing in the room when it was scanned. Faint, because it
@@ -328,7 +328,7 @@ export function Plan({
           y={scaleY(feet(f.max.y))}
           width={Math.abs(px(feet(f.max.x)) - px(feet(f.min.x)))}
           height={Math.abs(scaleY(feet(f.min.y)) - scaleY(feet(f.max.y)))}
-          fill="#cbd5e1" fillOpacity={0.5} stroke="#94a3b8"
+          fill="rgb(var(--c-rule))" fillOpacity={0.5} stroke="rgb(var(--c-faint))"
           strokeWidth={1}
           strokeDasharray="3 3"
         >
@@ -411,14 +411,14 @@ export function Plan({
         // because the one thing that must never happen is a moved wall reading
         // like a measured one.
         const stroke = w.open
-          ? '#94a3b8'
+          ? 'rgb(var(--c-faint))'
           : w.confidence === 'verified'
-            ? '#0f172a'
+            ? 'rgb(var(--c-ink))'
             : w.confidence === 'adjusted'
-              ? '#7c3aed'
+              ? 'rgb(var(--c-adjusted))'
               : w.confidence === 'derived'
-                ? '#64748b'
-                : '#b45309';
+                ? 'rgb(var(--c-derived))'
+                : 'rgb(var(--c-scanned))';
         const share = blocked.get(w.id)?.blockedPerMille ?? 0n;
 
         return (
@@ -449,7 +449,7 @@ export function Plan({
             {/* A fat invisible line so a finger can hit a wall on a phone. */}
             <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={34} />
             {isSelected && (
-              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#0ea5e9" strokeWidth={16} strokeOpacity={0.28} />
+              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgb(var(--c-focus))" strokeWidth={16} strokeOpacity={0.28} />
             )}
             {/*
               A wall somebody has given a thickness is drawn at that thickness,
@@ -503,7 +503,7 @@ export function Plan({
                     {/* The gap: the wall stops here. */}
                     <line
                       x1={ax} y1={ay} x2={bx} y2={by}
-                      stroke="#ffffff" strokeWidth={band + 1} strokeLinecap="butt"
+                      stroke="rgb(var(--c-raise))" strokeWidth={band + 1} strokeLinecap="butt"
                     />
                     {/* The two jambs, so the gap has ends rather than fading out. */}
                     <line
@@ -560,7 +560,7 @@ export function Plan({
                 y1={y1}
                 x2={x2}
                 y2={y2}
-                stroke="#dc2626"
+                stroke="rgb(var(--c-refuse))"
                 strokeWidth={2}
                 strokeDasharray="6 5"
                 strokeOpacity={0.9}
@@ -588,7 +588,7 @@ export function Plan({
                 {...outward(mx, my, midX, midY, 34)}
                 size={22}
                 weight={400}
-                fill="#64748b"
+                fill="rgb(var(--c-derived))"
                 halo={6}
               >
                 angled
@@ -599,7 +599,7 @@ export function Plan({
       })}
 
       {model.walls.map((w) => (
-        <circle key={`${w.id}-corner`} cx={px(w.start.x)} cy={scaleY(w.start.y)} r={4} fill="#0f172a" />
+        <circle key={`${w.id}-corner`} cx={px(w.start.x)} cy={scaleY(w.start.y)} r={4} fill="rgb(var(--c-ink))" />
       ))}
 
       {/*
@@ -633,7 +633,7 @@ export function Plan({
                 y1={scaleY(feet(run.from.y))}
                 x2={px(feet(run.to.x))}
                 y2={scaleY(feet(run.to.y))}
-                stroke="#dc2626"
+                stroke="rgb(var(--c-refuse))"
                 strokeWidth={14}
                 strokeOpacity={0.55}
                 strokeLinecap="butt"
@@ -651,8 +651,8 @@ export function Plan({
               cx={px(feet(at.x))}
               cy={scaleY(feet(at.y))}
               r={9}
-              fill="#ffffff"
-              stroke="#dc2626"
+              fill="rgb(var(--c-raise))"
+              stroke="rgb(var(--c-refuse))"
               strokeWidth={4}
             />
           </g>
@@ -675,7 +675,7 @@ export function Plan({
             y1={scaleY(feet(divide.boundary.from.y))}
             x2={px(feet(divide.boundary.to.x))}
             y2={scaleY(feet(divide.boundary.to.y))}
-            stroke="#7C3AED"
+            stroke="rgb(var(--c-adjusted))"
             strokeWidth={3}
             strokeDasharray="14 9"
             strokeLinecap="round"
@@ -686,7 +686,7 @@ export function Plan({
             textAnchor="middle"
             fontSize={13}
             fontWeight={600}
-            fill="#6D28D9"
+            fill="rgb(var(--c-adjusted))"
           >
             {divide.names[0]} / {divide.names[1]}
           </text>
@@ -706,8 +706,8 @@ export function Plan({
             width={16}
             height={16}
             rx={2}
-            fill="#ffffff"
-            stroke="#0EA5E9"
+            fill="rgb(var(--c-raise))"
+            stroke="rgb(var(--c-focus))"
             strokeWidth={3.5}
           />
           <text
@@ -716,7 +716,7 @@ export function Plan({
             textAnchor="middle"
             fontSize={11}
             fontWeight={700}
-            fill="#0369A1"
+            fill="rgb(var(--c-focus))"
           >
             {CONDITION[tag.condition].plain.slice(0, 1)}
           </text>
@@ -734,17 +734,17 @@ export function Plan({
         the sheet.
       */}
       <g transform={`translate(0 ${SIDE + PAD * 2 - 18})`}>
-        <line x1={PAD / 2} y1={0} x2={viewWidth - PAD / 2} y2={0} stroke="#0f172a" strokeWidth={2} />
-        <text x={PAD / 2} y={38} fontSize={30} fontWeight={600} fill="#0f172a">
+        <line x1={PAD / 2} y1={0} x2={viewWidth - PAD / 2} y2={0} stroke="rgb(var(--c-ink))" strokeWidth={2} />
+        <text x={PAD / 2} y={38} fontSize={30} fontWeight={600} fill="rgb(var(--c-ink))">
           {room.name}
         </text>
-        <text x={viewWidth - PAD / 2} y={38} textAnchor="end" fontSize={30} fill="#0f172a">
+        <text x={viewWidth - PAD / 2} y={38} textAnchor="end" fontSize={30} fill="rgb(var(--c-ink))">
           {showArea(area(room).value)}
         </text>
-        <text x={PAD / 2} y={72} fontSize={21} fill={state.blocking.length > 0 ? '#b45309' : '#0f172a'}>
+        <text x={PAD / 2} y={72} fontSize={21} fill={state.blocking.length > 0 ? 'rgb(var(--c-scanned))' : 'rgb(var(--c-ink))'}>
           {caveat}
         </text>
-        <text x={PAD / 2} y={100} fontSize={19} fill="#64748b">
+        <text x={PAD / 2} y={100} fontSize={19} fill="rgb(var(--c-derived))">
           {trustLabel(state.trust)} · ceiling {len(room.ceilingHeight.value)}
         </text>
 
@@ -757,7 +757,7 @@ export function Plan({
           y1={118}
           x2={viewWidth - PAD / 2}
           y2={118}
-          stroke="#e2e8f0"
+          stroke="rgb(var(--c-rule))"
           strokeWidth={1}
         />
         {head.map((line, i) => (
@@ -767,7 +767,7 @@ export function Plan({
             y={148 + i * 26}
             fontSize={i === 0 ? 24 : 19}
             fontWeight={i === 0 ? 600 : 400}
-            fill={i === 0 ? '#0f172a' : '#64748b'}
+            fill={i === 0 ? 'rgb(var(--c-ink))' : 'rgb(var(--c-derived))'}
           >
             {line}
           </text>
@@ -777,7 +777,7 @@ export function Plan({
           y={148}
           textAnchor="end"
           fontSize={17}
-          fill="#94a3b8"
+          fill="rgb(var(--c-faint))"
         >
           Trueline
         </text>

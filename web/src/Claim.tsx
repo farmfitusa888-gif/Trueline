@@ -294,7 +294,7 @@ export function Claim({
                   <li key={damage.id} className="rounded-lg bg-slate-50 p-3">
                     <p className="font-medium text-slate-900">{damage.headline}</p>
                     {damage.summary && (
-                      <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">
+                      <p className="mt-1 text-sm font-semibold font-mono tabular-nums text-slate-900">
                         {damage.summary}
                       </p>
                     )}
@@ -311,7 +311,7 @@ export function Claim({
                             className="flex items-baseline justify-between gap-3 text-xs text-slate-600"
                           >
                             <dt>{reading.label}</dt>
-                            <dd className="tabular-nums">{reading.value}</dd>
+                            <dd className="font-mono tabular-nums">{reading.value}</dd>
                           </div>
                         ))}
                       </dl>

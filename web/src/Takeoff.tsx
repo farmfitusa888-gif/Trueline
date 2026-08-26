@@ -194,7 +194,7 @@ export function Takeoff({
               {wordFor(trade, row.what)}
               {open && <span className="block text-xs text-slate-500">{row.prices}</span>}
             </dt>
-            <dd className="shrink-0 font-semibold tabular-nums text-slate-900">{row.value}</dd>
+            <dd className="shrink-0 font-semibold font-mono tabular-nums text-slate-900">{row.value}</dd>
           </div>
         ))}
       </dl>
@@ -226,17 +226,17 @@ export function Takeoff({
                 <p className="mb-1 font-semibold text-slate-900">{zone.name}</p>
                 <div className="flex justify-between gap-3">
                   <dt className="text-slate-600">{wordFor(trade, 'Floor')}</dt>
-                  <dd className="font-semibold tabular-nums">{area(quantities.floorArea)}</dd>
+                  <dd className="font-semibold font-mono tabular-nums">{area(quantities.floorArea)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-slate-600">{wordFor(trade, 'Wall face')}</dt>
-                  <dd className="font-semibold tabular-nums">
+                  <dd className="font-semibold font-mono tabular-nums">
                     {area(quantities.wallFaceArea * 2n)}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-slate-600">{wordFor(trade, 'Baseboard')}</dt>
-                  <dd className="font-semibold tabular-nums">{len(quantities.baseboardRun)}</dd>
+                  <dd className="font-semibold font-mono tabular-nums">{len(quantities.baseboardRun)}</dd>
                 </div>
               </dl>
             ))}
@@ -268,7 +268,7 @@ export function Takeoff({
                   {wordFor(trade, line.what)}
                   {open && <span className="block text-xs text-slate-500">{line.workings}</span>}
                 </dt>
-                <dd className="shrink-0 font-semibold tabular-nums text-slate-900">
+                <dd className="shrink-0 font-semibold font-mono tabular-nums text-slate-900">
                   {line.quantity} {line.unit}
                 </dd>
               </div>
