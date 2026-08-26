@@ -52,18 +52,28 @@ function Field({
   );
 }
 
-export function Settings({ onClose }: { readonly onClose: () => void }) {
+export function Settings({ onClose }: { readonly onClose?: () => void }) {
   const { company, save } = useUnits();
   const [draft, setDraft] = useState<Company>(company);
   const [trouble, setTrouble] = useState<string | null>(null);
+  /**
+   * Whether the last press of Save landed, when there is nowhere to go after it.
+   *
+   * Inside the app this screen is a TAB, not a panel over a room -- so Save has
+   * nothing to close and nothing moves when it is pressed. A form that swallows
+   * a press is a form somebody types into twice, so it says so instead.
+   */
+  const [saved, setSaved] = useState(false);
   const file = useRef<HTMLInputElement>(null);
 
   // Nothing is committed until Save, so the screen can be left without a
   // half-typed licence number becoming the one on the drawings.
   useEffect(() => setDraft(company), [company]);
 
-  const set = <K extends keyof Company>(key: K, value: Company[K]) =>
+  const set = <K extends keyof Company>(key: K, value: Company[K]) => {
+    setSaved(false);
     setDraft((was) => ({ ...was, [key]: value }));
+  };
 
   let ceilingReads: string | null = null;
   if (draft.useDefaultCeiling) {
@@ -104,13 +114,18 @@ export function Settings({ onClose }: { readonly onClose: () => void }) {
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">Your business</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="min-h-11 px-2 text-sm text-slate-500 underline underline-offset-4"
-        >
-          Done
-        </button>
+        {/* Only when there is something to go back to. On the Business tab
+            this screen IS the destination, and a Done that closed it would
+            leave somebody looking at nothing. */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 px-2 text-sm text-slate-500 underline underline-offset-4"
+          >
+            Done
+          </button>
+        )}
       </div>
       <p className="mt-1 text-sm text-slate-600">
         This goes on every drawing and everything you send a client. Typed once.
@@ -340,12 +355,18 @@ export function Settings({ onClose }: { readonly onClose: () => void }) {
         type="button"
         onClick={() => {
           save(draft);
-          onClose();
+          setSaved(true);
+          onClose?.();
         }}
         className="mt-5 min-h-12 w-full rounded-md bg-slate-900 px-6 font-semibold text-white active:bg-slate-700"
       >
         Save
       </button>
+      {saved && !onClose && (
+        <p role="status" className="mt-2 text-center text-sm font-medium text-emerald-800">
+          Saved. This goes on every drawing and everything you send a client.
+        </p>
+      )}
     </section>
   );
 }

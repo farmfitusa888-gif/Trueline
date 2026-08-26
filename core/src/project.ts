@@ -81,7 +81,7 @@ const DEGREE = Math.PI / 180;
 const OBJECT_HEIGHT_FEET = 2.5;
 
 /** Nanometres to feet, as a float, at the boundary where drawing begins. */
-function feet(value: Nanometres): number {
+export function feet(value: Nanometres): number {
   return Number(value) / Number(NM_PER_FOOT);
 }
 
@@ -91,7 +91,7 @@ function feet(value: Nanometres): number {
  * room they are looking into — so it comes off, exactly as a dollhouse has no
  * near wall.
  */
-function facing(normal: { x: bigint; y: bigint }, turn: number): number {
+export function facing(normal: { x: bigint; y: bigint }, turn: number): number {
   const c = Math.cos(turn * DEGREE);
   const s = Math.sin(turn * DEGREE);
   const nx = Number(normal.x);
@@ -100,6 +100,53 @@ function facing(normal: { x: bigint; y: bigint }, turn: number): number {
   // The viewer looks along +y after the turn, so a normal with a negative
   // rotated y component is pointing back at them.
   return (nx * s + ny * c) / length;
+}
+
+/**
+ * A plan point and a height, as the axonometric camera sees it.
+ *
+ * Not `Seen`, which is this file's name for a point in the *perspective*
+ * viewer's frame and means something else entirely -- right, up and ahead
+ * rather than screen x, screen y and painter's depth. Two names, because they
+ * are two things.
+ */
+export interface Placed2D {
+  readonly x: number;
+  readonly y: number;
+  /** Larger is further away. Painter's algorithm orders on this. */
+  readonly depth: number;
+}
+
+/**
+ * The camera, as a function from a plan point and a height to a screen point.
+ *
+ * Lifted out of `project` when the floor grew a three-dimensional view of its
+ * own. Both views turn about the vertical axis and then tip the whole thing
+ * back, and they have to do it identically: a floor whose rooms sat at a
+ * different angle from the room screen's would read as two drawings of two
+ * buildings. One transform, used twice, is the only way that stays true.
+ */
+export function viewer(camera: Camera): (p: Point, height: number) => Placed2D {
+  const turn = camera.turn * DEGREE;
+  // Straight down is the plan, and at exactly 90 degrees the walls collapse to
+  // lines. Held a little short of it so a "top" view still shows the room has
+  // height.
+  const tilt = Math.max(2, Math.min(88, camera.tilt)) * DEGREE;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
+  const sinTilt = Math.sin(tilt);
+  const cosTilt = Math.cos(tilt);
+  return (p: Point, height: number) => {
+    const x = feet(p.x);
+    const y = feet(p.y);
+    const across = x * cos - y * sin;
+    const into = x * sin + y * cos;
+    return {
+      x: across,
+      y: into * sinTilt - height * cosTilt,
+      depth: into * cosTilt + height * sinTilt,
+    };
+  };
 }
 
 /**
@@ -152,27 +199,7 @@ export function project(
   const points = corners(room);
   const normals = outwardNormals(room);
 
-  const turn = camera.turn * DEGREE;
-  // Straight down is the plan, and at exactly 90 degrees the walls collapse to
-  // lines. Held a little short of it so a "top" view still shows the room has
-  // height.
-  const tilt = Math.max(2, Math.min(88, camera.tilt)) * DEGREE;
-  const cos = Math.cos(turn);
-  const sin = Math.sin(turn);
-
-  /** Plan point plus a height, into the viewer's frame. */
-  const view = (p: Point, height: number) => {
-    const x = feet(p.x);
-    const y = feet(p.y);
-    // Turn about the vertical axis, then tip the whole thing back.
-    const across = x * cos - y * sin;
-    const into = x * sin + y * cos;
-    return {
-      x: across,
-      y: into * Math.sin(tilt) - height * Math.cos(tilt),
-      depth: into * Math.cos(tilt) + height * Math.sin(tilt),
-    };
-  };
+  const view = viewer(camera);
 
   interface Raw {
     wallId: string;

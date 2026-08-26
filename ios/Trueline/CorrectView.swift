@@ -18,6 +18,31 @@ import WebKit
 /// the scan is handed across as an argument rather than uploaded anywhere.
 struct CorrectView: UIViewRepresentable {
 
+    /// Which screen the page opens on.
+    ///
+    /// The app used to have one way in — open a scan — so the floor, the
+    /// handbook and the contractor's own business details all lived behind
+    /// links inside some room's page. Setting a licence number meant first
+    /// picking a room you did not want to look at. Floor and Business are tabs
+    /// now, and both load this same bundle with nothing scanned; the route is
+    /// how they say where to land.
+    ///
+    /// It goes across on the URL fragment, which is the one part of a URL the
+    /// scheme handler never sees and never has to serve.
+    enum Opening: String {
+        case room = ""
+        case floor = "floor"
+        case business = "business"
+
+        var url: URL {
+            self == .room
+                ? WebBundle.start
+                : URL(string: WebBundle.start.absoluteString + "#" + rawValue)!
+        }
+    }
+
+    var opensOn: Opening = .room
+
     /// The scan to hand over: RoomPlan's own JSON, and the photo manifest.
     let roomJSON: Data
     let photosJSON: Data
@@ -41,7 +66,12 @@ struct CorrectView: UIViewRepresentable {
 
     let title: String
     /// Where this scan lives, so a save can land beside the capture it came from.
-    let folder: URL
+    ///
+    /// Nothing on the Floor and Business tabs: there is no scan open there, so
+    /// there is no folder to save into and no folder of photographs the page
+    /// may read. `WebBundle` already refuses a photograph request when it has
+    /// no folder, and says so, which is the right answer rather than a blank.
+    var folder: URL?
     /// Called on every save, with the whole saved project.
     let onSave: (Data) -> Void
     /// Called once when the plan is drawn, with a small PNG of it for the list.
@@ -59,12 +89,21 @@ struct CorrectView: UIViewRepresentable {
     /// The details this app is already keeping, handed over on load.
     let companyJSON: Data
 
+    /// Every corrected room on this phone, as `persist.ts` wrote them.
+    ///
+    /// Only on the Floor tab, and empty everywhere else. The floor is built out
+    /// of rooms in the page's own storage, which until now only ever held a
+    /// room somebody had actually opened — so a phone with six scans showed an
+    /// empty floor until each had been visited one at a time. The app has all
+    /// six on disk; this hands them over.
+    var everyRoom: [Data] = []
+
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> WKWebView {
         // Which capture's photographs this page may show — one folder, the one
         // being looked at, and nothing else on the disk.
-        context.coordinator.bundle.photos = folder.appendingPathComponent("photos", isDirectory: true)
+        context.coordinator.bundle.photos = folder?.appendingPathComponent("photos", isDirectory: true)
 
         let configuration = WKWebViewConfiguration()
         // The channel the correction screens save through. Without it a room
@@ -106,7 +145,7 @@ struct CorrectView: UIViewRepresentable {
             webView.loadHTMLString(missingBundleMessage, baseURL: nil)
             return webView
         }
-        webView.load(URLRequest(url: WebBundle.start))
+        webView.load(URLRequest(url: opensOn.url))
         return webView
     }
 
@@ -295,6 +334,33 @@ struct CorrectView: UIViewRepresentable {
                 })();
                 """
             )
+
+            // Every corrected room on the phone, for the floor to draw.
+            //
+            // Before anything else that touches storage, and before the early
+            // returns below -- the floor reads storage when it mounts and the
+            // page has already mounted by the time any of this runs, so the
+            // far side raises a listener rather than relying on order. What
+            // matters here is that it happens at all, on the one tab that
+            // needs it, and that the room being CORRECTED (below) is handed
+            // over afterwards so it is the one on screen.
+            if !parent.everyRoom.isEmpty {
+                let rooms = parent.everyRoom
+                    .compactMap { String(data: $0, encoding: .utf8) }
+                    .map { quoted($0) }
+                    .joined(separator: ", ")
+                run(
+                    on: webView,
+                    """
+                    (function () {
+                      var rooms = [\(rooms)];
+                      if (window.trueline && window.trueline.putRooms) {
+                        window.trueline.putRooms(rooms);
+                      }
+                    })();
+                    """
+                )
+            }
 
             // A walked room and a scanned room go across the same hook and come
             // out the same on the other side. Which one this is, is the only

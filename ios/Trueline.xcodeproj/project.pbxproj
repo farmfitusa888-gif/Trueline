@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2DA95C005491B35E2A0D9C58 /* DeadCaptureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12430DB0BD406E0C3A0A3F2 /* DeadCaptureScreen.swift */; };
+		B8BA3C066340E227D255D21F /* Handbook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 994AE2C99D3905EA0A1DA05D /* Handbook.swift */; };
+		2AFC2439A2A391D8A48F1B36 /* WebScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4E4D096D57EB43C81A9470 /* WebScreen.swift */; };
+		B3E05AC56A1D0880FE8D3E3B /* RootTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA07A3A13E0DF1A45233511 /* RootTabs.swift */; };
 		6FFECB776AC5742785DD6FC6 /* PinRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A0ED7697B909B4265F7F126 /* PinRecorder.swift */; };
 		431341F6EFB7F6667CA3C19C /* Calendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413B1ADF6E4754D38FD3CF58 /* Calendar.swift */; };
 		B5FB642000E31B6B6F08259D /* Entitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F19B08B728EA3668918F1E /* Entitlement.swift */; };
@@ -35,6 +39,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D12430DB0BD406E0C3A0A3F2 /* DeadCaptureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadCaptureScreen.swift; sourceTree = "<group>"; };
+		994AE2C99D3905EA0A1DA05D /* Handbook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Handbook.swift; sourceTree = "<group>"; };
+		AE4E4D096D57EB43C81A9470 /* WebScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebScreen.swift; sourceTree = "<group>"; };
+		6AA07A3A13E0DF1A45233511 /* RootTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabs.swift; sourceTree = "<group>"; };
 		6A0ED7697B909B4265F7F126 /* PinRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinRecorder.swift; sourceTree = "<group>"; };
 		413B1ADF6E4754D38FD3CF58 /* Calendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Calendar.swift; sourceTree = "<group>"; };
 		48F19B08B728EA3668918F1E /* Entitlement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entitlement.swift; sourceTree = "<group>"; };
@@ -112,6 +120,10 @@
 				48F19B08B728EA3668918F1E /* Entitlement.swift */,
 				413B1ADF6E4754D38FD3CF58 /* Calendar.swift */,
 				6A0ED7697B909B4265F7F126 /* PinRecorder.swift */,
+				6AA07A3A13E0DF1A45233511 /* RootTabs.swift */,
+				AE4E4D096D57EB43C81A9470 /* WebScreen.swift */,
+				994AE2C99D3905EA0A1DA05D /* Handbook.swift */,
+				D12430DB0BD406E0C3A0A3F2 /* DeadCaptureScreen.swift */,
 				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
 				6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */,
 				DA1B9D64EFC2ED4C64672F34 /* Web */,
@@ -222,6 +234,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */,
+				2DA95C005491B35E2A0D9C58 /* DeadCaptureScreen.swift in Sources */,
+				B8BA3C066340E227D255D21F /* Handbook.swift in Sources */,
+				2AFC2439A2A391D8A48F1B36 /* WebScreen.swift in Sources */,
+				B3E05AC56A1D0880FE8D3E3B /* RootTabs.swift in Sources */,
 				6FFECB776AC5742785DD6FC6 /* PinRecorder.swift in Sources */,
 				431341F6EFB7F6667CA3C19C /* Calendar.swift in Sources */,
 				B5FB642000E31B6B6F08259D /* Entitlement.swift in Sources */,

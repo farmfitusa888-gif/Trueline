@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { type Join, floorQuantities } from '../../core/src/floor.ts';
 import { type DrawnOpening, couldBeTheSame, extentOf, floorPlan, placedArea } from '../../core/src/floorplan.ts';
+import { onRoomsArrived } from './bridge.ts';
 import { floorOf, joinBetween, loadJoins, saveJoins, savedRooms } from './floorStore.ts';
+import { FloorHouse } from './FloorHouse.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -32,15 +34,41 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
   const [joins, setJoins] = useState<Join[]>(() => loadJoins());
   const [picked, setPicked] = useState<DrawnOpening | null>(null);
   const [trouble, setTrouble] = useState<string | null>(null);
-  const rooms = useMemo(() => savedRooms(), []);
+  /**
+   * Flat, or with the roof off.
+   *
+   * The same pair of words the room screen uses for the same pair of things,
+   * in the same place on the screen. A floor that called them something else
+   * would be teaching the control twice.
+   */
+  const [look, setLook] = useState<'plan' | 'house'>('plan');
+  /**
+   * Bumped when the app hands more rooms across, so this reads storage again.
+   *
+   * Inside the iOS app the Floor tab is handed every corrected room on the
+   * phone, and that arrives after this screen has already asked what was in
+   * storage. Without this the answer would stay "no rooms yet" while six of
+   * them sat in the very storage it had just read.
+   */
+  const [arrived, setArrived] = useState(0);
+  useEffect(() => onRoomsArrived(() => setArrived((n) => n + 1)), []);
+  const rooms = useMemo(() => savedRooms(), [arrived]);
+
+  /**
+   * The floor both views draw from.
+   *
+   * One value, so the dollhouse and the blueprint cannot be looking at two
+   * different arrangements of the same rooms.
+   */
+  const floor = useMemo(() => floorOf(rooms, joins), [rooms, joins]);
 
   const plan = useMemo(() => {
     try {
-      return { it: floorPlan(floorOf(rooms, joins)), trouble: null as string | null };
+      return { it: floorPlan(floor), trouble: null as string | null };
     } catch (error) {
       return { it: null, trouble: error instanceof Error ? error.message : String(error) };
     }
-  }, [rooms, joins]);
+  }, [floor]);
 
   /**
    * What the whole floor takes, across every room that could be placed.
@@ -56,12 +84,12 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
    */
   const totals = useMemo(() => {
     try {
-      return floorQuantities(floorOf(rooms, joins));
+      return floorQuantities(floor);
     } catch {
       // The plan itself already says why it could not be laid out, above.
       return null;
     }
-  }, [rooms, joins]);
+  }, [floor]);
 
   function commit(next: Join[]) {
     setJoins(next);
@@ -176,6 +204,46 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
           </dl>
         )}
 
+        {/* The same control the room screen has, in the same place, saying the
+            same two words for the same two things. A floor that named them
+            differently would be teaching one idea twice. */}
+        <div
+          role="tablist"
+          aria-label="How to look at this floor"
+          className="mb-3 flex gap-1 rounded-lg bg-slate-100 p-1"
+        >
+          {(['plan', 'house'] as const).map((which) => (
+            <button
+              key={which}
+              type="button"
+              role="tab"
+              aria-selected={look === which}
+              onClick={() => setLook(which)}
+              className={`min-h-11 flex-1 rounded-md px-4 font-medium ${
+                look === which
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 active:bg-slate-200'
+              }`}
+            >
+              {which === 'plan' ? 'Blueprint' : 'Dollhouse'}
+            </button>
+          ))}
+        </div>
+
+        {look === 'house' ? (
+          <FloorHouse
+            floor={floor}
+            onOpenRoom={(roomId) => {
+              // The dollhouse knows a room by the id the FLOOR knows it by;
+              // opening one needs the file it was saved under. Looked up
+              // rather than assumed equal, because they are not: a room id
+              // comes out of the capture and a file name is what somebody
+              // called the folder.
+              const saved = rooms.find((one) => one.room.id === roomId);
+              if (saved) onOpenRoom(saved.fileName);
+            }}
+          />
+        ) : (
         <svg
           viewBox={`0 0 ${box} ${box}`}
           className="w-full h-auto select-none"
@@ -266,9 +334,13 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
             );
           })}
         </svg>
+        )}
 
         <p className="mt-2 px-1 text-sm text-slate-600">
-          {picked
+          {look === 'house'
+            ? 'Joining rooms is done on the blueprint — tap a doorway there, then tap the same ' +
+              'doorway in the room on the other side of it.'
+            : picked
             ? `Now tap the same ${picked.kind} in the other room.`
             : openings.length === 0
               ? 'None of these rooms has a door in it yet. Open one, tap the wall the door is ' +

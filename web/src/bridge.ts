@@ -1,5 +1,7 @@
 import type { Action } from './state.ts';
 import { setEntitlement } from './entitlementStore.ts';
+import { loadProject } from '../../core/src/persist.ts';
+import { STORAGE_PREFIX } from './state.ts';
 
 /**
  * How the scanner hands a room over.
@@ -45,6 +47,21 @@ export interface TruelineBridge {
   openSaved(project: string): void;
   /** Called with the contractor's profile, when the app is keeping one. */
   openCompany(company: string): void;
+  /**
+   * Every corrected room the app is holding, for the floor.
+   *
+   * The floor is built out of rooms in this page's `localStorage`, which only
+   * ever held a room somebody had actually opened in a web view. So a phone
+   * with six scans on it showed an empty floor until each one had been visited
+   * — "the floor/wall (doesn't work)", and it was right.
+   *
+   * The app has every corrected room on disk already. On the Floor tab it
+   * hands them all across, and they are written into the same storage the
+   * floor already reads. Nothing here overwrites a room that is newer in the
+   * browser than on disk: a correction typed a moment ago and not yet written
+   * back must not be undone by the copy it came from.
+   */
+  putRooms(projects: readonly string[]): number;
   /**
    * Whether this person has paid.
    *
@@ -218,6 +235,22 @@ export function onCompany(listen: (company: string) => void): () => void {
 }
 
 /**
+ * Whoever is drawing a floor when the app hands more rooms over.
+ *
+ * The floor reads storage once, when it mounts. The app's rooms arrive after
+ * that -- the hand-over runs when the page has finished loading, by which time
+ * React has already asked and been told what was there. Without this the Floor
+ * tab would be handed six rooms and go on showing none of them until somebody
+ * left the tab and came back.
+ */
+const roomListeners = new Set<() => void>();
+
+export function onRoomsArrived(listen: () => void): () => void {
+  roomListeners.add(listen);
+  return () => roomListeners.delete(listen);
+}
+
+/**
  * Whether these screens are running inside the app or in a browser.
  *
  * It changes what to offer when there is no room on screen. In a browser the
@@ -228,6 +261,61 @@ export function onCompany(listen: (company: string) => void): () => void {
  */
 export function insideApp(): boolean {
   return handler('saved') !== undefined;
+}
+
+/**
+ * Writes rooms the app is holding into the storage the floor reads.
+ *
+ * ## Why this is not a plain overwrite
+ *
+ * The app's copy of a room is written on every save, so it is normally the same
+ * bytes the browser has. Normally is not always: a correction typed thirty
+ * seconds ago is in `localStorage` before the app has finished writing it to
+ * disk, and on a phone that ran out of room to write, it may never get there.
+ * Overwriting unconditionally would take somebody's tape readings back off a
+ * room while they were looking at it.
+ *
+ * So each room is written only when the browser has nothing under that name, or
+ * when what the app is holding was saved LATER than what the browser has. A tie
+ * leaves the browser's copy alone, because the two are then the same room and
+ * writing achieves nothing.
+ *
+ * Returns how many were actually written, so the caller can say so rather than
+ * claim a number it did not check.
+ */
+export function putRooms(projects: readonly string[]): number {
+  let written = 0;
+  for (const text of projects) {
+    let saved: ReturnType<typeof loadProject>;
+    try {
+      saved = loadProject(text);
+    } catch {
+      // A room this build cannot read. Skipped rather than taking the floor
+      // down -- the same rule `savedRooms` already keeps for the same reason.
+      continue;
+    }
+    const key = STORAGE_PREFIX + saved.fileName;
+    try {
+      const here = window.localStorage.getItem(key);
+      if (here !== null) {
+        let mine = '';
+        try {
+          mine = loadProject(here).savedAt;
+        } catch {
+          // Unreadable here and readable there: the app's copy is the better
+          // one, so let it through.
+        }
+        if (mine !== '' && mine >= saved.savedAt) continue;
+      }
+      window.localStorage.setItem(key, text);
+      written += 1;
+    } catch {
+      // Storage full or refused. The room stays as it was, which is the safe
+      // half of this, and the floor shows what it can.
+    }
+  }
+  if (written > 0) for (const listen of roomListeners) listen();
+  return written;
 }
 
 /**
@@ -277,6 +365,7 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     openTrace,
     openSaved,
     openCompany,
+    putRooms,
     setSubscribed,
     version: BRIDGE_VERSION,
   };

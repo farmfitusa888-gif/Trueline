@@ -153,6 +153,36 @@ function NothingHere({ onDraw }: { onDraw: () => void }) {
   );
 }
 
+/**
+ * Which screen the app was asked to open on.
+ *
+ * ## Why there is a route at all now
+ *
+ * The iOS app used to have exactly one way in: open a scan, and everything —
+ * the floor, the handbook, the contractor's own business details — lived behind
+ * links inside that scan's page. So setting your licence number meant first
+ * picking some room you did not want to look at. The report was blunt: *"have
+ * to go through a project to get to the options"*.
+ *
+ * The app has a tab bar now, and Floor and Business are tabs. Both load this
+ * same bundle with no scan handed over, and both need it to open somewhere
+ * other than the top. The fragment is how they say which — `#floor`,
+ * `#business` — because it is the one part of a URL a custom scheme handler
+ * never sees and never has to serve.
+ *
+ * Anything unrecognised opens the room, which is the old behaviour and the
+ * right default: a bad route should cost nothing.
+ */
+export function openedAt(): 'room' | 'floor' | 'business' {
+  let hash = '';
+  try {
+    hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+  } catch {
+    return 'room';
+  }
+  return hash === 'floor' || hash === 'business' ? hash : 'room';
+}
+
 export function App() {
   const { len, area: showArea } = useUnits();
   const [state, dispatch] = useReducer(reduce, EMPTY);
@@ -166,11 +196,36 @@ export function App() {
   // it off moves nothing, because no number ever came from it.
   const [furniture, setFurniture] = useState(true);
   const [drawing, setDrawing] = useState(false);
-  const [settings, setSettings] = useState(false);
+  const [settings, setSettings] = useState(() => openedAt() === 'business');
   // One room, or all of them. The floor is a view over the rooms already saved
   // on this device plus the joins somebody declared between them, so switching
   // to it never touches what is being corrected.
-  const [showing, setShowing] = useState<'room' | 'floor'>('room');
+  const [showing, setShowing] = useState<'room' | 'floor'>(
+    openedAt() === 'floor' ? 'floor' : 'room'
+  );
+  /**
+   * Which screen the page was asked for, kept up to date.
+   *
+   * Read once at start-up in the first version, which was wrong in a way that
+   * only shows up outside the app: changing a URL's fragment is a
+   * same-document navigation. Nothing reloads, no state changes, React does
+   * not re-render, and the page goes on showing whatever it was showing. It
+   * looked right on a phone -- where every tab builds a new web view and does
+   * a real load -- and did nothing at all in a browser.
+   *
+   * A route that only works because of how its one caller happens to be built
+   * is not a route. So the hash is followed.
+   */
+  const [openedOn, setOpenedOn] = useState(openedAt);
+  useEffect(() => {
+    const follow = () => setOpenedOn(openedAt());
+    window.addEventListener('hashchange', follow);
+    return () => window.removeEventListener('hashchange', follow);
+  }, []);
+  useEffect(() => {
+    setSettings(openedOn === 'business');
+    setShowing(openedOn === 'floor' ? 'floor' : 'room');
+  }, [openedOn]);
   const loaded = state.loaded;
 
   // Let the scanner in — and pick up whatever was being corrected last time.
@@ -271,8 +326,16 @@ export function App() {
 
   const selectedWall = loaded && state.selected ? loaded.room.walls.find((w) => w.id === state.selected) : undefined;
 
+  const native = insideApp();
+
   return (
     <main className="mx-auto max-w-3xl px-4 pt-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+      {/* Hidden inside the iOS app, where the tab bar along the bottom and the
+          navigation bar along the top are the real chrome and this row was a
+          second, different-looking copy of both. It was the complaint: "the
+          menu looks weird and not everything works". In a browser it is the
+          only way to reach any of this, so there it stays. */}
+      {!native && (
       <header className="mb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         {/* The wordmark is the way home once a room is open, because that is
             where every app on this phone puts it. Not a link when there is
@@ -350,10 +413,14 @@ export function App() {
           </button>
         </span>
       </header>
+      )}
 
       {settings && (
         <div className="mb-5 space-y-5">
-          <Settings onClose={() => setSettings(false)} />
+          {/* No Done when this IS the screen. On the Business tab there is
+              nothing behind it to go back to, and a Done that closed it would
+              leave somebody looking at a blank page. */}
+          <Settings {...(openedOn === 'business' ? {} : { onClose: () => setSettings(false) })} />
           {/* Beside the profile rather than beside a room: a price list belongs
               to the business, not to the job somebody happens to have open. */}
           <PriceList />
@@ -379,7 +446,7 @@ export function App() {
         </div>
       )}
 
-      {showing === 'floor' ? (
+      {openedOn === 'business' ? null : showing === 'floor' ? (
         <Floor
           onOpenRoom={(fileName) => {
             dispatch({ type: 'restore', fileName, force: true });

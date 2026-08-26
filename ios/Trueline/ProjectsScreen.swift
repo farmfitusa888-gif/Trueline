@@ -29,46 +29,47 @@ struct ProjectsScreen: View {
 
     var body: some View {
         List {
-            Section {
-                NavigationLink(value: Route.newScan) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label("Scan a room", systemImage: "camera.viewfinder")
+            // Scan and Measure used to be the two rows at the top of this list.
+            // They are tabs now, along the bottom where a thumb is, so they are
+            // gone from here: two ways to start a scan, in two places, is two
+            // things to keep in step and one of them to forget.
+            if store.scans.isEmpty {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Nothing on this phone yet.")
                             .font(.headline)
                         Text(
                             ARMeasureSession.hasLiDAR
-                            ? "Walk it and the phone finds the walls"
-                            : "Needs LiDAR — this phone does not have it"
+                            ? "Tap Scan along the bottom and walk a room — the phone finds the "
+                              + "walls. Or tap Measure and put in the corners yourself."
+                            : "This phone has no LiDAR, so it cannot scan. Tap Measure along "
+                              + "the bottom and put in the corners yourself — every number in a "
+                              + "room measured that way is measured from the first keystroke."
                         )
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                     }
-                }
-                .disabled(!ARMeasureSession.hasLiDAR)
-
-                NavigationLink(value: Route.newMeasure) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label("Measure a room", systemImage: "ruler")
-                            .font(.headline)
-                        Text("Tap each corner. Works on any phone.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            if store.scans.isEmpty {
-                Section {
-                    Text("Nothing scanned yet. Walk a room and it appears here.")
-                        .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
                 }
             } else {
                 Section("On this phone") {
                     ForEach(store.scans) { entry in
-                        // A capture with nothing in it is not a link. Offering
-                        // one was the dead end: tap, get "The scan has no
-                        // walls", and land on a file picker with nothing on the
-                        // phone to pick.
-                        NavigationLink(value: Route.open(entry)) {
+                        // A capture with nothing in it IS a link now, and
+                        // that is a reversal worth writing down.
+                        //
+                        // It used to be `.disabled`, because tapping one landed
+                        // on a file picker with nothing on the phone to pick --
+                        // a dead end. Disabling it made a different dead end:
+                        // three rows on the list that could not be tapped, could
+                        // not be opened, and offered nothing. "all those rooms
+                        // when you get on the app, cant do anything with them,
+                        // no options."
+                        //
+                        // A row nobody can touch is not a safe row, it is a row
+                        // with no way out of it. So it opens a screen that says
+                        // what happened and gives three: scan the room again,
+                        // draw it by hand, or delete it.
+                        NavigationLink(value: entry.hasRoom ? Route.open(entry) : Route.dead(entry)) {
                             HStack(spacing: 12) {
                                 // The drawing, so the list shows the room
                                 // rather than the timestamp. Three folders
@@ -112,17 +113,45 @@ struct ProjectsScreen: View {
                                 }
                             }
                         }
-                        .disabled(!entry.hasRoom)
+                        // Every row, whether or not there is a room in it.
+                        // Swipe-to-delete has existed since this list was
+                        // written and is invisible until somebody guesses at
+                        // it, which is not a way to offer the only action a row
+                        // has.
+                        .contextMenu {
+                            if entry.hasRoom {
+                                NavigationLink(value: Route.open(entry)) {
+                                    Label("Open", systemImage: "square.and.pencil")
+                                }
+                                ShareLink(item: entry.folder) {
+                                    Label("Share the whole scan", systemImage: "square.and.arrow.up")
+                                }
+                            } else {
+                                NavigationLink(value: Route.dead(entry)) {
+                                    Label("What went wrong", systemImage: "questionmark.circle")
+                                }
+                            }
+                            Button(role: .destructive) {
+                                forget(entry)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        // And visible without a long press. A context menu is
+                        // still something you have to know is there.
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                forget(entry)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                     .onDelete { indexes in
-                        let going = indexes.map { store.scans[$0] }
-                        going.forEach(store.delete)
-                        // And the copy. Leaving it would mean the next device
-                        // to look puts the scan back, and somebody has to
-                        // delete the same room twice.
-                        Task {
-                            for entry in going { await backup.forget(scan: entry.name) }
-                        }
+                        // Through the same one place the menu and the swipe use,
+                        // so all three cannot come apart -- and so none of them
+                        // can ever forget the copy.
+                        indexes.map { store.scans[$0] }.forEach(forget)
                     }
                 }
             }
@@ -169,6 +198,10 @@ struct ProjectsScreen: View {
             }
         }
         .navigationTitle("Trueline")
+        // One tap from the first screen of the app. It used to be a text link
+        // at the top of a ROOM's page, so reading how to use the app required
+        // already having scanned something with it.
+        .toolbar { HandbookButton() }
         .navigationDestination(for: Route.self) { route in
             switch route {
             case .newScan:
@@ -184,9 +217,28 @@ struct ProjectsScreen: View {
                 }
             case .review(let scan):
                 ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar)
+            case .dead(let entry):
+                DeadCaptureScreen(
+                    entry: entry,
+                    store: store,
+                    backup: backup,
+                    subscription: subscription,
+                    calendar: calendar,
+                    path: $path
+                )
             }
         }
         .onAppear { store.refresh() }
+    }
+
+    /// Forgetting a scan: off the phone, and out of the copy.
+    ///
+    /// Both halves, always. Deleting only the local folder means the next
+    /// device to look puts the scan back, and somebody has to delete the same
+    /// room twice and wonder which time counted.
+    private func forget(_ entry: ProjectStore.Entry) {
+        store.delete(entry)
+        Task { await backup.forget(scan: entry.name) }
     }
 
     /// A finished capture takes the capture screen's place in the stack.
@@ -204,5 +256,7 @@ struct ProjectsScreen: View {
         case newMeasure
         case open(ProjectStore.Entry)
         case review(SavedScan)
+        /// A capture with no walls in it, and the three ways out of one.
+        case dead(ProjectStore.Entry)
     }
 }

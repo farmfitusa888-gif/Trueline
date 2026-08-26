@@ -50,6 +50,7 @@ const parts = [
   'a13-handbook.mjs',
   'a14-inside.mjs',
   'a15-openplan.mjs',
+  'a16-navigation.mjs',
 ];
 
 function run(part) {

@@ -80,7 +80,25 @@ export class SectionError extends RoomError {}
  * whose sign is the whole answer — so no normalising, and no floats.
  */
 export function outwardNormals(room: Room): { x: bigint; y: bigint }[] {
-  const points = corners(room);
+  return outwardOf(corners(room), room.name);
+}
+
+/**
+ * The same question asked of a bare outline: which way is out of each edge?
+ *
+ * A room on a floor has been turned and moved into the floor's coordinates, so
+ * it is no longer the chain of headings `corners` walks -- it is a polygon.
+ * Both views have to agree about which walls face the viewer, or the floor's
+ * dollhouse would keep a wall the room's own view drops, and a person looking
+ * at the two would be looking at two different buildings.
+ *
+ * A turn preserves winding, so asking the placed outline gives the same answer
+ * the room would give about itself. One rule, two callers.
+ */
+export function outwardOf(
+  points: readonly Point[],
+  what = 'That outline'
+): { x: bigint; y: bigint }[] {
   let twice = 0n;
   for (let i = 0; i < points.length; i += 1) {
     const a = points[i]!;
@@ -89,7 +107,7 @@ export function outwardNormals(room: Room): { x: bigint; y: bigint }[] {
   }
   if (twice === 0n) {
     throw new SectionError(
-      `"${room.name}" encloses no area, so its walls have no inside and no outside.`
+      `"${what}" encloses no area, so its walls have no inside and no outside.`
     );
   }
   const counterClockwise = twice > 0n;

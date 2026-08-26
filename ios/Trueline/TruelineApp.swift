@@ -9,24 +9,18 @@ struct TruelineApp: App {
     @StateObject private var subscription = Subscription()
     /// The phone's own calendar, written into and never read.
     @StateObject private var calendar = JobCalendar()
-    /// The navigation stack, held here rather than inside the list.
-    ///
-    /// Finishing a capture replaces the capture screen with the review rather
-    /// than pushing on top of it, and a screen cannot take itself out of a
-    /// stack it does not hold. See `ProjectsScreen.show`.
-    @State private var path: [ProjectsScreen.Route] = []
-
     var body: some Scene {
         WindowGroup {
-            NavigationStack(path: $path) {
-                ProjectsScreen(
-                    store: store,
-                    backup: backup,
-                    subscription: subscription,
-                    calendar: calendar,
-                    path: $path
-                )
-            }
+            // The tab bar, and everything under it. The navigation stack used
+            // to be here and is now one per tab, inside `RootTabs` -- pushing a
+            // room on Rooms must not disturb where somebody was on Floor, which
+            // is most of the reason to have tabs at all.
+            RootTabs(
+                store: store,
+                backup: backup,
+                subscription: subscription,
+                calendar: calendar
+            )
             .task {
                 // Before anything else: what has been paid for. A screen that
                 // draws a paywall over somebody who has already subscribed,

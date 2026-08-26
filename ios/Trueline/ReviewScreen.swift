@@ -69,7 +69,13 @@ struct ReviewScreen: View {
                     Button { sharing = true } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
+                    .accessibilityLabel("Send this scan")
                 }
+                // Beside it, on every screen in the app. The web page's own
+                // "How to use it" link is hidden inside the app now -- a row of
+                // small underlined links along the top was a second,
+                // different-looking navigation over the top of this one.
+                HandbookButton()
             }
             // Sharing the folder is how a scan leaves this phone: AirDrop it,
             // put it in Files, mail it. No account and no server involved.

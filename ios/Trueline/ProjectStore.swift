@@ -209,6 +209,23 @@ final class ProjectStore: ObservableObject {
     /// that this device does not.
     var names: Set<String> { Set(scans.map(\.name)) }
 
+    /// Every corrected room on this phone, as `persist.ts` wrote them.
+    ///
+    /// For the Floor tab. The floor is built out of rooms in the web view's own
+    /// storage, which only ever held a room somebody had opened there -- so six
+    /// scans on a phone drew an empty floor until each had been visited one at
+    /// a time. This is what the phone actually holds.
+    ///
+    /// Only rooms somebody has corrected. A capture nobody has opened has no
+    /// corrected file, and it is left out rather than guessed at: a floor is
+    /// made of rooms, and an uncorrected capture is not yet a room.
+    func correctedRooms() -> [Data] {
+        scans.compactMap { entry in
+            guard entry.hasRoom else { return nil }
+            return try? Data(contentsOf: entry.folder.appendingPathComponent(Self.correctedFile))
+        }
+    }
+
     /// Writes a scan that came back from iCloud into a folder of its own.
     ///
     /// Only ever called for a name this phone does not already have, so it
