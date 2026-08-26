@@ -82,12 +82,29 @@ check('the takeoff shows the split beside the whole room',
 /* --------------------------------------------- the check that must not bend */
 
 const numbers = await page.evaluate(() => {
-  const sq = (s) => Number((s.match(/([\d,.]+)\s*sq ft/) ?? [])[1]?.replace(/,/g, '') ?? NaN);
-  const cards = [...document.querySelectorAll('[data-panel="takeoff"] dl')];
-  const whole = document.querySelector('[data-panel="takeoff"]').innerText;
+  // Read off the ROW rather than by counting lines.
+  //
+  // This used to match "Floor" plus the next line and pull a figure out of it,
+  // which worked only while a row was exactly two lines. The takeoff shows the
+  // workings under every figure now -- "the floor outline" -- so the number
+  // moved to the third line and this quietly became NaN.
+  //
+  // A row is a `dt` and a `dd`. Asking for those is asking the question the
+  // check actually means, and it survives the next time the row grows a line.
+  const panel = document.querySelector('[data-panel="takeoff"]');
+  const number = (text) => Number((text.match(/([\d,.]+)/) ?? [])[1]?.replace(/,/g, '') ?? NaN);
+  const rowNamed = (want) => {
+    for (const row of panel.querySelectorAll('dl > div')) {
+      const dt = row.querySelector('dt');
+      const dd = row.querySelector('dd');
+      if (dt && dd && dt.innerText.trim().toLowerCase().startsWith(want)) return number(dd.innerText);
+    }
+    return NaN;
+  };
   return {
-    wholeFloor: sq((whole.match(/Floor[^\n]*\n?[^\n]*/) ?? [''])[0]),
-    zones: cards.slice(-2).map((c) => c.innerText),
+    wholeFloor: rowNamed('floor'),
+    wholeFace: rowNamed('wall face'),
+    zones: [...panel.querySelectorAll('dl')].slice(-2).map((c) => c.innerText),
   };
 });
 check('two zone cards are drawn', numbers.zones.length === 2, JSON.stringify(numbers.zones));
@@ -102,11 +119,8 @@ check('the two floors add to the whole room',
 const zoneFaces = numbers.zones.map((t) =>
   Number((t.match(/Wall face\s+([\d,.]+)/) ?? [])[1]?.replace(/,/g, '') ?? NaN)
 );
-const wholeFace = await page.evaluate(() => {
-  const t = document.querySelector('[data-panel="takeoff"]').innerText;
-  const m = t.match(/Wall face[^\d]*([\d,.]+)/);
-  return Number(m?.[1]?.replace(/,/g, '') ?? NaN);
-});
+// Read the same way, off the same row, in the same pass above.
+const wholeFace = numbers.wholeFace;
 check('and their wall face does NOT gain a surface nobody will build',
   zoneFaces[0] + zoneFaces[1] <= wholeFace + 0.15,
   `${zoneFaces[0]} + ${zoneFaces[1]} = ${zoneFaces[0] + zoneFaces[1]}, whole room is ${wholeFace}`);

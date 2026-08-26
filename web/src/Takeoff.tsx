@@ -140,42 +140,92 @@ export function Takeoff({
     );
   }
 
-  // The lines wall thickness unlocks — jamb, wrap, plates, studs, footprint —
-  // kept in their own block rather than mixed into the finishes, because they
-  // are a different trade reading a different column.
-  // What the person holding the phone calls these, and which ones they care
-  // about first. Applied here, at the point of display: the sheet, the quote
-  // and every rate underneath are in the app's own words, so changing trade
-  // reorders a screen and moves nothing.
   const trade = tradeOf(company.trade);
-  const extras = order(trade, sheet.lines.filter((line) => line.group !== undefined));
 
-  const rows = order(trade, [
-    { what: 'Floor', value: area(q.it.floorArea), prices: 'flooring, tile, underlay' },
-    { what: 'Ceiling', value: area(q.it.ceilingArea), prices: 'ceiling drywall and paint' },
-    {
-      what: 'Wall face',
-      value: area(2n * q.it.wallFaceArea),
-      prices: 'drywall and paint — every door and window taken off',
-    },
-    {
-      what: 'Baseboard',
-      value: run(q.it.baseboardRun),
-      prices: 'trim — doors taken off, windows left on',
-    },
-    ...(q.it.openRun > 0n
-      ? [
-          {
-            what: 'Open span',
-            value: run(q.it.openRun),
-            prices: 'nothing built here — no drywall, no paint, no trim',
-          },
-        ]
-      : []),
-  ]);
+  /**
+   * The sheet, built from what the takeoff actually produced.
+   *
+   * ## The bug this shape exists to end
+   *
+   * The four figures were hand-written here and the rest of the sheet was
+   * `sheet.lines.filter((line) => line.group !== undefined)`. Doors, windows
+   * and cased openings carry no group -- they are finishes, not framing -- so
+   * that filter dropped them, and **the takeoff screen never told anybody there
+   * was a door in the room.** The count was computed, it went into the text
+   * somebody shares and into the CSV somebody prices off, and the screen the
+   * contractor actually reads left it out.
+   *
+   * That is the worst kind of bug this app can have: not a wrong number, a
+   * missing one, on the sheet somebody orders material from.
+   *
+   * So nothing is hand-listed any more. Every row comes from `sheet.lines`, and
+   * a line the engine learns to produce tomorrow appears here without anybody
+   * remembering to add it. `web/audit/a17-takeoff.mjs` fails if one ever stops
+   * arriving.
+   *
+   * ## Why the values are still overridden
+   *
+   * `TakeoffLine.quantity` is written in feet, because the text and the CSV go
+   * to a lumber yard and a spreadsheet. The screen follows whichever units this
+   * contractor set, so the ones the app can convert are re-rendered through
+   * `area` and `run`. A count of doors is a count in any unit and is left
+   * exactly as the engine wrote it.
+   */
+  const shown = useMemo(() => {
+    const inMyUnits: Record<string, string> = {
+      Floor: area(q.it!.floorArea),
+      Ceiling: area(q.it!.ceilingArea),
+      'Wall face': area(2n * q.it!.wallFaceArea),
+      Baseboard: run(q.it!.baseboardRun),
+      'Open span': run(q.it!.openRun),
+    };
+    return sheet.lines.map((line) => ({
+      ...line,
+      value: inMyUnits[line.what] ?? `${line.quantity} ${line.unit}`,
+      /** True for the ones somebody orders material against by the sheet. */
+      big: line.unit === 'sq ft' || line.what === 'Baseboard',
+    }));
+  }, [sheet.lines, q.it, area, run]);
+
+  /**
+   * In the order this trade cares about, under the engine's own headings.
+   *
+   * A painter opens this wanting wall face; a flooring contractor wants the
+   * floor. `order` has been able to put their line first since the trade
+   * vocabulary was built -- it just had four hand-written rows to work with
+   * instead of the whole sheet.
+   */
+  /**
+   * Whether the sheet is of two minds about itself.
+   *
+   * Six rows all reading SCANNED is the bug the dimension list had and the tag
+   * list nearly had: a column where every cell is identical carries nothing,
+   * and it costs the row that IS different its only way of standing out. The
+   * sentence under the buttons already says what the whole sheet is.
+   *
+   * So the per-line word appears only when the lines disagree — which happens
+   * the moment somebody tapes a wall, because opening sizes stay the
+   * scanner's. That is exactly the moment it is worth reading.
+   */
+  const mixed = useMemo(
+    () => new Set(shown.map((line) => line.provenance)).size > 1,
+    [shown]
+  );
+
+  const blocks = useMemo(() => {
+    const names: string[] = [];
+    for (const line of shown) {
+      const name = line.group ?? '';
+      if (!names.includes(name)) names.push(name);
+    }
+    return names.map((name) => ({
+      name,
+      lines: order(trade, shown.filter((line) => (line.group ?? '') === name)),
+    }));
+  }, [shown, trade]);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="font-semibold text-slate-900">What this room takes</h2>
         <button
@@ -183,21 +233,74 @@ export function Takeoff({
           onClick={() => setOpen(!open)}
           className="min-h-11 px-2 text-sm text-slate-500 underline underline-offset-4"
         >
-          {open ? 'Hide' : 'Show'}
+          {open ? 'Less' : 'More'}
         </button>
       </div>
 
-      <dl className="mt-2 divide-y divide-slate-100">
-        {rows.map((row) => (
-          <div key={row.what} className="flex items-baseline justify-between gap-4 py-3">
-            <dt className="text-slate-700">
-              {wordFor(trade, row.what)}
-              {open && <span className="block text-xs text-slate-500">{row.prices}</span>}
-            </dt>
-            <dd className="shrink-0 font-semibold font-mono tabular-nums text-slate-900">{row.value}</dd>
+      {blocks.map((block) => (
+        <div key={block.name || 'finishes'}>
+          {/* A heading only where the engine gave one. The finishes have no
+              group and want none: they are the sheet. */}
+          {block.name && (
+            <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {block.name}
+            </h3>
+          )}
+          <dl className="mt-1 divide-y divide-slate-100">
+            {block.lines.map((line) => (
+              <div key={line.what} className="flex items-baseline justify-between gap-3 py-2">
+                <dt className="min-w-0">
+                  <span className="text-slate-700">{wordFor(trade, line.what)}</span>
+                  {/* Where the number came from, under it, always.
+                      This is the one screen where a figure turns into an order,
+                      and "built walls x their height, less every door and
+                      window" is the sentence that lets somebody check it
+                      against their own head. It was behind a Show link, which
+                      is where an explanation goes to never be read. */}
+                  <span className="mt-0.5 block text-xs leading-snug text-slate-500">
+                    {line.workings}
+                    {open && <span className="block text-slate-400">prices {line.prices}</span>}
+                  </span>
+                </dt>
+                <dd className="shrink-0 text-right">
+                  <span
+                    className={`block font-mono tabular-nums text-slate-900 ${
+                      line.big ? 'text-lg font-semibold' : 'font-medium'
+                    }`}
+                  >
+                    {line.value}
+                  </span>
+                  {/* The same two words, in the same two colours, this app uses
+                      on a wall — and only where the sheet disagrees with
+                      itself. A takeoff line is exactly as trustworthy as the
+                      walls under it, and this is where that stops being an
+                      abstraction and starts being money. */}
+                  {mixed && (
+                    <span
+                      className={`block font-mono text-[10px] uppercase tracking-wider ${
+                        line.provenance === 'measured' ? 'text-emerald-700' : 'text-amber-700'
+                      }`}
+                    >
+                      {line.provenance}
+                    </span>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
+
+      {open && (
+        <div className="mt-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Every wall
+          </h3>
+          <div className="mt-1 overflow-x-auto rounded-md bg-slate-100 p-3">
+            <pre className="whitespace-pre font-mono text-xs leading-relaxed text-slate-800">{schedule}</pre>
           </div>
-        ))}
-      </dl>
+        </div>
+      )}
 
       {/* The same numbers, split the way the space is. Below the whole rather
           than instead of it: the whole is what gets ordered, and the split is
@@ -254,27 +357,6 @@ export function Takeoff({
         <p role="alert" className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-900">
           The split could not be worked out, so only the whole room is shown: {perZone.trouble}
         </p>
-      )}
-
-      {extras.length > 0 && (
-        <>
-          <h3 className="mt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            {extras[0]!.group}
-          </h3>
-          <dl className="divide-y divide-slate-100">
-            {extras.map((line) => (
-              <div key={line.what} className="flex items-baseline justify-between gap-4 py-3">
-                <dt className="text-slate-700">
-                  {wordFor(trade, line.what)}
-                  {open && <span className="block text-xs text-slate-500">{line.workings}</span>}
-                </dt>
-                <dd className="shrink-0 font-semibold font-mono tabular-nums text-slate-900">
-                  {line.quantity} {line.unit}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </>
       )}
 
       {sheet.withoutThickness.length > 0 && (
