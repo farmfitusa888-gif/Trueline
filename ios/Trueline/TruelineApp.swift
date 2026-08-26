@@ -9,6 +9,11 @@ struct TruelineApp: App {
     @StateObject private var subscription = Subscription()
     /// The phone's own calendar, written into and never read.
     @StateObject private var calendar = JobCalendar()
+    /// What went wrong, kept where somebody can send it. See `Diagnostics`:
+    /// until there is an App Store listing, Apple's own crash pipe has nothing
+    /// in it, and the six months before that listing exists are the six months
+    /// when a crash on Gilbert's phone matters most.
+    @StateObject private var diagnostics = Diagnostics()
     var body: some Scene {
         WindowGroup {
             // The tab bar, and everything under it. The navigation stack used
@@ -19,9 +24,15 @@ struct TruelineApp: App {
                 store: store,
                 backup: backup,
                 subscription: subscription,
-                calendar: calendar
+                calendar: calendar,
+                diagnostics: diagnostics
             )
             .task {
+                // First, and not inside the awaits below: `start()` picks up
+                // the payloads iOS has already collected, and a crash from the
+                // previous launch is exactly the thing that must not be lost
+                // behind an iCloud round trip that may never come back.
+                diagnostics.start()
                 // Before anything else: what has been paid for. A screen that
                 // draws a paywall over somebody who has already subscribed,
                 // even for a moment, is the worst first impression this app

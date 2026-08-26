@@ -11,6 +11,13 @@ struct ReviewScreen: View {
     @ObservedObject var backup: Backup
     @ObservedObject var subscription: Subscription
     @ObservedObject var calendar: JobCalendar
+    /// Where a JavaScript error from these screens goes.
+    ///
+    /// This is the screen that matters most for it: the takeoff, the plan, the
+    /// proposal and the claim document all run in the web view below, and
+    /// MetricKit cannot see a single thing that happens inside one. A blank
+    /// panel in a basement is invisible without this.
+    @ObservedObject var diagnostics: Diagnostics
     @State private var sharing = false
 
     var body: some View {
@@ -59,7 +66,15 @@ struct ReviewScreen: View {
                 store.writeCompany(json)
                 Task { await backup.pushCompany(json) }
             },
-            companyJSON: store.company
+            companyJSON: store.company,
+            // Skipping `everyRoom`, `reportsJSON` and `onTrouble`, which have
+            // defaults: this screen has one room open rather than all of them,
+            // and the reports are listed on the Business tab. Named arguments
+            // may be omitted but not reordered -- the comment at the top of
+            // this call is about exactly that.
+            onWebError: { message, place, stack in
+                diagnostics.record(webError: message, at: place, stack: stack)
+            }
         )
             .ignoresSafeArea(.container, edges: .bottom)
             .navigationTitle(scan.title)

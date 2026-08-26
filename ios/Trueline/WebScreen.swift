@@ -31,6 +31,18 @@ struct WebScreen: View {
     let title: String
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
+    /// What went wrong, for the Business tab to list. Nil on the Floor tab:
+    /// the floor is a drawing of rooms and has nothing to say about crashes.
+    var diagnostics: Diagnostics?
+
+    /// The file of reports, once somebody has asked to send it. Held here
+    /// rather than inside `CorrectView` because presenting a mail composer is a
+    /// SwiftUI job and `CorrectView` is a web view — it can only say that
+    /// somebody tapped the button.
+    @State private var sending: ReportsFile?
+    /// Set when Send them was tapped and there was nothing to send, so the
+    /// screen says that rather than opening an empty mail.
+    @State private var nothingToSend = false
 
     var body: some View {
         CorrectView(
@@ -73,12 +85,76 @@ struct WebScreen: View {
             companyJSON: store.company,
             // Only the floor needs every room. Handing them to the business
             // screen would be filling storage for a screen that never looks.
-            everyRoom: opensOn == .floor ? store.correctedRooms() : []
+            everyRoom: opensOn == .floor ? store.correctedRooms() : [],
+            // Only the Business tab, and empty everywhere else: the list of
+            // reports belongs on the one screen that has somewhere to put it.
+            reportsJSON: diagnostics?.asJSON() ?? Data(),
+            onTrouble: act,
+            onWebError: { message, place, stack in
+                diagnostics?.record(webError: message, at: place, stack: stack)
+            }
         )
             .ignoresSafeArea(.container, edges: .bottom)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { HandbookButton() }
             .onAppear { store.refresh() }
+            // Mail when the phone has an account set up, and the share sheet
+            // when it does not. Not a fallback pretending to be the same thing:
+            // the screen names the address either way, so somebody sending it
+            // from a webmail app knows where it goes.
+            .sheet(item: $sending) { ready in
+                if MailReports.canSend {
+                    MailReports(file: ready.file) { sending = nil }
+                } else {
+                    TroubleShareSheet(items: [ready.file])
+                }
+            }
+            .alert("Nothing has gone wrong yet", isPresented: $nothingToSend) {
+                Button("All right", role: .cancel) {}
+            } message: {
+                Text(
+                    "There are no reports on this phone. Apple delivers crash reports on a "
+                    + "later launch rather than at the moment of the crash, so one from today "
+                    + "usually appears tomorrow."
+                )
+            }
     }
+
+    /// What the Business screen asked for.
+    ///
+    /// Two words rather than a free-form command, checked here: a web view is a
+    /// program, and a screen that could name any file to mail would be a screen
+    /// that could mail any file on the phone.
+    private func act(_ what: String) {
+        guard let diagnostics else { return }
+        switch what {
+        case "send":
+            if let file = diagnostics.bundleUp() {
+                sending = ReportsFile(file: file)
+            } else {
+                nothingToSend = true
+            }
+        case "clear":
+            diagnostics.clear()
+        default:
+            return
+        }
+    }
+}
+
+/// The file of reports, once there is one, so it can drive `.sheet(item:)`.
+///
+/// `sheet(isPresented:)` with a separate `@State` for the file has a frame in it
+/// where the sheet is up and the file is still nil, and the composer would be
+/// built in that frame. Tying the two together means there is a sheet exactly
+/// when there is a file.
+///
+/// A wrapper rather than making `URL` itself `Identifiable`: a retroactive
+/// conformance on a standard-library type is visible to every file in the
+/// target and collides the moment anything else does the same. This is four
+/// lines and belongs to this screen.
+struct ReportsFile: Identifiable {
+    let file: URL
+    var id: String { file.absoluteString }
 }

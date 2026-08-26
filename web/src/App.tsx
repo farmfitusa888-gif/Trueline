@@ -30,6 +30,7 @@ import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
 import { Settings } from './Settings.tsx';
 import { PriceList } from './PriceList.tsx';
+import { Trouble } from './Trouble.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Price } from './Price.tsx';
 import { JobStatus } from './JobStatus.tsx';
@@ -424,6 +425,11 @@ export function App() {
           {/* Beside the profile rather than beside a room: a price list belongs
               to the business, not to the job somebody happens to have open. */}
           <PriceList />
+          {/* Last, and only when this IS the Business tab. It is about the app
+              rather than about a room, and it must not be the first thing
+              somebody meets when they open the sheet to type a licence number.
+              It draws nothing at all outside the app -- see `Trouble`. */}
+          {openedOn === 'business' && <Trouble />}
         </div>
       )}
 

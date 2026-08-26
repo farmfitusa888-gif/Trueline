@@ -35,6 +35,11 @@ struct RootTabs: View {
     @ObservedObject var backup: Backup
     @ObservedObject var subscription: Subscription
     @ObservedObject var calendar: JobCalendar
+    /// What went wrong. Only the Business tab shows it — see `Diagnostics` and
+    /// `Settings.tsx`: it is the one tab that is about the app rather than
+    /// about a room, and a diagnostics icon in front of a contractor every time
+    /// he opens the app is a product apologising before it has done anything.
+    @ObservedObject var diagnostics: Diagnostics
 
     /// Which tab is showing. Held here so finishing a capture can put the
     /// review on the Rooms tab and then switch to it, rather than leaving the
@@ -57,6 +62,7 @@ struct RootTabs: View {
                     backup: backup,
                     subscription: subscription,
                     calendar: calendar,
+                    diagnostics: diagnostics,
                     path: $roomsPath
                 )
             }
@@ -87,7 +93,13 @@ struct RootTabs: View {
             .tag(Tab.floor)
 
             NavigationStack {
-                WebScreen(opensOn: .business, title: "Your business", store: store, backup: backup)
+                WebScreen(
+                    opensOn: .business,
+                    title: "Your business",
+                    store: store,
+                    backup: backup,
+                    diagnostics: diagnostics
+                )
             }
             .tabItem { Label("Business", systemImage: "building.2") }
             .tag(Tab.business)

@@ -75,6 +75,14 @@ export interface TruelineBridge {
    * `false` -- see `entitlementStore.ts`.
    */
   setSubscribed(paid: boolean): void;
+  /**
+   * Every report the app is holding, for the Business screen to list.
+   *
+   * Handed across rather than read: these screens have no filesystem, and the
+   * reports are files in the app's own Documents folder. `Diagnostics.asJSON`
+   * builds it; nothing here can produce one.
+   */
+  openReports(reports: string): void;
   /** Version of this contract, so a mismatched app build can say so. */
   readonly version: 1;
 }
@@ -187,6 +195,65 @@ export function handBackDamagePhoto(
   }
 }
 
+/**
+ * Something these screens threw, to the app that can keep it.
+ *
+ * ## Why this exists at all
+ *
+ * MetricKit — which is what the app subscribes to for crashes — sees native
+ * code and nothing else. Most of this product is not native code. The takeoff,
+ * the plan, the proposal, the change order and the claim document all run in
+ * here, and every one of them can throw, render a blank panel, and be
+ * completely invisible to Apple's pipe.
+ *
+ * `docs/BUSINESS.md` §6 lists being blind as the one risk marked *certain*.
+ * This is the half of the fix that MetricKit cannot do.
+ *
+ * ## What it does not do
+ *
+ * It does not send anything anywhere. The app writes it to a file on the
+ * device, and it leaves only if somebody taps Send them on the Business screen.
+ * A browser with no app around it has no handler and nothing here fails — the
+ * console still has the error, which is where a browser's errors belong.
+ */
+export function reportTrouble(error: unknown, where_: string): void {
+  const post = handler('trouble');
+  if (!post) return;
+  const problem = error instanceof Error ? error : new Error(String(error));
+  try {
+    post.postMessage({
+      message: `${problem.name}: ${problem.message}`,
+      where: where_,
+      stack: problem.stack ?? '(no stack)',
+      version: BRIDGE_VERSION,
+    });
+  } catch {
+    // Reporting a failure must never be a second failure. If the channel will
+    // not take it, the console still has it and the screen is unaffected.
+  }
+}
+
+/**
+ * Send the reports, or throw them away.
+ *
+ * Two words and nothing else: the app checks them again on its side. A screen
+ * that could name a file to mail would be a screen that could mail any file on
+ * the phone, and this one runs whatever HTML it is given.
+ *
+ * Returns whether there was an app to hear it, so the button can say "not in
+ * the app" rather than appearing to work.
+ */
+export function askAbout(reports: 'send' | 'clear'): boolean {
+  const post = handler('trouble');
+  if (!post) return false;
+  try {
+    post.postMessage({ action: reports, version: BRIDGE_VERSION });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function handBack(fileName: string, project: string): void {
   const saved = handler('saved');
   if (!saved) return;
@@ -248,6 +315,35 @@ const roomListeners = new Set<() => void>();
 export function onRoomsArrived(listen: () => void): () => void {
   roomListeners.add(listen);
   return () => roomListeners.delete(listen);
+}
+
+/** One report the app is holding, as `Diagnostics.asJSON` writes it. */
+export interface TroubleReport {
+  /** The file name on the device. Shown so a report can be named out loud. */
+  name: string;
+  /** `crash`, `hang`, `launch`, `cpu`, `disk`, `daily`, or `screen`. */
+  kind: string;
+  /** ISO 8601, from the app. */
+  when: string;
+  /** The first line of the report, written to be readable on its own. */
+  summary: string;
+}
+
+/**
+ * Whoever is showing the reports when the app hands them over.
+ *
+ * Same shape as the profile, and for the same reason: the hand-over runs once
+ * the page has finished loading, by which time React has already mounted and
+ * asked. Without a listener the Business screen would be handed the list and go
+ * on showing none of it until somebody left the tab and came back.
+ */
+const reportListeners = new Set<(reports: readonly TroubleReport[]) => void>();
+
+export function onReports(
+  listen: (reports: readonly TroubleReport[]) => void
+): () => void {
+  reportListeners.add(listen);
+  return () => reportListeners.delete(listen);
 }
 
 /**
@@ -347,6 +443,32 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     for (const listen of companyListeners) listen(company);
   };
 
+  const openReports = (reports: string) => {
+    let rows: TroubleReport[] = [];
+    try {
+      const parsed: unknown = JSON.parse(reports);
+      // Checked rather than cast. This arrives from the app, which is the same
+      // side of the wall as this code -- but a list drawn from a shape nobody
+      // verified is how one renamed field becomes a screen of `undefined`.
+      if (Array.isArray(parsed)) {
+        rows = parsed.filter(
+          (row): row is TroubleReport =>
+            typeof row === 'object' &&
+            row !== null &&
+            typeof (row as TroubleReport).name === 'string' &&
+            typeof (row as TroubleReport).kind === 'string' &&
+            typeof (row as TroubleReport).when === 'string' &&
+            typeof (row as TroubleReport).summary === 'string'
+        );
+      }
+    } catch {
+      // A build whose app half writes something this one cannot read. An empty
+      // list is the honest answer; the screen says how many it has either way.
+      rows = [];
+    }
+    for (const listen of reportListeners) listen(rows);
+  };
+
   const openTrace = (trace: unknown, fileName?: string) => {
     dispatch({
       type: 'openTrace',
@@ -365,6 +487,7 @@ export function installBridge(dispatch: (action: Action) => void): Window['truel
     openTrace,
     openSaved,
     openCompany,
+    openReports,
     putRooms,
     setSubscribed,
     version: BRIDGE_VERSION,

@@ -728,6 +728,26 @@ const GUIDE = [
         done: 'It stops renewing. Every room you have measured stays on the phone.' },
     ],
   },
+  {
+    group: 'When it misbehaves',
+    why: 'The app writes down what went wrong. Nothing is sent unless you send it.',
+    cards: [
+      { t: 'Sending the reports', where: 'Business → When something goes wrong', tag: null,
+        what: 'If the app quits on its own, or a screen goes blank, there is a report on the phone.',
+        steps: ['Bottom tab: <b>Business</b>. Scroll to the bottom.',
+                'Under <b>When something goes wrong</b>, each report says what it was and when.',
+                'Tap <b>Send them</b>. It opens a mail to support@trueline.tools with everything attached.',
+                '<b>Delete them</b> throws them away, and asks twice because it cannot be undone.'],
+        done: 'A mail is open with one file attached, waiting for you to press send.',
+        warn: 'A crash from today usually appears tomorrow. iOS hands crash reports over on a later launch rather than at the moment of the crash. Anything a screen inside the app throws is written straight away.' },
+      { t: 'What is in one, and what is not', where: 'Business → When something goes wrong', tag: null,
+        what: 'Which build, which model of phone, and what failed. Nothing about the job.',
+        steps: ['No room, no client, no address, no photograph and no measurement is in a report.',
+                'Nothing goes anywhere on its own — there is no server in this app and no network call that sends one.',
+                'The files are in the Files app under Trueline → Reports if you would rather look yourself.'],
+        done: 'You can read the whole file before you send it.' },
+    ],
+  },
 ];
 
 /* --------------------------------------------------------------- rendering */

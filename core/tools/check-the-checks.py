@@ -99,7 +99,7 @@ def expect(what: str, code: int, output: str, *, fires: bool, saying: str = '') 
 # ---------------------------------------------------------------- swift names
 
 def swiftNames(bench: Bench) -> None:
-    print('check-swift-names.py — the four things it claims to find')
+    print('check-swift-names.py — the five things it claims to find')
 
     code, out = bench.run('check-swift-names.py')
     expect('says nothing about the repository as it stands', code, out, fires=False)
@@ -127,6 +127,34 @@ def swiftNames(bench: Bench) -> None:
         bench.write(rel, swapped)
         code, out = bench.run('check-swift-names.py')
         expect('arguments to CorrectView out of order', code, out,
+               fires=True, saying='out of order')
+        bench.restore(rel)
+
+    # 2b. The same thing, on two properties that carry DEFAULTS.
+    #
+    #     Swift puts a defaulted stored property in the memberwise initialiser
+    #     as a parameter that may be omitted -- omitted, but not reordered. The
+    #     checker used to leave those out of its list of labels entirely, so
+    #     `set(passed) - set(labels)` came out non-empty, the call was written
+    #     off as "some other overload", and the ordering check went quiet on it.
+    #
+    #     That is not a hypothetical: `CorrectView` grew `reportsJSON`,
+    #     `onTrouble` and `onWebError` on 2026-08-26 and the check stopped
+    #     looking at the very call it exists for. This case is here so it
+    #     cannot happen again quietly.
+    rel = 'ios/Trueline/WebScreen.swift'
+    was = bench.read(rel)
+    swapped = was.replace(
+        'reportsJSON: diagnostics?.asJSON() ?? Data(),\n            onTrouble: act,',
+        'onTrouble: act,\n            reportsJSON: diagnostics?.asJSON() ?? Data(),',
+    )
+    if swapped == was:
+        failures.append('WebScreen no longer passes reportsJSON then onTrouble')
+        print(f'  {RED}✗{OFF} two defaulted arguments out of order (nothing to swap)')
+    else:
+        bench.write(rel, swapped)
+        code, out = bench.run('check-swift-names.py')
+        expect('two defaulted arguments out of order', code, out,
                fires=True, saying='out of order')
         bench.restore(rel)
 

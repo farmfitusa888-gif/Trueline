@@ -17,6 +17,9 @@ struct ProjectsScreen: View {
     /// hand the answer to the correction screens.
     @ObservedObject var subscription: Subscription
     @ObservedObject var calendar: JobCalendar
+    /// Passed straight through to `ReviewScreen`, which is where the web
+    /// view that can throw actually lives.
+    @ObservedObject var diagnostics: Diagnostics
     /// The whole stack, owned above this screen.
     ///
     /// It has to be, because finishing a capture does not *push* the review —
@@ -212,13 +215,13 @@ struct ProjectsScreen: View {
                 ARMeasureScreen(store: store, backup: backup, onFinished: show)
             case .open(let entry):
                 if let scan = store.load(entry) {
-                    ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar)
+                    ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar, diagnostics: diagnostics)
                 } else {
                     Text("That capture could not be read. Its room.json or trace.json is missing.")
                         .padding()
                 }
             case .review(let scan):
-                ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar)
+                ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar, diagnostics: diagnostics)
             case .dead(let entry):
                 DeadCaptureScreen(
                     entry: entry,

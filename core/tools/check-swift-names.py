@@ -209,6 +209,26 @@ ATTRIBUTED = re.compile(
     re.X,
 )
 
+# A stored property that carries its own default -- `var everyRoom: [Data] = []`.
+#
+# Swift puts these in the memberwise initialiser too, as a parameter with a
+# default value. Leaving them out is not a smaller claim, it is a wrong one:
+# `set(passed) - set(labels)` then contains the defaulted label, the call is
+# written off as "some other overload", and the ordering check silently stops
+# looking at it. That is exactly what happened when `CorrectView` grew
+# `reportsJSON`, `onTrouble` and `onWebError` -- three defaulted properties, and
+# the check went quiet on the very call it was written for.
+#
+# `var` and not `let`: a `let` with a default cannot be set, so Swift leaves it
+# out of the initialiser altogether. Nothing private and nothing carrying a
+# property wrapper: `@State private var tab: Tab = .rooms` is a SwiftUI view's
+# own state, and no call site anywhere passes one.
+DEFAULTED = re.compile(
+    r"""^\s*(?:internal\s+|public\s+)?
+        var\s+(\w+)\s*:\s*[^={\n]+=""",
+    re.X,
+)
+
 
 def bodyOf(source: str, start: int) -> str | None:
     """The braces-matched body of a declaration whose `{` is at or after start."""
@@ -250,10 +270,18 @@ def memberwise(source: str) -> dict[str, list[str]]:
                     ownInit = True
                     break
                 prop = ATTRIBUTED.match(line)
-                # A default value or a computed body means it is not a plain
-                # stored property in the initialiser's sense.
+                # A computed body is not a stored property at all.
                 if prop and '=' not in line.split(':', 1)[1] and not line.rstrip().endswith('{'):
                     labels.append(prop.group(1))
+                    continueLine = True
+                else:
+                    continueLine = False
+                # And the same property with a default on it, which Swift still
+                # takes -- as a parameter that may be omitted, in this position.
+                if not continueLine:
+                    withDefault = DEFAULTED.match(line)
+                    if withDefault:
+                        labels.append(withDefault.group(1))
             depth += line.count('{') - line.count('}')
         if labels and not ownInit:
             found[match.group(1)] = labels

@@ -98,6 +98,33 @@ struct CorrectView: UIViewRepresentable {
     /// six on disk; this hands them over.
     var everyRoom: [Data] = []
 
+    /// What has gone wrong on this phone, for the Business screen to list.
+    ///
+    /// Built by `Diagnostics.asJSON()` and handed across like everything else:
+    /// a web view has no filesystem, so the list of files has to come from this
+    /// side or not exist. Empty on every screen but Business.
+    var reportsJSON: Data = Data()
+
+    /// What the Business screen asked to do about them — `send` or `clear`.
+    ///
+    /// The page cannot send anything itself: there is no mail composer in a web
+    /// view and no network in this bundle. It says which of two things somebody
+    /// tapped, and `WebScreen` does it.
+    var onTrouble: (String) -> Void = { _ in
+        // Every screen but Business. There are no reports listed there to act
+        // on, so there is nothing for a tap to mean.
+    }
+
+    /// A JavaScript error the correction screens threw: message, where, stack.
+    ///
+    /// Every screen, not just Business — a takeoff that goes blank in a
+    /// basement is exactly the failure nothing else in this app can see, and it
+    /// has to be caught where it happens rather than where it is read.
+    var onWebError: (String, String, String) -> Void = { _, _, _ in
+        // A build with no diagnostics attached. Nothing is written and nothing
+        // fails; the console still has it.
+    }
+
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -122,6 +149,11 @@ struct CorrectView: UIViewRepresentable {
         configuration.userContentController.add(context.coordinator, name: "photo")
         // The days somebody has scheduled, on their way to the calendar app.
         configuration.userContentController.add(context.coordinator, name: "calendar")
+        // Two directions on one channel: an error the page threw, which gets
+        // written into the reports folder, and a tap on Send them or Delete
+        // them, which `WebScreen` acts on. Most of this app is these screens,
+        // and MetricKit cannot see a single thing that happens in here.
+        configuration.userContentController.add(context.coordinator, name: "trouble")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -266,6 +298,23 @@ struct CorrectView: UIViewRepresentable {
                 else { return }
                 parent.onDamagePhoto(name, data)
 
+            case "trouble":
+                // Two shapes, and the one that is present decides which. Both
+                // are capped and neither names a file: `Diagnostics` chooses
+                // every file name it writes, and `WebScreen` accepts exactly
+                // two words. A web view is a program, and this is the channel
+                // that can put bytes on disk and open a mail.
+                if let action = body["action"] as? String {
+                    parent.onTrouble(action)
+                    return
+                }
+                guard let message = body["message"] as? String, !message.isEmpty else { return }
+                parent.onWebError(
+                    message,
+                    (body["where"] as? String) ?? "",
+                    (body["stack"] as? String) ?? ""
+                )
+
             default:
                 return
             }
@@ -314,6 +363,24 @@ struct CorrectView: UIViewRepresentable {
                       var company = \(quoted(company));
                       if (window.trueline && window.trueline.openCompany) {
                         window.trueline.openCompany(company);
+                      }
+                    })();
+                    """
+                )
+            }
+
+            // What has gone wrong on this phone, for the Business screen.
+            // Before the room, like the profile: the section is at the bottom
+            // of a screen somebody may already be scrolled to.
+            if !parent.reportsJSON.isEmpty,
+               let reports = String(data: parent.reportsJSON, encoding: .utf8) {
+                run(
+                    on: webView,
+                    """
+                    (function () {
+                      var reports = \(quoted(reports));
+                      if (window.trueline && window.trueline.openReports) {
+                        window.trueline.openReports(reports);
                       }
                     })();
                     """
