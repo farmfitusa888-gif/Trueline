@@ -1725,16 +1725,11 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   any of those goes green over it. Sixteen cases. That is not a compiler and is
   not claimed to be one.
 
-- **A dollhouse for a whole floor.** The geometry exists and is tested —
-  `dollhouse()` in `section.ts` takes the ceiling off and drops the walls
-  standing between the eye and the room — and `Floor.tsx` draws every placed
-  room, in 2D. Nothing joins the two. One room in 3D has *Stand inside* and
-  *Cut it*; a floor has neither.
-
-  The other three of the four asked for are built: walking through a room in
-  perspective (`projectFrom` / `standingInside`, behind *Stand inside*),
-  measuring anything after leaving the room (the Measure screen), and tags
-  pinned in space (`tag.ts`, the *What is behind the wall* panel).
+- ~~A dollhouse for a whole floor.~~ **Built 2026-08-26.** `floor3d.ts`, behind
+  a *Dollhouse* toggle on the floor beside *Blueprint*. All four of the
+  Matterport features asked for are now built: walking through a room in
+  perspective, measuring anything after leaving it, tags pinned in space, and
+  the whole floor with the roof off.
 
 - **The batch photo delete spec** — checkboxes, select-all, and the warning when
   the photo being deleted is the only one showing a wall. Decided (gap 3 above),
@@ -1742,6 +1737,16 @@ Updated 2026-08-25, after the first compiler this project has ever met.
 
 - **`docs/on-the-phone.md` describes 22 tests and none have been run on a
   phone.** Gilbert's actual kitchen is the first one that matters.
+
+- **`ScanScreen.orientation()` reads `UIApplication.shared` from a nonisolated
+  static function.** Under Swift 5 with minimal concurrency checking — which is
+  what the project builds as — a main-actor member imported from another module
+  is a warning, and it built. Under Swift 6 it is an error. It is left alone
+  deliberately: it is only ever called from a SwiftUI gesture closure, which
+  runs on the main thread, so nothing is wrong at runtime; and annotating it
+  `@MainActor` blind could make a build failure nobody here can compile to rule
+  out. The right time to change it is the day `SWIFT_VERSION` moves to 6, when
+  the compiler will name it.
 
 - **Rooms drawn by hand before 2026-08-25 used a hard-coded 8' ceiling**,
   whatever the profile said, because *Your business* offered a default ceiling
