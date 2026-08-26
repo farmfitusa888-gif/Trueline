@@ -18,8 +18,10 @@ because nobody has sold this to anybody yet.
 
 ## 1. What is actually built
 
-Not a roadmap. This is what compiles, passes 761 tests and 17 audit parts, and
-ran on a phone in August 2026.
+Not a roadmap. This is what compiles, passes 788 tests and 18 audit parts, and
+ran on a phone in August 2026 — where the first afternoon of real use found six
+things, all fixed, and the audit grew a part that would have caught the worst of
+them.
 
 | | State |
 |---|---|

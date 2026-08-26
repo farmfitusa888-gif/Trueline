@@ -52,6 +52,7 @@ const parts = [
   'a15-openplan.mjs',
   'a16-navigation.mjs',
   'a17-takeoff.mjs',
+  'a18-handover.mjs',
 ];
 
 function run(part) {

@@ -448,3 +448,33 @@ exteriors, a hosted client link, and accounts that join two phones to one job.
 Tell me **which numbered test**, what you saw, and which room. If it is a scan,
 send the folder — the app writes every scan into its own folder in **Files → On
 My iPhone → Trueline**, which you can AirDrop to yourself.
+
+---
+
+## What changed on 2026-08-26, and what it means for this list
+
+Six things came out of the first afternoon this app spent on a real phone, and
+one of them changes how you read every test above.
+
+**Every paid screen was blank.** Takeoff, Price, Agreement, Work and Insurance
+all drew an empty panel — not a paywall, nothing. So tests 8, 11, 14, 15, 17,
+18, 19, 21 and 22 were untestable, and the app looked like it had no pricing in
+it at all. Fixed; see `web/src/bridge.ts` for what it was.
+
+**Text you typed was invisible in dark mode.** Every input in the app painted
+near-white text on WebKit's near-white default box. If you tried any of these
+tests at night and thought a field was not accepting input, that was why.
+
+**Tapping a wall in the 3D view did nothing**, in either the orbit or the
+inside view, for as long as the screen has existed — so test 3's "tapping a
+wall selects it" could never have passed. The view captured the pointer on the
+first touch, which sends the click that follows to the view rather than to the
+wall under your finger.
+
+Also: Close on the Scan tab now goes to Rooms; what is behind a wall takes as
+many findings as you tick rather than one; the walls in 3D carry their names;
+and your rates are on the Business tab as well as inside a room.
+
+**`docs/first-six-tests.md` is the short version of this page** — the six that
+decide whether the other sixteen are worth running, aimed at any room with four
+walls rather than one particular kitchen.

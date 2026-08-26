@@ -23,8 +23,10 @@ import { useUnits } from './units.tsx';
  * anything with it — a mesh does not know which triangle is the wall you just
  * measured.
  *
- * Drag to walk around it. That is the whole interaction, because a contractor
- * holding a phone in one hand has one thumb.
+ * Drag to walk around it, tap a wall to select it. That is the whole
+ * interaction, because a contractor holding a phone in one hand has one thumb —
+ * and the two have to be told apart by movement alone, which is what `move`
+ * does and what was wrong with it for as long as this screen existed.
  *
  * ## Two places to look from
  *
@@ -92,6 +94,9 @@ export function Room3D({
     /** Where the viewer was standing when the drag began, if inside. */
     standing: Standing | null;
     moved: boolean;
+    /** The finger, and the element to hand it to once this becomes a drag. */
+    pointer: number;
+    svg: SVGSVGElement;
   } | null>(null);
   // `click` fires after `pointerup`, by which time the drag is already cleared,
   // so asking `drag.current?.moved` inside the click handler always read
@@ -153,8 +158,8 @@ export function Room3D({
   // over a few dozen facets, not a hook, so its place in the body is free.
   const labels = wallLabels(view.projection.facets, SIZE);
 
-  const start = (x: number, y: number) => {
-    drag.current = { x, y, from: camera, standing: inside, moved: false };
+  const start = (x: number, y: number, pointer: number, svg: SVGSVGElement) => {
+    drag.current = { x, y, from: camera, standing: inside, moved: false, pointer, svg };
   };
 
   const move = (x: number, y: number) => {
@@ -162,7 +167,22 @@ export function Room3D({
     if (!at) return;
     const dx = x - at.x;
     const dy = y - at.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) at.moved = true;
+    if (!at.moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      at.moved = true;
+      // Only now, and this is the whole fix. Capturing on `pointerdown` meant
+      // the svg owned every gesture from the first touch -- and while a pointer
+      // is captured the `click` that follows is dispatched to the capturing
+      // element, not to the polygon under the finger. So `onClick` on a wall
+      // never fired, in either view, and the screen said "Tap a wall to
+      // measure it" while tapping a wall did nothing at all.
+      //
+      // Capture is still needed once this really is a drag: the polygons are
+      // re-keyed as the depth order changes while turning, so React unmounts
+      // the element under the finger mid-gesture and the rotation sticks. Both
+      // things are true, and the difference between them is three pixels of
+      // movement.
+      at.svg.setPointerCapture?.(at.pointer);
+    }
     if (at.standing) {
       // From inside, a drag turns your head. Dragging left has to look left,
       // which is the opposite sign from orbiting: out there you are pushing the
@@ -181,7 +201,20 @@ export function Room3D({
   };
 
   const end = () => {
-    wasDrag.current = drag.current?.moved ?? false;
+    const at = drag.current;
+    wasDrag.current = at?.moved ?? false;
+    // Handed back, so the next tap is hit-tested against the polygons again
+    // rather than going to whatever held the last drag.
+    //
+    // Asked first, and that is not belt and braces. This runs on `pointerup`
+    // AND on `pointercancel`, and the browser has already released the capture
+    // by the time it dispatches a cancel -- releasing it again throws
+    // `InvalidPointerId`. Which, now that `main.tsx` catches what these screens
+    // throw, would file a crash report every time somebody's gesture was
+    // interrupted by a phone call.
+    if (at?.moved && at.svg.hasPointerCapture?.(at.pointer)) {
+      at.svg.releasePointerCapture(at.pointer);
+    }
     drag.current = null;
   };
 
@@ -197,12 +230,12 @@ export function Room3D({
             : `${room.name} in three dimensions`
         }
         onPointerDown={(event) => {
-          // Captured on the svg, not on the polygon under the finger: the
-          // polygons are re-keyed as the depth order changes while turning, so
-          // React unmounts the captured element mid-drag and the rotation
-          // sticks halfway through the gesture.
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-          start(event.clientX, event.clientY);
+          // Nothing is captured here. See `move`: capture goes on once the
+          // gesture has actually moved, because capturing at the first touch
+          // sends the following `click` to the svg instead of to the wall under
+          // the finger — which is why tapping a wall did nothing for as long as
+          // this screen has existed.
+          start(event.clientX, event.clientY, event.pointerId, event.currentTarget);
         }}
         onPointerMove={(event) => move(event.clientX, event.clientY)}
         onPointerUp={end}

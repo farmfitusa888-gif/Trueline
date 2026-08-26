@@ -56,6 +56,78 @@ export function nameOf(wallId: string): string {
   return numbered ? `Wall ${numbered[1]}` : wallId;
 }
 
+/**
+ * The part of a face that is actually inside the picture.
+ *
+ * ## Why this is here and a centroid alone was not enough
+ *
+ * Standing inside a room is a **perspective** projection, and a wall you are
+ * nearly parallel to projects to an enormous trapezium running far off both
+ * sides of the drawing. The SVG clips it, so it looks perfectly ordinary — but
+ * its centroid is computed from the raw projected corners and lands nowhere
+ * near the picture.
+ *
+ * Measured on this project's own kitchen, standing inside a 386-pixel view:
+ * Wall 3's centre came out at x = 3920 and Wall 1's at x = -3536. Both labels
+ * were drawn, both were outside the box, and neither was ever seen. One label
+ * appeared where there should have been three, and it looked like a feature
+ * that worked.
+ *
+ * So the polygon is cut to the drawing first — Sutherland and Hodgman's
+ * algorithm, four half-planes, the oldest one there is — and the label goes on
+ * the middle of what is left. A wall half out of shot gets its label in the
+ * half you can see, which is also the only half worth labelling.
+ *
+ * A face entirely outside comes back empty, and gets no label at all.
+ */
+export function insideTheBox(
+  points: readonly { readonly x: number; readonly y: number }[],
+  size: number
+): { readonly x: number; readonly y: number }[] {
+  // Each edge as "keep the side where this is true", in order: left, right,
+  // top, bottom. `at` is where a segment crosses it.
+  const edges: {
+    keep: (p: { x: number; y: number }) => boolean;
+    at: (a: { x: number; y: number }, b: { x: number; y: number }) => { x: number; y: number };
+  }[] = [
+    {
+      keep: (p) => p.x >= 0,
+      at: (a, b) => ({ x: 0, y: a.y + ((b.y - a.y) * (0 - a.x)) / (b.x - a.x) }),
+    },
+    {
+      keep: (p) => p.x <= size,
+      at: (a, b) => ({ x: size, y: a.y + ((b.y - a.y) * (size - a.x)) / (b.x - a.x) }),
+    },
+    {
+      keep: (p) => p.y >= 0,
+      at: (a, b) => ({ x: a.x + ((b.x - a.x) * (0 - a.y)) / (b.y - a.y), y: 0 }),
+    },
+    {
+      keep: (p) => p.y <= size,
+      at: (a, b) => ({ x: a.x + ((b.x - a.x) * (size - a.y)) / (b.y - a.y), y: size }),
+    },
+  ];
+
+  let kept = points.map((p) => ({ x: p.x, y: p.y }));
+  for (const edge of edges) {
+    if (kept.length === 0) return [];
+    const next: { x: number; y: number }[] = [];
+    for (let i = 0; i < kept.length; i += 1) {
+      const a = kept[i]!;
+      const b = kept[(i + 1) % kept.length]!;
+      const aIn = edge.keep(a);
+      const bIn = edge.keep(b);
+      if (aIn) next.push(a);
+      // A crossing produces the point on the edge. Guarded against the
+      // degenerate segment -- two identical corners cross nothing, and the
+      // interpolation above would divide by zero.
+      if (aIn !== bIn && (a.x !== b.x || a.y !== b.y)) next.push(edge.at(a, b));
+    }
+    kept = next;
+  }
+  return kept;
+}
+
 /** Twice the polygon's area, by the shoelace formula. Sign carries winding. */
 function twiceArea(points: readonly { readonly x: number; readonly y: number }[]): number {
   let sum = 0;
@@ -122,7 +194,12 @@ export function wallLabels(
 
   for (const facet of facets) {
     if (facet.kind !== 'wall') continue;
-    const { x, y, area } = centreOf(facet.points);
+    // The visible part, not the whole face. See `insideTheBox`: standing in a
+    // room, a wall runs thousands of pixels off both sides of the picture and
+    // its true centre is nowhere near it.
+    const shown = insideTheBox(facet.points, size);
+    if (shown.length < 3) continue;
+    const { x, y, area } = centreOf(shown);
     if (area < floor) continue;
     const already = best.get(facet.wallId);
     if (already && already.area >= area) continue;

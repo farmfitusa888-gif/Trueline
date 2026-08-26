@@ -91,6 +91,48 @@ were fixed by making the check smarter rather than by excusing the control: a
 print button is proved by counting the print call, and an option that is
 already the chosen one is expected to change nothing when pressed again.
 
+## The state seventeen parts never tried
+
+**A18 exists because 264 checks walked past a bug the first hour on a phone
+found.** Every paid screen in the app — Takeoff, Price, Agreement, Work,
+Insurance — was drawing an empty panel. Not a paywall. Nothing.
+
+The reason nothing here saw it is worth writing down, because it is the shape of
+the next one too. A10 tests the gate from both sides, properly, and it does it
+by loading a room through the file picker and then calling `setSubscribed` on a
+page that is already up. **That is a state the phone is never in.** On a phone
+the app hands the room over to a page that may not have run its modules yet, so
+the payload is parked on the window for the page to collect — and the parked
+payload carried the room and nothing else. The subscription answer was dropped,
+and `Gate` returned `null` for good.
+
+So A18 does two things nothing else did:
+
+1. It parks the payload **before the page loads**, which is what actually
+   happens, rather than talking to a page that is already running.
+2. It asserts a rule rather than a screen: **no panel is ever empty**, in any
+   state, including the one where the app never answers at all. Eight sections,
+   three states, twenty-four checks that do not care what the screen is
+   supposed to say — only that it says something.
+
+That second one is the check worth copying. Every other part in this folder
+tests that a specific screen shows specific words, and a screen showing nothing
+passes none of them and fails none of them either, because nothing asks.
+
+It found two more real things on its first run, neither of which anybody had
+reported:
+
+- Standing inside a room, two of three wall labels landed at x = 3920 and
+  x = -3536 in a 386-pixel picture. A perspective view projects a wall you are
+  nearly parallel to thousands of pixels off both sides; the SVG clips it so it
+  looks ordinary, and the label goes with it. One label appeared where there
+  should have been three, and it looked like a feature that worked.
+- **Tapping a wall in the 3D view had never done anything**, in either the orbit
+  or the inside view, for as long as the screen has existed. The view captured
+  the pointer on `pointerdown`, and a captured pointer sends the `click` that
+  follows to the capturing element rather than to the polygon under the finger.
+  The screen said "Tap a wall to measure it" the whole time.
+
 ## What it does not cover
 
 The iOS half. Capture, the AR walk, the CloudKit backup and the navigation are

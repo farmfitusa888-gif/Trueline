@@ -117,7 +117,15 @@ text = await page.locator('body').innerText();
 check('an empty form says what it wants rather than doing nothing',
   /Fill in .*how far along it.*what you found/.test(text), text.slice(0, 400));
 
+// Ticking, not choosing, since 2026-08-26: an open wall is rarely one thing,
+// and the form now starts with Framing lit. This part is about a tag never
+// becoming a quantity, so it wants one condition on it — tick Electrical, then
+// untick Framing. What happens when several are ticked is A18's subject.
 await page.getByRole('button', { name: 'Electrical' }).click();
+await page.getByRole('button', { name: 'Framing' }).click();
+check('a tag can be brought back to one thing',
+  (await page.locator('button[aria-pressed="true"]').filter({ hasText: /^Electrical$/ }).count()) === 1
+  && (await page.locator('button[aria-pressed="true"]').filter({ hasText: /^Framing$/ }).count()) === 0);
 await page.getByLabel('How far along it').fill(`6'`);
 await page.getByLabel('How high (if it matters)').fill(`7'`);
 await page.getByLabel('What you found').fill('knob and tube, still live');

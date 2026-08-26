@@ -52,6 +52,76 @@ export async function open() {
 export function noise() { return problems; }
 
 /**
+ * The app, as it actually hands a room over — parked before the page loads.
+ *
+ * ## Why this exists and `appLike` in A10 was not enough
+ *
+ * A10 loads the room through the file picker and then calls `setSubscribed`
+ * from a page that is already up. That is a state the phone is never in. On a
+ * phone the app talks to a page that may not have run its modules yet, so the
+ * payload is parked on `window.truelinePayload` for `installBridge` to drain —
+ * and for months the parked payload carried the room and nothing else. The
+ * subscription answer was dropped, `waiting()` stayed true forever, and five
+ * screens drew themselves as empty rectangles.
+ *
+ * Seventeen audit parts and 264 checks never saw it, because every one of them
+ * answered the entitlement from a live page. This is the missing state: park
+ * exactly what `CorrectView.hand(over:)` writes, before anything runs.
+ *
+ * Leave `subscribed` out of the payload to get the state the bug produced — the
+ * app never says. Nothing should ever be blank in it.
+ */
+export async function openAsApp(payload, { scheme = 'light' } = {}) {
+  const browser = await chromium.launch({ executablePath: CHROME });
+  const ctx = await browser.newContext({
+    viewport: { width: 430, height: 1600 },
+    acceptDownloads: true,
+    colorScheme: scheme,
+  });
+  const page = await ctx.newPage();
+  problems = [];
+  page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+  page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  await page.addInitScript((parked) => {
+    // The handlers `insideApp()` looks for. Present before a line of the
+    // bundle runs, which is how it is on the phone.
+    window.webkit = { messageHandlers: {} };
+    for (const name of ['saved', 'thumbnail', 'company', 'photo', 'calendar', 'trouble']) {
+      window.webkit.messageHandlers[name] = { postMessage() {} };
+    }
+    if (parked) window.truelinePayload = parked;
+  }, payload);
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  return { browser, ctx, page };
+}
+
+/** Every section of a room, by the name the tab bar uses. */
+export const SECTIONS = [
+  'Plan', 'Room', 'Takeoff', 'Price', 'Agreement', 'Work', 'Insurance', 'Files',
+];
+
+/**
+ * Contrast between two `rgb(...)` strings, by WCAG's own formula.
+ *
+ * Here because "can you read it" is not answerable by looking at class names,
+ * and the bug it was written for — every text field in the app painting
+ * near-white text on WebKit's near-white default input background — is
+ * invisible to every other kind of check.
+ */
+export function contrast(a, b) {
+  const lum = (rgb) => {
+    const [r, g, bl] = String(rgb).match(/[\d.]+/g).slice(0, 3).map(Number).map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
  * Select a wall by keyboard, which is also the screen-reader path.
  *
  * Idempotent: pressing Enter on a wall that is already selected DESELECTS it,
