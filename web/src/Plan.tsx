@@ -270,9 +270,22 @@ export function Plan({
   const midY = model.walls.reduce((t, w) => t + scaleY(w.start.y), 0) / model.walls.length;
 
   const state = readiness(room);
+  /**
+   * What this drawing is, said in one word on the sheet itself.
+   *
+   * It said SCANNED for anything unmeasured, which was true when a scan was
+   * the only way an unmeasured room could exist. A room tapped out on a grid is
+   * unmeasured too and nothing scanned it — and a sheet that says a hand
+   * drawing came off a sensor is the app telling the exact lie it exists to
+   * prevent. Read off the walls rather than assumed: whichever provenance
+   * actually dominates is the word.
+   */
+  const drawnByHand = room.walls.every((wall) => wall.length.provenance.kind === 'derived');
   const caveat =
     state.blocking.length > 0
-      ? 'SCANNED — no wall here has had a tape on it. These numbers will move.'
+      ? drawnByHand
+        ? 'DRAWN — every length came off the grid, not a tape. These numbers will move.'
+        : 'SCANNED — no wall here has had a tape on it. These numbers will move.'
       : 'Measured — a tape has been on a wall running each way.';
 
   return (

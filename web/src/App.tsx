@@ -33,6 +33,7 @@ import { PriceList } from './PriceList.tsx';
 import { RateBook } from './Rates.tsx';
 import { Trouble } from './Trouble.tsx';
 import { Sheet } from './Sheet.tsx';
+import { Sketch } from './Sketch.tsx';
 import { Price } from './Price.tsx';
 import { JobStatus } from './JobStatus.tsx';
 import { Floor } from './Floor.tsx';
@@ -451,13 +452,47 @@ export function App() {
         />
       ) : !loaded ? (
         drawing ? (
-          <Draw
-            onDone={(room, name) => {
-              dispatch({ type: 'openDrawn', room, fileName: name });
-              setDrawing(false);
-            }}
-            onCancel={() => setDrawing(false)}
-          />
+          <div className="space-y-4">
+            {/* Two ways to draw a room by hand, and they are genuinely
+                different rather than a choice of skin.
+
+                Tapping corners takes the SHAPE first and leaves naming and
+                measuring for afterwards — any shape, no compass, edit
+                anything. Nothing it produces is measured, and it says so.
+
+                Typing walls is measured from the first keystroke and cannot
+                draw a shape that is not a run of compass headings.
+
+                So the tapped one is offered first, because it is the one
+                somebody reaches for, and the typed one is right underneath
+                for the room somebody already has the numbers for. */}
+            <Sketch
+              onDone={(room, name) => {
+                dispatch({ type: 'openDrawn', room, fileName: name });
+                setDrawing(false);
+              }}
+              onCancel={() => setDrawing(false)}
+            />
+            <details className="rounded-lg border border-slate-200 bg-white p-4">
+              <summary className="min-h-11 cursor-pointer text-sm font-medium text-slate-700">
+                Or type it in wall by wall, with the tape readings you already have
+              </summary>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                Slower, and the only way where every number is measured from the first
+                keystroke — nothing comes off a grid. Right when you are working from a
+                sheet of dimensions rather than from the room.
+              </p>
+              <div className="mt-3">
+                <Draw
+                  onDone={(room, name) => {
+                    dispatch({ type: 'openDrawn', room, fileName: name });
+                    setDrawing(false);
+                  }}
+                  onCancel={() => setDrawing(false)}
+                />
+              </div>
+            </details>
+          </div>
         ) : insideApp() ? (
           <NothingHere onDraw={() => setDrawing(true)} />
         ) : (

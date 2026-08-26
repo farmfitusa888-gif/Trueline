@@ -202,6 +202,37 @@ export function derive(
   };
 }
 
+/**
+ * A length read off a drawing rather than measured on a wall.
+ *
+ * ## Why this is `derived` and not `verified`
+ *
+ * Tapping corners on a grid gives every wall a length without anybody putting a
+ * tape on anything. That is genuinely useful — it is how somebody draws a room
+ * from an old sheet, or sketches one they cannot get into — and calling the
+ * result a measurement would be the one dishonest thing this model could do.
+ *
+ * A room drawn in ten seconds would tell an adjuster it had been measured, and
+ * every promise this app makes about where a number came from would be worth
+ * nothing. So it is `derived`: worked out from something, not measured, and
+ * `isVerified` says false about it — which is what stops a drawn room claiming
+ * it was taped.
+ *
+ * The tolerance is real rather than decorative. A corner lands within half a
+ * grid square of where it was meant to, at each end, so a wall drawn on a
+ * six-inch grid is good to about six inches — and the app says so instead of
+ * printing a figure to the nearest sixteenth that nobody earned.
+ */
+export function drawnOn(value: Nanometres, tolerance: Nanometres): Measurement {
+  if (tolerance < 0n) {
+    throw new MeasurementError('A drawn length cannot be more certain than nothing.');
+  }
+  return {
+    value,
+    provenance: { kind: 'derived', tolerance, from: ['the grid it was drawn on'] },
+  };
+}
+
 /* --------------------------------------------------------------- questions */
 
 /** A person stood behind this number. */

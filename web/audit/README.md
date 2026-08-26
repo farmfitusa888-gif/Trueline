@@ -133,6 +133,24 @@ reported:
   follows to the capturing element rather than to the polygon under the finger.
   The screen said "Tap a wall to measure it" the whole time.
 
+## Do not touch the tree while it is running
+
+Twice in one afternoon a part came back failed and the failure was the harness,
+not the app:
+
+- `npm run build` under the running preview server — A12 died mid-navigation on
+  `ERR_HTTP_RESPONSE_CODE_FAILURE`, because `dist` was being rewritten while a
+  page was loading out of it.
+- A handbook card added while the audit was in flight — A13 reported "56 on
+  screen, 57 in the source", which was exactly true and entirely self-inflicted:
+  the root `prebuild` is what copies `docs/handbook.html` into `web/public`, and
+  it had run before the edit.
+
+Both cost a full re-run and a few minutes of believing a real bug had appeared.
+The audit builds and serves from the working tree, so an edit during a run is a
+change to the thing being measured. Start it, leave it alone, read it when it
+finishes.
+
 ## What it does not cover
 
 The iOS half. Capture, the AR walk, the CloudKit backup and the navigation are
