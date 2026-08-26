@@ -114,7 +114,17 @@ final class Backup: ObservableObject {
     /// it — the room with everybody's tape readings in it, not the raw capture.
     /// `capture` is what the scanner produced, kept alongside so a second device
     /// can rebuild the scan from nothing.
-    func push(scan name: String, capture: Data, corrected: Data?) async {
+    ///
+    /// `kind` says which file that capture came out of — `scanned`, `walked` or
+    /// `drawn` — because the three are different formats and the field they go
+    /// in is one field. Without it every restored capture was written to
+    /// `room.json`, so a walked room came back onto a second phone as a
+    /// RoomPlan capture that no importer could read, and a drawn room came back
+    /// as an empty one. A record written before this field existed has no
+    /// `kind`, and `scanned` is the right answer for those: every capture the
+    /// app had put in iCloud up to then really was a scan, because nothing else
+    /// was being backed up.
+    func push(scan name: String, capture: Data, corrected: Data?, kind: String) async {
         // A phone with no iCloud account has nowhere to put it, and saying so
         // once is enough — retrying on every keystroke would only spend the
         // battery. A *failure* is different: a lost signal comes back, and the
@@ -135,6 +145,7 @@ final class Backup: ObservableObject {
             }
             record["name"] = name as CKRecordValue
             record["capture"] = capture as CKRecordValue
+            record["kind"] = kind as CKRecordValue
             if let corrected {
                 record["corrected"] = corrected as CKRecordValue
             }
@@ -277,6 +288,8 @@ final class Backup: ObservableObject {
     struct Restored {
         let name: String
         let capture: Data
+        /// `scanned`, `walked` or `drawn` — which file the capture belongs in.
+        let kind: String
         let corrected: Data?
         let savedAt: Date
     }
@@ -317,6 +330,7 @@ final class Backup: ObservableObject {
                         Restored(
                             name: name,
                             capture: capture,
+                            kind: record["kind"] as? String ?? "scanned",
                             corrected: record["corrected"] as? Data,
                             savedAt: record["savedAt"] as? Date ?? .distantPast
                         )

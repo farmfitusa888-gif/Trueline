@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C02BF52EA80B0C4E9EC95FDE /* DrawScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC0C9101520AA217046DA3C /* DrawScreen.swift */; };
 		5C867CE20C5C4BA4F555D470 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AD5B3997BF82C119A063163 /* Diagnostics.swift */; };
 		85BC20B401C2445455833E40 /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8136ECB4A1596435B3E4826C /* Design.swift */; };
 		2DA95C005491B35E2A0D9C58 /* DeadCaptureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12430DB0BD406E0C3A0A3F2 /* DeadCaptureScreen.swift */; };
@@ -41,6 +42,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		CDC0C9101520AA217046DA3C /* DrawScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawScreen.swift; sourceTree = "<group>"; };
 		4AD5B3997BF82C119A063163 /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
 		8136ECB4A1596435B3E4826C /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
 		D12430DB0BD406E0C3A0A3F2 /* DeadCaptureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeadCaptureScreen.swift; sourceTree = "<group>"; };
@@ -130,6 +132,7 @@
 				D12430DB0BD406E0C3A0A3F2 /* DeadCaptureScreen.swift */,
 				8136ECB4A1596435B3E4826C /* Design.swift */,
 				4AD5B3997BF82C119A063163 /* Diagnostics.swift */,
+				CDC0C9101520AA217046DA3C /* DrawScreen.swift */,
 				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
 				6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */,
 				DA1B9D64EFC2ED4C64672F34 /* Web */,
@@ -240,6 +243,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */,
+				C02BF52EA80B0C4E9EC95FDE /* DrawScreen.swift in Sources */,
 				5C867CE20C5C4BA4F555D470 /* Diagnostics.swift in Sources */,
 				85BC20B401C2445455833E40 /* Design.swift in Sources */,
 				2DA95C005491B35E2A0D9C58 /* DeadCaptureScreen.swift in Sources */,

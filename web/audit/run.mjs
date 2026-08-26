@@ -53,6 +53,7 @@ const parts = [
   'a16-navigation.mjs',
   'a17-takeoff.mjs',
   'a18-handover.mjs',
+  'a19-money.mjs',
 ];
 
 function run(part) {

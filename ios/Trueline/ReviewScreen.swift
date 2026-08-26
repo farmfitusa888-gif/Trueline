@@ -48,7 +48,8 @@ struct ReviewScreen: View {
                     await backup.push(
                         scan: scan.title,
                         capture: scan.isTrace ? scan.traceJSON : scan.roomJSON,
-                        corrected: project
+                        corrected: project,
+                        kind: scan.kind
                     )
                 }
             },

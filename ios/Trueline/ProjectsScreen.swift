@@ -36,6 +36,29 @@ struct ProjectsScreen: View {
             // They are tabs now, along the bottom where a thumb is, so they are
             // gone from here: two ways to start a scan, in two places, is two
             // things to keep in step and one of them to forget.
+            //
+            // Drawing is the third way in and it is NOT a tab, because iOS
+            // folds anything past the fifth tab into a "More" list and five are
+            // spent. So it is a row, here, on the first screen of the app --
+            // permanently, not only when the list is empty. Until this row
+            // existed the grid in `Sketch.tsx` could be reached exactly one
+            // way: start a scan, fail it, open the dead capture, and take a way
+            // out. A way out is not a way in.
+            Section {
+                NavigationLink(value: Route.newDraw) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Draw a room", systemImage: "square.grid.3x3")
+                        Text(
+                            "Tap the corners onto a grid. No camera, no LiDAR, no scan — the "
+                            + "way to price a room off an old drawing, or one you cannot get "
+                            + "into."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(Ink.quiet)
+                    }
+                }
+            }
+
             if store.scans.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
@@ -44,10 +67,12 @@ struct ProjectsScreen: View {
                         Text(
                             ARMeasureSession.hasLiDAR
                             ? "Tap Scan along the bottom and walk a room — the phone finds the "
-                              + "walls. Or tap Measure and put in the corners yourself."
+                              + "walls. Or tap Measure and point at each corner. Or draw one "
+                              + "above, with no camera at all."
                             : "This phone has no LiDAR, so it cannot scan. Tap Measure along "
-                              + "the bottom and put in the corners yourself — every number in a "
-                              + "room measured that way is measured from the first keystroke."
+                              + "the bottom and point at each corner — every number in a room "
+                              + "measured that way is measured from the first keystroke. Or "
+                              + "draw one above, with no camera at all."
                         )
                         .font(.callout)
                         .foregroundStyle(Ink.quiet)
@@ -221,6 +246,16 @@ struct ProjectsScreen: View {
                 )
             case .newMeasure:
                 ARMeasureScreen(store: store, backup: backup, onFinished: show)
+            case .newDraw:
+                // Same contract as the other two ways in: it makes a room, and
+                // the room takes this screen's place in the stack rather than
+                // sitting on top of it.
+                DrawScreen(
+                    store: store,
+                    backup: backup,
+                    diagnostics: diagnostics,
+                    onFinished: show
+                )
             case .open(let entry):
                 if let scan = store.load(entry) {
                     ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar, diagnostics: diagnostics)
@@ -267,6 +302,8 @@ struct ProjectsScreen: View {
     enum Route: Hashable {
         case newScan
         case newMeasure
+        /// The grid, for a room drawn rather than captured.
+        case newDraw
         case open(ProjectStore.Entry)
         case review(SavedScan)
         /// A capture with no walls in it, and the three ways out of one.

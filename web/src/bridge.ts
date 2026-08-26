@@ -357,8 +357,35 @@ export const BRIDGE_VERSION = 1;
 /** Whoever wants to know when the app hands a profile over. */
 const companyListeners = new Set<(company: string) => void>();
 
+/**
+ * The last profile the app handed over, kept for a listener that was late.
+ *
+ * ## The same bug as the blank paid screens, one level down
+ *
+ * `installBridge` runs in an effect inside `App`. `UnitsProvider` — the one
+ * thing that listens for a profile — is `App`'s **parent**, and React runs
+ * effects children-first. So the hand-over was always drained before the only
+ * subscriber existed, and `openCompany` fired into an empty set.
+ *
+ * On a phone that had been used before, nothing looked wrong: the profile is
+ * also in this web view's `localStorage`, which every tab shares, so the rates
+ * were there anyway. It breaks exactly where the hand-over is the *only* copy —
+ * a new phone restoring from iCloud, or a web view whose storage the operating
+ * system reclaimed. Then a contractor opens a room and his own rates, licence
+ * number and insurance are simply gone, and the takeoff prices nothing.
+ *
+ * That is the identical failure that drew five paid screens as blank
+ * rectangles: something handed across before anybody was listening for it.
+ * There the fix was one `take` with one fallback. Here it is this — the profile
+ * is kept, and a listener that subscribes afterwards is given it immediately,
+ * so the order the two effects happen to run in stops mattering.
+ */
+let lastCompany: string | undefined;
+
 export function onCompany(listen: (company: string) => void): () => void {
   companyListeners.add(listen);
+  // Whatever the app already said, said again to whoever just arrived.
+  if (lastCompany !== undefined) listen(lastCompany);
   return () => companyListeners.delete(listen);
 }
 
@@ -503,6 +530,7 @@ export function installBridge(dispatch: (action: Action) => void): void {
   // The profile is not part of the room, so it does not go through the reducer.
   // The provider that owns it subscribes here instead.
   const openCompany = (company: string) => {
+    lastCompany = company;
     for (const listen of companyListeners) listen(company);
   };
 

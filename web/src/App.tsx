@@ -173,17 +173,31 @@ function NothingHere({ onDraw }: { onDraw: () => void }) {
  * `#business` — because it is the one part of a URL a custom scheme handler
  * never sees and never has to serve.
  *
+ * ## And `#draw`, which was a screen with no door
+ *
+ * Drawing a room by tapping its corners is built, tested and audited, and on a
+ * phone it could not be opened. The only thing that ever rendered it was the
+ * no-room branch below, and the app never loads this bundle without a room
+ * except on Floor and Business. So the one way to reach it was to start a scan,
+ * fail it, open the dead capture and take the way out — which is not a way in.
+ *
+ * That is the same failure `Sections.tsx` and `RootTabs.swift` each exist to
+ * fix, for the third time: work that is finished and unreachable is
+ * indistinguishable from work that was never done.
+ *
+ * `#draw` is the door. `DrawScreen.swift` is what opens it, from the Rooms tab.
+ *
  * Anything unrecognised opens the room, which is the old behaviour and the
  * right default: a bad route should cost nothing.
  */
-export function openedAt(): 'room' | 'floor' | 'business' {
+export function openedAt(): 'room' | 'floor' | 'business' | 'draw' {
   let hash = '';
   try {
     hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
   } catch {
     return 'room';
   }
-  return hash === 'floor' || hash === 'business' ? hash : 'room';
+  return hash === 'floor' || hash === 'business' || hash === 'draw' ? hash : 'room';
 }
 
 export function App() {
@@ -198,7 +212,10 @@ export function App() {
   // On a sheet going to a client it is clutter, so it comes off -- and taking
   // it off moves nothing, because no number ever came from it.
   const [furniture, setFurniture] = useState(true);
-  const [drawing, setDrawing] = useState(false);
+  // Opened straight onto the grid when the app asked for `#draw`, which is what
+  // the Rooms tab's "Draw a room" pushes. Everywhere else it starts closed and
+  // a button opens it.
+  const [drawing, setDrawing] = useState(() => openedAt() === 'draw');
   const [settings, setSettings] = useState(() => openedAt() === 'business');
   // One room, or all of them. The floor is a view over the rooms already saved
   // on this device plus the joins somebody declared between them, so switching
@@ -228,6 +245,10 @@ export function App() {
   useEffect(() => {
     setSettings(openedOn === 'business');
     setShowing(openedOn === 'floor' ? 'floor' : 'room');
+    // Only ever turned ON by the route. A finished drawing sets it false and
+    // opens the room it made; re-asserting the route here would throw that room
+    // straight back off the screen.
+    if (openedOn === 'draw') setDrawing(true);
   }, [openedOn]);
   const loaded = state.loaded;
 
@@ -471,7 +492,7 @@ export function App() {
                 dispatch({ type: 'openDrawn', room, fileName: name });
                 setDrawing(false);
               }}
-              onCancel={() => setDrawing(false)}
+              {...(openedOn === 'draw' ? {} : { onCancel: () => setDrawing(false) })}
             />
             <details className="rounded-lg border border-slate-200 bg-white p-4">
               <summary className="min-h-11 cursor-pointer text-sm font-medium text-slate-700">
@@ -488,7 +509,7 @@ export function App() {
                     dispatch({ type: 'openDrawn', room, fileName: name });
                     setDrawing(false);
                   }}
-                  onCancel={() => setDrawing(false)}
+                  {...(openedOn === 'draw' ? {} : { onCancel: () => setDrawing(false) })}
                 />
               </div>
             </details>

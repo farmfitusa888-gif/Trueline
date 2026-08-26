@@ -42,7 +42,15 @@ export function Draw({
   onCancel,
 }: {
   readonly onDone: (room: Room, name: string) => void;
-  readonly onCancel: () => void;
+  /**
+   * Given where there is somewhere to go back to.
+   *
+   * Absent on the phone's own Draw a room screen, which is pushed on the Rooms
+   * tab and already has a back button in the navigation bar. A second Back
+   * inside the page would dump somebody on "This capture has no room in it" —
+   * a sentence about a scan that was never started.
+   */
+  readonly onCancel?: () => void;
 }) {
   const { len, company } = useUnits();
 
@@ -161,13 +169,15 @@ export function Draw({
           >
             Start
           </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700 active:bg-slate-100"
-          >
-            Back
-          </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700 active:bg-slate-100"
+            >
+              Back
+            </button>
+          )}
         </div>
       </div>
     );
@@ -360,7 +370,16 @@ export function Draw({
         </button>
         <button
           type="button"
-          onClick={onCancel}
+          /* What it says: the typed room goes, and the screen is the one it
+             started on — ready to name another. It used to call `onCancel`,
+             which left the drawing screen entirely; that was wrong even before
+             the phone had a Draw a room screen with nothing behind it to leave
+             to. */
+          onClick={() => {
+            setDraft(null);
+            setFixing(null);
+            setTrouble(null);
+          }}
           className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700 active:bg-slate-100"
         >
           Throw it away

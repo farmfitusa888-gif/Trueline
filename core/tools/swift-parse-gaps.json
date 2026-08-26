@@ -1,6 +1,6 @@
 {
   "Backup.swift": {
-    "sha256": "42b9ec2e4fdba8c03e42ae97d21950e6b43f1844f522f72f36a59474152fc6c4",
-    "why": "uses `switch try await`, `if let x = try? await y()` and a nil-coalesced optional cast in a guard -- all valid Swift the tree-sitter grammar rejects. Read line by line on 2026-08-25. Hash updated the same day for one added line, `import Combine`: the file uses ObservableObject and @Published, which live in Combine and were never imported. The diff was read before the hash was moved -- which is the whole point of the hash."
+    "sha256": "acc3ce89ca890dfa59f6813f728967ce3937e11acaf523a2b364c2b237b37716",
+    "why": "uses `switch try await`, `if let x = try? await y()` and a nil-coalesced optional cast in a guard -- all valid Swift the tree-sitter grammar rejects. Read line by line on 2026-08-25. Hash updated the same day for one added line, `import Combine`: the file uses ObservableObject and @Published, which live in Combine and were never imported. Hash updated again on 2026-08-26 for the `kind` field: a scan, a walk and a drawing are three formats sharing one `capture` field, and without a word saying which, every restored capture was written to room.json. The whole diff -- one parameter, one record key, one struct field, one read with a `scanned` default for records written before it existed -- was read before the hash was moved, which is the whole point of the hash."
   }
 }

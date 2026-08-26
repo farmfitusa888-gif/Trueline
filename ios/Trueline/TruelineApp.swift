@@ -44,7 +44,7 @@ struct TruelineApp: App {
                 await backup.check()
                 let missing = await backup.fetchMissing(have: store.names)
                 for scan in missing {
-                    store.restore(name: scan.name, capture: scan.capture, corrected: scan.corrected)
+                    store.restore(name: scan.name, capture: scan.capture, kind: scan.kind, corrected: scan.corrected)
                     // And the photographs of damage that go with it. Without
                     // these, a claim pulled down onto a second phone opens with
                     // a document referring to evidence the phone has never

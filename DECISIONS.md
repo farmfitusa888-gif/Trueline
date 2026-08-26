@@ -1719,11 +1719,13 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   unverified surface in the repository.
 
   What now stands between the code and a compiler is checked without one:
-  `check-swift.py` parses all 23 files, `check-swift-names.py` finds four
-  classes of error a parser cannot see, `check-pbxproj.py` reads the project
-  file, and `check-the-checks.py` breaks the real files on purpose and fails if
-  any of those goes green over it. Sixteen cases. That is not a compiler and is
-  not claimed to be one.
+  `check-swift.py` parses 29 of 30 files -- `Backup.swift` excused against a
+  recorded hash, read line by line -- `check-swift-names.py` finds seven classes
+  of error a parser cannot see, `check-pbxproj.py` reads the project file,
+  `check-doors.py` proves every route the app can push has something that opens
+  it, and `check-the-checks.py` breaks the real files on purpose and fails if
+  any of those goes green over it. Twenty-three cases. That is not a compiler
+  and is not claimed to be one.
 
 - ~~A dollhouse for a whole floor.~~ **Built 2026-08-26.** `floor3d.ts`, behind
   a *Dollhouse* toggle on the floor beside *Blueprint*. All four of the
@@ -1752,6 +1754,33 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   whatever the profile said, because *Your business* offered a default ceiling
   that nothing read. Fixed. Any room drawn before then wants its height
   checked before its quantities are trusted.
+
+- **The grid had no door for a day, and this is the third time.** Drawing a
+  room by tapping its corners was built, unit tested, driven in a browser and
+  written up in the handbook, and on a phone it could be opened exactly one way:
+  start a scan, let it fail, open the dead capture, and take a way out. Fixed --
+  `#draw`, `DrawScreen.swift`, and a *Draw a room* row at the top of the Rooms
+  tab. `check-doors.py` now fails if any route loses its door or gains one with
+  no screen behind it. It cannot catch a *web* screen with no route at all,
+  which is the shape this one took, and says so in its own header; the check
+  that a person can reach the grid is `a19-money.mjs`, which drives a browser.
+
+- **A profile handed over by the app was dropped before anybody was listening.**
+  `installBridge` runs in an effect inside `App`; `UnitsProvider` is `App`'s
+  parent, and React runs effects children-first. So `openCompany` always fired
+  into an empty set. It never showed on a phone that had been used before,
+  because the profile is in `localStorage` too -- it breaks exactly where the
+  hand-over is the only copy: a new phone restoring from iCloud, or a web view
+  whose storage the system reclaimed. Fixed by keeping the last profile in
+  `bridge.ts` and replaying it to a listener that subscribes late. Same shape as
+  the blank paid screens, one level down.
+
+- **A walked room restored from iCloud came back as a scan.** `Backup.push`
+  sends whatever capture a room has in one `capture` field, and `restore` wrote
+  every one of them to `room.json` -- so a trace came back onto a second phone
+  as a RoomPlan capture no importer could read. The record carries a `kind` now
+  (`scanned` / `walked` / `drawn`), and a record written before that field
+  existed reads as `scanned`, which is what every one of them actually was.
 
 Everything else: build proceeds.
 

@@ -267,4 +267,17 @@ struct SavedScan: Identifiable, Hashable {
 
     var id: URL { folder }
     var isTrace: Bool { !traceJSON.isEmpty }
+
+    /// How this room got into the app: `scanned`, `walked` or `drawn`.
+    ///
+    /// The same three words `ProjectStore.kind(of:)` reads off a folder, worked
+    /// out here from what the scan is actually carrying — so a room that has
+    /// just been made and one read back off disk answer this the same way.
+    /// iCloud stores it, because the capture field is one field and the three
+    /// formats are not interchangeable.
+    var kind: String {
+        if !roomJSON.isEmpty { return "scanned" }
+        if !traceJSON.isEmpty { return "walked" }
+        return "drawn"
+    }
 }

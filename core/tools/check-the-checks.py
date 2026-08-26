@@ -449,10 +449,73 @@ def xcscheme(bench: Bench) -> None:
                  blocks=True, saying='LaunchAction')
 
 
+# ---------------------------------------------------------------------- doors
+
+def doors(bench: Bench) -> None:
+    """The three shapes of "a screen nobody can reach".
+
+    Each of these is the undoing of a fix made this week, after the grid in
+    `Sketch.tsx` turned out to be openable exactly one way: start a scan, let it
+    fail, open the dead capture, and take a way out.
+
+    The first version of `check-doors.py` passed two of these three, and it is
+    worth writing down which, because both are the same mistake twice:
+
+      * With the only `NavigationLink(value: Route.newDraw)` deleted it still
+        found `case .newDraw:` in the destination switch and called that a door.
+        A branch in a switch is the room, not the way in.
+      * With `opensOn: .draw` deleted it still found `scene.draw(corners:)` and
+        the sentence "Or draw one above". A bare word is not a route.
+
+    Both went green on a file broken on purpose, which is the one failure this
+    whole harness exists to make impossible.
+    """
+    print('check-doors.py — a route with no door, and a door onto nothing')
+
+    code, out = bench.run('check-doors.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    # 1. The door itself: the row on the Rooms tab that opens the grid.
+    rel = 'ios/Trueline/ProjectsScreen.swift'
+    dead = 'ios/Trueline/DeadCaptureScreen.swift'
+    bench.write(rel, bench.read(rel).replace(
+        'NavigationLink(value: Route.newDraw) {', 'NavigationLink(value: Route.newScan) {'))
+    bench.write(dead, bench.read(dead).replace('path = [.newDraw]', 'path = [.newMeasure]'))
+    code, out = bench.run('check-doors.py')
+    expect('the Draw a room row taken off the Rooms tab', code, out,
+           fires=True, saying='has no door')
+    bench.restore(rel)
+    bench.restore(dead)
+
+    # 2. The room behind it: the branch that actually builds the screen.
+    was = bench.read(rel)
+    at = was.find('case .newDraw:')
+    end = was.find('case .open(let entry):', at)
+    if at < 0 or end < 0:
+        failures.append('could not find the .newDraw branch to remove')
+        print(f'  {RED}✗{OFF} the destination behind Draw a room removed (no branch found)')
+    else:
+        bench.write(rel, was[:at] + was[end:])
+        code, out = bench.run('check-doors.py')
+        expect('the destination behind Draw a room removed', code, out,
+               fires=True, saying='door onto nothing')
+        bench.restore(rel)
+
+    # 3. The web route: the one thing that loads the bundle on the grid.
+    rel = 'ios/Trueline/DrawScreen.swift'
+    bench.write(rel, bench.read(rel).replace('opensOn: .draw,', 'opensOn: .room,'))
+    code, out = bench.run('check-doors.py')
+    expect('the only screen that opens the bundle on the grid', code, out,
+           fires=True, saying='Opening.draw')
+    bench.restore(rel)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
         swiftNames(bench)
+        print()
+        doors(bench)
         print()
         pbxproj(bench)
         print()

@@ -20,7 +20,7 @@
     "what-is-left": "python3 core/tools/check-reachable.py",
     "verify": "npm test && npm run typecheck && npm run build && npm run check-guide && npm run what-is-left && npm run check-tokens && npm run check-art && npm run check-swift && npm run check-the-checks",
     "ship-web": "npm run build && rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/",
-    "check-swift": "python3 core/tools/check-swift.py && python3 core/tools/check-swift-names.py && python3 core/tools/check-pbxproj.py",
+    "check-swift": "python3 core/tools/check-swift.py && python3 core/tools/check-swift-names.py && python3 core/tools/check-pbxproj.py && python3 core/tools/check-doors.py",
     "check-the-checks": "python3 core/tools/check-the-checks.py",
     "prebuild": "cp docs/handbook.html web/public/handbook.html",
     "tokens": "node --experimental-strip-types core/tools/gen-design.mjs",

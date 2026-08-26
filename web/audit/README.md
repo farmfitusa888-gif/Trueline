@@ -156,3 +156,27 @@ finishes.
 The iOS half. Capture, the AR walk, the CloudKit backup and the navigation are
 Swift, and nothing in this repository has compiled them. `docs/on-the-phone.md`
 is the list for that, and it has to be walked on a phone by a person.
+
+## A19 and the two ways a join fails
+
+`a19-money.mjs` is the only part that takes a **journey** rather than a feature:
+the Business tab, a scan arriving as the app hands it over, all eight parts of
+the room, the takeoff, the money, the proposal, a signature, and an invoice —
+then the same journey again for a room nobody scanned.
+
+It exists because the two failures that cost the most on a real phone were both
+joins rather than features, and eighteen parts of hard feature-driving never
+saw either:
+
+* every paid screen drawing itself blank, because the entitlement was dropped
+  between the app and the page;
+* the contractor's own rate book never reaching a room, for the same reason one
+  level down — the listener subscribed after the hand-over had already run.
+
+Two rules make it worth running rather than reassuring:
+
+* **The arithmetic is done here.** A total that agrees with itself proves
+  nothing. Every priced line is checked against quantity × the rate this file
+  typed, and the total against the lines.
+* **It uses `openAsApp`, never `open`.** The parked-payload state is the one a
+  phone is actually in, and it is the state both of those bugs lived in.

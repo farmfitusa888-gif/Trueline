@@ -29,10 +29,19 @@ struct CorrectView: UIViewRepresentable {
     ///
     /// It goes across on the URL fragment, which is the one part of a URL the
     /// scheme handler never sees and never has to serve.
+    /// And `draw`, which is the door a finished screen did not have.
+    ///
+    /// Tapping a room's corners on a grid is built, tested and audited in
+    /// `Sketch.tsx`, and on a phone there was no way to open it. The page shows
+    /// it when it is loaded with no room in it, and the app never loads it that
+    /// way except on Floor and Business — so the only route to the grid was to
+    /// start a scan, fail it, open the dead capture and take the way out.
+    /// A way out is not a way in.
     enum Opening: String {
         case room = ""
         case floor = "floor"
         case business = "business"
+        case draw = "draw"
 
         var url: URL {
             self == .room

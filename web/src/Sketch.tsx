@@ -60,7 +60,16 @@ export function Sketch({
   onCancel,
 }: {
   readonly onDone: (room: Room, name: string) => void;
-  readonly onCancel: () => void;
+  /**
+   * Given where there is somewhere to go back to.
+   *
+   * Absent on the phone's own Draw a room screen, which is pushed on the Rooms
+   * tab and already has a back button in the navigation bar. A second Cancel
+   * inside the page would be a control that either does nothing or dumps
+   * somebody on "This capture has no room in it" — a sentence about a scan that
+   * was never started.
+   */
+  readonly onCancel?: () => void;
 }) {
   const { len, company } = useUnits();
 
@@ -314,14 +323,16 @@ export function Sketch({
           >
             Start drawing
           </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700
-                       active:bg-slate-100"
-          >
-            Cancel
-          </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="min-h-12 rounded-md border border-slate-300 px-4 font-medium text-slate-700
+                         active:bg-slate-100"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </section>
     );

@@ -52,6 +52,18 @@ export async function open() {
 export function noise() { return problems; }
 
 /**
+ * What the page has sent the app through one of its message handlers.
+ *
+ * Only from a page opened with `openAsApp`, which is the only one that has the
+ * handlers on it. Newest last, and empty rather than undefined when nothing has
+ * been sent — a part asking "did the room reach the app" should get `[]` and
+ * fail its own check, not a TypeError two lines later.
+ */
+export async function sentTo(page, name) {
+  return page.evaluate((which) => window.__sent?.[which] ?? [], name);
+}
+
+/**
  * The app, as it actually hands a room over — parked before the page loads.
  *
  * ## Why this exists and `appLike` in A10 was not enough
@@ -85,9 +97,21 @@ export async function openAsApp(payload, { scheme = 'light' } = {}) {
   await page.addInitScript((parked) => {
     // The handlers `insideApp()` looks for. Present before a line of the
     // bundle runs, which is how it is on the phone.
+    //
+    // Each one keeps what it was sent, because half of what this app does on a
+    // phone is send something to the native side and trust it landed. The
+    // corrected room, the contractor's profile, the plan thumbnail: none of it
+    // is visible on the screen, and a check that cannot see it can only ever
+    // prove the button was there. `sentTo` reads them back.
+    window.__sent = {};
     window.webkit = { messageHandlers: {} };
     for (const name of ['saved', 'thumbnail', 'company', 'photo', 'calendar', 'trouble']) {
-      window.webkit.messageHandlers[name] = { postMessage() {} };
+      window.__sent[name] = [];
+      window.webkit.messageHandlers[name] = {
+        postMessage(body) {
+          window.__sent[name].push(body);
+        },
+      };
     }
     if (parked) window.truelinePayload = parked;
   }, payload);

@@ -22,9 +22,13 @@ import SwiftUI
 /// the only three things anybody would want:
 ///
 ///   - **Scan the room again** — the usual answer, and it is one tap away.
-///   - **Draw it by hand** — needs no LiDAR, and every number in a room drawn
-///     that way is measured from the first keystroke. On a phone with no LiDAR
-///     it is the *only* answer, so it is offered first there.
+///   - **Point at each corner** — needs no LiDAR, and every number in a room
+///     walked that way is measured from the first tap. On a phone with no LiDAR
+///     it is one of the two answers left, so it is offered first there.
+///   - **Draw it on a grid** — no camera at all, for the room somebody cannot
+///     get back into. Both of these used to be one button called "Draw it by
+///     hand" that opened the camera, which was the wrong words for one of them
+///     and no door at all for the other.
 ///   - **Delete it** — off the phone and out of the iCloud copy, both, so the
 ///     next device to look does not put it back.
 ///
@@ -83,14 +87,34 @@ struct DeadCaptureScreen: View {
                     }
                 }
 
+                // Two different things, named for what they actually are.
+                // Both of them used to be one button called "Draw it by hand",
+                // and it opened the camera -- so somebody who wanted to tap a
+                // room onto a grid got a live viewfinder and a reticle, and
+                // somebody standing in a room they could not scan had no idea
+                // one of these was a drawing screen.
                 Button {
                     path = [.newMeasure]
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Label("Draw it by hand", systemImage: "ruler")
+                        Label("Point at each corner", systemImage: "ruler")
                         Text(
-                            "Put in the corners yourself. Needs no LiDAR, and every number in "
-                            + "it is measured from the first keystroke."
+                            "Walk the room and tap each corner through the camera. Needs no "
+                            + "LiDAR, and every number in it is measured from the first tap."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(Ink.quiet)
+                    }
+                }
+
+                Button {
+                    path = [.newDraw]
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Draw it on a grid", systemImage: "square.grid.3x3")
+                        Text(
+                            "Tap the corners onto a grid, then put the tape readings in. No "
+                            + "camera at all — the way to do a room you cannot get back into."
                         )
                         .font(.caption)
                         .foregroundStyle(Ink.quiet)

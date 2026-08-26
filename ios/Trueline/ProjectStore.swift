@@ -63,9 +63,7 @@ final class ProjectStore: ObservableObject {
                     modified: (try? folder.resourceValues(forKeys: [.contentModificationDateKey])
                         .contentModificationDate) ?? .distantPast,
                     hasRoom: Self.holdsARoom(folder),
-                    kind: FileManager.default.fileExists(
-                        atPath: folder.appendingPathComponent("room.json").path
-                    ) ? "scanned" : "walked",
+                    kind: Self.kind(of: folder),
                     thumbnail: {
                         let picture = folder.appendingPathComponent(Self.thumbnailFile)
                         return FileManager.default.fileExists(atPath: picture.path) ? picture : nil
@@ -84,7 +82,12 @@ final class ProjectStore: ObservableObject {
     func load(_ entry: Entry) -> SavedScan? {
         let room = (try? Data(contentsOf: entry.folder.appendingPathComponent("room.json"))) ?? Data()
         let trace = (try? Data(contentsOf: entry.folder.appendingPathComponent("trace.json"))) ?? Data()
-        guard !room.isEmpty || !trace.isEmpty else { return nil }
+        let corrected = (try? Data(contentsOf: entry.folder.appendingPathComponent(Self.correctedFile))) ?? Data()
+        // A drawn room has neither a capture nor a walk — the room came off a
+        // grid somebody tapped, and the corrected file IS the room. It outranks
+        // both of the others on the way over anyway (`CorrectView`), so a folder
+        // holding only that one opens exactly like a folder holding all three.
+        guard !room.isEmpty || !trace.isEmpty || !corrected.isEmpty else { return nil }
         let photos = (try? Data(contentsOf: entry.folder.appendingPathComponent("photos.json")))
             ?? Data(#"{"schema":"trueline.photos.v1","capturedAt":"","device":"","photos":[]}"#.utf8)
         // Empty when nothing was marked, which is most scans. The far side
@@ -98,7 +101,7 @@ final class ProjectStore: ObservableObject {
             photosJSON: photos,
             pinsJSON: pins,
             traceJSON: trace,
-            correctedJSON: (try? Data(contentsOf: entry.folder.appendingPathComponent(Self.correctedFile))) ?? Data()
+            correctedJSON: corrected
         )
     }
 
@@ -122,12 +125,34 @@ final class ProjectStore: ObservableObject {
         if FileManager.default.fileExists(atPath: folder.appendingPathComponent("trace.json").path) {
             return true
         }
+        // A room drawn by tapping its corners has no capture at all -- there was
+        // no sensor and no walk, so there is no `room.json` and no `trace.json`
+        // to write. What it has is the corrected room itself, which is the same
+        // file every other kind of room also ends up with. Without this line a
+        // hand-drawn room is listed as a capture that failed, on the first
+        // screen of the app, with a "nothing was captured" page behind it.
+        if FileManager.default.fileExists(atPath: folder.appendingPathComponent(correctedFile).path) {
+            return true
+        }
         guard
             let data = try? Data(contentsOf: folder.appendingPathComponent("room.json")),
             let top = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return false }
         let walls = top["walls"] as? [Any]
         return (walls?.isEmpty == false)
+    }
+
+    /// How this room got into the app, for the line under its name.
+    ///
+    /// Three ways in and three words, rather than two words and a room that has
+    /// to be one of them. A drawn room is not "walked" — nobody walked it — and
+    /// calling it that on the list is the kind of small lie that makes somebody
+    /// stop believing the rest of the screen.
+    static func kind(of folder: URL) -> String {
+        let there = { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+        if there("room.json") { return "scanned" }
+        if there("trace.json") { return "walked" }
+        return "drawn"
     }
 
     /// What a corrected room is called inside a scan's folder.
@@ -230,11 +255,24 @@ final class ProjectStore: ObservableObject {
     ///
     /// Only ever called for a name this phone does not already have, so it
     /// cannot overwrite work in progress with an older copy from somewhere else.
-    func restore(name: String, capture: Data, corrected: Data?) {
+    ///
+    /// `kind` decides which file the capture is written into, and it has to:
+    /// a scan, a walk and a drawing are three different formats and every one
+    /// of them used to be written to `room.json`. A walked room came back onto
+    /// a second phone as a RoomPlan capture no importer could read, and a drawn
+    /// room — which has no capture at all — would have come back as an empty
+    /// `room.json`, which is exactly the shape `holdsARoom` calls a failed one.
+    func restore(name: String, capture: Data, kind: String, corrected: Data?) {
         let folder = self.folder(named: name)
         guard !FileManager.default.fileExists(atPath: folder.path) else { return }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try? capture.write(to: folder.appendingPathComponent("room.json"), options: .atomic)
+        // Nothing is written for a drawn room: there is no capture behind it,
+        // and an empty file is not the same as no file to everything that reads
+        // this folder afterwards.
+        if !capture.isEmpty {
+            let into = kind == "walked" ? "trace.json" : "room.json"
+            try? capture.write(to: folder.appendingPathComponent(into), options: .atomic)
+        }
         if let corrected {
             try? corrected.write(to: folder.appendingPathComponent(Self.correctedFile), options: .atomic)
         }
