@@ -41,6 +41,29 @@ final class ScanModel: ObservableObject {
 
     @Published private(set) var stage: Stage = .walking
 
+    /// The folder of a room that already exists, when this is a marking pass.
+    ///
+    /// ## What a marking pass is, and why it is not a second scan
+    ///
+    /// > "Yes, and let it re-open the scanner too" — for the Claim screen.
+    /// > "Marks onto the room you already have."
+    ///
+    /// Damage turns up on the second visit. A water line behind a cabinet, a
+    /// stain that only shows once the lights are on. Until now the only way to
+    /// mark it was to walk the whole room again, which produces a **second
+    /// room** — a second set of walls, a second folder, and every tape reading
+    /// typed against the first one left behind on it.
+    ///
+    /// So a marking pass runs the same capture session, for the same reason
+    /// (Mark needs a tracked camera and a ray to cast), and then throws the
+    /// walls away. Nothing RoomPlan builds is written. What is written is the
+    /// pins and the photographs, merged into the folder the room is already in.
+    ///
+    /// The room, its measurements, and everything typed against it are
+    /// untouched by definition: this never opens `room.json` and never calls
+    /// `CaptureWriter.write`.
+    var markingInto: URL?
+
     let session: ScanSession
     private let store: ProjectStore
     /// All four are remade by `reset`, so a second scan on the same tab is a
@@ -159,6 +182,14 @@ final class ScanModel: ObservableObject {
     /// there the instant the button is pressed. Waiting for it is not a spinner
     /// for the sake of one — the room genuinely does not exist yet.
     func finish() {
+        if let folder = markingInto {
+            // No room is being built, so there is nothing to wait for. Stop the
+            // session so the last frames are in, then merge.
+            stage = .building
+            session.stop()
+            keepMarks(in: folder)
+            return
+        }
         stage = .building
         session.stop()
         Task {
@@ -188,6 +219,87 @@ final class ScanModel: ObservableObject {
             }
             save()
         }
+    }
+
+    /// Adds this pass's marks and photographs to a room that already exists.
+    ///
+    /// Both files are **merged, never replaced**. A marking pass that overwrote
+    /// `pins.json` would delete every mark made during the original walk, which
+    /// is the opposite of what somebody pressing "mark more" is asking for.
+    ///
+    /// The photographs are moved rather than copied, and only the ones this
+    /// pass took: the recorder writes into its own scratch folder, so there is
+    /// nothing of the original walk in it to collide with.
+    private func keepMarks(in folder: URL) {
+        do {
+            let manager = FileManager.default
+            let photos = folder.appendingPathComponent("photos", isDirectory: true)
+            try manager.createDirectory(at: photos, withIntermediateDirectories: true)
+            let taken = scratch.appendingPathComponent("photos", isDirectory: true)
+            for file in (try? manager.contentsOfDirectory(at: taken, includingPropertiesForKeys: nil)) ?? [] {
+                let landing = photos.appendingPathComponent(file.lastPathComponent)
+                if manager.fileExists(atPath: landing.path) { continue }
+                try? manager.moveItem(at: file, to: landing)
+            }
+
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+            try Self.merge(
+                encoder.encode(session.pins.manifest()),
+                into: folder.appendingPathComponent("pins.json"),
+                under: "pins"
+            )
+            try Self.merge(
+                encoder.encode(recorder.manifest(device: UIDevice.current.model)),
+                into: folder.appendingPathComponent("photos.json"),
+                under: "photos"
+            )
+
+            store.refresh()
+            let name = folder.lastPathComponent
+            finished = SavedScan(
+                folder: folder,
+                title: name,
+                roomJSON: (try? Data(contentsOf: folder.appendingPathComponent("room.json"))) ?? Data(),
+                photosJSON: (try? Data(contentsOf: folder.appendingPathComponent("photos.json"))) ?? Data(),
+                pinsJSON: (try? Data(contentsOf: folder.appendingPathComponent("pins.json"))) ?? Data(),
+                traceJSON: (try? Data(contentsOf: folder.appendingPathComponent("trace.json"))) ?? Data(),
+                correctedJSON: (try? Data(contentsOf: folder.appendingPathComponent(ProjectStore.correctedFile))) ?? Data()
+            )
+        } catch {
+            stage = .failed(error.localizedDescription)
+            session.reportFailure(error.localizedDescription)
+        }
+    }
+
+    /// Appends one manifest's list to the list already in a file.
+    ///
+    /// Both files are `{"schema": "...", "<under>": [...]}`, so this reads the
+    /// two arrays, joins them, and writes the incoming manifest's own schema
+    /// back — the two passes are the same build, so the schemas match.
+    ///
+    /// A file that is not there yet is the ordinary case for `pins.json`: most
+    /// scans mark nothing, so most rooms have no pins file at all until the
+    /// first marking pass writes one.
+    private static func merge(_ incoming: Data, into file: URL, under key: String) throws {
+        guard var top = try JSONSerialization.jsonObject(with: incoming) as? [String: Any] else {
+            return
+        }
+        let mine = (top[key] as? [Any]) ?? []
+        if mine.isEmpty && !FileManager.default.fileExists(atPath: file.path) { return }
+        var all: [Any] = []
+        if
+            let there = try? Data(contentsOf: file),
+            let was = try? JSONSerialization.jsonObject(with: there) as? [String: Any],
+            let already = was[key] as? [Any]
+        {
+            all = already
+        }
+        all.append(contentsOf: mine)
+        top[key] = all
+        let data = try JSONSerialization.data(withJSONObject: top, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: file, options: .atomic)
     }
 
     private func save() {

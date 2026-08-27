@@ -119,6 +119,17 @@ struct CorrectView: UIViewRepresentable {
     /// The page cannot send anything itself: there is no mail composer in a web
     /// view and no network in this bundle. It says which of two things somebody
     /// tapped, and `WebScreen` does it.
+    /// The Claim screen asked to open the camera again, for marks only.
+    ///
+    /// Nothing on the Floor, Business or Draw screens: there is no room open
+    /// there to add a mark to, so the button is not shown and this is never
+    /// called.
+    var onMarkAgain: () -> Void = {
+        // No room open, so there is nothing to mark. The web half hides the
+        // button when this handler is absent; this default is for the screens
+        // where the handler exists and the answer is still nothing.
+    }
+
     var onTrouble: (String) -> Void = { _ in
         // Every screen but Business. There are no reports listed there to act
         // on, so there is nothing for a tap to mean.
@@ -163,6 +174,11 @@ struct CorrectView: UIViewRepresentable {
         // them, which `WebScreen` acts on. Most of this app is these screens,
         // and MetricKit cannot see a single thing that happens in here.
         configuration.userContentController.add(context.coordinator, name: "trouble")
+        // "Open the camera again, for marks only." One word on the wire and no
+        // payload: the app already knows which room is open, and a screen that
+        // could name a folder would be a screen that could name any folder on
+        // the phone. This one runs whatever HTML it is given.
+        configuration.userContentController.add(context.coordinator, name: "mark")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -238,6 +254,9 @@ struct CorrectView: UIViewRepresentable {
                     let data = project.data(using: .utf8)
                 else { return }
                 parent.onSave(data)
+
+            case "mark":
+                parent.onMarkAgain()
 
             case "calendar":
                 // Handed over as JSON rather than as a dictionary, so the shape

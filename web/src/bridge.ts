@@ -319,6 +319,46 @@ export function askAbout(reports: 'send' | 'clear'): boolean {
   }
 }
 
+/**
+ * Asks the app to open the scanner again, for marks only.
+ *
+ * ## Why a room needs this at all
+ *
+ * Damage turns up on the second visit — a water line behind a cabinet, a stain
+ * that only shows with the lights on. Until now the only way to mark it was to
+ * walk the whole room again, which produces a **second room**: a second set of
+ * walls, a second folder, and every tape reading typed against the first one
+ * left behind on it.
+ *
+ * So this asks for a marking pass instead. The app runs the same capture
+ * session — Mark needs a tracked camera and a ray to cast — and throws the
+ * walls away, merging only the pins and photographs into the folder this room
+ * is already in. Nothing measured changes, by construction: that path never
+ * opens `room.json`.
+ *
+ * No payload. The app knows which room is open; a screen that could name a
+ * folder would be a screen that could name any folder on the phone, and this
+ * one runs whatever HTML it is given.
+ *
+ * Returns whether there was an app to hear it, so the button can be absent in
+ * a browser rather than appearing to work.
+ */
+export function markAgain(): boolean {
+  const post = handler('mark');
+  if (!post) return false;
+  try {
+    post.postMessage({ version: BRIDGE_VERSION });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether this build of the app can open a marking pass. */
+export function canMarkAgain(): boolean {
+  return handler('mark') !== undefined;
+}
+
 export function handBack(fileName: string, project: string): void {
   const saved = handler('saved');
   if (!saved) return;

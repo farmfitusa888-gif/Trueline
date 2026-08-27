@@ -105,7 +105,7 @@ export async function openAsApp(payload, { scheme = 'light' } = {}) {
     // prove the button was there. `sentTo` reads them back.
     window.__sent = {};
     window.webkit = { messageHandlers: {} };
-    for (const name of ['saved', 'thumbnail', 'company', 'photo', 'calendar', 'trouble']) {
+    for (const name of ['saved', 'thumbnail', 'company', 'photo', 'calendar', 'trouble', 'mark']) {
       window.__sent[name] = [];
       window.webkit.messageHandlers[name] = {
         postMessage(body) {

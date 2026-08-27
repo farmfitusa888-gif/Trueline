@@ -38,6 +38,15 @@ struct ScanScreen: View {
     /// Whoever put this screen on screen knows the way back out, and says so.
     let onClose: () -> Void
 
+    /// The folder of a room that already exists, when this is a marking pass.
+    ///
+    /// Nil for an ordinary scan. Set from the Claim screen, where the point is
+    /// to add a mark to a room somebody measured weeks ago without walking it
+    /// again — see `ScanModel.markingInto`. Nothing RoomPlan builds during a
+    /// marking pass is written; the room and every tape reading against it are
+    /// untouched.
+    let markingInto: URL?
+
     /// Written out rather than generated, because `model` has to be built from
     /// `store` and a memberwise initialiser cannot do that.
     ///
@@ -49,13 +58,21 @@ struct ScanScreen: View {
         store: ProjectStore,
         backup: Backup,
         onFinished: @escaping (SavedScan) -> Void,
-        onClose: @escaping () -> Void
+        onClose: @escaping () -> Void,
+        markingInto: URL? = nil
     ) {
         self.store = store
         self.backup = backup
         self.onFinished = onFinished
         self.onClose = onClose
-        _model = StateObject(wrappedValue: ScanModel(store: store))
+        self.markingInto = markingInto
+        // On from the first frame of a marking pass, because that is the only
+        // thing a marking pass is for. Off for an ordinary scan, where every
+        // accidental brush of the screen would otherwise drop a pin.
+        _marking = State(initialValue: markingInto != nil)
+        let model = ScanModel(store: store)
+        model.markingInto = markingInto
+        _model = StateObject(wrappedValue: model)
     }
 
     /// Whether a tap on the picture marks damage or does nothing.
@@ -66,7 +83,7 @@ struct ScanScreen: View {
     /// somebody with eleven pins called "" and a scan they have to redo. So
     /// marking is a mode, it says on screen that it is on, and it turns itself
     /// off the moment a pin is kept.
-    @State private var marking = false
+    @State private var marking: Bool
     @State private var saying = ""
     @State private var kind = "water"
 
@@ -186,6 +203,14 @@ struct ScanScreen: View {
                         .background(.ultraThinMaterial, in: Capsule())
                         .padding(.top, 12)
                 }
+                if markingInto != nil {
+                    Text("Marking only — the room and its measurements are not touched")
+                        .font(.footnote)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .padding(.top, 8)
+                }
                 if marking {
                     Text("Point at the damage and tap it")
                         .font(.subheadline.weight(.semibold))
@@ -268,10 +293,16 @@ struct ScanScreen: View {
         VStack(spacing: 12) {
             // Named while walking rather than afterwards, because afterwards is
             // three rooms later and they are all called Room.
-            TextField("What is this room?", text: $model.name)
-                .textFieldStyle(.roundedBorder)
-                .submitLabel(.done)
-                .padding(.horizontal, 20)
+            //
+            // Not on a marking pass: the room already has a name, this field
+            // would not be writing it, and a box somebody can type into that
+            // changes nothing is worse than no box.
+            if markingInto == nil {
+                TextField("What is this room?", text: $model.name)
+                    .textFieldStyle(.roundedBorder)
+                    .submitLabel(.done)
+                    .padding(.horizontal, 20)
+            }
 
             shutterRow
         }

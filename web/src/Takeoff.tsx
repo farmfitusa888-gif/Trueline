@@ -32,9 +32,19 @@ export function Takeoff({
   room,
   readiness,
   divide = null,
+  onSetThickness,
 }: {
   readonly room: Room;
   readonly readiness: Readiness;
+  /**
+   * Takes somebody to where a wall's thickness is set.
+   *
+   * The sentence below used to name four walls that were not being counted and
+   * stop there — a statement of a problem with no way to it. Framing is on the
+   * rate list, so somebody who has typed a Studs rate and sees no Studs line
+   * has been told the reason and given nothing to do about it.
+   */
+  readonly onSetThickness?: () => void;
   /** How the space is split, when it is. */
   readonly divide?: {
     readonly boundary: Boundary;
@@ -361,8 +371,22 @@ export function Takeoff({
 
       {sheet.withoutThickness.length > 0 && (
         <p className="mt-2 text-sm text-slate-600">
-          Nothing above counts {sheet.withoutThickness.join(', ')} — no thickness has been given
-          for {sheet.withoutThickness.length === 1 ? 'it' : 'them'}.
+          No plates, studs or headers for {sheet.withoutThickness.join(', ')} — framing needs a
+          wall thickness and {sheet.withoutThickness.length === 1 ? 'it has' : 'they have'} not
+          been given one. A scan cannot see inside a wall, so this is the one number that has to
+          be said rather than measured.
+          {onSetThickness && (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={onSetThickness}
+                className="min-h-11 font-semibold text-slate-900 underline underline-offset-4"
+              >
+                Set it now
+              </button>
+            </>
+          )}
         </p>
       )}
 

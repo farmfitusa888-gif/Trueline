@@ -37,6 +37,7 @@ checkers run against that. The working tree is never written to, which matters:
 a harness that edits your files and restores them is one interrupted run away
 from leaving a deliberate bug in the repository.
 """
+import re
 import shutil
 import subprocess
 import sys
@@ -201,12 +202,14 @@ def swiftNames(bench: Bench) -> None:
     #     what a hand-written signature actually takes.
     rel = 'ios/Trueline/ScanScreen.swift'
     was = bench.read(rel)
-    broken = was.replace(
-        """        onFinished: @escaping (SavedScan) -> Void,
-        onClose: @escaping () -> Void
-    ) {""",
-        """        onFinished: @escaping (SavedScan) -> Void
-    ) {""",
+    # Written against the shape of the signature rather than its full text, so
+    # adding a later parameter -- `markingInto` was added the day this comment
+    # was written -- does not silently stop the mutation happening. When it did
+    # stop, only the `self.onClose = onClose` line was removed, which is not a
+    # signature change at all: the checker correctly said nothing and this
+    # harness reported the checker as broken.
+    broken = re.sub(
+        r'\n\s*onClose: @escaping \(\) -> Void,?(?=\n)', '', was, count=1
     ).replace('        self.onClose = onClose\n', '')
     if broken == was:
         failures.append('ScanScreen no longer writes its own init taking onClose')

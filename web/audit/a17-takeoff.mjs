@@ -150,6 +150,30 @@ check(
   `framing at ${where('openings and framing')}, baseboard at ${where('baseboard')}`
 );
 
+/* -------------------------------------- the thickness the framing waits for */
+
+// Plates, Studs and Headers are on the rate book, and they never priced,
+// because framing needs a wall thickness and a scan cannot see inside a wall.
+// The takeoff said so and stopped there — a stated problem with no way to it.
+await section(page, 'Takeoff');
+const uncounted = await page.locator('[data-panel="takeoff"]').innerText();
+if (/framing needs a\s+wall thickness/.test(uncounted)) {
+  check('the takeoff says WHY there is no framing, not just that there is none',
+    /cannot see inside a wall/.test(uncounted), uncounted.slice(-400));
+  const setIt = page.getByRole('button', { name: 'Set it now' });
+  check('and offers a way to it rather than naming the walls and stopping',
+    (await setIt.count()) === 1);
+  await setIt.first().click();
+  await page.waitForTimeout(400);
+  const landed = await page.locator('[data-panel="room"]').innerText();
+  check('which lands where the thickness is actually set',
+    (await page.locator('[data-panel="room"]:not([hidden])').count()) === 1 && /thick/i.test(landed),
+    landed.slice(0, 300));
+} else {
+  check('the takeoff says why there is no framing', false,
+    'this scan now has thickness on every wall — the fixture changed, not the app');
+}
+
 check('no console or page errors across the whole run', noise().length === 0, noise().join(' | '));
 
 const bad = report('A17 — the sheet somebody orders material from');

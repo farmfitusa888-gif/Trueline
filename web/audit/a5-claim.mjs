@@ -121,4 +121,49 @@ check('turning insurance off hides the restoration screens',
 check('and the damage comes off the plan',
   (await page.locator('svg line[stroke="#dc2626"][stroke-width="14"]').count()) === 0);
 
+/* ------------------------------- back to the camera, without a second room */
+
+{
+  // Damage turns up on the second visit, and the only way to record it used to
+  // be walking the whole room again -- which makes a SECOND room, with a second
+  // set of walls, and leaves every tape reading on the first one.
+  //
+  // In a browser there is no camera to open and no folder to merge into, so the
+  // button must not be there at all: a control that cannot work is worse than
+  // no control.
+  check('a browser is not offered a marking pass it cannot run',
+    (await page.getByRole('button', { name: 'Mark more on the phone' }).count()) === 0);
+
+  const { openAsApp, sentTo } = await import('./lib.mjs');
+  const { readFileSync } = await import('node:fs');
+  // Handed over the way the app hands it over. There is no file picker inside
+  // the app -- `insideApp()` sees the handlers and offers the scanner instead,
+  // which is the whole point of `NothingHere`.
+  const inApp = await openAsApp({
+    subscribed: true,
+    room: JSON.parse(readFileSync(`${SP}/garage.json`, 'utf8')),
+    fileName: 'garage',
+  }, {});
+  await inApp.page.waitForTimeout(400);
+  await section(inApp.page, 'Insurance');
+  const turnOn = inApp.page.getByRole('button', { name: 'Turn it on' });
+  if (await turnOn.count()) { await turnOn.click(); await inApp.page.waitForTimeout(300); }
+
+  const ask = inApp.page.getByRole('button', { name: 'Mark more on the phone' });
+  check('inside the app, the claim can send you back to the camera',
+    (await ask.count()) === 1);
+  if (await ask.count()) {
+    await ask.click();
+    await inApp.page.waitForTimeout(300);
+    const asked = await sentTo(inApp.page, 'mark');
+    check('and it actually asks the app for a marking pass', asked.length === 1,
+      `${asked.length} sent`);
+    check('and says the room is not being rescanned',
+      /walls and every measurement stay/.test(
+        await inApp.page.locator('[data-panel="claim"]').innerText()
+      ));
+  }
+  await inApp.ctx.close();
+}
+
 process.exit(report('A5 — insurance mode, end to end') > 0 ? 1 : 0);

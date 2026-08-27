@@ -18,6 +18,16 @@ struct ReviewScreen: View {
     /// MetricKit cannot see a single thing that happens inside one. A blank
     /// panel in a basement is invisible without this.
     @ObservedObject var diagnostics: Diagnostics
+    /// The Claim screen asked to open the camera again, for marks only.
+    ///
+    /// Handed in rather than done here, for the same reason `ScanScreen.onClose`
+    /// is: this screen does not own the stack it is in, and a screen cannot push
+    /// onto a stack it does not hold.
+    var onMarkAgain: () -> Void = {
+        // A build with nowhere to push. The button is only shown when the
+        // handler exists, so this is the case where it exists and there is
+        // still nothing to do.
+    }
     @State private var sharing = false
 
     var body: some View {
@@ -73,6 +83,7 @@ struct ReviewScreen: View {
             // and the reports are listed on the Business tab. Named arguments
             // may be omitted but not reordered -- the comment at the top of
             // this call is about exactly that.
+            onMarkAgain: onMarkAgain,
             onWebError: { message, place, stack in
                 diagnostics.record(webError: message, at: place, stack: stack)
             }

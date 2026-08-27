@@ -909,7 +909,8 @@ export function App() {
             <Panel section="takeoff" active={section}>
               <Gate feature="takeoff">
               <div data-sheet="yes">
-                <Takeoff room={loaded.room} readiness={derived.state} divide={loaded.divide} />
+                <Takeoff
+                  onSetThickness={() => setSection('room')} room={loaded.room} readiness={derived.state} divide={loaded.divide} />
               </div>
               </Gate>
             </Panel>

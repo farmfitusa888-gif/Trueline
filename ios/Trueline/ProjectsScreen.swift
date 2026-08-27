@@ -258,13 +258,35 @@ struct ProjectsScreen: View {
                 )
             case .open(let entry):
                 if let scan = store.load(entry) {
-                    ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar, diagnostics: diagnostics)
+                    ReviewScreen(
+                        scan: scan, store: store, backup: backup,
+                        subscription: subscription, calendar: calendar, diagnostics: diagnostics,
+                        // Appended rather than replacing, so Back from the
+                        // marking pass is the room it was opened from.
+                        onMarkAgain: { path.append(.markAgain(scan)) }
+                    )
                 } else {
                     Text("That capture could not be read. Its room.json or trace.json is missing.")
                         .padding()
                 }
             case .review(let scan):
-                ReviewScreen(scan: scan, store: store, backup: backup, subscription: subscription, calendar: calendar, diagnostics: diagnostics)
+                ReviewScreen(
+                    scan: scan, store: store, backup: backup,
+                    subscription: subscription, calendar: calendar, diagnostics: diagnostics,
+                    onMarkAgain: { path.append(.markAgain(scan)) }
+                )
+            case .markAgain(let scan):
+                // The same camera and the same Mark button, and nothing
+                // RoomPlan builds is kept -- see `ScanModel.markingInto`. The
+                // pins and photographs are merged into this room's own folder,
+                // and finishing lands back on the room with them in it.
+                ScanScreen(
+                    store: store,
+                    backup: backup,
+                    onFinished: show,
+                    onClose: { if !path.isEmpty { path.removeLast() } },
+                    markingInto: scan.folder
+                )
             case .dead(let entry):
                 DeadCaptureScreen(
                     entry: entry,
@@ -308,5 +330,7 @@ struct ProjectsScreen: View {
         case review(SavedScan)
         /// A capture with no walls in it, and the three ways out of one.
         case dead(ProjectStore.Entry)
+        /// The camera again, for marks only, over a room that already exists.
+        case markAgain(SavedScan)
     }
 }

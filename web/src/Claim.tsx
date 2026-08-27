@@ -11,6 +11,7 @@ import {
 } from '../../core/src/claim.ts';
 import { useUnits } from './units.tsx';
 import { ReportPhotos } from './ReportPhotos.tsx';
+import { canMarkAgain, markAgain } from './bridge.ts';
 
 /**
  * Insurance mode: the switch, the claim's own facts, and the document.
@@ -66,6 +67,51 @@ function Field({
       />
       {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
     </label>
+  );
+}
+
+/**
+ * Back to the camera, for marks only.
+ *
+ * ## Why this button exists
+ *
+ * Damage turns up on the second visit. A water line behind a cabinet, a stain
+ * that only shows once the lights are on, a ceiling nobody looked at. Until now
+ * the only way to record it was to walk the whole room again — which makes a
+ * **second room**, with a second set of walls, in a second folder, and every
+ * tape reading typed against the first one left behind on it.
+ *
+ * So this asks for a marking pass instead: the same camera and the same Mark
+ * button, and nothing RoomPlan builds is kept. The pins and the photographs are
+ * merged into the folder this room is already in, and the room, its
+ * measurements and everything typed against them are untouched — see
+ * `ScanModel.markingInto`, which never opens `room.json`.
+ *
+ * Absent in a browser, where there is no camera to open and no folder to merge
+ * into. A button that cannot work is worse than no button, which is the lesson
+ * of the dead capture screen.
+ */
+function MarkMore() {
+  const [asked, setAsked] = useState(false);
+  if (!canMarkAgain()) return null;
+  return (
+    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <button
+        type="button"
+        onClick={() => setAsked(markAgain())}
+        className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white
+                   active:bg-slate-700"
+      >
+        Mark more on the phone
+      </button>
+      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+        {asked
+          ? 'Opening the camera. Point at what is wrong and tap Mark — the walls and every ' +
+            'measurement stay exactly as they are.'
+          : 'Opens the camera again to add marks and photographs to this room. It does not ' +
+            'rescan it: nothing measured changes, and nothing you have typed is lost.'}
+      </p>
+    </div>
   );
 }
 
@@ -149,6 +195,8 @@ export function Claim({
           </button>
         </span>
       </div>
+
+      <MarkMore />
 
       {showing === 'details' ? (
         <>
