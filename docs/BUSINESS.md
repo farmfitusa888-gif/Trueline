@@ -27,7 +27,8 @@ them.
 |---|---|
 | **The measurement engine** — exact integer arithmetic end to end, lengths in nanometres, areas in doubled square-nanometres, money in cents. No float ever touches a measurement. Every dimension carries whether it was `scanned`, `measured`, `derived` or `adjusted`, and the app refuses to call a room measured until a tape has been on one wall running each way. | Built |
 | **The business half** — takeoff, price book, proposal with e-signature and audit trail, signed baseline, change orders, scheduling into the phone's calendar, invoicing, QuickBooks export. | Built |
-| **Insurance restoration** — damage pins dropped live during a scan, photographs with the camera pose attached, the claim document as a real PDF, and ESX export for Xactimate. | Built |
+| **Insurance restoration** — damage pins dropped live during a scan, photographs with the camera pose attached, the claim document as a real PDF, the damage scope on its own sheet, and a one-file job archive an adjuster can open. | Built |
+| **ESX export for Xactimate** | **Not built, on purpose.** Xactimate's schema is not published and there is no public specification to write against. Writing a speculative zip of XML and calling it an export would ship a file nobody can verify opens, which is worse than not having the button. Getting it properly means a commercial agreement with Verisk, and that is Sam's decision to make. Full reasoning in `docs/money.md`. |
 | **Crash and error reporting** | MetricKit for native crashes and hangs, `window.onerror` for everything the web screens throw, both written to the phone and sent only when somebody taps Send them. No server, no third-party SDK, nothing collected about the job. | Built |
 | **Never been sold** | Zero customers. Zero App Store listing. Zero analytics, on purpose — see §6. |
 
