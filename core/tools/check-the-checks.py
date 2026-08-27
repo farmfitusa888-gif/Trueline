@@ -596,6 +596,45 @@ def portable(bench: Bench) -> None:
     expect('and the resolver itself is allowed to name them', code, out, fires=False)
 
 
+# --------------------------------------------------------------- conformance
+
+def conformance(bench: Bench) -> None:
+    """A type that says it is Hashable, holding something that is not.
+
+    The build error, in full, from Sam's Mac:
+
+        ios/Trueline/ProjectStore.swift:15:12: error: type 'ProjectStore.Entry'
+        does not conform to protocol 'Hashable'
+
+    `Entry` is what `NavigationLink(value:)` carries, so it has to hash, and
+    Swift synthesises that only when every stored property already does. `Entry`
+    grew a `card: RoomCard`; `RoomCard` was declared `Codable, Equatable`. One
+    missing word, in a file three away from the error, and no compiler on the
+    machine it was written on.
+
+    The mutation below is that exact undoing.
+    """
+    print('check-swift-conform.py — a conformance Swift cannot synthesise')
+
+    code, out = bench.run('check-swift-conform.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    rel = 'ios/Trueline/RoomCard.swift'
+    bench.write(rel, bench.read(rel).replace(
+        'struct RoomCard: Codable, Hashable {', 'struct RoomCard: Codable, Equatable {'))
+    code, out = bench.run('check-swift-conform.py')
+    expect('RoomCard put back to Equatable, exactly as it was', code, out,
+           fires=True, saying='Entry says it is Hashable')
+    expect('and it names the property that carries it', code, out,
+           fires=True, saying='card: RoomCard')
+    bench.restore(rel)
+
+    # A conformance somebody wrote by hand is not synthesised, so a property
+    # that does not conform is the author's business and not an error.
+    code, out = bench.run('check-swift-conform.py')
+    expect('quiet again once the word is back', code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -608,6 +647,8 @@ def main() -> int:
         xcscheme(bench)
         print()
         portable(bench)
+        print()
+        conformance(bench)
 
     print()
     if failures:

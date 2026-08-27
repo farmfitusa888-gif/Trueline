@@ -1,0 +1,38 @@
+{
+  "AppIcon.appiconset/icon-1024.png": {
+    "source": "0d0643d265509c9c57186dd4a6d4c61e",
+    "png": "133fb3546755637d53b82d93078843aa"
+  },
+  "AppIcon.appiconset/icon-1024-dark.png": {
+    "source": "681a5e6361aec6f4665d19a333f24e44",
+    "png": "85aef1d4810c093891f3e1e5673d8b29"
+  },
+  "AppIcon.appiconset/icon-1024-tinted.png": {
+    "source": "402c3674981bddd718f9bb1eb51fa200",
+    "png": "97979c9dc1cd2bd6300e07d000697acd"
+  },
+  "LaunchMark.imageset/mark-1x.png": {
+    "source": "70b08130a0106ba21cfdff4b1f88351f",
+    "png": "98647c10bd460705aca8d147035d7c51"
+  },
+  "LaunchMark.imageset/mark-dark-1x.png": {
+    "source": "adf667da3f87f431a53d73c7ceab6c5e",
+    "png": "1604a10b06fdaf5e6e137b8fd8760421"
+  },
+  "LaunchMark.imageset/mark-2x.png": {
+    "source": "26b80d5f214b2d0d7f19a87ac27d194f",
+    "png": "782c2471c29369e23c5fde6dfc171c2f"
+  },
+  "LaunchMark.imageset/mark-dark-2x.png": {
+    "source": "1bc0a4a1fcb6d1a120f8799772dbd783",
+    "png": "48efb89e334162bed5df13c7e245da68"
+  },
+  "LaunchMark.imageset/mark-3x.png": {
+    "source": "c6fb6b975bbecf03d6250cb50af4d7f8",
+    "png": "d2bea8777492b38436265909b184277f"
+  },
+  "LaunchMark.imageset/mark-dark-3x.png": {
+    "source": "6c81cf508625628ac0cb906ff8839723",
+    "png": "440e56839d86bb2b0bdc4bb5778b1535"
+  }
+}

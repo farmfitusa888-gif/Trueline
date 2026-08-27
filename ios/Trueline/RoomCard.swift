@@ -35,7 +35,21 @@ import Foundation
 ///
 /// It is a few hundred bytes, and `refresh()` reads one per folder — the same
 /// order of work as the `fileExists` checks that were already there.
-struct RoomCard: Codable, Equatable {
+/// `Hashable`, not merely `Equatable`, and the difference is a compile error.
+///
+/// `ProjectStore.Entry` holds one of these and is itself `Hashable` — it is
+/// what `NavigationLink(value:)` carries, and SwiftUI's navigation values must
+/// hash. Swift synthesises that conformance only when EVERY stored property
+/// already has it, so a card that was only `Equatable` made the whole entry
+/// non-conforming:
+///
+///     ProjectStore.swift:15:12: error: type 'ProjectStore.Entry' does not
+///     conform to protocol 'Hashable'
+///
+/// Nothing in this repository could catch that before `check-swift-conform.py`
+/// — there is no Swift compiler on the machine it is written on, and the error
+/// is not a misspelled name.
+struct RoomCard: Codable, Hashable {
     static let schema = "trueline.card.v1"
     static let file = "card.json"
 

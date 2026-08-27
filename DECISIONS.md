@@ -1822,6 +1822,33 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   `check-the-checks.py`, and the resolver's own branches tested against fake
   disks describing machines that are not this one.
 
+- **`ProjectStore.Entry` stopped conforming to `Hashable`, three files away
+  from the change that did it.** `Entry` is what `NavigationLink(value:)`
+  carries, so it must hash, and Swift synthesises that only when every stored
+  property already does. `Entry` grew a `card: RoomCard`; `RoomCard` was
+  declared `Codable, Equatable`. One missing word, and the app would not
+  compile. Nothing here could catch it: there is no Swift compiler on the
+  machine this is written on, `check-swift.py` reads the grammar and
+  `check-swift-names.py` finds names that do not exist -- and every name in
+  this one existed. `check-swift-conform.py` now checks every synthesised
+  conformance against the types actually held, and only complains about a type
+  declared in this repository, so it has no false positives to teach anybody to
+  ignore it. Watched failing on the exact mutation in `check-the-checks.py`.
+  **Sam's Mac remains the only real compiler this project has**, and that is
+  the argument for a macOS runner.
+
+- **`check-art` compared rendered PNG bytes, which is a different answer on
+  every machine.** Two Chromium builds encode and antialias the same picture
+  differently, so the moment it went into `verify` it reported all nine pieces
+  of art as out of date on Sam's Mac, on art nobody had touched. What the check
+  is FOR is one sentence -- nobody changed the mark or the colour tokens and
+  left the art behind -- which is a statement about inputs. `ios/art.stamp.json`
+  now records a hash of the exact SVG string rendered and of the PNG that came
+  out; `--check` compares both and needs no browser at all. It gives up being
+  able to say that two machines would draw the same picture; nothing portable
+  can. The stamp lives beside `Assets.xcassets` and never inside it, because
+  `actool` compiles that folder whole.
+
 Everything else: build proceeds.
 
 ## Standing constraints carried from Plumbline
