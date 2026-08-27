@@ -450,17 +450,17 @@ test('objects from the import land against the walls they are actually against',
   // scanner first reported it.
   assert.equal(blocked.get(idFor(report, 'south'))!.blockedLength, 2n * NM_PER_METRE);
   assert.equal(blocked.get(idFor(report, 'south'))!.blockedPerMille, 249n);
-  assert.deepEqual(blocked.get(idFor(report, 'south'))!.by, ['bench']);
+  assert.deepEqual(blocked.get(idFor(report, 'south'))!.by, ['a storage unit']);
 
   // The cabinets run the whole 6 m north wall.
   assert.equal(blocked.get(idFor(report, 'north'))!.blockedPerMille, 1000n);
-  assert.equal(describe(blocked.get(idFor(report, 'north'))!), 'Almost all of this wall was behind cabinets — the scan could not see it properly.');
+  assert.equal(describe(blocked.get(idFor(report, 'north'))!), 'Almost all of this wall was behind a storage unit — the scan could not see it properly.');
 
   // The cabinet run reaches the corner, so it butts into the west wall too and
   // hides its last 600 mm. That is not a false positive: the scanner could not
   // see that stretch of the west wall either.
   assert.equal(blocked.get(idFor(report, 'west'))!.blockedLength, 600n * NM_PER_METRE / 1000n);
-  assert.deepEqual(blocked.get(idFor(report, 'west'))!.by, ['cabinets']);
+  assert.deepEqual(blocked.get(idFor(report, 'west'))!.by, ['a storage unit']);
 
   // Nothing is near the lower east stub.
   assert.equal(blocked.get(idFor(report, 'east-lower'))!.blockedLength, 0n);
@@ -471,7 +471,7 @@ test('a wall at an angle is checked the same way as one running square', () => {
   const { room, report, footprints } = importRoomPlan(withCounter(), { at: AT });
   const chamfer = obstructions(room, footprints).find((o) => o.wallId === idFor(report, 'chamfer'))!;
   assert.ok(chamfer.blockedPerMille > 0n, 'the fridge is in the cut corner');
-  assert.ok(chamfer.by.includes('fridge'));
+  assert.ok(chamfer.by.includes('a refrigerator'));
 });
 
 test('the punch list ranks by what is at stake, and says what was in the way', () => {
@@ -484,7 +484,7 @@ test('the punch list ranks by what is at stake, and says what was in the way', (
     assert.ok(list[i - 1]!.weight >= list[i]!.weight, 'out of order');
   }
   const north = list.find((x) => x.wallId === idFor(report, 'north'))!;
-  assert.deepEqual(north.blockedBy, ['cabinets']);
+  assert.deepEqual(north.blockedBy, ['a storage unit']);
   assert.equal(north.blockedPerMille, 1000n);
 });
 
@@ -516,7 +516,7 @@ test('an open span is checked too: something can stand in a garage door opening'
   };
   const { room, report, footprints } = importRoomPlan(inTheOpening, { at: AT });
   const open = obstructions(room, footprints).find((o) => o.wallId === 'opening-1')!;
-  assert.ok(open.by.includes('pallet'));
+  assert.ok(open.by.includes('a storage unit'));
   assert.ok(open.blockedPerMille > 0n);
 });
 

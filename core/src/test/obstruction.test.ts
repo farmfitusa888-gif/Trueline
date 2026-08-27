@@ -47,7 +47,7 @@ test('a sofa against a wall blocks the stretch it covers', () => {
 
   assert.equal(north.blockedLength, parseLength(`8'`));
   assert.equal(north.blockedPerMille, 400n); // 8' of 20'
-  assert.deepEqual(north.by, ['sofa']);
+  assert.deepEqual(north.by, ['a sofa']);  // the category, not the identifier
 });
 
 test('an empty room blocks nothing', () => {
@@ -86,7 +86,7 @@ test('two things side by side against one wall are counted once, not twice', () 
   // 2' to 14' is twelve feet of wall, not the fourteen you get by adding them up.
   assert.equal(north.blockedLength, parseLength(`12'`));
   assert.equal(north.blocked.length, 1);
-  assert.deepEqual([...north.by].sort(), ['shelf', 'sofa']);
+  assert.deepEqual([...north.by].sort(), ['a sofa', 'a storage unit']);
 });
 
 test('two things apart on the same wall stay two separate stretches', () => {
@@ -125,7 +125,7 @@ test('a wall behind something is ranked above one merely uncertain', () => {
 
   assert.equal(list[0]?.wallId, 'north');
   assert.equal(list[0]?.blockedPerMille, 1000n);
-  assert.deepEqual(list[0]?.blockedBy, ['wall-unit']);
+  assert.deepEqual(list[0]?.blockedBy, ['a storage unit']);
 
   const south = list.find((i) => i.wallId === 'south')!;
   assert.equal(south.blockedPerMille, 0n);
@@ -160,11 +160,16 @@ test('the punch list is ranked, and honours its limit', () => {
 });
 
 test('it says something a contractor would actually read', () => {
-  const all = obstructions(room(), [box('sofa', 'sofa', `0'`, `0'`, `19'`, `3'`)]);
+  // Names the THING, not RoomPlan's identifier for it. The screen used to read
+  // "was behind F167331F-EA3C-4C7F-B774-E24F7AA0781F" in front of a contractor
+  // deciding which wall to put a tape on, because `by` was filled with the
+  // footprint's id instead of its category.
+  const all = obstructions(room(), [box('9F7FFC5E-E04B', 'sofa', `0'`, `0'`, `19'`, `3'`)]);
   const north = all.find((o) => o.wallId === 'north')!;
-  assert.match(describeObstruction(north), /Almost all of this wall was behind sofa/);
+  assert.match(describeObstruction(north), /Almost all of this wall was behind a sofa/);
+  assert.ok(!/9F7FFC5E/.test(describeObstruction(north)), 'no identifier in the sentence');
 
-  const part = obstructions(room(), [box('sofa', 'sofa', `0'`, `0'`, `5'`, `3'`)])
+  const part = obstructions(room(), [box('9F7FFC5E-E04B', 'sofa', `0'`, `0'`, `5'`, `3'`)])
     .find((o) => o.wallId === 'north')!;
   assert.match(describeObstruction(part), /Part of this wall/);
 
@@ -172,7 +177,17 @@ test('it says something a contractor would actually read', () => {
     box('a', 'sofa', `0'`, `0'`, `6'`, `3'`),
     box('b', 'storage', `10'`, `0'`, `18'`, `2'`),
   ]).find((o) => o.wallId === 'north')!;
-  assert.match(describeObstruction(two), /behind 2 things/);
+  // Both of them, by name, rather than a count.
+  assert.match(describeObstruction(two), /behind a sofa and a storage unit/);
+
+  // A category this build has never heard of is split on its capitals rather
+  // than printed raw or dropped.
+  const odd = obstructions(room(), [box('x', 'washerDryer', `0'`, `0'`, `19'`, `3'`)])
+    .find((o) => o.wallId === 'north')!;
+  assert.match(describeObstruction(odd), /behind a washer or dryer/);
+  const unknown = obstructions(room(), [box('y', 'espressoMachine', `0'`, `0'`, `19'`, `3'`)])
+    .find((o) => o.wallId === 'north')!;
+  assert.match(describeObstruction(unknown), /behind an espresso machine/);
 });
 
 test('a negative reach is refused rather than quietly treated as zero', () => {

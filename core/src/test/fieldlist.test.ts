@@ -55,7 +55,9 @@ test('it carries what the scanner said, so the disagreement shows up on the spot
 test('it says why each wall is on the list', () => {
   const list = fieldList(room(), counter);
   const blocked = list.lines.find((l) => l.wallId === 'wall-3')!;
-  assert.match(blocked.why, /% of it was behind something/);
+  // Named, not counted. This line used to say "behind something" whatever it
+  // was, and on a real scan the sentence beside it printed RoomPlan's UUID.
+  assert.match(blocked.why, /% of it was behind a storage unit/);
 
   const clear = list.lines.find((l) => l.wallId === 'wall-1')!;
   assert.equal(clear.why, 'nothing was in the way, but nobody has measured it');

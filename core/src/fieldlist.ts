@@ -79,7 +79,10 @@ export function fieldList(
     if (o && o.blockedPerMille > 0n) {
       reasons.push(
         `${Number(o.blockedPerMille) / 10}% of it was behind ` +
-          (o.by.length === 1 ? 'something' : `${o.by.length} things`)
+          (o.by.length === 0 ? 'something'
+            : o.by.length === 1 ? o.by[0]!
+            : o.by.length === 2 ? `${o.by[0]} and ${o.by[1]}`
+            : `${o.by.slice(0, -1).join(', ')} and ${o.by[o.by.length - 1]}`)
       );
     }
     if (wall.open) reasons.push('the scan found no wall across this one');

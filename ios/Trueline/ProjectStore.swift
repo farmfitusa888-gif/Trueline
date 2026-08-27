@@ -213,6 +213,9 @@ final class ProjectStore: ObservableObject {
             //
             // The job and the archive flag are NOT touched here: they are the
             // list's own, and a save from inside a room must not undo them.
+            // "Room" is what `name(inside:)` hands back when there is no name
+            // anywhere, and writing that onto a card would replace a real name
+            // with a placeholder.
             let named = RoomCard.name(inside: project)
             if named != "Room" {
                 var card = RoomCard.read(in: folder)

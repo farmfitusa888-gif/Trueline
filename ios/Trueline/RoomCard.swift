@@ -82,12 +82,36 @@ struct RoomCard: Codable, Hashable {
     /// and `ProjectStore.writeCorrected`, to keep the list's name in step with
     /// the room's.
     static func name(inside project: Data) -> String {
-        guard
-            let top = try? JSONSerialization.jsonObject(with: project) as? [String: Any],
-            let name = top["fileName"] as? String,
-            !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard let top = try? JSONSerialization.jsonObject(with: project) as? [String: Any]
         else { return "Room" }
-        return name
+
+        // The ROOM's name first, and the file's name only as a fallback.
+        //
+        // ## The bug, and what it cost
+        //
+        // Renaming a room on the correction screen changes `room.name`. It
+        // deliberately does NOT change `fileName` -- that is the folder's
+        // identity, the key it is saved under, and its address in iCloud and
+        // under every photograph in it, and moving a folder is how a backup
+        // ends up pointing at nothing.
+        //
+        // This read `fileName` and nothing else. So somebody renamed a room,
+        // the room screen said the new name, the Rooms list went on saying
+        // "Room 2026-08-26 0927" forever, and the two looked like two
+        // different rooms. Sam deleted one of them believing it was a
+        // duplicate. It was his scan.
+        //
+        // Trimmed and checked for emptiness both ways, because a room named
+        // with a space is a room with no name.
+        let clean = { (value: Any?) -> String? in
+            guard let text = value as? String else { return nil }
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        if let room = top["room"] as? [String: Any], let named = clean(room["name"]) {
+            return named
+        }
+        return clean(top["fileName"]) ?? "Room"
     }
 
     /// Reads the card beside a scan, or the blank one every folder starts with.

@@ -34,6 +34,44 @@ export interface Footprint {
 export class ObstructionError extends RoomError {}
 
 /**
+ * What RoomPlan calls a thing, said the way a person says it.
+ *
+ * RoomPlan's categories are camel-cased single words — `storage`,
+ * `washerDryer`, `televisionSet`. Printed raw they read as a machine's output
+ * in a sentence that is otherwise plain English, so they are spelt out here.
+ * Anything not on the list is split on its capitals and lower-cased, which
+ * turns a category this build has never heard of into readable words rather
+ * than into nothing.
+ */
+const PLAINLY: Readonly<Record<string, string>> = {
+  bathtub: 'a bath',
+  bed: 'a bed',
+  chair: 'a chair',
+  dishwasher: 'a dishwasher',
+  fireplace: 'a fireplace',
+  oven: 'an oven',
+  refrigerator: 'a refrigerator',
+  sink: 'a sink',
+  sofa: 'a sofa',
+  stairs: 'the stairs',
+  storage: 'a storage unit',
+  stove: 'a stove',
+  table: 'a table',
+  toilet: 'a toilet',
+  washerDryer: 'a washer or dryer',
+  television: 'a television',
+  televisionSet: 'a television',
+};
+
+export function plainly(category: string): string {
+  const known = PLAINLY[category];
+  if (known) return known;
+  const words = category.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().trim();
+  if (!words) return 'something';
+  return /^[aeiou]/.test(words) ? `an ${words}` : `a ${words}`;
+}
+
+/**
  * How close an object has to be to a wall before it counts as blocking it.
  *
  * Six inches, because that is roughly where a piece of furniture stops leaving
@@ -142,7 +180,18 @@ export function obstructions(
       if (!shared) continue;
 
       spans.push(shared);
-      if (!by.includes(f.id)) by.push(f.id);
+      // The CATEGORY, not the identifier.
+      //
+      // `f.id` is RoomPlan's own UUID, so the screen read:
+      //
+      //   "A little of this wall was behind
+      //    F167331F-EA3C-4C7F-B774-E24F7AA0781F"
+      //
+      // in front of a contractor deciding which wall to put a tape on. The
+      // category is right there on the footprint and is the thing a person
+      // recognises: a sofa, a storage unit, a refrigerator.
+      const what = plainly(f.category);
+      if (!by.includes(what)) by.push(what);
     }
 
     const blocked = merge(spans);
@@ -217,6 +266,10 @@ export function describe(o: WallObstruction): string {
     o.blockedPerMille >= 900n ? 'Almost all' :
     o.blockedPerMille >= 500n ? 'More than half' :
     o.blockedPerMille >= 200n ? 'Part' : 'A little';
-  const what = o.by.length === 1 ? o.by[0]! : `${o.by.length} things`;
+  const what =
+    o.by.length === 0 ? 'something' :
+    o.by.length === 1 ? o.by[0]! :
+    o.by.length === 2 ? `${o.by[0]} and ${o.by[1]}` :
+    `${o.by.slice(0, -1).join(', ')} and ${o.by[o.by.length - 1]}`;
   return `${share} of this wall was behind ${what} — the scan could not see it properly.`;
 }
