@@ -14,8 +14,8 @@ node site/tools/check.mjs  # reads site/dist and fails on anything wrong
 | `content/site.mjs` | The business: name, price, email, and the list of things the site is allowed to claim. |
 | `content/guides/` | 28 guides as data — four files, one per audience. |
 | `content/templates.mjs` | The free PDF forms, field by field. |
-| `src/style.css` | The design: drafting paper, blueprint ink, dimension lines. |
-| `src/room3d.js` | A real room in WebGL, hand written, about 6 kB. |
+| `src/style.css` | The design: gunmetal, machined grey, safety yellow, scribed line work. |
+| `src/site.js` | The room you can drive, the blueprint it turns into, and the rule down the page edge. Hand-written WebGL and SVG, no libraries. |
 | `src/shots/` | Real screenshots of the real app. |
 | `build.mjs` | Generates every page, the sitemap and robots.txt. |
 | `tools/capture.mjs` | Re-takes the screenshots by driving the actual app. |

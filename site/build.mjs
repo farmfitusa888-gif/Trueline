@@ -350,59 +350,126 @@ function guidePage(guide) {
 }
 
 function homePage() {
+  const guide = (slug) => GUIDES.find((g) => g.slug === slug);
+  /* Three guides, by name and by hand. A link to the index is a link to a
+     shelf; a link to a guide is a link to something worth reading. */
+  const trio = ['drywall-takeoff', 'document-water-damage', 'magicplan-alternative'].map(guide);
+  const rates = guide('contractor-rate-book');
+
   const body = `
-<section class="hero">
-  <div class="wrap hero-grid">
-    <div>
-      <p class="eyebrow">iPhone · no server · no account</p>
-      <h1>${esc(SITE.tagline)}</h1>
-      <p class="lede">${esc(SITE.description)}</p>
-      <p style="display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1.6rem">
-        <a class="btn btn-solid" href="#get-it">Get it when it opens</a>
-        <a class="btn btn-line" href="/guides/">Read the guides</a>
-      </p>
+<section class="hero" data-mark="Room">
+  <div class="wrap">
+    <div class="hero-head">
+      <div>
+        <p class="eyebrow">iPhone · no server · no account</p>
+        <h1>${esc(SITE.tagline)}</h1>
+      </div>
+      <div>
+        <p class="lede">${esc(SITE.description)}</p>
+        <p class="hero-act">
+          <a class="btn btn-solid" href="#get-it">Get on the TestFlight list</a>
+          <a class="btn btn-line" href="#watch">Watch it work</a>
+        </p>
+      </div>
     </div>
-    <div class="stage" data-room3d aria-label="A room in three dimensions. Drag to turn it.">
-      <canvas></canvas>
-      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <style>
-          .dim { stroke: var(--ink-quiet); stroke-width: 1; }
-          .tick { stroke: var(--amber); stroke-width: 1.4; }
-          .fig { font: 500 13px var(--f-mono); fill: var(--ink); text-anchor: middle;
-                 dominant-baseline: middle; paint-order: stroke;
-                 stroke: var(--paper-sunk); stroke-width: 4px; }
-        </style>
-      </svg>
+
+    <!-- The hero is the room.
+         The stage below is the app's own 21' × 20' kitchen, drawn in WebGL, and
+         it is the same geometry the Blueprint view draws in flat SVG. Every
+         control is here in the HTML and "hidden" until site.js has actually
+         attached to it, so the page never shows a switch that does nothing.
+         With no WebGL the 3D button is removed and Blueprint — which needs no
+         GPU — becomes the view. With no JavaScript at all, the <noscript> plan
+         is what shows. -->
+    <div class="stage" data-room3d data-view="3d" data-furn="on" data-dims="on" data-labels="off">
+      <canvas role="img" aria-label="The kitchen in three dimensions, 21 feet by 20 feet with a 9 foot ceiling. Drag to turn it."></canvas>
+      <svg class="over" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+      <svg class="plan" xmlns="http://www.w3.org/2000/svg" role="img" hidden
+           aria-label="The same kitchen in plan: 21 feet by 20 feet, a door on the west wall and a window on the north."></svg>
       <span class="hint">Drag to turn</span>
       <span class="block">21′ × 20′ · 420 sq ft<br><b>SCANNED</b></span>
+      <noscript><img src="/img/plan.png" width="812"
+        alt="A dimensioned plan of the scanned kitchen, marked SCANNED"></noscript>
+    </div>
+    <div class="panel" data-room-panel hidden>
+      <span class="lab">View</span>
+      <div class="grp grp--view" role="group" aria-label="View">
+        <button class="sw" type="button" data-view-btn="3d" aria-pressed="true">3D</button>
+        <button class="sw" type="button" data-view-btn="plan" aria-pressed="false">Blueprint</button>
+      </div>
+      <span class="lab">Show</span>
+      <div class="grp" role="group" aria-label="Show">
+        <button class="sw" type="button" data-toggle="furn" aria-pressed="true">Furniture</button>
+        <button class="sw" type="button" data-toggle="dims" aria-pressed="true">Measurements</button>
+        <button class="sw" type="button" data-toggle="labels" aria-pressed="false">Labels</button>
+      </div>
+      <span class="spacer"></span>
+      <span class="note-t">The app’s own kitchen · 21′ × 20′ × 9′</span>
     </div>
   </div>
 </section>
 
-<hr class="rule">
-
-<section class="wrap rise">
-  <p class="eyebrow">The one thing it will not do</p>
-  <h2 style="margin-top:0">Tell you a scan is a measurement</h2>
-  <p style="max-width:58ch">Every length in this app carries where it came from, and the word
-    is on the drawing. A length the phone found is <span class="tag tag-scanned">Scanned</span>.
-    A length you put a tape on is <span class="tag tag-measured">Measured</span>. A room drawn
-    on a grid says <span class="tag tag-scanned">Drawn</span>.</p>
-  <p style="max-width:58ch">Until a tape has been on one wall running each way, every document
-    says so, on its face, where a client will read it. That is the whole product. A number you
-    cannot defend line by line to a homeowner is worse than no number.</p>
+<section class="band" data-mark="Proof">
+  <div class="wrap proof">
+    <figure class="rise">
+      <img src="/img/plan.png" alt="A dimensioned plan of a scanned kitchen, marked SCANNED"
+           loading="lazy" decoding="async" width="812">
+      <figcaption>A real plan, off a real scan. The line under it says the numbers came from a
+        scanner rather than a tape — and it stays there until somebody changes that.</figcaption>
+    </figure>
+    <div class="rise">
+      <p class="eyebrow">What it puts on the drawing</p>
+      <h2>Every length says where it came from</h2>
+      <p>A length the phone found is <span class="nb"><span class="tag tag-scanned">Scanned</span>.</span>
+        A length you put a tape on is <span class="nb"><span class="tag tag-measured">Measured</span>.</span>
+        A room drawn on a grid says <span class="nb"><span class="tag tag-scanned">Drawn</span>.</span></p>
+      <p>Until a tape has been on one wall running each way, every document says so, on its
+        face, where a client will read it. A number you cannot defend line by line to a
+        homeowner is worse than no number.</p>
+      <p><a href="/about/#true">Every claim on this site, and how to check it</a></p>
+    </div>
+  </div>
 </section>
 
-<section class="wrap rise" style="margin-top:3rem">
-  <figure>
-    <img src="/img/plan.png" alt="A dimensioned plan of a scanned kitchen, marked SCANNED"
-         loading="lazy" decoding="async" width="812">
-    <figcaption>A real plan, off a real scan. The line under it says the numbers came from a
-      scanner rather than a tape — and it stays there until somebody changes that.</figcaption>
-  </figure>
+<section class="band band--sunk" data-mark="Price">
+  <div class="wrap">
+    <p class="eyebrow">What it costs</p>
+    <h2>Free to measure. Paid to price.</h2>
+    <p class="lede">One seat, no per-project fee, and no charge for a
+      client to open something you sent them.</p>
+    <div class="plate rise" style="margin-top:1.6rem">
+      <div class="fig">
+        <span class="big">$${SITE.price.monthly}</span>
+        <span class="unit">per month</span>
+        <span class="alt">or $${SITE.price.yearly} a year</span>
+      </div>
+      <div class="split">
+        <div>
+          <h4>Free, and staying free</h4>
+          <ul>
+            <li>Measuring the room</li>
+            <li>The drawing</li>
+            <li>The room in 3D</li>
+          </ul>
+        </div>
+        <div>
+          <h4>The subscription</h4>
+          <ul>
+            <li>The takeoff</li>
+            <li>The pricing</li>
+            <li>The proposal and change orders</li>
+            <li>The claim document</li>
+            <li>The exports</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="note"><p><strong>Not on the App Store yet.</strong> Trueline is in testing with
+      a working remodeling contractor. The prices above are what it will be sold for; nothing is
+      on sale today, and this page will say so until it is.
+      <a href="#get-it">Leave an email for the TestFlight link.</a></p></div>
+  </div>
 </section>
-
-<hr class="rule">
 
 <!-- The two films.
 
@@ -415,153 +482,133 @@ function homePage() {
      preload="none" on purpose. Four megabytes that nobody asked for is four
      megabytes of somebody's data on a job site, and the poster frame is the
      plan that is already on this page and already cached. -->
-<section class="wrap rise" id="watch" style="margin-top:3rem">
-  <p class="eyebrow">Watch it work</p>
-  <h2 style="margin-top:0">Two films, of the real app</h2>
-  <p style="max-width:58ch">Neither is a mock-up or a best take. Both were filmed by driving
-    the app itself, so every tap is a real tap and every figure on screen is one it worked
-    out. If the app changes, the films are re-shot from it.</p>
+<section class="band" id="watch" data-mark="Films">
+  <div class="wrap">
+    <p class="eyebrow">Watch it work</p>
+    <h2>Two films, of the real app</h2>
+    <p>Neither is a mock-up or a best take. Both were filmed by driving
+      the app itself, so every tap is a real tap and every figure on screen is one it worked
+      out.</p>
 
-  <div class="films">
-    <figure>
-      <video controls playsinline preload="none" poster="/film/demo-poster.jpg" width="430"
-             aria-label="The work being done: a kitchen scanned, measured, priced, signed and invoiced">
-        <source src="/film/demo.mp4" type="video/mp4">
-        Your browser will not play this. <a href="/film/demo.mp4">Download it instead.</a>
-      </video>
-      <figcaption><strong>The job, end to end — 1:42.</strong> An empty app, a business and
-        eight rates typed once, a scan opened, two walls put a tape on, the takeoff, the price,
-        the proposal written and signed, a deposit raised, the damage marked and metered, and
-        the files that leave.</figcaption>
-    </figure>
+    <div class="films">
+      <figure>
+        <video controls playsinline preload="none" poster="/film/demo-poster.jpg" width="430"
+               aria-label="The work being done: a kitchen scanned, measured, priced, signed and invoiced">
+          <source src="/film/demo.mp4" type="video/mp4">
+          Your browser will not play this. <a href="/film/demo.mp4">Download it instead.</a>
+        </video>
+        <figcaption><strong>The job, end to end — 1:42.</strong> An empty app, a business and
+          eight rates typed once, a scan opened, two walls put a tape on, the takeoff, the price,
+          the proposal written and signed, a deposit raised, the damage marked and metered, and
+          the files that leave.</figcaption>
+      </figure>
 
-    <figure>
-      <video controls playsinline preload="none" poster="/film/tour-poster.jpg" width="430"
-             aria-label="The guided tour: every screen in the app, over a finished kitchen">
-        <source src="/film/tour.mp4" type="video/mp4">
-        Your browser will not play this. <a href="/film/tour.mp4">Download it instead.</a>
-      </video>
-      <figcaption><strong>Every screen — 1:54.</strong> The guided tour that ships inside the
-        app, running over a finished kitchen: the drawing, the room in 3D, the takeoff, the
-        price, the proposal, the signature, the change orders, the calendar, the invoice, the
-        claim and the files.</figcaption>
-    </figure>
+      <figure>
+        <video controls playsinline preload="none" poster="/film/tour-poster.jpg" width="430"
+               aria-label="The guided tour: every screen in the app, over a finished kitchen">
+          <source src="/film/tour.mp4" type="video/mp4">
+          Your browser will not play this. <a href="/film/tour.mp4">Download it instead.</a>
+        </video>
+        <figcaption><strong>Every screen — 1:54.</strong> The guided tour that ships inside the
+          app, running over a finished kitchen: the drawing, the room in 3D, the takeoff, the
+          price, the proposal, the signature, the change orders, the calendar, the invoice, the
+          claim and the files.</figcaption>
+      </figure>
+    </div>
   </div>
 </section>
 
-<hr class="rule">
-
-<section class="wrap rise">
-  <p class="eyebrow">How a job goes through it</p>
-  <ol class="steps" style="max-width:60ch">
-    <li><div><h3>Walk the room</h3><p>The phone finds the walls, the doors and the windows in
-      about ninety seconds. No LiDAR? Tap the corners onto a grid, or point at each one
-      through the camera.</p></div></li>
-    <li><div><h3>Put a tape on it</h3><p>One wall running each way. The app tells you which
-      walls are worth measuring and why — an error on the longest wall costs the most floor
-      area.</p></div></li>
-    <li><div><h3>Take it off</h3><p>Floor, ceiling, wall face, baseboard, framing, every door
-      and window deducted. The arithmetic is shown rather than hidden.</p></div></li>
-    <li><div><h3>Price it from your own book</h3><p>Your rates, typed once. No averages, no
-      market data. Every line is a number you set times a number the room measured.</p></div></li>
-    <li><div><h3>Get it signed</h3><p>A proposal in sentences, an exclusions list, and a
-      signature record: who signed, when, the exact words, and a fingerprint of the
-      document.</p></div></li>
-    <li><div><h3>Bill against what was signed</h3><p>Deposits, progress payments and the final,
-      built from the signed scope. Anything that changes becomes a change order.</p></div></li>
-  </ol>
-</section>
-
-<hr class="rule">
-
-<section class="wrap rise">
-  <p class="eyebrow">What is in it</p>
-  <div class="cards" style="margin-top:1.5rem">
-    <div class="card"><h3>The drawing</h3><p>A plan with real dimension lines, doors, windows,
-      north and your letterhead. Blueprint or 3D — walk through the room, or take the roof off
-      the whole floor.</p></div>
-    <div class="card"><h3>The takeoff</h3><p>Every quantity with its workings, as a sheet you
-      can send, copy, or open in a spreadsheet.</p></div>
-    <div class="card"><h3>Insurance</h3><p>Mark damage while standing in front of it.
-      Photographs, moisture readings over time, a claim document, and ESX for Xactimate.</p></div>
-    <div class="card"><h3>Scheduling and invoicing</h3><p>Days into your own calendar. Invoices
-      off the signed scope. A QuickBooks export. No monthly service behind any of it.</p></div>
-    <div class="card"><h3>Your business, once</h3><p>Licence number, insurance, logo and rates
-      typed one time and on every document after that.</p></div>
-    <div class="card"><h3>Written on the phone</h3><p>On an iPhone that supports Apple
-      Intelligence it will draft the scope paragraph and the loss description from figures it
-      already has — free, offline, nothing leaves the device. You read every word first.</p></div>
+<section class="band" data-mark="Method">
+  <div class="wrap duo">
+    <div>
+      <p class="eyebrow">How a job goes through it</p>
+      <h2>Walk in. Leave with it signed.</h2>
+      <p style="font-size:.97rem">Six steps, in the order they happen on site.</p>
+      <p><a href="/guides/${rates.slug}/">${esc(rates.title)}</a></p>
+    </div>
+    <ol class="steps steps--grid">
+      <li><div><h3>Walk the room</h3><p>The phone finds the walls, the doors and the windows in
+        about ninety seconds. No LiDAR? Tap the corners onto a grid.</p></div></li>
+      <li><div><h3>Put a tape on it</h3><p>One wall running each way. The app says which walls
+        are worth measuring, and why.</p></div></li>
+      <li><div><h3>Take it off</h3><p>Floor, ceiling, wall face, baseboard, framing, every door
+        and window deducted. The arithmetic is shown rather than hidden.</p></div></li>
+      <li><div><h3>Price it from your own book</h3><p>Your rates, typed once. No averages, no
+        market data — a number you set times a number the room measured.</p></div></li>
+      <li><div><h3>Get it signed</h3><p>A proposal in sentences, an exclusions list, and a
+        record of who signed, when, and the exact words.</p></div></li>
+      <li><div><h3>Bill against what was signed</h3><p>Deposits, progress payments and the
+        final. Anything that changes becomes a change order.</p></div></li>
+    </ol>
   </div>
 </section>
 
-<hr class="rule">
-
-<section class="wrap rise">
-  <p class="eyebrow">Where your work lives</p>
-  <div class="scroll">
-    <table>
-      <thead><tr><th>Thing</th><th>Where it is</th><th>What that means</th></tr></thead>
-      <tbody>
-        <tr><td>The rooms</td><td>A folder per scan on your phone</td>
-          <td>Visible in the Files app. AirDrop one, mail one, copy one off. No account needed
-            to read your own work.</td></tr>
-        <tr><td>The backup</td><td>Your own iCloud</td>
-          <td>Not ours — yours. A corrected room is a few kilobytes, so a free iCloud account
-            holds a very large number of them.</td></tr>
-        <tr><td>The photographs</td><td>On the phone</td>
-          <td>A scan’s pictures run to tens of megabytes. Sending them up would fill your
-            iCloud with one job, so that is a decision per job rather than a default.</td></tr>
-        <tr><td>Everything else</td><td>Nowhere</td>
-          <td>There is no Trueline server. Nothing is uploaded, nothing is analysed, and there
-            is no way for one person’s house to reach another’s.</td></tr>
-      </tbody>
-    </table>
+<section class="band band--sunk" data-mark="Spec">
+  <div class="wrap duo">
+    <div>
+      <p class="eyebrow">Specification</p>
+      <h2>What is in it, and where it lives</h2>
+      <p style="font-size:.97rem">There is no Trueline server. Nothing is
+        uploaded, nothing is analysed, and there is no way for one person’s house to reach
+        another’s.</p>
+      <p><a href="/templates/">Take the blank forms, free</a></p>
+    </div>
+    <dl class="spec">
+      <div><dt>The drawing</dt><dd>A plan with real dimension lines, doors, windows, north and
+        your letterhead. Blueprint or 3D.</dd></div>
+      <div><dt>The takeoff</dt><dd>Every quantity with its workings, as a sheet you can send,
+        copy, or open in a spreadsheet.</dd></div>
+      <div><dt>Insurance</dt><dd>Damage marked while you stand in front of it. Photographs,
+        moisture readings over time, a claim document, and ESX for Xactimate.</dd></div>
+      <div><dt>Scheduling</dt><dd>Days into your own calendar. Invoices off the signed scope. A
+        QuickBooks export.</dd></div>
+      <div><dt>Your business</dt><dd>Licence number, insurance, logo and rates typed one time
+        and on every document after that.</dd></div>
+      <div><dt>Written on the phone</dt><dd>On an iPhone with Apple Intelligence it drafts the
+        scope paragraph and the loss description from figures it already has — free, offline,
+        nothing leaves the device. You read every word first.</dd></div>
+      <div><dt>The rooms</dt><dd>A folder per scan, visible in the Files app. AirDrop one, mail
+        one, copy one off. No account needed to read your own work.</dd></div>
+      <div><dt>The backup</dt><dd>Your own iCloud — not ours. A corrected room is a few
+        kilobytes, so a free iCloud account holds a very large number of them.</dd></div>
+      <div><dt>The photographs</dt><dd>On the phone. A scan’s pictures run to tens of megabytes,
+        so sending them up is a decision per job rather than a default.</dd></div>
+    </dl>
   </div>
 </section>
 
-<hr class="rule">
-
-<section class="wrap rise">
-  <p class="eyebrow">What it costs</p>
-  <h2 style="margin-top:0">Free to measure. Paid to price.</h2>
-  <p style="max-width:56ch">Measuring, the drawing and the 3D view are free and will stay free.
-    The takeoff, the pricing, the proposal, the change orders, the claim document and the
-    exports are the subscription: <strong>$${SITE.price.monthly} a month, or
-    $${SITE.price.yearly} a year</strong>. One seat, no per-project fee, and no charge for a
-    client to open something you sent them.</p>
-  <div class="note"><p><strong>Not on the App Store yet.</strong> Trueline is in testing with a
-    working remodeling contractor. The prices above are what it will be sold for; nothing is on
-    sale today, and this page will say so until it is.</p></div>
-</section>
-
-<section class="wrap" id="get-it">
-  <div class="signup rise">
-    <p class="eyebrow" style="margin-bottom:.5rem">Get it when it opens</p>
-    <h2 style="margin:0 0 .4rem">One email, when there is something to install.</h2>
-    <p style="max-width:52ch;margin:0">No newsletter, no drip sequence, no sharing it with
-      anybody. If you would rather just write:
-      <a href="mailto:${SITE.email}">${SITE.email}</a>.</p>
-    <form name="waitlist" method="POST" data-netlify="true" action="/thanks/">
-      <input type="hidden" name="form-name" value="waitlist">
-      <p style="display:none"><label>Leave this empty <input name="bot-field"></label></p>
-      <label class="visually-hidden" for="trade" style="position:absolute;left:-9999px">Your trade</label>
-      <input id="trade" type="text" name="trade" placeholder="Your trade — remodeler, restoration…" autocomplete="organization-title">
-      <label class="visually-hidden" for="email" style="position:absolute;left:-9999px">Email address</label>
-      <input id="email" type="email" name="email" placeholder="you@yourcompany.com" required autocomplete="email">
-      <button class="btn btn-solid" type="submit">Tell me when</button>
-    </form>
-    <p class="fine">Stored by Netlify as form submissions. Nothing else happens to it.</p>
+<section class="band" data-mark="Guides">
+  <div class="wrap">
+    <p class="eyebrow">Start here</p>
+    <h2>Three that are worth the time</h2>
+    <div class="next" style="margin-top:1.4rem">
+      ${trio.map((g) => `<a href="/guides/${g.slug}/">
+        <span class="k">${esc(AUDIENCE[g.audience].label)} · ${g.minutes} min</span>
+        <span class="t">${esc(g.title)}</span></a>`).join('\n      ')}
+    </div>
+    <p style="margin-top:1.2rem"><a href="/guides/">All ${GUIDES.length} guides, by trade</a></p>
   </div>
 </section>
 
-<section class="wrap rise">
-  <p class="eyebrow">Start here</p>
-  <div class="next" style="margin-top:1rem">
-    ${['drywall-takeoff', 'document-water-damage', 'magicplan-alternative', 'estimate-should-include']
-      .map((slug) => GUIDES.find((g) => g.slug === slug))
-      .map((g) => `<a href="/guides/${g.slug}/">
-        <span class="k">${esc(AUDIENCE[g.audience].label)}</span>
-        <span class="t">${esc(g.title)}</span></a>`).join('\n    ')}
+<section class="band" id="get-it" data-mark="Email">
+  <div class="wrap">
+    <div class="signup rise">
+      <p class="eyebrow" style="margin-bottom:.6rem">The one thing this page asks for</p>
+      <h2>Leave an email. Get the TestFlight link.</h2>
+      <p style="max-width:52ch;margin:0">One email, when there is something to install. No
+        newsletter, no drip sequence, no sharing it with anybody. If you would rather just write:
+        <a href="mailto:${SITE.email}">${SITE.email}</a>.</p>
+      <form name="waitlist" method="POST" data-netlify="true" action="/thanks/">
+        <input type="hidden" name="form-name" value="waitlist">
+        <p style="display:none"><label>Leave this empty <input name="bot-field"></label></p>
+        <label class="visually-hidden" for="trade">Your trade</label>
+        <input id="trade" type="text" name="trade" placeholder="Your trade — remodeler, restoration…" autocomplete="organization-title">
+        <label class="visually-hidden" for="email">Email address</label>
+        <input id="email" type="email" name="email" placeholder="you@yourcompany.com" required autocomplete="email">
+        <button class="btn btn-solid" type="submit">Tell me when</button>
+      </form>
+      <p class="fine">Stored by Netlify as form submissions. Nothing else happens to it.</p>
+    </div>
   </div>
 </section>`;
 
@@ -597,29 +644,65 @@ function homePage() {
 }
 
 function guidesIndex() {
-  const groups = Object.entries(AUDIENCE).map(([key, meta]) => {
+  /* Four shelves in the order somebody arrives at them, not in whatever order
+     the four data files happen to import. */
+  const ORDER = ['contractor', 'restoration', 'compare', 'homeowner'];
+  /* The one to hand somebody first. Written down rather than "the first in the
+     array", because which guide opens a shelf is an editorial decision and it
+     should not change silently when a guide is added. */
+  const LEAD = {
+    contractor: 'drywall-takeoff',
+    restoration: 'document-water-damage',
+    compare: 'magicplan-alternative',
+    homeowner: 'estimate-should-include',
+  };
+  const MARK = { contractor: 'Trade', restoration: 'Resto', compare: 'Compare', homeowner: 'Owner' };
+
+  const counts = Object.fromEntries(
+    ORDER.map((key) => [key, GUIDES.filter((g) => g.audience === key).length]));
+
+  const shelves = ORDER.map((key) => {
+    const meta = AUDIENCE[key];
     const mine = GUIDES.filter((g) => g.audience === key);
+    const lead = mine.find((g) => g.slug === LEAD[key]) ?? mine[0];
+    const rest = mine.filter((g) => g !== lead);
     return `
-  <section id="${key}" class="rise" style="margin-top:3rem">
-    <p class="eyebrow">${esc(meta.label)} · ${mine.length} guides</p>
-    <h2 style="margin-top:0">${esc(meta.blurb)}</h2>
-    <div class="next" style="margin-top:1.4rem">
-      ${mine.map((g) => `<a href="/guides/${g.slug}/">
-        <span class="k">${g.minutes} min</span>
-        <span class="t">${esc(g.title)}</span></a>`).join('\n      ')}
-    </div>
-  </section>`;
+    <section class="shelf" id="${key}" data-mark="${esc(MARK[key])}">
+      <p class="eyebrow">${counts[key]} guides</p>
+      <h2>${esc(meta.label)}</h2>
+      <p class="blurb">${esc(meta.blurb)}</p>
+      <a class="lead" href="/guides/${lead.slug}/">
+        <span class="k">Start here · ${lead.minutes} min</span>
+        <span class="t">${esc(lead.title)}</span>
+        <span class="d">${esc(lead.description)}</span>
+      </a>
+      <ul class="rows">
+        ${rest.map((g) => `<li><a href="/guides/${g.slug}/">
+          <span class="t">${esc(g.title)}</span>
+          <span class="m">${g.minutes} min</span></a></li>`).join('\n        ')}
+      </ul>
+    </section>`;
   }).join('\n');
 
   const body = `
 <div class="wrap">
   <div class="guide-head">
-    <p class="eyebrow">${GUIDES.length} guides</p>
+    <p class="eyebrow">${GUIDES.length} guides · free · no sign-up</p>
     <h1>How to measure it, price it and get paid for it</h1>
     <p class="lede">Written for people who do this work. No affiliate links, no prices invented
       for a market nobody here knows, and nothing claimed that has not been established.</p>
   </div>
-  ${groups}
+
+  <div class="index-grid" style="margin-top:2.75rem">
+    <nav class="index-nav" aria-label="Guides by trade">
+      <ol>
+        ${ORDER.map((key) => `<li><a href="#${key}"><span>${esc(AUDIENCE[key].label)}</span>
+          <b>${counts[key]}</b></a></li>`).join('\n        ')}
+      </ol>
+    </nav>
+    <div>${shelves}
+    </div>
+  </div>
 </div>`;
 
   return {

@@ -180,8 +180,13 @@ h1, h2, h3, h4 {
   margin: 0;
 }
 h1 { font-size: clamp(2.7rem, 7vw, 4.9rem); font-weight: 700; line-height: .96; }
-h2 { font-size: clamp(1.75rem, 3.6vw, 2.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.75rem, 3.6vw, 2.6rem); font-weight: 700; margin: 2.6rem 0 .6rem; }
 h3 { font-size: 1.18rem; font-weight: 600; letter-spacing: .005em; }
+/* A heading that opens a section already has the section's own space above it,
+   and the field label above that. Only a heading standing in running prose has
+   to make its own room. */
+.eyebrow + h2, .duo h2, .proof h2, .signup h2, .shelf > h2 { margin-top: 0; }
+h1 + p, h1 + .lede { margin-top: .95rem; }
 p { margin: 0 0 1.05rem; max-width: var(--measure); }
 a { color: inherit; text-decoration-color: var(--yline); text-underline-offset: .2em;
     text-decoration-thickness: 1.5px; }
@@ -233,6 +238,13 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
 .bar nav a:hover { color: var(--ink); }
 .bar nav a[aria-current] { color: var(--ink); border-bottom-color: var(--yellow); }
 @media (max-width: 46rem) { .bar nav a.hide-sm { display: none; } .bar nav { gap: 1rem; } }
+/* Below about 26rem the three remaining links plus the wordmark are wider than
+   the screen, and a title bar is the last place to introduce a sideways scroll.
+   The bar takes a second row instead: no link is hidden and nothing overflows. */
+@media (max-width: 26rem) {
+  .bar .wrap { flex-wrap: wrap; gap: .2rem 1rem; padding-block: .45rem; min-height: 0; }
+  .bar nav { margin-left: 0; width: 100%; gap: .9rem; }
+}
 
 /* ------------------------------------------------- the scale down the edge */
 
@@ -247,7 +259,7 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
     z-index: 30; pointer-events: none;
   }
   .scale svg { width: 100%; height: 100%; display: block; overflow: visible; }
-  .scale .grad { stroke: var(--rule); stroke-width: 1; }
+  .scale .grad { stroke: var(--quiet); stroke-width: 1; opacity: .38; }
   .scale .grad-major { stroke: var(--quiet); stroke-width: 1; }
   .scale .mark-t { font: 500 9px var(--f-mono); fill: var(--quiet); opacity: .55;
                    letter-spacing: .06em; }
@@ -260,7 +272,7 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
 
 /* ----------------------------------------------------------------- the hero */
 
-.hero { padding: clamp(1.75rem, 4.5vw, 3rem) 0 clamp(2.5rem, 6vw, 4rem); }
+.hero { padding: clamp(1.2rem, 3vw, 2rem) 0 clamp(1.5rem, 3vw, 2.2rem); }
 .hero-head { display: grid; gap: 1.4rem 3rem; align-items: end; margin-bottom: 1.6rem; }
 @media (min-width: 58rem) { .hero-head { grid-template-columns: 1.15fr .85fr; } }
 .hero h1 { max-width: 12ch; }
@@ -274,10 +286,24 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
   background: var(--sunk);
   overflow: hidden; touch-action: none;
 }
-@media (min-width: 58rem) { .stage { aspect-ratio: 16 / 9; max-height: 58vh; } }
+/* Capped so the panel of switches under it is above the fold on a 900 px
+   laptop. The room being driveable is the point of the hero, and a control you
+   have to scroll to find is a control most people never find. */
+@media (min-width: 58rem) { .stage { aspect-ratio: 16 / 9; max-height: 48vh; } }
 .stage[data-view='3d'] { cursor: grab; }
 .stage[data-view='3d']:active { cursor: grabbing; }
 .stage canvas, .stage > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* The plan is inset from the stage's own corners rather than filling it, so the
+   drawing can never end up under the two chips pinned to the top of the frame.
+   On a phone the stage is 4:3 and small, and the title block sat squarely on
+   top of the north arrow. */
+.stage > svg.plan {
+  inset: 2.5rem .6rem .6rem;
+  /* Sized outright rather than left to the insets: an <svg> carries its own
+     intrinsic size, and with width/height auto Chrome keeps that instead of the
+     box the insets describe, so the drawing runs off the bottom of the frame. */
+  width: calc(100% - 1.2rem); height: calc(100% - 3.1rem);
+}
 .stage > svg { pointer-events: none; }
 .stage canvas[hidden], .stage > svg[hidden] { display: none; }
 .stage noscript img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border: 0; }
@@ -314,7 +340,8 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
 
 /* The blueprint. Drawn in feet — every stroke width below is a width in feet,
  * so the whole sheet scales as one drawing however big the stage is. */
-.plan .p-poche { fill: var(--rule); stroke: var(--ink); stroke-width: .075; stroke-linejoin: miter; }
+.plan .p-poche { fill: color-mix(in srgb, var(--ink) 20%, var(--sunk));
+                 stroke: var(--ink); stroke-width: .075; stroke-linejoin: miter; }
 .plan .p-open { stroke: var(--ink); stroke-width: .06; fill: none; }
 .plan .p-swing { stroke: var(--quiet); stroke-width: .05; fill: none; stroke-dasharray: .3 .25; }
 .plan .p-furn rect { fill: none; stroke: var(--quiet); stroke-width: .05; }
@@ -373,6 +400,22 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
 .panel .note-t { font-family: var(--f-mono); font-size: .62rem; color: var(--quiet); letter-spacing: .04em; }
 .panel .spacer { flex: 1 1 0; min-width: 0; }
 
+/* ------------------------------------------------------- section rhythms */
+
+/* Two shapes, so that the page is not nine of the same slab. `.proof` puts the
+   evidence first and the argument beside it; `.duo` hangs a heading and its one
+   onward link off the left and lets the content run wide on the right. */
+.proof { display: grid; gap: 1.5rem 3rem; align-items: center; }
+/* The plate is a phone screenshot, so it is held at the width of a phone. Given
+   half the page it stops being evidence and becomes the page. */
+@media (min-width: 58rem) { .proof { grid-template-columns: minmax(0, 21rem) 1fr; } }
+.proof figure { margin: 0; }
+.proof h2 { margin-top: 0; }
+
+.duo { display: grid; gap: 1.6rem 3rem; }
+@media (min-width: 62rem) { .duo { grid-template-columns: 19rem 1fr; align-items: start; } }
+.duo > div > p:last-child { margin-bottom: 0; }
+
 /* ------------------------------------------------------------------ pieces */
 
 .btn {
@@ -392,6 +435,7 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
 /* Provenance. The app's own two colours, printed as a stamp rather than as
    tinted text, because tinted amber text on aluminium is 3.9:1 and this is
    0.64rem uppercase — the exact size at which that is not readable. */
+.nb { white-space: nowrap; }
 .tag {
   display: inline-block; font-family: var(--f-mono); font-size: .64rem; font-weight: 500;
   letter-spacing: .14em; text-transform: uppercase; padding: .2rem .42rem;
@@ -575,7 +619,7 @@ hr.rule { border: 0; border-top: 1px solid var(--rule); margin: clamp(2.5rem, 6v
 .index-nav a b { color: var(--ink); font-weight: 500; }
 
 .shelf + .shelf { margin-top: 3.25rem; }
-.shelf > h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); }
+.shelf > h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0; }
 .shelf .blurb { color: var(--quiet); margin: .5rem 0 1.4rem; max-width: 52ch; }
 .lead {
   display: block; text-decoration: none; color: var(--ink);
@@ -617,7 +661,9 @@ ul.rows .m { font-family: var(--f-mono); font-size: .68rem; letter-spacing: .08e
   border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
   font: inherit; font-size: .98rem;
 }
-.signup input::placeholder { color: var(--quiet); opacity: .85; }
+/* No dimming: on this form the placeholder IS the visible label, so it has to
+   read at the same contrast as any other text. */
+.signup input::placeholder { color: var(--quiet); opacity: 1; }
 .signup .fine { font-family: var(--f-mono); font-size: .7rem; color: var(--quiet); margin: .8rem 0 0; }
 
 /* ------------------------------------------------------------------ footer */

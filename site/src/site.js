@@ -331,7 +331,7 @@ const DIMS = [
 const T = 0.5;                       // wall thickness, feet
 const OX0 = X0 - T, OX1 = X1 + T;    // outside face of the walls
 const OZ0 = Z0 - T, OZ1 = Z1 + T;
-const PLAN_BOX = { x: -15.5, y: -15, w: 31, h: 30 };
+const PLAN_BOX = { x: -15.2, y: -15.2, w: 30.4, h: 30.4 };
 
 const svgEl = (name, attrs) => {
   const el = document.createElementNS(NS, name);
@@ -369,21 +369,40 @@ function arrow(x, y, dx, dy) {
   });
 }
 
-/** One dimension: witness lines out of the thing, a broken line, two arrows. */
+/**
+ * One dimension: witness lines out of the thing, a broken line, two arrows.
+ *
+ * The gap left in the middle for the figure is a fraction of the dimension, not
+ * a fixed 1.5 ft. At a fixed gap a 3 ft door came out with a gap exactly as wide
+ * as the dimension itself, so both halves of the line were zero length and the
+ * door was dimensioned by two arrowheads with nothing between them.
+ *
+ * The witness lines stand off the thing they measure by a few inches, the way
+ * they are drawn on paper — and, here, so that the witness line of the door
+ * dimension does not run continuously into the door leaf and read as one line.
+ */
+const WITNESS_GAP = 0.35;
+
 function dimension(g, { x1, y1, x2, y2, from, text, vertical }) {
-  const gap = 1.5;
+  const span = Math.abs(vertical ? y2 - y1 : x2 - x1);
+  const gap = Math.min(1.4, span * 0.34);
+  const beyond = 0.4;
   if (vertical) {
-    g.append(seg(from, y1, x1 + 0.4, y1, 'p-wit'), seg(from, y2, x1 + 0.4, y2, 'p-wit'));
+    const out = from < x1 ? 1 : -1;
+    const a = from + out * WITNESS_GAP, b = x1 + out * beyond;
+    g.append(seg(a, y1, b, y1, 'p-wit'), seg(a, y2, b, y2, 'p-wit'));
     const mid = (y1 + y2) / 2;
     g.append(seg(x1, y1, x1, mid - gap, 'p-dim'), seg(x1, mid + gap, x1, y2, 'p-dim'));
     g.append(arrow(x1, y1, 0, -1), arrow(x1, y2, 0, 1));
-    g.append(label(x1, mid, text, 'p-fig', 1.05, -90));
+    g.append(label(x1, mid, text, 'p-fig', 1, -90));
   } else {
-    g.append(seg(x1, from, x1, y1 + 0.4, 'p-wit'), seg(x2, from, x2, y1 + 0.4, 'p-wit'));
+    const out = from < y1 ? 1 : -1;
+    const a = from + out * WITNESS_GAP, b = y1 + out * beyond;
+    g.append(seg(x1, a, x1, b, 'p-wit'), seg(x2, a, x2, b, 'p-wit'));
     const mid = (x1 + x2) / 2;
     g.append(seg(x1, y1, mid - gap, y1, 'p-dim'), seg(mid + gap, y1, x2, y1, 'p-dim'));
     g.append(arrow(x1, y1, -1, 0), arrow(x2, y1, 1, 0));
-    g.append(label(mid, y1, text, 'p-fig', 1.05));
+    g.append(label(mid, y1, text, 'p-fig', 1));
   }
 }
 
@@ -438,25 +457,50 @@ function drawPlan(svg) {
   const dims = svgEl('g', { class: 'p-dims' });
   dimension(dims, { x1: X0, x2: X1, y1: OZ1 + 2.2, from: OZ1, text: "21'" });
   dimension(dims, { x1: OX1 + 2.2, y1: Z0, y2: Z1, from: OX1, text: "20'", vertical: true });
-  dimension(dims, { x1: WIN_A, x2: WIN_B, y1: OZ0 - 2.2, from: OZ0, text: "4'" });
-  dimension(dims, { x1: OX0 - 2.2, y1: DOOR_A, y2: DOOR_B, from: OX0, text: "3'", vertical: true });
+  // The opening dimensions run OUTSIDE the overall ones, so the wall names have
+  // the band right against the wall to themselves.
+  dimension(dims, { x1: WIN_A, x2: WIN_B, y1: OZ0 - 3.3, from: OZ0, text: "4'" });
+  dimension(dims, { x1: OX0 - 3.3, y1: DOOR_A, y2: DOOR_B, from: OX0, text: "3'", vertical: true });
   g.append(dims);
 
   /* --- the wall names --- */
+  // Outside the wall line, not inside it. The cabinet runs are pushed against
+  // every wall in this room, so a label set on the inside face lands on top of
+  // one — which is exactly the collision a plan is drawn to avoid.
   const labels = svgEl('g', { class: 'p-labels' });
+
+  /**
+   * Along the wall, in the longest stretch of it that has no opening.
+   *
+   * Centred is the obvious choice and it is wrong here: the door sits across
+   * the middle of the west wall, so "WEST · 20'" landed level with the door's
+   * own 3' dimension and the two read as one cluster of numbers. A draughtsman
+   * puts the name where there is room for it, which is what this works out --
+   * the widest gap between the openings, and its midpoint.
+   */
+  const clearOf = (from, to, openings) => {
+    const edges = [from, ...openings.flat(), to];
+    let best = [from, to], span = -Infinity;
+    for (let i = 0; i < edges.length; i += 2) {
+      const a = edges[i], b = edges[i + 1];
+      if (b - a > span) { span = b - a; best = [a, b]; }
+    }
+    return (best[0] + best[1]) / 2;
+  };
+
   labels.append(
-    label(0, Z0 + 1.1, `NORTH · ${ROOM.w}'`, 'p-lab', 0.95),
-    label(0, Z1 - 1.1, `SOUTH · ${ROOM.w}'`, 'p-lab', 0.95),
-    label(X1 - 1.1, 0, `EAST · ${ROOM.d}'`, 'p-lab', 0.95, -90),
-    label(X0 + 1.1, 0, `WEST · ${ROOM.d}'`, 'p-lab', 0.95, 90),
+    label(clearOf(X0, X1, [[WIN_A, WIN_B]]), OZ0 - 0.85, `NORTH · ${ROOM.w}'`, 'p-lab', 0.95),
+    label(0, OZ1 + 0.85, `SOUTH · ${ROOM.w}'`, 'p-lab', 0.95),
+    label(OX1 + 0.85, 0, `EAST · ${ROOM.d}'`, 'p-lab', 0.95, -90),
+    label(OX0 - 0.85, clearOf(Z0, Z1, [[DOOR_A, DOOR_B]]), `WEST · ${ROOM.d}'`, 'p-lab', 0.95, -90),
   );
   g.append(labels);
 
   /* --- north, because a plan without it is a picture --- */
   const north = svgEl('g', { class: 'p-northmark' });
   north.append(
-    svgEl('polygon', { class: 'p-north', points: '13.2,-13.6 14.0,-11.6 13.2,-12.2 12.4,-11.6' }),
-    label(13.2, -10.6, 'N', 'p-lab', 1),
+    svgEl('polygon', { class: 'p-north', points: '13.3,-13.4 14.1,-11.4 13.3,-12.0 12.5,-11.4' }),
+    label(13.3, -10.4, 'N', 'p-lab', 1),
   );
   g.append(north);
 
@@ -531,7 +575,7 @@ function room3d(stage, canvas, svg, state) {
 
   const at = (event) => ({ x: event.clientX, y: event.clientY });
   stage.addEventListener('pointerdown', (event) => {
-    if (state.view !== '3d' || event.target.closest('.panel')) return;
+    if (state.view !== '3d') return;
     holding = { ...at(event), turn, tilt, id: event.pointerId };
     spin = false;
     stage.setPointerCapture?.(event.pointerId);
@@ -697,9 +741,15 @@ function wireStage(stage) {
     stage.dataset.dims = state.dims ? 'on' : 'off';
     stage.dataset.labels = state.labels ? 'on' : 'off';
     const is3d = state.view === '3d';
-    canvas.hidden = !is3d;
-    svg.hidden = !is3d;
-    plan.hidden = is3d;
+    // `hidden` is a property of HTMLElement and NOT of SVGElement, so
+    // `svg.hidden = true` on an <svg> sets a JavaScript field nobody reads and
+    // leaves the element on screen. The attribute is what both kinds honour.
+    const showing = (el, yes) => {
+      if (yes) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+    };
+    showing(canvas, is3d);
+    showing(svg, is3d);
+    showing(plan, !is3d);
     if (engine) { if (is3d) engine.start(); else engine.stop(); }
   };
 

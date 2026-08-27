@@ -105,7 +105,7 @@ for (const [path, html] of pages) {
       if (!files.includes(target.slice(1))) say(path, `dead asset link ${target}`);
       continue;
     }
-    if (['/style.css', '/room3d.js', '/favicon.svg', '/apple-touch-icon.png',
+    if (['/style.css', '/site.js', '/favicon.svg', '/apple-touch-icon.png',
          '/sitemap.xml', '/robots.txt'].includes(target)) {
       if (!files.includes(target.slice(1))) say(path, `dead asset link ${target}`);
       continue;
