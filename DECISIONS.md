@@ -1849,6 +1849,32 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   can. The stamp lives beside `Assets.xcassets` and never inside it, because
   `actool` compiles that folder whole.
 
+- **`webView.evaluateJavaScript(...)` written bare, inside a `Task`.** WebKit
+  has two: the one taking a completion handler is ordinary, the one that does
+  not is `async throws`, and in an async context that is the overload the
+  compiler picks. Two errors from one line -- no `try`, no `await` -- in a file
+  that calls the callback form correctly sixteen lines further down.
+  `check-swift-await.py` now looks for a written-out list of async SDK calls
+  this project makes and requires `await`, and `try` where it can throw. Its
+  first version listed bare NAMES and reported seven of this project's own
+  methods -- `save`, `record`, `data` -- as CloudKit and URLSession calls;
+  seven false positives is seven reasons to stop reading a checker's output, so
+  every entry is receiver-qualified or argument-label-qualified now, and what
+  cannot be pinned down that way is left off the list and said to be left off.
+  Its second version forbade a preceding dot in the pattern, matched nothing at
+  all, and reported "0 calls" cheerfully -- which is the same failure as going
+  green on a broken file, so `check-the-checks.py` asserts the count as well as
+  the complaint.
+
+- **The films are on the website, and their posters come out of the films.**
+  The first cut used the plan already on the page, so both players showed the
+  same landscape drawing letterboxed into a portrait box and neither looked
+  like a film. `site/tools/film.mjs` now cuts a still from each -- the takeoff
+  with real quantities on it, and a tour stop standing inside the room in 3D --
+  so a poster cannot show a screen its film does not. `preload="none"`: four
+  megabytes nobody asked for is four megabytes of somebody's data on a job
+  site.
+
 Everything else: build proceeds.
 
 ## Standing constraints carried from Plumbline

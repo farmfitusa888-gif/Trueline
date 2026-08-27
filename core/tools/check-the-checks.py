@@ -635,6 +635,63 @@ def conformance(bench: Bench) -> None:
     expect('quiet again once the word is back', code, out, fires=False)
 
 
+# ------------------------------------------------------------------- awaiting
+
+def awaiting(bench: Bench) -> None:
+    """An SDK call that is async or throwing, written as if it were neither.
+
+    From Sam's Mac, both errors from the one line:
+
+        CorrectView.swift:292:21: error: call can throw, but it is not marked
+                                  with 'try' and the error is not handled
+        CorrectView.swift:292:21: error: expression is 'async' but is not
+                                  marked with 'await'
+
+    WebKit has two `evaluateJavaScript`. The one taking a completion handler is
+    ordinary; the one that does not is `async throws`, and inside a `Task` that
+    is the overload the compiler picks. The same file calls the callback form
+    sixteen lines further down and compiles fine, which is why nobody looks
+    twice at either.
+
+    The second case below is the one that matters most for this checker's
+    usefulness: the callback form must NOT be flagged. An earlier version of
+    this checker listed bare names and reported seven of this project's own
+    methods -- `save`, `record`, `data` -- as async SDK calls. Seven false
+    positives is seven reasons to stop reading a checker's output, so the
+    patterns are receiver-qualified now and this proves it.
+    """
+    print('check-swift-await.py — async written as if it were not')
+
+    code, out = bench.run('check-swift-await.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    rel = 'ios/Trueline/CorrectView.swift'
+    was = bench.read(rel)
+
+    bench.write(rel, was.replace(
+        '_ = try? await webView.evaluateJavaScript(', 'webView.evaluateJavaScript('))
+    code, out = bench.run('check-swift-await.py')
+    expect('the await taken back off, exactly as it was', code, out,
+           fires=True, saying='evaluateJavaScript')
+    bench.restore(rel)
+
+    # `try` alone is still a compile error, and a different one.
+    bench.write(rel, was.replace(
+        '_ = try? await webView.evaluateJavaScript(', '_ = try? webView.evaluateJavaScript('))
+    code, out = bench.run('check-swift-await.py')
+    expect('try without await', code, out, fires=True, saying='says `await`')
+    bench.restore(rel)
+
+    bench.write(rel, was.replace(
+        '_ = try? await webView.evaluateJavaScript(', '_ = await webView.evaluateJavaScript('))
+    code, out = bench.run('check-swift-await.py')
+    expect('await without try', code, out, fires=True, saying='says `try`')
+    bench.restore(rel)
+
+    code, out = bench.run('check-swift-await.py')
+    expect('and the completion-handler form is never flagged', code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -649,6 +706,8 @@ def main() -> int:
         portable(bench)
         print()
         conformance(bench)
+        print()
+        awaiting(bench)
 
     print()
     if failures:

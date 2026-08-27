@@ -502,6 +502,35 @@ encode([demoPath, jobPath], `${OUT}/demo.mp4`);
 encode([tourPath], `${OUT}/tour.mp4`);
 rmSync(RAW, { recursive: true, force: true });
 
+/**
+ * A still off each film, for the player to show before anybody presses play.
+ *
+ * ## Why not the plan that is already on the page
+ *
+ * That is what the first version did, and both players then showed the same
+ * landscape drawing letterboxed into a portrait box. Two films that look
+ * identical and neither of them looks like a film — a viewer has no reason to
+ * press either.
+ *
+ * So each poster is a frame of its own film, chosen for what it says at a
+ * glance: the takeoff with real quantities on it for the one about doing the
+ * work, and a stop of the tour standing inside the room in 3D for the one
+ * about the tour. Cut from the films themselves, so they cannot show a screen
+ * the film does not.
+ */
+const POSTERS = [
+  ['demo.mp4', 'demo-poster.jpg', '34', 'the takeoff, with the quantities on it'],
+  ['tour.mp4', 'tour-poster.jpg', '28', 'a stop of the tour, standing inside the room in 3D'],
+];
+for (const [film, poster, at, what] of POSTERS) {
+  execFileSync(FFMPEG, [
+    '-hide_banner', '-loglevel', 'error',
+    '-ss', at, '-i', `${OUT}/${film}`,
+    '-frames:v', '1', '-q:v', '3', '-y', `${OUT}/${poster}`,
+  ], { stdio: 'pipe' });
+  console.log(`  ✓ poster from ${film} at ${at}s — ${what}`);
+}
+
 // `ffmpeg -i` with no output file prints what it found and then exits 1,
 // because it was asked to convert nothing. That is not a failure here — the
 // exit code is the point of the call and the report is on stderr.

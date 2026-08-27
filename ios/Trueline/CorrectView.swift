@@ -289,7 +289,23 @@ struct CorrectView: UIViewRepresentable {
                     // refused -- and the far side turns it into "no draft this
                     // time" rather than into an error.
                     let quotedText = written.map { self.quoted($0) } ?? "null"
-                    webView.evaluateJavaScript(
+                    // `try? await`, and both words are load-bearing.
+                    //
+                    // `evaluateJavaScript(_:)` with no completion handler is
+                    // `async throws` in the modern SDK, and inside a `Task`
+                    // that is the overload the compiler picks. Written bare it
+                    // is two errors, not one:
+                    //
+                    //     error: call can throw, but it is not marked with
+                    //            'try' and the error is not handled
+                    //     error: expression is 'async' but is not marked
+                    //            with 'await'
+                    //
+                    // The throw is discarded on purpose. The page having gone
+                    // away before a draft came back is an ordinary thing --
+                    // somebody left the screen -- and there is nothing useful
+                    // to do about it but stop.
+                    _ = try? await webView.evaluateJavaScript(
                         "window.trueline && window.trueline.drafted"
                         + "(\(self.quoted(id)), \(quotedText))"
                     )

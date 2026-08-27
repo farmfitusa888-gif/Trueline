@@ -402,6 +402,53 @@ function homePage() {
 
 <hr class="rule">
 
+<!-- The two films.
+
+     Not a promo cut and not a screen recording of somebody's best take: both
+     are produced by site/tools/film.mjs, which drives the real app in a real
+     browser at the size of a phone and encodes what happened. Every tap is a
+     real tap and every number on screen is one the app worked out, so if the
+     app breaks the film breaks with it.
+
+     preload="none" on purpose. Four megabytes that nobody asked for is four
+     megabytes of somebody's data on a job site, and the poster frame is the
+     plan that is already on this page and already cached. -->
+<section class="wrap rise" id="watch" style="margin-top:3rem">
+  <p class="eyebrow">Watch it work</p>
+  <h2 style="margin-top:0">Two films, of the real app</h2>
+  <p style="max-width:58ch">Neither is a mock-up or a best take. Both were filmed by driving
+    the app itself, so every tap is a real tap and every figure on screen is one it worked
+    out. If the app changes, the films are re-shot from it.</p>
+
+  <div class="films">
+    <figure>
+      <video controls playsinline preload="none" poster="/film/demo-poster.jpg" width="430"
+             aria-label="The work being done: a kitchen scanned, measured, priced, signed and invoiced">
+        <source src="/film/demo.mp4" type="video/mp4">
+        Your browser will not play this. <a href="/film/demo.mp4">Download it instead.</a>
+      </video>
+      <figcaption><strong>The job, end to end — 1:42.</strong> An empty app, a business and
+        eight rates typed once, a scan opened, two walls put a tape on, the takeoff, the price,
+        the proposal written and signed, a deposit raised, the damage marked and metered, and
+        the files that leave.</figcaption>
+    </figure>
+
+    <figure>
+      <video controls playsinline preload="none" poster="/film/tour-poster.jpg" width="430"
+             aria-label="The guided tour: every screen in the app, over a finished kitchen">
+        <source src="/film/tour.mp4" type="video/mp4">
+        Your browser will not play this. <a href="/film/tour.mp4">Download it instead.</a>
+      </video>
+      <figcaption><strong>Every screen — 1:54.</strong> The guided tour that ships inside the
+        app, running over a finished kitchen: the drawing, the room in 3D, the takeoff, the
+        price, the proposal, the signature, the change orders, the calendar, the invoice, the
+        claim and the files.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<hr class="rule">
+
 <section class="wrap rise">
   <p class="eyebrow">How a job goes through it</p>
   <ol class="steps" style="max-width:60ch">
@@ -783,6 +830,18 @@ for (const page of pages) write(page);
 /* Assets. */
 cpSync(join(HERE, 'src/style.css'), join(DIST, 'style.css'));
 cpSync(join(HERE, 'src/room3d.js'), join(DIST, 'room3d.js'));
+// The films, if they have been shot. `node site/tools/film.mjs` makes them,
+// and the page above degrades to a download link rather than a broken player
+// when they are absent — which is what a checkout with no films in it looks
+// like, and it must not fail the build.
+if (existsSync(join(HERE, 'film'))) {
+  mkdirSync(join(DIST, 'film'), { recursive: true });
+  for (const name of ['demo.mp4', 'tour.mp4', 'demo-poster.jpg', 'tour-poster.jpg']) {
+    const from = join(HERE, 'film', name);
+    if (existsSync(from)) cpSync(from, join(DIST, 'film', name));
+  }
+}
+
 if (existsSync(join(HERE, 'src/shots'))) {
   cpSync(join(HERE, 'src/shots'), join(DIST, 'img'), { recursive: true });
 }

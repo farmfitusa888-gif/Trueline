@@ -232,6 +232,24 @@ figcaption::before {
   content: ''; position: absolute; left: 0; top: .55em; width: 1.05rem; height: 1px; background: var(--amber);
 }
 
+/* The two films.
+ *
+ * Both are portrait, because both are of a phone. Side by side on a desk and
+ * stacked on a phone, and neither is allowed to grow past the height of a
+ * reasonable screen -- a 430x932 video given the full column width on a wide
+ * monitor is a phone the size of a door. */
+.films {
+  display: grid; gap: 2.5rem; margin-top: 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  align-items: start;
+}
+.films figure { margin: 0; }
+.films video {
+  display: block; width: 100%; max-width: 24rem; height: auto; max-height: 78vh;
+  border: 1px solid var(--rule); border-radius: .5rem;
+  background: var(--paper-sunk); box-shadow: var(--shadow);
+}
+
 table { border-collapse: collapse; width: 100%; min-width: 32rem; font-size: .95rem; }
 .scroll { overflow-x: auto; margin: 1.4rem 0; }
 th, td { text-align: left; padding: .62rem .55rem; border-bottom: 1px solid var(--rule-faint); vertical-align: top; }

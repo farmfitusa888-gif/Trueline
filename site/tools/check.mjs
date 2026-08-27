@@ -96,7 +96,12 @@ for (const [path, html] of pages) {
   /* --- internal links must resolve, and count inbound --- */
   for (const [, href] of html.matchAll(/href="(\/[^"#?]*)/g)) {
     const target = href.endsWith('/') || href.includes('.') ? href : href + '/';
-    if (target.startsWith('/downloads/') || target.startsWith('/img/')) {
+    // Files rather than pages: the PDFs, the screenshots, and the two films.
+    // Checked against what is actually in `dist` — a download link to a file
+    // that was never built is worse than no link, because it looks like the
+    // thing works.
+    if (target.startsWith('/downloads/') || target.startsWith('/img/')
+        || target.startsWith('/film/')) {
       if (!files.includes(target.slice(1))) say(path, `dead asset link ${target}`);
       continue;
     }
