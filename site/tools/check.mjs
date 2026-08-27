@@ -164,6 +164,44 @@ for (const p of pages.keys()) {
   if (!listed.has(p)) problems.push(`sitemap is missing ${p}`);
 }
 
+/* --- the deployed Content-Security-Policy allows what the pages actually use ---
+
+   A CSP is the one part of a static site that behaves differently on a local
+   server and on the real one, so it is the one part that has to be read rather
+   than tried. `default-src 'none'` covers every fetch a directive does not name
+   -- and a <video> is governed by `media-src`, not `img-src`. Adding the films
+   without adding `media-src 'self'` would have left two players that work
+   perfectly on a laptop and are blocked in production.
+
+   Checked directive by directive against what the built pages contain, so this
+   goes on being true for whatever gets added next. --- */
+
+{
+  const toml = join(dirname(DIST), 'netlify.toml');
+  const policy = existsSync(toml)
+    ? (/Content-Security-Policy = "([^"]*)"/.exec(readFileSync(toml, 'utf8'))?.[1] ?? '')
+    : '';
+  if (!policy) {
+    problems.push('site/netlify.toml has no Content-Security-Policy to check');
+  } else {
+    const needs = [
+      [/<video[\s>]|<source\s[^>]*type="video/i, 'media-src', 'a <video>'],
+      [/<audio[\s>]/i, 'media-src', 'an <audio>'],
+      [/<img[\s>]/i, 'img-src', 'an <img>'],
+      [/<script[\s>]/i, 'script-src', 'a <script>'],
+      [/<iframe[\s>]/i, 'frame-src', 'an <iframe>'],
+    ];
+    for (const [uses, directive, what] of needs) {
+      const page = [...pages].find(([, html]) => uses.test(html));
+      if (page && !new RegExp('(^|;)\\s*' + directive + '\\s').test(policy)) {
+        problems.push(
+          `${page[0]} has ${what}, and the deployed CSP names no ${directive} — `
+          + `it falls back to default-src and the browser will block it`);
+      }
+    }
+  }
+}
+
 /* --- titles and descriptions are unique --- */
 const seenTitle = new Map();
 for (const [p, html] of pages) {

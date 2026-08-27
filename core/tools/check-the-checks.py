@@ -692,6 +692,43 @@ def awaiting(bench: Bench) -> None:
     expect('and the completion-handler form is never flagged', code, out, fires=False)
 
 
+# ------------------------------------------------------------------ arguments
+
+def arguments(bench: Bench) -> None:
+    """A call that does not pass what the function it calls requires.
+
+        ios/Trueline/DrawScreen.swift:168:116: error: missing argument for
+                                              parameter 'card' in call
+
+    `Backup.push` gained a `card:` so a room restored on a second phone would
+    remember its own name. Two places call it, in two files. One was updated.
+
+    `check-swift-names.py` reads memberwise initialisers and passed this
+    happily: `push` is an ordinary method, and nothing was reading ordinary
+    methods' arguments.
+    """
+    print('check-swift-args.py — a call missing an argument the function needs')
+
+    code, out = bench.run('check-swift-args.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    rel = 'ios/Trueline/DrawScreen.swift'
+    was = bench.read(rel)
+    bench.write(rel, was.replace('                kind: "drawn",\n                card: cardJSON\n',
+                                 '                kind: "drawn"\n'))
+    code, out = bench.run('check-swift-args.py')
+    expect('the card argument taken back off, exactly as it was', code, out,
+           fires=True, saying="missing 'card'")
+    expect('and it names where the function is declared', code, out,
+           fires=True, saying='Backup.swift')
+    bench.restore(rel)
+
+    # An argument that HAS a default may be left out, and must not be flagged --
+    # otherwise every optional parameter in the project becomes a false alarm.
+    code, out = bench.run('check-swift-args.py')
+    expect('quiet again once it is back', code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -708,6 +745,8 @@ def main() -> int:
         conformance(bench)
         print()
         awaiting(bench)
+        print()
+        arguments(bench)
 
     print()
     if failures:

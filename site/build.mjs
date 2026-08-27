@@ -867,3 +867,10 @@ writeFileSync(join(DIST, 'robots.txt'),
   `User-agent: *\nAllow: /\nDisallow: /thanks/\n\nSitemap: ${url('/sitemap.xml')}\n`);
 
 console.log(`${pages.length} pages · ${GUIDES.length} guides · ${pdfs.length} PDFs · ${indexable.length} in the sitemap`);
+// Said every time, because opening dist/index.html by double-clicking it does
+// not work and does not look like it does not work: every link and stylesheet
+// on this site is an absolute path, and under `file://` an absolute path
+// resolves to the root of the disk. The page then loads with no CSS at all --
+// which renders as one enormous purple shape, not as a blank page, so it reads
+// as a broken site rather than as a wrong way to open one.
+console.log('Look at it with:  npm run site-open   (a real server, on 127.0.0.1:4180)');

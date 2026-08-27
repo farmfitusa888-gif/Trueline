@@ -1875,6 +1875,31 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   megabytes nobody asked for is four megabytes of somebody's data on a job
   site.
 
+- **`Backup.push` gained a `card:` and only one of its two callers got it.**
+  `DrawScreen.swift:168` -- a different file, on a line long enough that the end
+  of it ran off the screen. `check-swift-names.py` reads memberwise
+  initialisers and passed it: `push` is an ordinary method, and nothing was
+  reading ordinary methods' arguments. `check-swift-args.py` now checks every
+  call against every `func` declared here, and only speaks when every label a
+  call passes is a label the local declaration has -- so a same-named method
+  in Foundation or CloudKit is never mistaken for ours. Unlabelled calls are
+  skipped, which loses coverage and is the price of never crying wolf.
+
+- **The site's deployed CSP would have blocked the films.** `default-src 'none'`
+  with no `media-src`: a `<video>` is governed by `media-src`, so the two
+  players would have worked perfectly on a laptop and been blocked in
+  production -- the worst shape a bug can take, because nothing local
+  reproduces it. `media-src 'self'` added, and `check.mjs` now reads the
+  deployed policy directive by directive against what the built pages actually
+  contain, so the next thing added is covered too.
+
+- **Opening `site/dist/index.html` by double-clicking it does not work.** Every
+  path on the site is absolute, and under `file://` an absolute path resolves to
+  the root of the disk -- so the page loads with no CSS and renders as one
+  enormous purple shape, which reads as a broken site rather than as a wrong way
+  to open one. `npm run site-open` serves it properly on 127.0.0.1:4180, and the
+  build prints that line every time.
+
 Everything else: build proceeds.
 
 ## Standing constraints carried from Plumbline

@@ -24,7 +24,12 @@
     # Google Fonts is the only outside host this site touches, and it is named
     # rather than allowed by category. Everything else — scripts, images, styles
     # — is our own origin.
-    Content-Security-Policy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+    # `media-src` is not decoration. A <video> is governed by it, and with
+    # `default-src 'none'` and no media-src the two films would be blocked on
+    # the live site while working perfectly on a local server -- the worst
+    # possible shape of bug. `check.mjs` fails the build if a page gains a
+    # <video> and this line does not mention media-src.
+    Content-Security-Policy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"

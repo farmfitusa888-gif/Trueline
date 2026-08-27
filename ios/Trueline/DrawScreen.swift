@@ -148,6 +148,9 @@ struct DrawScreen: View {
         // box on this side would be the same question in a different place.
         let name = RoomCard.name(inside: project)
         let folder = store.folder(named: CaptureWriter.folderName(for: name, at: startedAt))
+        // Declared out here because it is written inside the `do` and read
+        // after it, when the room goes to iCloud.
+        var cardJSON: Data?
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try project.write(
@@ -159,13 +162,26 @@ struct DrawScreen: View {
             var card = RoomCard()
             card.name = name
             card.write(in: folder)
+            cardJSON = try? Data(contentsOf: folder.appendingPathComponent(RoomCard.file))
         } catch {
             trouble = error.localizedDescription
             return
         }
         written = true
         store.refresh()
-        Task { await backup.push(scan: folder.lastPathComponent, capture: Data(), corrected: project, kind: "drawn") }
+        // The card goes to iCloud with the room. Without it a second phone
+        // restores a drawing that has forgotten its own name, which is what
+        // `card:` was added to `push` for -- and this call was the one that did
+        // not get it.
+        Task {
+            await backup.push(
+                scan: folder.lastPathComponent,
+                capture: Data(),
+                corrected: project,
+                kind: "drawn",
+                card: cardJSON
+            )
+        }
         onFinished(
             SavedScan(
                 folder: folder,
