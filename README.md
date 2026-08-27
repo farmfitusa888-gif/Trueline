@@ -57,7 +57,7 @@ is proven.
 
 | | |
 |---|---|
-| Tests | **833 passing, 0 failing** (`npm test`) |
+| Tests | **904 passing, 0 failing** (`npm test`) |
 | Typecheck | clean (`npm run typecheck`) |
 | Verified against | Node 22.22 |
 
@@ -130,7 +130,7 @@ was captured changes nothing about how it is corrected.**
 `ios/Trueline.xcodeproj` is checked in: open it, set your signing team, press Run.
 
 **There is a handbook.** `docs/handbook.html` — every screen and every button in the app, in
-59 cards, with a search box that filters them live and a card for each that says where it is,
+64 cards, with a search box that filters them live and a card for each that says where it is,
 what it does, the steps, and how you know it worked. `docs/handbook.pdf` is the same thing
 printed. `docs/build/check-guide.py` holds it honest: every button the handbook quotes has to
 exist in the app's own source, so renaming a control fails the check rather than silently
