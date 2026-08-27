@@ -58,8 +58,47 @@ final class ScanSession: NSObject, ObservableObject {
     /// move it.
     static let automaticInterval: TimeInterval = 2.0
 
-    let captureView: RoomCaptureView
-    private var captureSession: RoomCaptureSession { captureView.captureSession }
+    /// RoomPlan's own view, and the one scan it belongs to.
+    ///
+    /// ## Why this is replaced rather than reused
+    ///
+    /// > "WHEN I GO BACK TO SCANNER... THE NEXT SCAN STARTS LIKE THIS BLACK
+    /// >  CAMERA SCREEN"
+    ///
+    /// The screenshot underneath that sentence is the whole diagnosis: "Keep
+    /// going" at the top, two wall lengths, "8 photos", Done live — every
+    /// number on the screen moving — over a completely black picture. So the
+    /// session was up and reporting while the camera feed was not being drawn,
+    /// which is a split that cannot happen to a `RoomCaptureView` on its first
+    /// scan.
+    ///
+    /// A `RoomCaptureView` owns a session and a renderer, and stopping the
+    /// session is the end of that view's job: it stops drawing frames and turns
+    /// itself over to showing the finished model. Running the same session
+    /// again does start ARKit again — which is why the walls and the photograph
+    /// count were live — but nothing puts the renderer back to drawing the
+    /// camera. The picture stays where the last scan left it, and on a view
+    /// that never got as far as a model that is black.
+    ///
+    /// So: one view per scan, and the old one is let go the moment the scan is
+    /// over. `viewGeneration` is how the screen is told, because SwiftUI asks a
+    /// `UIViewRepresentable` for its view exactly once and would otherwise go
+    /// on showing the dead one forever.
+    @Published private(set) var captureView: RoomCaptureView
+    /// Bumped every time the view above is replaced. See `CaptureViewport`.
+    @Published private(set) var viewGeneration = 0
+    /// The session belonging to the view above, held rather than read back off
+    /// the view on every use.
+    ///
+    /// This is what a late delegate callback is measured against. RoomPlan ends
+    /// a scan on its own schedule and `RoomBuilder` takes seconds on a big
+    /// room, so a result can land long after the person has walked away from
+    /// the screen — and the answer to "is this still the scan we are on?" has
+    /// to be something that cannot be true by accident. An object identity
+    /// cannot be.
+    private var live: RoomCaptureSession
+    /// Whether the view above has already had a scan run through it.
+    private var hasRun = false
     /// Where photographs go. Replaced by `take(_:)` between scans, so a second
     /// room's pictures never land in the first room's folder.
     private var recorder: PhotoRecorder
@@ -74,10 +113,12 @@ final class ScanSession: NSObject, ObservableObject {
     private var finished: CapturedRoom?
 
     init(recorder: PhotoRecorder) {
-        self.captureView = RoomCaptureView(frame: .zero)
+        let view = RoomCaptureView(frame: .zero)
+        self.captureView = view
+        self.live = view.captureSession
         self.recorder = recorder
         super.init()
-        captureView.captureSession.delegate = self
+        view.captureSession.delegate = self
     }
 
     func start() {
@@ -86,9 +127,14 @@ final class ScanSession: NSObject, ObservableObject {
                 + "an iPhone or iPad Pro."
             return
         }
+        // A view that has already run a scan cannot draw another one. This is
+        // the line that stops the second scan being a black rectangle; see
+        // `captureView` above for what the phone was actually doing.
+        if hasRun { retire() }
         var configuration = RoomCaptureSession.Configuration()
         configuration.isCoachingEnabled = true
-        captureSession.run(configuration: configuration)
+        live.run(configuration: configuration)
+        hasRun = true
         isRunning = true
         compass.start()
 
@@ -97,12 +143,52 @@ final class ScanSession: NSObject, ObservableObject {
         }
     }
 
+    /// Ends the run that is up, and only if one is.
+    ///
+    /// The guard is not tidiness. `stop()` is what makes RoomPlan deliver the
+    /// scan, and it used to be called two and three times over on the way out
+    /// of one room — `finish()` stops it, then `reset()` stops it again, then
+    /// leaving the tab stops it a third time. Each of those was another
+    /// `didEndWith`, each spawning another `RoomBuilder`, each finishing at its
+    /// own pace and writing whatever it had built into the same place the next
+    /// scan reads from.
     func stop() {
         timer?.invalidate()
         timer = nil
-        captureSession.stop()
         compass.stop()
+        guard isRunning else { return }
+        // Down before the session is told, so nothing re-entrant gets a second
+        // look at a live flag for a session that is already ending.
         isRunning = false
+        live.stop()
+    }
+
+    /// Throws this scan's camera away and stands the next one's up.
+    ///
+    /// Two jobs that have to happen together, and separating them is what the
+    /// bug was. The dead view has to go so the next scan has a picture, and the
+    /// room built from the dead view's session has to go with it so the next
+    /// scan does not save it.
+    ///
+    /// A view that has never been run is already the next scan's, so it is left
+    /// alone: leaving a tab and coming straight back should not cost a Metal
+    /// view for nothing.
+    private func retire() {
+        stop()
+        if hasRun || finished != nil {
+            let view = RoomCaptureView(frame: .zero)
+            view.captureSession.delegate = self
+            captureView = view
+            live = view.captureSession
+            viewGeneration += 1
+        }
+        hasRun = false
+        finished = nil
+        // Both of these are about a room nobody is standing in any more. They
+        // were left set, so a second scan opened showing the first room's wall
+        // lengths and its last coaching line before a single frame had arrived.
+        walls = []
+        instruction = nil
     }
 
     /// Everything about the last scan, forgotten.
@@ -113,24 +199,44 @@ final class ScanSession: NSObject, ObservableObject {
     /// instantly, with the first room's walls, before the phone had built
     /// anything at all.
     ///
-    /// The pins and the instruction go with it: a mark made in one room has no
-    /// business appearing in the next, and "Move closer to the wall" left over
-    /// from a finished scan is an instruction about a room nobody is standing
-    /// in.
+    /// **Nil-ing it here was never enough on its own, and that is the report.**
+    /// The room is not written here; it is written by `didEndWith`, seconds
+    /// later, from inside a `RoomBuilder` that was already running when this
+    /// ran. So the sequence that produced "THE BLUEPRINT IS JUST A SQUARE AND
+    /// THE 3D IS HALF A BOX" is: step off the Scan tab part-way through a look
+    /// around, which stops the session; this clears the room; the build that
+    /// stop set going finishes afterwards and puts a few seconds of walking
+    /// back into `finished`; walk the real room properly; press Done — and
+    /// `finish()` finds a room already sitting there and saves that one,
+    /// without ever waiting for the room that was just walked.
+    ///
+    /// `retire()` is what actually fixes it. The half-built room and the
+    /// session that is building it are thrown away together, and the delegate
+    /// checks that the session it is answering for is still the live one before
+    /// it stores anything.
+    ///
+    /// The pins and the photograph count go too: a mark made in one room has no
+    /// business appearing in the next, and a count carried over is the app
+    /// telling somebody it is holding photographs it has never taken.
     func reset() {
-        stop()
-        finished = nil
+        retire()
         failure = nil
-        instruction = nil
         pinTrouble = nil
         pins.forgetEverything()
         pinCount = 0
         pending = nil
+        photoCount = 0
     }
 
     /// Where the next scan's photographs go.
+    ///
+    /// The count moves with the recorder. It did not, and that is the second
+    /// half of "IT SAYS THERE WAS A LOT OF PICS THERE": the fresh scan opened
+    /// reading the last room's total, held it until the first automatic
+    /// photograph two seconds later, and then dropped to 1.
     func take(_ next: PhotoRecorder) {
         recorder = next
+        photoCount = next.count
     }
 
     /// Clears a refusal once it has been read.
@@ -143,7 +249,7 @@ final class ScanSession: NSObject, ObservableObject {
     /// The shutter. Same machinery as the automatic one; only the label differs,
     /// and the label is what tells somebody later that a person meant this shot.
     func takePhoto(trigger: PhotoRecorder.Trigger) {
-        guard let frame = captureSession.arSession.currentFrame else { return }
+        guard let frame = live.arSession.currentFrame else { return }
 
         // A heading is only worth anything paired with the pose taken at the
         // same instant, and here is the one place both are in hand at once.
@@ -180,7 +286,7 @@ final class ScanSession: NSObject, ObservableObject {
     func markWhereTapped(at point: CGPoint, in viewport: CGSize, orientation: UIInterfaceOrientation) {
         pinTrouble = nil
         guard isRunning else { return }
-        guard let frame = captureSession.arSession.currentFrame else {
+        guard let frame = live.arSession.currentFrame else {
             pinTrouble = "The camera is not tracking yet, so there is nothing to point at."
             return
         }
@@ -189,7 +295,7 @@ final class ScanSession: NSObject, ObservableObject {
             at: point,
             in: viewport,
             orientation: orientation,
-            session: captureSession.arSession
+            session: live.arSession
         ) else {
             pinTrouble = "Nothing there yet. Point at a wall the phone has already covered."
             return
@@ -255,7 +361,23 @@ final class ScanSession: NSObject, ObservableObject {
     }
 
     /// The finished room, once the scan has stopped and RoomPlan has settled.
+    ///
+    /// Never a room from an earlier walk. `retire()` clears it and replaces the
+    /// session it came from in the same breath, and `isLive(_:)` below is what
+    /// keeps a build that was already running from putting it back.
     var capturedRoom: CapturedRoom? { finished }
+
+    /// Whether a delegate callback is about the scan that is on screen now.
+    ///
+    /// The one question every callback in the extension below has to answer
+    /// before it writes anything down. RoomPlan holds on to the session it was
+    /// given, so a callback names its own session and this is an identity test
+    /// rather than a guess about timing — which matters, because the timing is
+    /// the part nobody can predict: `RoomBuilder` takes as long as the room is
+    /// big, and the person is already somewhere else by then.
+    private func isLive(_ session: RoomCaptureSession) -> Bool {
+        session === live
+    }
 
     /// Something outside the session went wrong and the person should know.
     /// Kept here so there is one place a failure is shown from, rather than two
@@ -269,6 +391,7 @@ extension ScanSession: RoomCaptureSessionDelegate {
 
     nonisolated func captureSession(_ session: RoomCaptureSession, didUpdate room: CapturedRoom) {
         Task { @MainActor in
+            guard self.isLive(session) else { return }
             self.walls = room.walls.map { wall in
                 LiveWall(
                     id: wall.identifier,
@@ -285,6 +408,7 @@ extension ScanSession: RoomCaptureSessionDelegate {
         didProvide instruction: RoomCaptureSession.Instruction
     ) {
         Task { @MainActor in
+            guard self.isLive(session) else { return }
             // RoomPlan is reading the actual session and this app is not, so
             // whatever it says wins and is shown as it was said.
             self.instruction = Self.wording(for: instruction)
@@ -298,12 +422,27 @@ extension ScanSession: RoomCaptureSessionDelegate {
     ) {
         Task { @MainActor in
             if let error {
+                guard self.isLive(session) else { return }
                 self.failure = "The scan ended early: \(error.localizedDescription)"
                 return
             }
             do {
-                self.finished = try await RoomBuilder(options: [.beautifyObjects]).capturedRoom(from: data)
+                let room = try await RoomBuilder(options: [.beautifyObjects]).capturedRoom(from: data)
+                // Checked AFTER the build and not before it, because the build
+                // is where the seconds go. On a living room walked with a
+                // hundred photographs this line is reached long after the
+                // person has pressed Done, left the tab, or started walking the
+                // next room — and writing a room from a session that is over
+                // into the place the NEXT scan reads from is the whole of "THE
+                // BLUEPRINT IS JUST A SQUARE AND THE 3D IS HALF A BOX".
+                //
+                // Nothing is lost by dropping it. A room whose session has been
+                // retired is a room nobody is waiting for: `finish()` only ever
+                // waits on the session that is live.
+                guard self.isLive(session) else { return }
+                self.finished = room
             } catch {
+                guard self.isLive(session) else { return }
                 self.failure = "The scan finished but could not be turned into a room: "
                     + error.localizedDescription
             }

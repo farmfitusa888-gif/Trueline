@@ -138,6 +138,14 @@ function estimate(room: Room): string {
 export interface CeilingPanelProps {
   readonly room: Room;
   /**
+   * Shut the panel.
+   *
+   * The wall panel has a Done button and this one had only the gesture, which
+   * is one place the ceiling still behaved unlike a wall. Worse under the 3D
+   * view, where there is no floor on screen to tap a second time.
+   */
+  readonly onClose?: () => void;
+  /**
    * What is being done to it, what is wrong with it, what was said about it.
    *
    * Handed in rather than built here, and that is the whole reason this panel
@@ -176,7 +184,7 @@ export interface CeilingPanelProps {
  * ceiling that read 419.9 on the panel and 420.0 on the sheet would be two of
  * this app's own screens disagreeing about one room.
  */
-export function CeilingPanel({ room, children, spans = [] }: CeilingPanelProps) {
+export function CeilingPanel({ room, children, spans = [], onClose }: CeilingPanelProps) {
   const { len } = useUnits();
   const area = ceilingArea(room);
 
@@ -280,6 +288,16 @@ export function CeilingPanel({ room, children, spans = [] }: CeilingPanelProps) 
         the room at all. <strong>Look up</strong> there puts the ceiling back on its own, with the
         walls dropped away. Tap the middle of the room on the blueprint again to close this.
       </p>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-3 min-h-11 w-full rounded-md border border-slate-300 px-4 text-sm
+                     font-medium text-slate-700 active:bg-slate-100"
+        >
+          Done
+        </button>
+      )}
     </section>
   );
 }

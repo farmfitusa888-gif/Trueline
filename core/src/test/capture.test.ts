@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { importRoomPlan } from '../import-roomplan.ts';
+import { type ImportReport, importRoomPlan } from '../import-roomplan.ts';
 import { checkCapture } from '../health.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NM_PER_METRE, parseLength } from '../length.ts';
 import { scanned, verified } from '../measurement.ts';
 import { type Heading, type Room, type Wall } from '../room.ts';
-import { shows, unphotographedWalls, wallsInFrame } from '../photo.ts';
+import { photosOfWall, shows, unphotographedWalls, wallsInFrame } from '../photo.ts';
 import {
   type CapturedNorth,
   type CapturedPhoto,
@@ -590,4 +590,205 @@ test('a believable camera height raises nothing, and an unbelievable one does', 
 
   assert.equal(alarms(at([1.3, 1.4, 1.55])).length, 0, 'a person holding a phone is not an alarm');
   assert.equal(alarms(at([3.3, 3.4, 3.55])).length, 1, 'two metres out has to be one');
+});
+
+/* ----------------------- the room from one walk, the photographs from the next */
+
+/**
+ * What Sam's phone actually handed back, written down as data.
+ *
+ * > "WHEN I HIT DONE, IT BUILDS IT, BUT THERES NO PICS THERE AND THE BLUEPRINT
+ * >  IS JUST A SQUARE AND THE 3D IS HALF A BOX"
+ *
+ * Those are one fault and not two, and these tests are here to say so. The
+ * scanner saved a `CapturedRoom` that had been built from a session stopped
+ * minutes earlier — a few seconds of looking around before the real walk —
+ * while the photographs came from the walk that followed it. Two ARKit
+ * sessions, two world origins, metres apart.
+ *
+ * Nothing about the photographs is wrong. Every pose is finite, every set of
+ * intrinsics is usable, not one of them is refused. They are simply somewhere
+ * else — and what that looks like on the phone is a photo strip with nothing
+ * in it under every single wall, which reads exactly like a walk where nobody
+ * took a picture.
+ *
+ * The fix is on the phone: `ScanSession.isLive(_:)` refuses a room built from a
+ * session that is no longer the live one, and `core/tools/check-scan.py` refuses
+ * a callback that stores one without asking. These are here so that if it ever
+ * comes back, it comes back as a red test rather than as a contractor standing
+ * in somebody's kitchen.
+ */
+
+const REPORT: ImportReport = {
+  sourceVersion: 2,
+  walls: room.walls.map((wall) => wall.id),
+  openSpans: [],
+  dropped: [],
+  snapped: [],
+  diagonals: [],
+  closureBeforeSolving: { x: 0n, y: 0n },
+  openings: [],
+  recoveredSills: [],
+  sourceIds: [],
+  notes: [],
+};
+
+/**
+ * One walk of the kitchen: four quarter turns from the middle of the floor.
+ *
+ * `startedAt` is where the ARKit session had its origin, in metres. Zero is the
+ * walk that produced this room. Anything else is a walk that produced a
+ * different one — the photographs are identical in every other respect, which
+ * is the whole point.
+ */
+function walk(startedAt: [number, number, number]): PhotoManifest {
+  const [ox, oy, oz] = startedAt;
+  const turns = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+  // World z is negated onto the plan, so standing at plan (3, 2) -- the middle
+  // of a 6 by 4 kitchen -- is world z of -2. Getting that backwards puts the
+  // photographer two metres outside their own room, which is the very thing
+  // these tests are here to tell apart.
+  return {
+    schema: PHOTO_MANIFEST_SCHEMA,
+    capturedAt: T0,
+    device: 'iPhone14,3',
+    photos: turns.map((turn, i) => ({
+      ...camera([3 + ox, 1.6 + oy, -2 + oz], turn),
+      id: `shot-${i}`,
+    })),
+  };
+}
+
+test('photographs from a different walk than the room show nothing on any wall', () => {
+  const own = importPhotos(walk([0, 0, 0]), PLAIN);
+  assert.deepEqual(own.rejected, []);
+  assert.deepEqual(
+    unphotographedWalls(own.photos, room),
+    [],
+    'four quarter turns from the middle of the room cover all four walls'
+  );
+
+  // The same four photographs, from a session that started thirty metres away.
+  const elsewhere = importPhotos(walk([30, 0, 30]), PLAIN);
+  assert.deepEqual(elsewhere.rejected, [], 'not one of them is malformed, and that is the trouble');
+  assert.equal(elsewhere.photos.length, 4);
+
+  assert.deepEqual(
+    [...unphotographedWalls(elsewhere.photos, room)].sort(),
+    room.walls.map((wall) => wall.id).sort(),
+    'not one wall has a photograph against it'
+  );
+  for (const wall of room.walls) {
+    assert.deepEqual(
+      photosOfWall(elsewhere.photos, room, wall.id),
+      [],
+      `the strip under ${wall.id} is empty, which on the phone reads as "theres no pics there"`
+    );
+  }
+});
+
+test('a capture whose photographs are from another walk is caught, not drawn', () => {
+  const elsewhere = importPhotos(walk([30, 0, 30]), PLAIN);
+
+  const quiet = checkCapture({ room, report: REPORT, photos: importPhotos(walk([0, 0, 0]), PLAIN).photos })
+    .filter((f) => f.what.includes('standing outside this room'));
+  assert.deepEqual(quiet, [], 'the walk that made this room says nothing');
+
+  const findings = checkCapture({ room, report: REPORT, photos: elsewhere.photos });
+  const caught = findings.filter((f) => f.what.includes('standing outside this room'));
+  assert.equal(caught.length, 1, 'and the walk that did not has to be a finding');
+  assert.equal(caught[0]!.severity, 'stop', 'nothing may be drawn from a capture in two frames');
+  assert.match(caught[0]!.detail, /4 of 4 photographs/);
+});
+
+test('the floor of the wrong walk puts every photograph at an impossible height', () => {
+  // The other half of the same fault, and the one that does not need the plan
+  // at all. A room built from a session that started on a different storey
+  // carries that session's floor, so subtracting it from this session's poses
+  // gives heights nobody has ever held a phone at.
+  const manifest = walk([0, 0, 0]);
+  const own = heightsAboveFloor(manifest, FLOOR_AT_ZERO);
+  assert.ok(
+    own.every((h) => h >= PLAUSIBLE_CAMERA_HEIGHT.low && h <= PLAUSIBLE_CAMERA_HEIGHT.high),
+    'a phone at 1.6 m is a person holding a phone'
+  );
+
+  // The same photographs against a floor read off a room from another walk,
+  // three metres lower.
+  const foreign = heightsAboveFloor(manifest, nm(-3));
+  assert.ok(
+    foreign.every((h) => h > PLAUSIBLE_CAMERA_HEIGHT.high),
+    'and 4.6 m is not'
+  );
+
+  const findings = checkCapture({ room, report: REPORT, cameraHeights: foreign })
+    .filter((f) => f.what.includes('same room as the walls'));
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]!.severity, 'stop');
+});
+
+/* ------------------------------------------ what a half-written capture is */
+
+/**
+ * The law this file exists to keep: **a photograph is placed or it is
+ * reported, and it is never neither.**
+ *
+ * A scan is minutes of somebody's day and a folder of a few hundred pictures.
+ * One of them arriving unusable is ordinary — a frame taken while the phone was
+ * pointed at the floor, a record written as the app was being killed. Losing it
+ * without saying so is not, and it is the failure that hides: the manifest says
+ * ninety, the screen shows eighty-six, and nothing anywhere says which four
+ * went or why.
+ *
+ * So this counts them. Every id in the manifest comes out exactly once, on one
+ * side or the other, whatever shape the record was in.
+ */
+test('every photograph in a manifest is either placed or reported, never lost', () => {
+  const half: PhotoManifest = {
+    schema: PHOTO_MANIFEST_SCHEMA,
+    capturedAt: T0,
+    device: 'iPhone14,3',
+    photos: [
+      { ...camera([3, 1.6, 2], 0), id: 'whole' },
+      // A transform cut off part-way, which is what a record written while the
+      // app was being torn down looks like.
+      { ...camera([3, 1.6, 2], 0), id: 'cut-short', cameraPoseARFrame: [1, 0, 0, 0, 0, 1] },
+      { ...camera([3, 1.6, 2], 0), id: 'no-lens', intrinsics: [] },
+      // Finite, complete, and pointed straight down at the slab.
+      {
+        ...camera([3, 1.6, 2], 0),
+        id: 'at-the-floor',
+        cameraPoseARFrame: [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 3, 1.6, 2, 1],
+      },
+      { ...camera([3, 1.6, 2], Math.PI), id: 'whole-too' },
+    ],
+  };
+
+  const { photos, rejected } = importPhotos(half, PLAIN);
+
+  const accounted = [...photos.map((p) => p.id), ...rejected.map((r) => r.id)].sort();
+  assert.deepEqual(
+    accounted,
+    half.photos.map((p) => p.id).sort(),
+    'every id in the manifest comes out on one side or the other'
+  );
+  assert.equal(
+    photos.length + rejected.length,
+    half.photos.length,
+    'and exactly once — nothing is counted twice and nothing is dropped'
+  );
+
+  assert.deepEqual(photos.map((p) => p.id), ['whole', 'whole-too']);
+  // Each refusal says which photograph and why, in words, because that list is
+  // what the correction screen shows somebody who is asking where their
+  // pictures went.
+  for (const one of rejected) {
+    assert.ok(one.reason.length > 20, `"${one.id}" was refused without a reason`);
+    // Named in the sentence, not only in the record beside it. `checkCapture`
+    // puts `rejectedPhotos[0].reason` on the screen and nothing else, so a
+    // reason that does not say which photograph it is about leaves somebody
+    // reading "could not be placed" with no way to find out which one.
+    assert.match(one.reason, new RegExp(one.id), 'a reason has to name its own photograph');
+  }
+  assert.deepEqual(rejected.map((r) => r.id).sort(), ['at-the-floor', 'cut-short', 'no-lens']);
 });

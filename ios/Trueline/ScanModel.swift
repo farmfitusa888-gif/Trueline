@@ -190,9 +190,29 @@ final class ScanModel: ObservableObject {
             keepMarks(in: folder)
             return
         }
+        // Read before the session is told to stop, because stopping is what
+        // makes it false.
+        //
+        // The wait below has no deadline on purpose, and a wait with no
+        // deadline needs to know that an answer is actually coming. It comes
+        // from `didEndWith`, and `didEndWith` only fires for a session that was
+        // running. Pressing Done on a session that had already been stopped by
+        // something else -- a phone call, a tab switch that raced the tap --
+        // would otherwise leave "Building the room from your scan" on the
+        // screen for ever, which is the shape of every "IT GETS STUCK" report
+        // this app has ever had.
+        let wasRunning = session.isRunning
         stage = .building
         session.stop()
         Task {
+            guard wasRunning || session.capturedRoom != nil || session.failure != nil else {
+                stage = .failed(
+                    "The camera had already stopped before Done was pressed, so there is no "
+                    + "scan to build a room from. Nothing has been thrown away — any "
+                    + "photographs taken are still on this phone. Walk it again."
+                )
+                return
+            }
             // Until it is there, or until RoomPlan says it cannot be done.
             //
             // Not a deadline. There was an eight-second one, and what it did
@@ -206,6 +226,13 @@ final class ScanModel: ObservableObject {
             // called exactly once by RoomPlan after `stop()`, and it either
             // sets the room or sets a failure. Waiting for one of those two is
             // waiting for an answer that is coming.
+            //
+            // And it is an answer about THIS walk. `session.capturedRoom` used
+            // to be able to hold a room built from a session that had been
+            // stopped minutes earlier, so this loop could finish before it
+            // started and save a room nobody had just walked -- the square
+            // blueprint and the half box. `ScanSession.isLive(_:)` is what
+            // makes that impossible now.
             while session.capturedRoom == nil && session.failure == nil {
                 try? await Task.sleep(for: .milliseconds(150))
             }
@@ -230,16 +257,23 @@ final class ScanModel: ObservableObject {
     /// The photographs are moved rather than copied, and only the ones this
     /// pass took: the recorder writes into its own scratch folder, so there is
     /// nothing of the original walk in it to collide with.
+    ///
+    /// **They used to collide, and the collision won.** Both walks named their
+    /// photographs `photo_00001.jpg` upward, so the second pass arrived at a
+    /// name the first had already used, the loop skipped it as "already there",
+    /// and the mark somebody had just stood in front of and typed a sentence
+    /// about ended up pointing at a picture of a different wall. The names
+    /// carry the recorder's own series now — see `PhotoRecorder.series` — so
+    /// two walks in one folder cannot meet.
     private func keepMarks(in folder: URL) {
         do {
-            let manager = FileManager.default
-            let photos = folder.appendingPathComponent("photos", isDirectory: true)
-            try manager.createDirectory(at: photos, withIntermediateDirectories: true)
-            let taken = scratch.appendingPathComponent("photos", isDirectory: true)
-            for file in (try? manager.contentsOfDirectory(at: taken, includingPropertiesForKeys: nil)) ?? [] {
-                let landing = photos.appendingPathComponent(file.lastPathComponent)
-                if manager.fileExists(atPath: landing.path) { continue }
-                try? manager.moveItem(at: file, to: landing)
+            let lost = CaptureWriter.placePhotographs(
+                from: scratch.appendingPathComponent("photos", isDirectory: true),
+                into: folder,
+                listed: recorder.records.map { $0.fileName }
+            )
+            if !lost.isEmpty {
+                session.reportFailure(CaptureWriter.saying(lost: lost, stillIn: scratch))
             }
 
             let encoder = JSONEncoder()
@@ -315,10 +349,20 @@ final class ScanModel: ObservableObject {
             // The photographs were written to scratch while walking; move them
             // in beside the room rather than copying, so a large scan does not
             // need twice the space to be saved.
-            try? FileManager.default.moveItem(
-                at: scratch.appendingPathComponent("photos"),
-                to: folder.appendingPathComponent("photos")
+            //
+            // One at a time, and the ones that did not make it come back by
+            // name. `photos.json` has already been written by the line above
+            // and it lists every photograph the walk took, so a move that
+            // failed silently was a room claiming evidence it did not have.
+            // See `CaptureWriter.placePhotographs`.
+            let lost = CaptureWriter.placePhotographs(
+                from: scratch.appendingPathComponent("photos", isDirectory: true),
+                into: folder,
+                listed: recorder.records.map { $0.fileName }
             )
+            if !lost.isEmpty {
+                session.reportFailure(CaptureWriter.saying(lost: lost, stillIn: scratch))
+            }
             store.refresh()
             finished = SavedScan(
                 folder: written.folder,

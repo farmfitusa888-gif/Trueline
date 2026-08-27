@@ -185,7 +185,11 @@ const panel = page.locator('[data-surface="ceiling"]');
 check('the ceiling has a panel of its own', (await panel.count()) === 1,
   `${await panel.count()} of them`);
 
-const ceilingPanel = await panel.innerText();
+// `.first()`, so a screen that grew a SECOND ceiling panel is reported by the
+// count check above and the run carries on to say what else is wrong. Reading
+// strictly here made a duplicated panel abort the whole part on a strict-mode
+// violation, which reports one fault and hides the rest of them.
+const ceilingPanel = await panel.first().innerText();
 const shown = Number((/([\d,]+\.\d) sq ft/.exec(ceilingPanel) ?? [])[1]?.replace(/,/g, ''));
 check('with the ceiling’s area on it, to the square foot worked out here',
   shown === CEILING_SQ_FT, `${shown}, and 20 x 21 is ${CEILING_SQ_FT}`);

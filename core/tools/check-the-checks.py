@@ -889,6 +889,79 @@ def onlyOnce(bench: Bench) -> None:
            code, out, fires=False)
 
 
+def scanLifecycle(bench: Bench) -> None:
+    """The four ways the scanner lost a scan on Sam's phone, 2026-08-27.
+
+    None of these is a compile error and none is a wrong number, which is why
+    all four reached a contractor standing in a kitchen. Each mutation below
+    puts one of them back exactly as it was.
+    """
+    print('check-scan.py — a scanner that cannot finish a job')
+
+    code, out = bench.run('check-scan.py')
+    expect('says nothing about the scanner as it stands', code, out, fires=False)
+
+    # 1. The black camera screen: a stored view handed to SwiftUI once.
+    rel = 'ios/Trueline/ScanScreen.swift'
+    was = bench.read(rel)
+    bench.write(rel, was[:was.index('private struct CaptureViewport')] + (
+        'private struct CaptureViewport: UIViewRepresentable {\n'
+        '    let session: ScanSession\n'
+        '\n'
+        '    func makeUIView(context: Context) -> RoomCaptureView { session.captureView }\n'
+        '    func updateUIView(_ view: RoomCaptureView, context: Context) {}\n'
+        '}\n'))
+    code, out = bench.run('check-scan.py')
+    expect('a viewport that hands over a stored view and never swaps it',
+           code, out, fires=True, saying='hands SwiftUI a view it was given')
+    bench.restore(rel)
+
+    # 2. "IT SAYS THERE WAS A LOT OF PICS THERE": the count from the last room.
+    rel = 'ios/Trueline/ScanSession.swift'
+    bench.write(rel, bench.read(rel).replace('        photoCount = 0\n', '', 1))
+    code, out = bench.run('check-scan.py')
+    expect('reset() leaving photoCount holding the last scan total', code, out,
+           fires=True, saying='publishes `photoCount` and reset() never puts it back')
+    bench.restore(rel)
+
+    # 3. The square blueprint: a room stored without asking whose session it is.
+    was = bench.read(rel)
+    bench.write(rel, was.replace(
+        '                guard self.isLive(session) else { return }\n'
+        '                self.finished = room\n',
+        '                self.finished = room\n'))
+    code, out = bench.run('check-scan.py')
+    expect('didEndWith storing a room from a session that may be over', code, out,
+           fires=True, saying='without asking whose scan it is')
+    bench.restore(rel)
+
+    # 4. "THERES NO PICS THERE": the move whose error was swallowed.
+    rel = 'ios/Trueline/ScanModel.swift'
+    was = bench.read(rel)
+    bench.write(rel, was.replace(
+        '            let lost = CaptureWriter.placePhotographs(\n'
+        '                from: scratch.appendingPathComponent("photos", isDirectory: true),\n'
+        '                into: folder,\n'
+        '                listed: recorder.records.map { $0.fileName }\n'
+        '            )\n'
+        '            if !lost.isEmpty {\n'
+        '                session.reportFailure(CaptureWriter.saying(lost: lost, stillIn: scratch))\n'
+        '            }\n'
+        '            store.refresh()\n',
+        '            try? FileManager.default.moveItem(\n'
+        '                at: scratch.appendingPathComponent("photos"),\n'
+        '                to: folder.appendingPathComponent("photos")\n'
+        '            )\n'
+        '            store.refresh()\n'))
+    code, out = bench.run('check-scan.py')
+    expect('save() carrying the photographs across with try?', code, out,
+           fires=True, saying='a photograph is moved with `try?`')
+    bench.restore(rel)
+
+    code, out = bench.run('check-scan.py')
+    expect('and quiet again on all four once they are fixed', code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -913,6 +986,8 @@ def main() -> int:
         paywall(bench)
         print()
         onlyOnce(bench)
+        print()
+        scanLifecycle(bench)
 
     print()
     if failures:

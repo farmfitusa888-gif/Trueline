@@ -856,7 +856,10 @@ export function App() {
                   Beside the wall panel and never with it: one selection, one
                   surface, exactly as a wall behaves. */}
               {!selectedWall && state.selected === surfaceKey(CEILING) && workProps && (
-                <CeilingPanel room={loaded.room}>
+                <CeilingPanel
+                  room={loaded.room}
+                  onClose={() => dispatch({ type: 'select', wallId: null })}
+                >
                   <WorkOnSurface {...workProps} surface={CEILING} />
                 </CeilingPanel>
               )}

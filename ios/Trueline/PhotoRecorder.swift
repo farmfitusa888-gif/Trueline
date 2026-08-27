@@ -87,6 +87,30 @@ final class PhotoRecorder {
     private let directory: URL
     private let context = CIContext()
     private let started = Date()
+    /// What makes this recorder's photographs its own.
+    ///
+    /// The names used to be `photo_00001.jpg` counting from one, and the ids
+    /// `photo-1` likewise — per recorder, which meant every walk in the app
+    /// produced the same names as every other walk. Inside one folder that is
+    /// fine, and for an ordinary scan there is only ever one.
+    ///
+    /// A **marking pass** puts two walks in one folder. It runs the camera
+    /// again over a room that already exists and merges what it records into
+    /// that room's `photos.json` and `photos/` — so the second pass's
+    /// `photo_00001.jpg` arrived at a name the first walk had already taken.
+    /// The merge kept the file that was there and dropped the new one, and the
+    /// merged manifest then carried two records claiming the same picture and
+    /// the same id. The photograph a person took *of the damage they had just
+    /// pointed at* was thrown away, silently, and its record pointed at a shot
+    /// of some other wall from weeks earlier.
+    ///
+    /// Eight hex characters of a fresh UUID, so two recorders cannot collide
+    /// however close together they are made. Nothing reads the shape of these
+    /// names — a name is data that travels in `photos.json`, not a convention
+    /// anything reconstructs.
+    private let series: String = String(
+        UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
+    )
     private static let stamp: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -122,7 +146,11 @@ final class PhotoRecorder {
     func record(frame: ARFrame, trigger: Trigger) throws -> String {
         try ensureDirectory()
         let index = records.count + 1
-        let fileName = String(format: "photo_%05d.jpg", index)
+        // `series` is what keeps two walks in one folder apart. See its
+        // declaration: without it a marking pass overwrote nothing and lost
+        // everything, because the name it wanted was already taken.
+        let id = "photo-\(series)-\(index)"
+        let fileName = "photo_\(series)_" + String(format: "%05d.jpg", index)
 
         let image = CIImage(cvPixelBuffer: frame.capturedImage)
         guard let data = context.jpegRepresentation(
@@ -139,7 +167,7 @@ final class PhotoRecorder {
 
         records.append(
             Record(
-                id: "photo-\(index)",
+                id: id,
                 takenAt: Self.stamp.string(from: Date()),
                 trigger: trigger,
                 fileName: fileName,
@@ -150,7 +178,7 @@ final class PhotoRecorder {
                 trackingQuality: String(describing: frame.camera.trackingState)
             )
         )
-        return "photo-\(index)"
+        return id
     }
 
     /// Set once, the first time a usable heading and a pose land together.

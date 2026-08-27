@@ -100,7 +100,7 @@ struct ScanScreen: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            CaptureViewport(session: model.session)
+            CaptureViewport(session: model.session, generation: model.session.viewGeneration)
                 .ignoresSafeArea()
 
             // The tap target, over the picture and under the controls. Only
@@ -511,9 +511,60 @@ extension ScanScreen {
 
 /// RoomPlan's own view, which draws the room as it is found and runs the
 /// coaching overlay. Rebuilding that would be work for a worse result.
+///
+/// ## Why it sits in a box instead of being handed over directly
+///
+/// This used to be `makeUIView { session.captureView }` with nothing at all in
+/// `updateUIView`, and that is the second half of the black camera screen.
+///
+/// SwiftUI asks a `UIViewRepresentable` for its view **once** and then keeps
+/// that object for as long as the representable's place in the view tree lives.
+/// Scan is a tab, so that is the whole life of the app. The moment
+/// `ScanSession` began standing up a fresh `RoomCaptureView` per scan — which
+/// it has to, and `ScanSession.captureView` says why — this screen would have
+/// gone on showing the first one for ever: a view whose session had been
+/// stopped, drawing nothing, while a second live session it had never heard of
+/// reported wall lengths and photograph counts over the top of it.
+///
+/// A plain `UIView` that holds whichever capture view is current fixes it. The
+/// box is what SwiftUI keeps hold of; what is inside the box is this screen's
+/// business, and `updateUIView` swaps it as soon as there is a new one.
 private struct CaptureViewport: UIViewRepresentable {
     let session: ScanSession
+    /// Which scan's camera this is.
+    ///
+    /// Held here rather than reached for inside `updateUIView`, and that is the
+    /// point of it: SwiftUI decides whether to call `updateUIView` at all from
+    /// what the representable itself carries, so a value that changes per scan
+    /// has to be one of them.
+    let generation: Int
 
-    func makeUIView(context: Context) -> RoomCaptureView { session.captureView }
-    func updateUIView(_ view: RoomCaptureView, context: Context) {}
+    func makeUIView(context: Context) -> UIView {
+        let box = UIView(frame: .zero)
+        // Black rather than nothing, for the moment before the first frame
+        // arrives. A camera warming up should look like a camera warming up.
+        box.backgroundColor = .black
+        put(session.captureView, in: box)
+        return box
+    }
+
+    func updateUIView(_ box: UIView, context: Context) {
+        let wanted = session.captureView
+        guard wanted.superview !== box else { return }
+        for old in box.subviews {
+            old.removeFromSuperview()
+        }
+        put(wanted, in: box)
+    }
+
+    private func put(_ view: RoomCaptureView, in box: UIView) {
+        view.translatesAutoresizingMaskIntoConstraints = false
+        box.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.topAnchor.constraint(equalTo: box.topAnchor),
+            view.bottomAnchor.constraint(equalTo: box.bottomAnchor),
+            view.leadingAnchor.constraint(equalTo: box.leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: box.trailingAnchor),
+        ])
+    }
 }

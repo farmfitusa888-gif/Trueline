@@ -306,6 +306,25 @@ export function planFromWorld(
  */
 export function toPhoto(captured: CapturedPhoto, frame: RoomFrame): Photo {
   const m = captured.cameraPoseARFrame;
+  // Checked here, by name, rather than left to `at()` further down.
+  //
+  // `at()` is handed a bare array and can only say "a transform in the capture
+  // has 6 entries; it needs 16" — a true sentence about no photograph in
+  // particular. That sentence is what somebody reads: `checkCapture` puts the
+  // FIRST refusal's reason on the correction screen and nothing else, so a
+  // reason that does not name its photograph tells a person some picture is
+  // missing and gives them no way to find out which.
+  //
+  // A short transform is what a manifest written while the app was being torn
+  // down looks like, so this is the refusal most likely to be the one anybody
+  // ever reads.
+  if (m.length !== 16) {
+    throw new CaptureError(
+      `Photo "${captured.id}" has a camera transform of ${m.length} numbers where it needs 16, ` +
+        `so there is no way to know where it was taken from or which way it faced. Its image is ` +
+        `still in the scan's folder; only its place on the plan is lost.`
+    );
+  }
   const fx = captured.intrinsics[0];
   const cx = captured.intrinsics[2];
   const fy = captured.intrinsics[4];
