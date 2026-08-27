@@ -4,12 +4,16 @@ import {
   type ImportResult,
   type Mapping,
   type ParsedList,
+  importForVendor,
   importList,
   merge,
   parseList,
 } from '../../core/src/pricelist.ts';
 import { money } from '../../core/src/price.ts';
 import { pricing } from '../../core/src/company.ts';
+import { addStore, recordPrices, storeById, storeId } from '../../core/src/vendor.ts';
+import { Stores, useVendorBook } from './Vendor.tsx';
+import { Gate } from './Locked.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -26,6 +30,22 @@ import { useUnits } from './units.tsx';
  * trusts, and the nineteen are exactly the ones worth looking at — a unit
  * nothing can convert, a price with four decimal places, a duplicate the
  * supplier should be asked about.
+ *
+ * ## Where the list lands, now that a store is a thing
+ *
+ * Two places, and they are not the same thing:
+ *
+ *   - **The store's own book** (`vendor.ts`), as prices seen at a named shop on
+ *     the day the list arrived. That is what a price list literally is, and
+ *     keeping it that way is what lets the catalogue answer "what does Floor &
+ *     Decor charge for tile" without the lumber yard mixed into the answer.
+ *   - **The contractor's rate book**, exactly as before, because a rate is what
+ *     prices a takeoff and nothing about that has changed.
+ *
+ * The store is created from the name on this screen if it is not in the list
+ * already, so nobody has to set one up before importing a file. The name is the
+ * store's identity — see `storeId` — so next quarter's list from the same yard
+ * lands in the same book and the screen can say what moved.
  */
 
 function Column({
@@ -78,7 +98,7 @@ function readGuess(
   headers: readonly string[],
   already: Partial<Mapping>
 ): Partial<Mapping> {
-  const fields = ['item', 'unit', 'price', 'code', 'coverage'] as const;
+  const fields = ['item', 'unit', 'price', 'code', 'coverage', 'category'] as const;
   // Built as a mutable record and handed back as the readonly shape: `Mapping`
   // is readonly for the right reason -- nothing downstream may edit a mapping
   // out from under the pickers -- and this is the one place that assembles one.
@@ -100,12 +120,22 @@ function readGuess(
 
 export function PriceList() {
   const { company, save } = useUnits();
+  const { book: stores, save: saveStores } = useVendorBook();
   const input = useRef<HTMLInputElement>(null);
   const [list, setList] = useState<ParsedList | null>(null);
   const [supplier, setSupplier] = useState('');
+  // Kept, because it is the evidence on every price this file produces. "From
+  // their price list, miller-august.csv" is checkable; "from a price list" is
+  // not.
+  const [fileName, setFileName] = useState('');
   const [mapping, setMapping] = useState<Partial<Mapping>>({});
   const [done, setDone] = useState<
-    (ImportResult & { changed: readonly { item: string; was: bigint; now: bigint }[] }) | null
+    | (ImportResult & {
+        changed: readonly { item: string; was: bigint; now: bigint }[];
+        store: string;
+        kept: number;
+      })
+    | null
   >(null);
   const [trouble, setTrouble] = useState<string | null>(null);
 
@@ -121,6 +151,7 @@ export function PriceList() {
       const parsed = parseList(await file.text());
       setList(parsed);
       setMapping(parsed.guess);
+      setFileName(file.name);
       if (supplier.trim() === '') setSupplier(file.name.replace(/\.csv$/i, ''));
     } catch (error) {
       setList(null);
@@ -131,16 +162,37 @@ export function PriceList() {
   function bring() {
     if (!list || !ready) return;
     try {
-      const result = importList(
+      const now = new Date().toISOString();
+      const name = supplier.trim() || 'a supplier';
+      const by = company.name || 'me';
+      // The shop's book first, and nothing is saved until both have been worked
+      // out. `addStore` refuses a name with no letters in it, and a refusal
+      // after the rate book had already been written would leave somebody
+      // reading an error over five rates that silently went in anyway.
+      const id = storeId(name);
+      const withStore = storeById(stores, id) ? stores : addStore(stores, name);
+      const seen = importForVendor(
         list,
         mapping as Mapping,
-        company.name || 'me',
-        new Date().toISOString(),
-        supplier.trim() || 'a supplier'
+        id,
+        by,
+        now.slice(0, 10),
+        fileName || `${name}.csv`
       );
+      const written = recordPrices(withStore, seen.sightings, now);
+
+      const result = importList(list, mapping as Mapping, by, now, name);
       const { rates, changed } = merge(book.rates, result.rates);
+
       save({ ...company, prices: { ...book, rates } });
-      setDone({ ...result, changed: changed.map((c) => ({ item: c.item, was: c.was, now: c.now })) });
+      saveStores(written.book);
+
+      setDone({
+        ...result,
+        changed: changed.map((c) => ({ item: c.item, was: c.was, now: c.now })),
+        store: storeById(written.book, id)?.name ?? name,
+        kept: seen.sightings.length - written.refused.length,
+      });
       setList(null);
       setTrouble(null);
     } catch (error) {
@@ -149,6 +201,11 @@ export function PriceList() {
   }
 
   return (
+    // Paid, and the same `Gate` every other paid screen uses — so the sentence
+    // in its place comes from the table the gate reads and cannot advertise
+    // something the app does not give. Outside the app `Gate` is open, so the
+    // development server and a client file are unaffected.
+    <Gate feature="priceList">
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-sheet="no">
       <h2 className="font-semibold text-slate-900">Your supplier’s prices</h2>
       <p className="mt-1 text-sm text-slate-600">
@@ -195,10 +252,36 @@ export function PriceList() {
               value={supplier}
               onChange={(event) => setSupplier(event.target.value)}
               placeholder="Miller Lumber"
+              aria-label="Whose list this is"
               className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2
                          focus:border-sky-500 focus:outline-none"
             />
           </label>
+          {stores.stores.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {/* The stores already in the book, on a tap. A name typed one
+                  letter differently starts a second book under a second name,
+                  and nothing on the screen would say why half his tile prices
+                  had gone missing. */}
+              {stores.stores.map((one) => (
+                <li key={one.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSupplier(one.name)}
+                    className="min-h-11 rounded-full border border-slate-300 bg-white px-3 text-sm
+                               text-slate-700 active:bg-slate-100"
+                  >
+                    {one.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1 text-xs text-slate-500">
+            This names the store these prices are filed under, so “what does{' '}
+            {supplier.trim() || 'this yard'} charge for tile” has an answer. If it is not in your
+            list of stores yet, importing adds it.
+          </p>
 
           {/* The mapping, guessed. It is only ever a SUGGESTION: the pickers
               below are what decides, the rows underneath show what the choice
@@ -221,6 +304,7 @@ export function PriceList() {
                   '- price',
                   '- code (the supplier’s own code)',
                   '- coverage (how much one of them covers)',
+                  '- category (the aisle or trade it belongs to)',
                 ].join('\n')
               }
               onWritten={(text) => setMapping(readGuess(text, list.headers, mapping))}
@@ -258,6 +342,18 @@ export function PriceList() {
               headers={list.headers}
               value={mapping.coverage}
               onChange={(coverage) => setMapping({ ...mapping, coverage })}
+              optional
+            />
+            {/* Guessed like the rest, and confirmed like the rest. It moves no
+                number — it decides which buttons the catalogue offers to narrow
+                the list down with, and a file with no such column simply offers
+                none rather than the app sorting somebody's materials into
+                trades it made up. */}
+            <Column
+              label="The aisle or trade"
+              headers={list.headers}
+              value={mapping.category}
+              onChange={(category) => setMapping({ ...mapping, category })}
               optional
             />
           </div>
@@ -309,6 +405,12 @@ export function PriceList() {
         <div className="mt-4 border-t border-slate-200 pt-4">
           <p className="font-semibold text-slate-900">
             {done.rates.length} price{done.rates.length === 1 ? '' : 's'} in your book.
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {done.kept} of them {done.kept === 1 ? 'is' : 'are'} written down as{' '}
+            <strong>{done.store}</strong>’s own prices as well, dated today. That is what they
+            charge you — they are under <em>What the stores charge</em>, and your mark-up goes on
+            top before any of it reaches a quote.
           </p>
 
           {done.changed.length > 0 && (
@@ -370,6 +472,12 @@ export function PriceList() {
           )}
         </div>
       )}
+
+      {/* The shops themselves, and the shelf tag. Here rather than in a place
+          of its own because "where do the numbers come from" is one question,
+          and a price list and a photographed tag are two answers to it. */}
+      <Stores />
     </section>
+    </Gate>
   );
 }

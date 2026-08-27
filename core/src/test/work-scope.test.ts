@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NM_PER_FOOT, parseLength } from '../length.ts';
-import { scanned, verified } from '../measurement.ts';
+import { isVerified, scanned, toleranceOf, verified } from '../measurement.ts';
 import { type Heading, type Opening, type Room, type Wall } from '../room.ts';
 import { verifyWall } from '../edit.ts';
 import { takeoff } from '../takeoff.ts';
@@ -12,17 +12,25 @@ import { NOBODY, optionFrom, proposalOf } from '../proposal.ts';
 import { CLIENT_INTENT, sign } from '../signature.ts';
 import { EMPTY_COMPANY } from '../company.ts';
 import {
+  type SpanFromPhone,
   type Surface,
   type WorkItem,
   type WorkScope,
+  CEILING,
   KNOWN_WORK,
   WorkError,
+  ceilingArea,
   describeScope,
   drop,
   everything,
+  measuresOn,
   nothing,
   pick,
   rateFor,
+  readSurface,
+  readSurfaceMeasure,
+  surfaceKey,
+  surfaceName,
   surfacesOf,
   validateItem,
   workItems,
@@ -81,7 +89,6 @@ const doorsItem = ITEMS.find((i) => i.item === 'Doors')!;
 
 const wallOf = (id: string): Surface => ({ kind: 'wall', wallId: id });
 const FLOOR: Surface = { kind: 'floor' };
-const CEILING: Surface = { kind: 'ceiling' };
 
 /** A scope with the given items on the given surfaces, and nothing else. */
 function scopeOf(pairs: readonly (readonly [Surface, WorkItem])[]): WorkScope {
@@ -646,4 +653,147 @@ test('the wall face of every wall adds up to the wall face of the room', () => {
   assert.deepEqual(each, [160, 80, 160, 80]);
   assert.equal(each.reduce((a, b) => a + b, 0), whole);
   assert.equal(whole, (60 * Number(8n * NM_PER_FOOT)) / Number(NM_PER_FOOT));
+});
+
+/* ============================================== the ceiling as a surface */
+
+/**
+ * Pointing the phone up at something and keeping the number.
+ *
+ * > "ON THE 3D MODEL I TOLD YOU THAT I DIDNT WANT THE CEILING BEING RENDERED
+ * >  AND ITS GREAT, BUT WHAT IF I HAVE TO SCAN A CEILING OR POINT IT UP TO
+ * >  SOMETHING SIMILAR, HOW WOULD THAT WORK?"
+ *
+ * The room here is the same 20 by 10 box, 8 ft high, so every figure below is
+ * one somebody can do on paper: 200 sq ft of ceiling, and a soffit measured at
+ * 356 mm is 356 million nanometres exactly and nothing else.
+ */
+
+const span = (over: Partial<SpanFromPhone> = {}): SpanFromPhone => ({
+  id: 'span-1',
+  surface: 'ceiling',
+  what: 'the soffit over the sink',
+  millimetres: '356',
+  toleranceMillimetres: '15',
+  at: T0,
+  sensor: 'arkit',
+  ...over,
+});
+
+test('a span pointed at the ceiling is kept against the ceiling, exactly', () => {
+  const measure = readSurfaceMeasure(box, span());
+
+  assert.equal(measure.surface, 'ceiling');
+  assert.equal(measure.what, 'the soffit over the sink');
+  // 356 mm, in whole nanometres. Not 0.356 of anything, and not a float that
+  // prints as 356 and compares as 355.99999999999994.
+  assert.equal(measure.length.value, 356_000_000n);
+  assert.equal(typeof measure.length.value, 'bigint');
+});
+
+test('and it is the sensor’s number, never a tape reading', () => {
+  const measure = readSurfaceMeasure(box, span());
+
+  // The whole point of the distinction: a reading off a moving camera that
+  // called itself verified would outrank an actual tape everywhere the two are
+  // compared, and would be eligible to become the ceiling height — which
+  // multiplies every square foot of board in the room.
+  assert.equal(isVerified(measure.length), false);
+  assert.equal(measure.length.provenance.kind, 'scanned');
+  assert.equal(
+    measure.length.provenance.kind === 'scanned' ? measure.length.provenance.sensor : '',
+    'arkit'
+  );
+  assert.equal(toleranceOf(measure.length), 15_000_000n);
+});
+
+test('a span on a surface this room has not got is refused, not filed', () => {
+  // The failure this prevents: it lands in the file, appears on no screen, and
+  // is gone the next time somebody saves.
+  assert.throws(
+    () => readSurfaceMeasure(box, span({ surface: 'wall:kitchen-2' })),
+    (error: unknown) => error instanceof WorkError && /has no such surface/.test(String(error))
+  );
+});
+
+test('a span that does not say what was measured is refused', () => {
+  assert.throws(
+    () => readSurfaceMeasure(box, span({ what: '   ' })),
+    (error: unknown) => error instanceof WorkError && /what was measured/.test(String(error))
+  );
+});
+
+test('a span claiming to be exact is refused, because a camera is not a tape', () => {
+  assert.throws(
+    () => readSurfaceMeasure(box, span({ toleranceMillimetres: '0' })),
+    (error: unknown) => error instanceof WorkError && /band/.test(String(error))
+  );
+});
+
+test('a length that is not whole millimetres never becomes a measurement', () => {
+  // A float that reached this far would be a float in a measurement of a
+  // building, which is the one thing this app does not do anywhere.
+  for (const bad of ['0.356', '356.0', '-356', '', 'three fifty six']) {
+    assert.throws(
+      () => readSurfaceMeasure(box, span({ millimetres: bad })),
+      (error: unknown) => error instanceof WorkError,
+      `"${bad}" was accepted as a length`
+    );
+  }
+  assert.throws(
+    () => readSurfaceMeasure(box, span({ millimetres: '0' })),
+    (error: unknown) => error instanceof WorkError && /nothing long/.test(String(error))
+  );
+});
+
+test('spans come back on the surface they were taken on, oldest first', () => {
+  const soffit = readSurfaceMeasure(box, span({ id: 'b', at: '2026-08-27T11:00:00Z' }));
+  const beam = readSurfaceMeasure(box, span({ id: 'a', at: '2026-08-27T09:30:00Z', what: 'the beam' }));
+  const onAWall = readSurfaceMeasure(
+    box,
+    span({ id: 'c', surface: 'wall:south', what: 'the header' })
+  );
+  const all = [soffit, beam, onAWall];
+
+  assert.deepEqual(measuresOn(all, CEILING).map((m) => m.id), ['a', 'b']);
+  assert.deepEqual(measuresOn(all, wallOf('south')).map((m) => m.id), ['c']);
+  assert.deepEqual(measuresOn(all, FLOOR).map((m) => m.id), []);
+});
+
+test('the ceiling panel’s area is the takeoff’s ceiling line, not a second sum', () => {
+  // 20 ft by 10 ft. Two hundred square feet, worked out here on paper.
+  assert.equal(ceilingArea(box), '200.0');
+
+  const sheet = sheetFor(box, everything(box, ITEMS, BY, T0));
+  const line = sheet.lines.find((l) => l.what === 'Ceiling');
+  assert.ok(line, 'the ceiling is on the sheet');
+  assert.equal(line.quantity, ceilingArea(box));
+  assert.equal(line.unit, 'sq ft');
+});
+
+test('measuring the ceiling moves nothing on the sheet', () => {
+  // The property Sam asked to be proved: adding a ceiling panel must not change
+  // any quantity the app produces for a room nobody has scoped. Spans are not
+  // an input to the sheet at all, and this is the test that says so — the whole
+  // full-replacement takeoff, line for line, computed by hand.
+  //
+  // 20 by 10, 8 ft up: floor and ceiling 200 sq ft each, four walls 60 lf of
+  // run at 8 ft is 480 sq ft of face, and 60 lf of base.
+  const before = sheetFor(box, everything(box, ITEMS, BY, T0));
+  readSurfaceMeasure(box, span());
+  readSurfaceMeasure(box, span({ id: 'span-2', what: 'the beam', millimetres: '2440' }));
+  const after = sheetFor(box, everything(box, ITEMS, BY, T0));
+
+  assert.deepEqual(
+    after.lines.map((l) => `${l.what} ${l.quantity} ${l.unit}`),
+    ['Floor 200.0 sq ft', 'Ceiling 200.0 sq ft', 'Wall face 480.0 sq ft', 'Baseboard 60.00 lf']
+  );
+  assert.deepEqual(after.lines.map((l) => l.quantity), before.lines.map((l) => l.quantity));
+});
+
+test('the ceiling is a surface of every room, and it is the same one every time', () => {
+  assert.equal(surfaceKey(CEILING), 'ceiling');
+  assert.deepEqual(readSurface('ceiling'), CEILING);
+  assert.ok(surfacesOf(box).some((s) => surfaceKey(s) === surfaceKey(CEILING)));
+  assert.equal(surfaceName(CEILING), 'the ceiling');
 });

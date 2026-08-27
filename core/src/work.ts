@@ -1,8 +1,8 @@
-import type { Nanometres } from './length.ts';
+import { type Nanometres, NM_PER_MM } from './length.ts';
 import type { PriceBook, PriceUnit, Rate } from './price.ts';
 import { type Room, RoomError, area } from './room.ts';
 import { type WallQuantities, byWall, wholeRoom } from './zone.ts';
-import { isVerified } from './measurement.ts';
+import { type Measurement, isVerified, scanned } from './measurement.ts';
 import { linearFeet, squareFeet, squareFeetOfHalves, typedAmount } from './quantity.ts';
 
 /**
@@ -113,6 +113,15 @@ export function surfacesOf(room: Room): readonly Surface[] {
     ...room.walls.filter((wall) => !wall.open).map((wall) => ({ kind: 'wall' as const, wallId: wall.id })),
   ];
 }
+
+/**
+ * The ceiling, as the one surface every room has and no wall carries.
+ *
+ * Written once here rather than as `{ kind: 'ceiling' }` in each screen that
+ * wants it. Three copies of a literal is how the plan and the panel end up
+ * filing a decision under two different keys.
+ */
+export const CEILING: Surface = { kind: 'ceiling' };
 
 /* -------------------------------------------------------------- measures */
 
@@ -803,6 +812,22 @@ export function amountOn(room: Room, surface: Surface, item: WorkItem): string {
   return isZero(tally) ? '' : show(tally);
 }
 
+/**
+ * How much ceiling there is, in the words the sheet uses.
+ *
+ * The ceiling panel has to print an area, and there are two numbers it could
+ * print: one worked out on the panel, and the one the takeoff has always
+ * charged against `Ceiling`. Those must never be two numbers, so this asks the
+ * same arithmetic the sheet asks — `amountOn`, against the takeoff's own
+ * ceiling line — rather than doing the multiplication a second time.
+ */
+export function ceilingArea(room: Room): string {
+  return amountOn(room, CEILING, CEILING_ITEM);
+}
+
+/** The takeoff's ceiling line, looked up once rather than searched per render. */
+const CEILING_ITEM: WorkItem = KNOWN_WORK.find((item) => item.item === 'Ceiling')!;
+
 /** The items that can be picked on this kind of surface, in the order offered. */
 export function itemsFor(items: readonly WorkItem[], kind: SurfaceKind): readonly WorkItem[] {
   return items.filter((item) => measureFits(measureById(item.measure), kind));
@@ -829,4 +854,160 @@ export function describeScope(room: Room, scope: WorkScope): string {
       : ` Nothing is being done to ${left.join(', ')}, so ${left.length === 1 ? 'it is' : 'they are'} ` +
         `not on this sheet at all — left out rather than priced at nothing.`)
   );
+}
+
+/* --------------------------------------- measured by pointing a phone at it */
+
+/**
+ * Something on a surface, measured point to point in the air.
+ *
+ * > "ON THE 3D MODEL I TOLD YOU THAT I DIDNT WANT THE CEILING BEING RENDERED
+ * >  AND ITS GREAT, BUT WHAT IF I HAVE TO SCAN A CEILING OR POINT IT UP TO
+ * >  SOMETHING SIMILAR, HOW WOULD THAT WORK?"
+ *
+ * The AR Measure screen has measured between two points in space since it was
+ * built, so pointing the phone up at a soffit already produces the right
+ * number. What it has never had is anywhere to put it: the reading is shown on
+ * the camera screen and then thrown away when the screen closes. Somebody
+ * measures the drop on a beam, walks to the next room, and the figure is gone.
+ *
+ * So a span is recorded against the surface it was taken on — the same
+ * `surfaceKey` a scope is filed under, so a ceiling has one identity in this
+ * app and not two.
+ *
+ * ## Why it is a `Measurement` and never a tape reading
+ *
+ * A tape on a wall is `verified`: somebody put a tape on it and signed for the
+ * number. ARKit did not. A span comes off a moving camera and a depth estimate
+ * and it carries a real band, so it is recorded exactly as the scan itself is
+ * recorded — `scanned`, with the sensor named and its tolerance on it. That is
+ * what stops it being quietly promoted into the ceiling height, where it would
+ * multiply every square foot of board in the room.
+ *
+ * ## Why it moves no number
+ *
+ * Nothing in `workSheet` reads one. A soffit that is 14 inches deep is a fact
+ * about the building that a carpenter needs and the takeoff has no opinion
+ * about, and the moment a measurement like this started feeding a quantity, a
+ * contractor pointing his phone at something to find out how big it was would
+ * be changing his own quote by accident.
+ */
+export interface SurfaceMeasure {
+  /** Unique within the room. The phone names the reading; nothing derives it. */
+  readonly id: string;
+  /** Which surface it was taken on — see `surfaceKey`. */
+  readonly surface: string;
+  /** What was measured, in the words of whoever was standing there. */
+  readonly what: string;
+  /** How long it is, with where the number came from and its band. */
+  readonly length: Measurement;
+}
+
+/**
+ * The spans taken on one surface, oldest first.
+ *
+ * Oldest first for the same reason `notesOnWall` is: this is somebody working
+ * their way round a room, and the order they did it in is the order it makes
+ * sense in. Newest-first is right for a list of files and wrong for a visit.
+ */
+export function measuresOn(
+  measures: readonly SurfaceMeasure[],
+  surface: Surface
+): readonly SurfaceMeasure[] {
+  const wanted = surfaceKey(surface);
+  return measures
+    .filter((measure) => measure.surface === wanted)
+    .sort((a, b) => (takenAt(a) === takenAt(b) ? a.id.localeCompare(b.id) : takenAt(a) < takenAt(b) ? -1 : 1));
+}
+
+/** When a span was taken, for ordering. Its provenance is the only record. */
+function takenAt(measure: SurfaceMeasure): string {
+  const p = measure.length.provenance;
+  return p.kind === 'scanned' ? p.capturedAt : p.kind === 'verified' ? p.verifiedAt : '';
+}
+
+/**
+ * What the phone sends when somebody points it at something and keeps the
+ * reading.
+ *
+ * Whole millimetres as a string, and that is not fussiness. ARKit works in
+ * float metres; every other float coming off Apple's frameworks is quantised
+ * at this boundary — see `Damage.milliseconds` and the photo manifest — and a
+ * measurement of a building is the last place in this app where a float would
+ * be allowed to survive. The phone rounds once, to the millimetre, and what
+ * crosses is an integer written down.
+ */
+export interface SpanFromPhone {
+  readonly id: string;
+  /** A surface key: `ceiling`, `floor`, or `wall:north`. */
+  readonly surface: string;
+  readonly what: string;
+  /** Whole millimetres, as digits. */
+  readonly millimetres: string;
+  /** The band on it, whole millimetres, as digits. Never omitted. */
+  readonly toleranceMillimetres: string;
+  /** ISO 8601, from the phone's clock. */
+  readonly at: string;
+  /** What took it, e.g. `arkit`. Printed wherever the number is. */
+  readonly sensor: string;
+}
+
+/**
+ * One reading off the phone, turned into a record of this room — or refused.
+ *
+ * Read here, at the point the panel shows it, rather than trusted. A payload
+ * from a newer build of the app can name a surface this one has never heard
+ * of, and the failure that must not happen is a measurement landing in the
+ * room silently attached to nothing: it would be in the file, on no screen,
+ * and gone the next time somebody saved. Refusing it out loud is the only
+ * version anybody can act on.
+ */
+export function readSurfaceMeasure(room: Room, raw: SpanFromPhone): SurfaceMeasure {
+  if (raw.id.trim() === '') {
+    throw new WorkError('That reading has no id, so nothing could ever show it twice the same.');
+  }
+  const surface = readSurface(raw.surface);
+  const here = new Set(surfacesOf(room).map(surfaceKey));
+  if (!here.has(raw.surface)) {
+    throw new WorkError(
+      `That reading was taken on ${surfaceName(surface)}, and "${room.name}" has no such ` +
+        `surface. A measurement filed against something that is not there is a measurement ` +
+        `nobody will ever see again.`
+    );
+  }
+  if (raw.what.trim() === '') {
+    throw new WorkError(
+      'That reading does not say what was measured. A number on its own is not a measurement of ' +
+        'anything — three weeks later nobody knows whether it was the soffit or the beam.'
+    );
+  }
+  const value = wholeMillimetres(raw.millimetres, 'how long it is');
+  if (value === 0n) {
+    throw new WorkError('That reading is nothing long. Two taps in the same place measured no distance.');
+  }
+  const tolerance = wholeMillimetres(raw.toleranceMillimetres, 'the band on it');
+  if (tolerance === 0n) {
+    throw new WorkError(
+      'That reading claims to be exact. A span off a camera has a band on it, and one that says ' +
+        'otherwise would outrank a tape on every screen that compares them.'
+    );
+  }
+  return {
+    id: raw.id.trim(),
+    surface: raw.surface,
+    what: raw.what.trim(),
+    length: scanned(value, tolerance, raw.at, raw.sensor),
+  };
+}
+
+/** Whole millimetres as digits, into exact nanometres. Nothing else is taken. */
+function wholeMillimetres(text: string, field: string): Nanometres {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new WorkError(
+      `"${text}" is not ${field}. The phone sends whole millimetres as digits, because rounding ` +
+        `once on the device is the only place a float is allowed to become a measurement.`
+    );
+  }
+  return BigInt(trimmed) * NM_PER_MM;
 }

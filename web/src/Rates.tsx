@@ -12,6 +12,8 @@ import {
   measureById,
   rateFor,
 } from '../../core/src/work.ts';
+import { STALE_DAYS, ageInDays, howOld } from '../../core/src/vendor.ts';
+import { Catalogue } from './Vendor.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -42,9 +44,24 @@ import { useUnits } from './units.tsx';
  * ## What it never does
  *
  * Invents a price. There is no market data, no regional average, and nothing
- * guessing what drywall costs in Ohio. Every rate is typed, or taken from this
- * contractor's own won jobs on a tap. A number he cannot defend line by line to
- * a client is worse than no number.
+ * guessing what drywall costs in Ohio. Every rate is typed, taken from this
+ * contractor's own won jobs on a tap, or taken from a price he wrote down at a
+ * named shop on a stated day. A number he cannot defend line by line to a
+ * client is worse than no number.
+ *
+ * ## Why the stores are on this screen
+ *
+ * > "AND WHAT ABOUT THE VENDOR PRICES? … CANT WE USE LIVE ONLINE PRICES"
+ *
+ * Because this is where somebody is standing when the question comes up. The
+ * catalogue underneath — a store dropdown, a search bar and chips over what the
+ * shops he buys at have actually charged him — is `Vendor.tsx`, and a price
+ * moves from it into the book above on a deliberate tap, because **what a store
+ * charges him is not what he charges.**
+ *
+ * Every rate here now says how old it is, too. A rate typed last March prices a
+ * job today at last March's material cost, and the only thing standing between
+ * that and a job worked for nothing is the app saying so out loud.
  */
 
 /** The lines a takeoff produces, so the book can be filled in without guessing. */
@@ -106,119 +123,157 @@ export function RateBook({
   const priceOf = (item: string, unit: PriceUnit) =>
     book.rates.find((r) => r.item === item && r.unit === unit);
 
+  // Read once per render rather than per row, so a list of rates cannot show
+  // two different "today"s if it is on screen over midnight.
+  const now = new Date().toISOString();
+
+  /**
+   * How old a rate is, and where it came from, in one line.
+   *
+   * A price with no date is not a price — the same rule the store book runs on,
+   * applied to his own rates. The wording is deliberately blunt on an old one:
+   * a stale rate does not look stale, which is exactly why it costs money.
+   */
+  function saidWhen(rate: Rate): { readonly text: string; readonly old: boolean } {
+    const days = ageInDays(rate.source.at, now);
+    const from =
+      rate.source.kind === 'learned'
+        ? `from ${rate.source.from.length} of your won jobs`
+        : rate.source.by;
+    return { text: `Set ${howOld(days)} · ${from}`, old: days > STALE_DAYS };
+  }
+
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-semibold text-slate-900">What you charge</h2>
-        {onDone && (
-          <button
-            type="button"
-            onClick={onDone}
-            className="min-h-11 px-2 text-sm text-slate-500 underline underline-offset-4"
-          >
-            Done
-          </button>
-        )}
-      </div>
-      <p className="mt-1 text-sm text-slate-600">
-        Your rates, typed once. Nothing here comes from anywhere else — no averages, no
-        guesses — so every line on a quote is a number you set times a number the room
-        measured, and you can defend both.
-      </p>
+    <>
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-semibold text-slate-900">What you charge</h2>
+          {onDone && (
+            <button
+              type="button"
+              onClick={onDone}
+              className="min-h-11 px-2 text-sm text-slate-500 underline underline-offset-4"
+            >
+              Done
+            </button>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-slate-600">
+          Your rates, typed once. Nothing here comes from anywhere else — no averages, no
+          guesses — so every line on a quote is a number you set times a number the room
+          measured, and you can defend both.
+        </p>
 
-      <dl className="mt-3 divide-y divide-slate-100">
-        {KNOWN.map(({ item, unit, prices }) => {
-          const key = `${item}|${unit}`;
-          const rate = priceOf(item, unit);
-          return (
-            <div key={key} className="flex items-baseline justify-between gap-3 py-3">
-              <dt className="text-slate-700">
-                {item}
-                <span className="block text-xs text-slate-500">{prices}</span>
-              </dt>
-              <dd className="flex shrink-0 items-baseline gap-2">
-                <input
-                  value={typing[key] ?? (rate ? (Number(rate.cents) / 100).toFixed(2) : '')}
-                  onChange={(event) => setTyping({ ...typing, [key]: event.target.value })}
-                  onBlur={(event) => {
-                    setRate(item, unit, event.target.value);
-                    setTyping(({ [key]: _gone, ...rest }) => rest);
-                  }}
-                  inputMode="decimal"
-                  placeholder="—"
-                  aria-label={`${item} rate`}
-                  className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 text-right
-                             font-mono tabular-nums focus:border-sky-500 focus:outline-none"
-                />
-                <span className="w-12 text-sm text-slate-500">/ {unit}</span>
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
-
-      <OwnItems />
-
-      <label className="mt-4 block">
-        <span className="text-sm font-medium text-slate-700">Mark-up on the whole job</span>
-        <span className="mt-1 flex items-baseline gap-2">
-          <input
-            value={String((book.marginBasisPoints ?? 0) / 100)}
-            onChange={(event) => {
-              const percent = Number(event.target.value);
-              if (!Number.isFinite(percent)) return;
-              save({
-                ...company,
-                prices: { ...book, marginBasisPoints: Math.round(percent * 100) },
-              });
-            }}
-            inputMode="decimal"
-            className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 text-right
-                       font-mono tabular-nums focus:border-sky-500 focus:outline-none"
-          />
-          <span className="text-sm text-slate-500">%</span>
-        </span>
-      </label>
-
-      {suggestions.length > 0 && (
-        <div className="mt-4 rounded-lg bg-slate-100 p-3">
-          <p className="text-sm font-semibold text-slate-900">What your won jobs say</p>
-          <p className="mt-1 text-xs text-slate-600">
-            From jobs you marked won, never from ones you did not. The middle number, so one
-            emergency job at triple rate does not move your book. Nothing changes unless you
-            tap it.
-          </p>
-          <ul className="mt-2 space-y-1">
-            {suggestions.map((r) => (
-              <li key={`${r.item}|${r.unit}`} className="flex items-baseline justify-between gap-3">
-                <span className="text-sm text-slate-700">
-                  {r.item} — {rateLabel(r)}
-                  {r.source.kind === 'learned' && (
-                    <span className="block text-xs text-slate-500">
-                      from {r.source.from.join(', ')}
+        <dl className="mt-3 divide-y divide-slate-100">
+          {KNOWN.map(({ item, unit, prices }) => {
+            const key = `${item}|${unit}`;
+            const rate = priceOf(item, unit);
+            const said = rate ? saidWhen(rate) : null;
+            return (
+              <div key={key} className="flex items-baseline justify-between gap-3 py-3">
+                <dt className="text-slate-700">
+                  {item}
+                  <span className="block text-xs text-slate-500">{prices}</span>
+                  {said && (
+                    <span
+                      className={`block text-xs ${
+                        said.old ? 'font-semibold text-red-700' : 'text-slate-500'
+                      }`}
+                    >
+                      {said.text}
                     </span>
                   )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setRate(r.item, r.unit, (Number(r.cents) / 100).toFixed(2))}
-                  className="min-h-11 shrink-0 rounded-md border border-slate-300 px-3 text-sm
-                             font-medium text-slate-700 active:bg-slate-100"
-                >
-                  Use it
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+                </dt>
+                <dd className="flex shrink-0 items-baseline gap-2">
+                  <input
+                    value={typing[key] ?? (rate ? (Number(rate.cents) / 100).toFixed(2) : '')}
+                    onChange={(event) => setTyping({ ...typing, [key]: event.target.value })}
+                    onBlur={(event) => {
+                      setRate(item, unit, event.target.value);
+                      setTyping(({ [key]: _gone, ...rest }) => rest);
+                    }}
+                    inputMode="decimal"
+                    placeholder="—"
+                    aria-label={`${item} rate`}
+                    className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 text-right
+                               font-mono tabular-nums focus:border-sky-500 focus:outline-none"
+                  />
+                  <span className="w-12 text-sm text-slate-500">/ {unit}</span>
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
 
-      {trouble && (
-        <p role="alert" className="mt-3 text-sm text-red-700">
-          {trouble}
-        </p>
-      )}
-    </section>
+        <OwnItems />
+
+        <label className="mt-4 block">
+          <span className="text-sm font-medium text-slate-700">Mark-up on the whole job</span>
+          <span className="mt-1 flex items-baseline gap-2">
+            <input
+              value={String((book.marginBasisPoints ?? 0) / 100)}
+              onChange={(event) => {
+                const percent = Number(event.target.value);
+                if (!Number.isFinite(percent)) return;
+                save({
+                  ...company,
+                  prices: { ...book, marginBasisPoints: Math.round(percent * 100) },
+                });
+              }}
+              inputMode="decimal"
+              className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 text-right
+                         font-mono tabular-nums focus:border-sky-500 focus:outline-none"
+            />
+            <span className="text-sm text-slate-500">%</span>
+          </span>
+        </label>
+
+        {suggestions.length > 0 && (
+          <div className="mt-4 rounded-lg bg-slate-100 p-3">
+            <p className="text-sm font-semibold text-slate-900">What your won jobs say</p>
+            <p className="mt-1 text-xs text-slate-600">
+              From jobs you marked won, never from ones you did not. The middle number, so one
+              emergency job at triple rate does not move your book. Nothing changes unless you
+              tap it.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {suggestions.map((r) => (
+                <li key={`${r.item}|${r.unit}`} className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-slate-700">
+                    {r.item} — {rateLabel(r)}
+                    {r.source.kind === 'learned' && (
+                      <span className="block text-xs text-slate-500">
+                        from {r.source.from.join(', ')}
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRate(r.item, r.unit, (Number(r.cents) / 100).toFixed(2))}
+                    className="min-h-11 shrink-0 rounded-md border border-slate-300 px-3 text-sm
+                               font-medium text-slate-700 active:bg-slate-100"
+                  >
+                    Use it
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {trouble && (
+          <p role="alert" className="mt-3 text-sm text-red-700">
+            {trouble}
+          </p>
+        )}
+      </section>
+
+      {/* Beside the book rather than inside it, because these are two different
+          numbers: above is what he charges, below is what the shop charges him.
+          A screen that put them in one list would be inviting somebody to work
+          a season at cost. */}
+      <Catalogue targets={KNOWN} />
+    </>
   );
 
 }

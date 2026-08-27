@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { area, isDiagonal, runLength } from '../../core/src/room.ts';
 import { isAdjusted } from '../../core/src/measurement.ts';
 import { EditWall, RenameRoom } from './Edit.tsx';
-import { WorkOnRoom, WorkOnWall, type WorkOnProps } from './WorkOn.tsx';
+import { WorkOnRoom, WorkOnSurface, WorkOnWall, type WorkOnProps } from './WorkOn.tsx';
 import { useUnits } from './units.tsx';
 import { readiness } from '../../core/src/issue.ts';
 import { extent } from '../../core/src/health.ts';
@@ -29,7 +29,8 @@ import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Section
 import { Tour, TOUR } from './Tour.tsx';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
-import { Ceiling } from './Ceiling.tsx';
+import { Ceiling, CeilingPanel } from './Ceiling.tsx';
+import { CEILING, surfaceKey } from '../../core/src/work.ts';
 import { Settings } from './Settings.tsx';
 import { PriceList } from './PriceList.tsx';
 import { RateBook } from './Rates.tsx';
@@ -846,6 +847,20 @@ export function App() {
                 )}
               </div>
 
+              {/* A gesture nobody is told about is a feature nobody has. */}
+              <p className="px-1 text-xs text-slate-500">
+                Tap a wall to measure it. Tap the middle of the room for the ceiling.
+              </p>
+
+              {/* The ceiling, opened by tapping the empty middle of the plan.
+                  Beside the wall panel and never with it: one selection, one
+                  surface, exactly as a wall behaves. */}
+              {!selectedWall && state.selected === surfaceKey(CEILING) && workProps && (
+                <CeilingPanel room={loaded.room}>
+                  <WorkOnSurface {...workProps} surface={CEILING} />
+                </CeilingPanel>
+              )}
+
               {selectedWall && (
                 <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
                   <div className="flex items-baseline justify-between gap-3">
@@ -1050,7 +1065,7 @@ export function App() {
                 }
               />
 
-              {workProps && <WorkOnRoom {...workProps} />}
+              {workProps && <WorkOnRoom {...workProps} ceilingHere={false} />}
 
               <Thickness
                 room={loaded.room}

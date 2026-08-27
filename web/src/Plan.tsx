@@ -1,5 +1,6 @@
 import { NM_PER_FOOT } from '../../core/src/length.ts';
 import { type Point, type Room, area, isDiagonal, runLength } from '../../core/src/room.ts';
+import { CEILING, surfaceKey } from '../../core/src/work.ts';
 import { letterhead } from '../../core/src/company.ts';
 import { useUnits } from './units.tsx';
 import { readiness, trustLabel } from '../../core/src/issue.ts';
@@ -380,6 +381,9 @@ function feet(nm: bigint): number {
   return Number(whole) + Number(rest) / Number(NM_PER_FOOT);
 }
 
+/** What the plan hands back when somebody taps the empty middle of the room. */
+const CEILING_KEY = surfaceKey(CEILING);
+
 export function Plan({
   room,
   north,
@@ -552,11 +556,43 @@ export function Plan({
         </g>
       )}
 
-      {/* The floor, so the inside of the room reads as inside. */}
-      <polygon
-        points={model.walls.map((w) => `${px(w.start.x)},${scaleY(w.start.y)}`).join(' ')}
-        fill="rgb(var(--c-sunk))"
-      />
+      {/*
+        The floor, so the inside of the room reads as inside — and the way in to
+        the ceiling.
+
+        A wall is a control on this drawing because marking one and taping one
+        both start by choosing it. The ceiling had no way in at all: it is the
+        one surface with nothing on the plan to touch, and it is where the water
+        stain and the popcorn coming off are.
+
+        So the empty middle is the ceiling, which is what it is — you are looking
+        down through it. `CEILING_KEY` rather than the string, so the plan and
+        the panel cannot file it under two different names.
+      */}
+      <g
+        role="button"
+        tabIndex={0}
+        aria-label="The ceiling"
+        aria-pressed={selected === CEILING_KEY}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(selected === CEILING_KEY ? null : CEILING_KEY);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          onSelect(selected === CEILING_KEY ? null : CEILING_KEY);
+        }}
+        className="cursor-pointer focus:outline-none focus-visible:outline focus-visible:outline-2
+                   focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+      >
+        <polygon
+          points={model.walls.map((w) => `${px(w.start.x)},${scaleY(w.start.y)}`).join(' ')}
+          fill={selected === CEILING_KEY ? 'rgb(var(--c-focus))' : 'rgb(var(--c-sunk))'}
+          fillOpacity={selected === CEILING_KEY ? 0.28 : 1}
+        />
+      </g>
 
       {/* Whatever was standing in the room when it was scanned. Faint, because it
           is not part of the building — but it is why some of these walls are

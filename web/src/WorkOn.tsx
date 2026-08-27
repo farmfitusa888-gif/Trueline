@@ -4,6 +4,7 @@ import {
   type Surface,
   type WorkItem,
   type WorkScope,
+  CEILING,
   amountOn,
   isPicked,
   itemsFor,
@@ -12,6 +13,7 @@ import {
   workItems,
 } from '../../core/src/work.ts';
 import { money } from '../../core/src/price.ts';
+import { CeilingPanel } from './Ceiling.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -205,64 +207,124 @@ function Picker({
   );
 }
 
-/** The panel for one wall, opened by tapping it on the plan. */
-export function WorkOnWall({ wallId, ...props }: WorkOnProps & { readonly wallId: string }) {
+/**
+ * What is being done to one surface, whichever surface it is.
+ *
+ * A wall, the floor, the ceiling: the panel is the same one, because the
+ * decision is the same decision. It was written out twice — once inside the
+ * wall panel and once inside the room panel — for exactly as long as the
+ * ceiling had nowhere of its own to live, and a third copy for the ceiling
+ * would have been the point where the three started to differ.
+ *
+ * `roomControls` is whether this is the place that carries the room-wide ways
+ * in and out — "Say what is being done", "Start from nothing", "Price it all
+ * again". All three undo or set up every surface in the room at once, so they
+ * belong to the room and not to a surface, and two surfaces on one screen each
+ * carrying a copy puts two controls with one name four inches apart on a phone.
+ * That is the failure `a12-everything` fails a screen for, and it is the reason
+ * `PriceItAllAgain` was pulled out of the picker in the first place.
+ */
+export function WorkOnSurface({
+  surface,
+  roomControls = true,
+  ...props
+}: WorkOnProps & { readonly surface: Surface; readonly roomControls?: boolean }) {
   const { company } = useUnits();
   const items = useMemo(() => workItems(company.prices ?? { rates: [] }), [company.prices]);
-  const surface: Surface = { kind: 'wall', wallId };
   if (!props.scope) {
-    return (
+    return roomControls ? (
       <NotScopedYet
         items={items}
         onStartFromEverything={props.onStartFromEverything}
         onStartFromNothing={props.onStartFromNothing}
       />
+    ) : (
+      // Said rather than left blank. A surface that goes quiet about what is
+      // being done to it reads as a surface with nothing happening to it, and
+      // this one is priced as a full replacement like everything else.
+      <p className="mt-3 text-sm text-slate-600">
+        Priced as replaced, along with the rest of the room. Saying what is actually being done
+        starts with the room's floor, just above.
+      </p>
     );
   }
   return (
     <div>
       <Picker {...props} scope={props.scope} surface={surface} items={items} />
-      <div className="mt-1 text-right">
-        <PriceItAllAgain onPriceEverything={props.onPriceEverything} />
-      </div>
+      {roomControls && (
+        <div className="mt-1 text-right">
+          <PriceItAllAgain onPriceEverything={props.onPriceEverything} />
+        </div>
+      )}
     </div>
   );
 }
 
+/** The panel for one wall, opened by tapping it on the plan. */
+export function WorkOnWall({ wallId, ...props }: WorkOnProps & { readonly wallId: string }) {
+  return <WorkOnSurface {...props} surface={{ kind: 'wall', wallId }} />;
+}
+
 /**
- * The floor and the ceiling, which are surfaces too.
+ * The floor, and the ceiling beside it.
  *
- * They live on the Room panel rather than in the wall panel for the obvious
- * reason — there is no floor to tap on the plan — and they get exactly the same
- * treatment, because "the floor comes out and the ceiling is paint only" is the
- * single most common thing a remodeler needs to say about a room.
+ * The floor lives on the Room panel for the obvious reason — there is no floor
+ * to tap on the plan — and the ceiling used to sit next to it as a second tick
+ * list and nothing else. That was the whole of the ceiling in this app:
+ *
+ * > "WHAT IF I HAVE TO SCAN A CEILING OR POINT IT UP TO SOMETHING SIMILAR, HOW
+ * >  WOULD THAT WORK?"
+ *
+ * A tick list is not a surface you can work on. So the ceiling's tick list now
+ * sits inside `CeilingPanel` — its area, its marks, its photographs, what was
+ * said about it and what was measured on it — rather than beside the floor's,
+ * and the panel is handed the same `WorkOnSurface` the wall gets. One decision,
+ * one control, in one place.
+ *
+ * `ceilingHere` is how it stops being in two places at once. The ceiling panel
+ * belongs wherever the ceiling is opened; when the plan grows a way to open it
+ * beside the wall panel, the room panel passes `false` and shows the floor
+ * alone. Two identical tick lists on two tabs is how a contractor unticks the
+ * ceiling on one screen and finds it still ticked on the other.
  */
-export function WorkOnRoom(props: WorkOnProps) {
+export function WorkOnRoom({ ceilingHere = true, ...props }: WorkOnProps & { readonly ceilingHere?: boolean }) {
   const { company } = useUnits();
   const items = useMemo(() => workItems(company.prices ?? { rates: [] }), [company.prices]);
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-sheet="no">
-      <h2 className="font-semibold text-slate-900">The floor and the ceiling</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Two surfaces, decided separately. A floor that comes out and a ceiling that only gets
-        painted are two different jobs in one room, and a sheet that cannot say so is a sheet
-        somebody corrects by hand.
-      </p>
-      {props.scope ? (
-        <>
-          <Picker {...props} scope={props.scope} surface={{ kind: 'floor' }} items={items} />
-          <Picker {...props} scope={props.scope} surface={{ kind: 'ceiling' }} items={items} />
-          <div className="mt-1 text-right">
-            <PriceItAllAgain onPriceEverything={props.onPriceEverything} />
-          </div>
-        </>
-      ) : (
-        <NotScopedYet
-          items={items}
-          onStartFromEverything={props.onStartFromEverything}
-          onStartFromNothing={props.onStartFromNothing}
-        />
+    <>
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-sheet="no">
+        <h2 className="font-semibold text-slate-900">
+          {ceilingHere ? 'The floor and the ceiling' : 'The floor'}
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">
+          {ceilingHere
+            ? 'Two surfaces, decided separately. A floor that comes out and a ceiling that only ' +
+              'gets painted are two different jobs in one room, and a sheet that cannot say so ' +
+              'is a sheet somebody corrects by hand.'
+            : 'The floor on its own. The ceiling has a panel of its own, opened from the plan, ' +
+              'because it carries marks and photographs as well as a decision.'}
+        </p>
+        {props.scope ? (
+          <>
+            <Picker {...props} scope={props.scope} surface={{ kind: 'floor' }} items={items} />
+            <div className="mt-1 text-right">
+              <PriceItAllAgain onPriceEverything={props.onPriceEverything} />
+            </div>
+          </>
+        ) : (
+          <NotScopedYet
+            items={items}
+            onStartFromEverything={props.onStartFromEverything}
+            onStartFromNothing={props.onStartFromNothing}
+          />
+        )}
+      </section>
+
+      {ceilingHere && (
+        <CeilingPanel room={props.room}>
+          <WorkOnSurface {...props} surface={CEILING} roomControls={false} />
+        </CeilingPanel>
       )}
-    </section>
+    </>
   );
 }

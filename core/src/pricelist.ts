@@ -1,5 +1,6 @@
 import { RoomError } from './room.ts';
 import { type Cents, type PriceUnit, type Rate, money, parseMoney } from './price.ts';
+import { type Sighting } from './vendor.ts';
 
 /**
  * A supplier's price list, into the contractor's own book.
@@ -50,6 +51,15 @@ export interface Mapping {
    * rate exactly; unmapped, those rows are refused rather than guessed at.
    */
   readonly coverage?: number;
+  /**
+   * Optional: whatever the store calls the aisle.
+   *
+   * The column that turns a flat list of four hundred rows into something a
+   * person can narrow down. It is never invented: a file with no such column
+   * offers no category chips at all, rather than the app sorting somebody's
+   * materials into trades it made up.
+   */
+  readonly category?: number;
 }
 
 export interface ParsedList {
@@ -134,6 +144,10 @@ const UNIT_WORDS = ['unit', 'uom', 'u/m', 'per', 'measure'];
 const PRICE_WORDS = ['price', 'cost', 'rate', 'each', 'amount', 'unit price', 'net'];
 const CODE_WORDS = ['sku', 'code', 'part', 'item #', 'item no', 'number', 'id'];
 const COVERAGE_WORDS = ['coverage', 'sq ft per', 'sqft per', 'covers', 'per box', 'per carton', 'yield'];
+// Deliberately short, and deliberately without "type": a heading called
+// "Item Type" is a category and a value called "Type X" is a kind of drywall,
+// and a word that matches both is a word that files gypsum board under itself.
+const CATEGORY_WORDS = ['category', 'class', 'group', 'department', 'dept', 'trade', 'aisle', 'family'];
 
 function guessColumn(
   headers: readonly string[],
@@ -312,11 +326,13 @@ export function parseList(text: string): ParsedList {
   const price = guessColumn(headers, PRICE_WORDS);
   const code = guessColumn(headers, CODE_WORDS);
   const coverage = guessColumn(headers, COVERAGE_WORDS);
+  const category = guessColumn(headers, CATEGORY_WORDS);
   if (item !== undefined) (guess as { item?: number }).item = item;
   if (unit !== undefined) (guess as { unit?: number }).unit = unit;
   if (price !== undefined) (guess as { price?: number }).price = price;
   if (code !== undefined) (guess as { code?: number }).code = code;
   if (coverage !== undefined) (guess as { coverage?: number }).coverage = coverage;
+  if (category !== undefined) (guess as { category?: number }).category = category;
 
   return { headers, rows: body, guess, headless };
 }
@@ -522,19 +538,38 @@ export interface ImportResult {
 }
 
 /**
- * The rows, as rates, once somebody has confirmed the columns.
+ * One row, read and checked, before anything decides what to make of it.
  *
- * `at` and `by` are passed in rather than taken from a clock, so a re-import of
- * the same file produces the same rates — and so a test can check one.
+ * Split out because there are now two things a confirmed row can become — a
+ * rate in the contractor's own book, and a price seen at a named store — and
+ * they must be read by the same code. Two readers is two sets of rules about
+ * what a square is, and they diverge on the day somebody fixes one of them.
  */
-export function importList(
-  list: ParsedList,
-  mapping: Mapping,
-  by: string,
-  at: string,
-  supplier: string
-): ImportResult {
-  const rates: Rate[] = [];
+interface ReadRow {
+  readonly line: number;
+  readonly item: string;
+  readonly unit: PriceUnit;
+  readonly cents: Cents;
+  /** The supplier's own code, or empty. */
+  readonly code: string;
+  /** Whatever the file called the aisle, or empty. Never invented. */
+  readonly category: string;
+  /** The arithmetic, when the price was worked out rather than read. Else ''. */
+  readonly workings: string;
+}
+
+interface ReadRows {
+  readonly rows: readonly ReadRow[];
+  readonly refused: readonly { readonly line: number; readonly what: string; readonly why: string }[];
+  readonly converted: readonly {
+    readonly line: number;
+    readonly item: string;
+    readonly workings: string;
+  }[];
+}
+
+function readRows(list: ParsedList, mapping: Mapping): ReadRows {
+  const rows: ReadRow[] = [];
   const refused: { line: number; what: string; why: string }[] = [];
   const converted: { line: number; item: string; workings: string }[] = [];
   const seen = new Set<string>();
@@ -546,6 +581,7 @@ export function importList(
     const rawUnit = (row[mapping.unit] ?? '').trim();
     const rawPrice = (row[mapping.price] ?? '').trim();
     const code = mapping.code === undefined ? '' : (row[mapping.code] ?? '').trim();
+    const category = mapping.category === undefined ? '' : (row[mapping.category] ?? '').trim();
     const rawCoverage =
       mapping.coverage === undefined ? '' : (row[mapping.coverage] ?? '').trim();
     const what = name || code || `line ${line}`;
@@ -651,7 +687,8 @@ export function importList(
         });
         continue;
       }
-      converted.push({ line, item: name, workings: `${workings} = ${money(priced)} / ${reading.unit}` });
+      workings = `${workings} = ${money(priced)} / ${reading.unit}`;
+      converted.push({ line, item: name, workings });
     }
 
     const key = `${name}|${reading.unit}`;
@@ -667,20 +704,97 @@ export function importList(
     }
     seen.add(key);
 
-    rates.push({
-      item: name,
-      unit: reading.unit,
-      cents: priced,
-      source: { kind: 'typed', by: `${supplier} price list, imported by ${by}`, at },
-      ...(code === '' || workings !== ''
-        ? workings !== ''
-          ? { note: code === '' ? workings : `supplier code ${code} · ${workings}` }
-          : {}
-        : { note: `supplier code ${code}` }),
-    });
+    rows.push({ line, item: name, unit: reading.unit, cents: priced, code, category, workings });
   }
 
-  return { rates, refused, converted };
+  return { rows, refused, converted };
+}
+
+/**
+ * What a row's supplier code and arithmetic read as on the rate it becomes.
+ *
+ * A derived rate has to carry its sum or nobody can check it, and a rate with a
+ * supplier code on it can be found again on the supplier's own system. Both,
+ * neither, or either — one place, so the two importers cannot disagree.
+ */
+function noteFor(row: ReadRow): string {
+  return [row.code === '' ? '' : `supplier code ${row.code}`, row.workings]
+    .filter((part) => part !== '')
+    .join(' · ');
+}
+
+/**
+ * The rows, as rates, once somebody has confirmed the columns.
+ *
+ * `at` and `by` are passed in rather than taken from a clock, so a re-import of
+ * the same file produces the same rates — and so a test can check one.
+ */
+export function importList(
+  list: ParsedList,
+  mapping: Mapping,
+  by: string,
+  at: string,
+  supplier: string
+): ImportResult {
+  const { rows, refused, converted } = readRows(list, mapping);
+  return {
+    rates: rows.map((row) => {
+      const note = noteFor(row);
+      return {
+        item: row.item,
+        unit: row.unit,
+        cents: row.cents,
+        source: { kind: 'typed' as const, by: `${supplier} price list, imported by ${by}`, at },
+        ...(note === '' ? {} : { note }),
+      };
+    }),
+    refused,
+    converted,
+  };
+}
+
+/**
+ * The same rows, as prices seen at a named store.
+ *
+ * The other half of the same file, and the reason `readRows` exists. A price
+ * list is a store's prices on the day the store sent it — so what comes out of
+ * here is a **sighting**: this item, this store, this day, and the file it came
+ * out of as its evidence. Nothing about it is a rate the contractor charges,
+ * and putting it in his book is a separate, deliberate tap.
+ *
+ * `seenAt` is passed in rather than read off a clock for the same reason `at`
+ * is above, and it matters more here: a sighting's day is its identity, so a
+ * clock inside this function would make re-importing the same list produce a
+ * second copy of every price in it.
+ */
+export function importForVendor(
+  list: ParsedList,
+  mapping: Mapping,
+  storeId: string,
+  by: string,
+  seenAt: string,
+  file: string
+): {
+  readonly sightings: readonly Sighting[];
+  readonly refused: ReadRows['refused'];
+  readonly converted: ReadRows['converted'];
+} {
+  const { rows, refused, converted } = readRows(list, mapping);
+  return {
+    sightings: rows.map((row) => ({
+      storeId,
+      item: row.item,
+      unit: row.unit,
+      cents: row.cents,
+      seenAt,
+      evidence: { kind: 'list' as const, file, by },
+      ...(row.code === '' ? {} : { code: row.code }),
+      ...(row.category === '' ? {} : { category: row.category }),
+      ...(row.workings === '' ? {} : { note: row.workings }),
+    })),
+    refused,
+    converted,
+  };
 }
 
 /**

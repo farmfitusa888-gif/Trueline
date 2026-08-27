@@ -10,6 +10,7 @@ import {
   standingInside,
 } from '../../core/src/project.ts';
 import { type Room, runLength } from '../../core/src/room.ts';
+import { ceilingArea } from '../../core/src/work.ts';
 import { fitInside, openingLabels, wallLabels } from '../../core/src/wallLabel.ts';
 import { useUnits } from './units.tsx';
 
@@ -55,9 +56,60 @@ import { useUnits } from './units.tsx';
  * crosses are all `section.ts`'s answers. This asks and draws; it decides
  * nothing, which is why a pony wall comes out whole rather than sawn off at a
  * plane that passes over it.
+ *
+ * ## And the one surface none of them shows
+ *
+ * > "ON THE 3D MODEL I TOLD YOU THAT I DIDNT WANT THE CEILING BEING RENDERED
+ * >  AND ITS GREAT, BUT WHAT IF I HAVE TO SCAN A CEILING OR POINT IT UP TO
+ * >  SOMETHING SIMILAR, HOW WOULD THAT WORK?"
+ *
+ * Both halves of that are right. Leaving the ceiling off is what makes the
+ * orbit view usable — a room with its lid on is a grey box — so **Look up** is
+ * a mode somebody turns on and never the default. It is the exact mirror of
+ * the view they already like: the orbit drops the ceiling so you can see in,
+ * and this drops the walls so you can see the ceiling.
+ *
+ * It is not a new projection. It is `projectFrom` with the viewer lying on the
+ * floor in the middle of the room looking straight up — which is what a person
+ * actually does — and every facet that is not the ceiling left undrawn. On the
+ * floor rather than at eye height on purpose: from 5'4" the ceiling is two and
+ * a half feet away and you see a patch of it, and from the floor you see the
+ * room.
  */
 
 const SIZE = 1000;
+
+/**
+ * Under the room, looking up at the ceiling, far enough back to see all of it.
+ *
+ * The first version of this put the viewer on the floor in the middle of the
+ * room, which is what a person does and which draws a blank grey rectangle. A
+ * ceiling 9 ft up over a 20 by 21 ft garage has its corners 58 degrees off
+ * vertical and the view is 72 degrees wide, so what fills the screen is the
+ * middle of the ceiling with no edge of it anywhere — a picture of nothing that
+ * looks exactly like a bug.
+ *
+ * So the eye goes back until the whole ceiling is inside the view. `back` is
+ * two fifths of the room's own perimeter, which puts a room's corners around 24
+ * degrees off centre: the ceiling fills most of the frame with margin round it,
+ * on any shape of room, without this file measuring anything. The perimeter is
+ * the one dimension of a room that is already in hand — no corners, no
+ * bounding box, no second walk of the outline.
+ *
+ * That puts the eye below the floor, and that is fine and worth being plain
+ * about on screen. A `Standing` is a viewpoint and never a measurement — no
+ * provenance, no tolerance, nothing that can reach a dimension — so where it
+ * sits is a question about framing, exactly like the zoom.
+ *
+ * 85 degrees rather than 90 because that is as far as `projectFrom` will look;
+ * it clamps there so the picture cannot turn over, and asking for more would be
+ * asking for a number the projection does not honour.
+ */
+function lyingDown(room: Room): Standing {
+  const perimeter = room.walls.reduce((total, wall) => total + runLength(wall), 0n);
+  const back = (perimeter * 2n) / 5n;
+  return { ...standingInside(room), height: room.ceilingHeight.value - back, tilt: 85 };
+}
 
 function ink(shade: number, selected: boolean): string {
   if (selected) return `hsl(24 78% ${Math.round(38 + shade * 18)}%)`;
@@ -104,6 +156,16 @@ export function Room3D({
    */
   const [box, setBox] = useState({ x: 0, y: 0, size: SIZE });
   const [inside, setInside] = useState<Standing | null>(null);
+  /**
+   * Whether the walls are dropped away and only the ceiling is drawn.
+   *
+   * Kept beside `inside` rather than folded into it because the two are
+   * genuinely different questions: `inside` is where the viewer is, and this is
+   * what is drawn from there. Looking up is standing inside — every drag, every
+   * pinch and every projection is the interior one — with everything except the
+   * ceiling left off.
+   */
+  const [lookUp, setLookUp] = useState(false);
   /** Where the plane sits, or nothing for the whole room. */
   const [plane, setPlane] = useState<bigint | null>(null);
   const { len } = useUnits();
@@ -135,7 +197,10 @@ export function Room3D({
       const section = plane !== null && !inside ? cutAt(room, { height: plane }) : undefined;
       return {
         projection: inside
-          ? projectFrom(room, inside, SIZE, furniture ? footprints : [])
+          // Nothing standing in the room is drawn while looking up. A fridge is
+          // a waist-high box on the floor; between the viewer and the ceiling
+          // it is a box across the middle of the one thing being looked at.
+          ? projectFrom(room, inside, SIZE, lookUp || !furniture ? [] : footprints)
           : project(room, camera, SIZE, furniture ? footprints : [], section),
         section,
         trouble: null as string | null,
@@ -147,7 +212,7 @@ export function Room3D({
         trouble: error instanceof Error ? error.message : String(error),
       };
     }
-  }, [room, camera, inside, footprints, furniture, plane]);
+  }, [room, camera, inside, footprints, furniture, plane, lookUp]);
 
   /**
    * The heights worth stopping at, tallest first.
@@ -178,7 +243,11 @@ export function Room3D({
   // nothing to label when there is no projection, and computing labels for a
   // view that will not be drawn is work done to be thrown away. It is a walk
   // over a few dozen facets, not a hook, so its place in the body is free.
-  const labels = wallLabels(view.projection.facets, SIZE);
+  //
+  // Nothing while looking up: the wall facets are still in the projection —
+  // only the drawing leaves them out — so labelling them would float four wall
+  // names and four lengths over a ceiling with no walls under them.
+  const labels = lookUp ? [] : wallLabels(view.projection.facets, SIZE);
   // Every wall's length, by its id, so a label can carry the measurement as
   // well as the name. Formatted by `len`, which is the app's units and not this
   // file's business -- nothing here reads a nanometre.
@@ -191,7 +260,43 @@ export function Room3D({
       (w.openings ?? []).map((o) => [o.id, `${len(o.width.value)} × ${len(o.height.value)}`])
     )
   );
-  const openings = openingLabels(view.projection.facets, SIZE);
+  const openings = lookUp ? [] : openingLabels(view.projection.facets, SIZE);
+
+  /**
+   * What is actually drawn.
+   *
+   * The ceiling arrives from `projectFrom` as a floor-kind facet called
+   * `ceiling` — one face, the room's own outline at ceiling height. Looking up
+   * keeps that and nothing else, which is what "the walls dropped away" means:
+   * they are still measured, still in the projection, and simply not painted.
+   */
+  const drawn = lookUp
+    ? view.projection.facets.filter((f) => f.kind === 'floor' && f.wallId === 'ceiling')
+    : view.projection.facets;
+
+  /** Where each wall's name goes round the edge of the ceiling. */
+  const ceilingEdges = (() => {
+    const face = lookUp ? drawn[0] : undefined;
+    if (!face || face.points.length !== room.walls.length) return [];
+    const middle = {
+      x: face.points.reduce((sum, p) => sum + p.x, 0) / face.points.length,
+      y: face.points.reduce((sum, p) => sum + p.y, 0) / face.points.length,
+    };
+    return room.walls.map((wall, i) => {
+      const a = face.points[i]!;
+      const b = face.points[(i + 1) % face.points.length]!;
+      const at = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      // A fifth of the way in from the edge. On the line itself the halo eats
+      // the outline of the ceiling; any further in and the name stops reading
+      // as belonging to that side.
+      return {
+        wallId: wall.id,
+        length: lengthOf.get(wall.id) ?? '',
+        x: at.x + (middle.x - at.x) * 0.2,
+        y: at.y + (middle.y - at.y) * 0.2,
+      };
+    });
+  })();
 
   /**
    * Where a label of this many characters actually fits.
@@ -326,7 +431,10 @@ export function Room3D({
       setInside({
         ...at.standing,
         turn: at.standing.turn - dx * 0.3,
-        tilt: Math.max(-85, Math.min(85, at.standing.tilt + dy * 0.25)),
+        // Looking up stays looking up. Without the floor on this clamp a drag
+        // downwards walks the view off the ceiling and onto four walls that are
+        // not being drawn, which is a blank screen with no way to tell why.
+        tilt: Math.max(lookUp ? 25 : -85, Math.min(85, at.standing.tilt + dy * 0.25)),
       });
       return;
     }
@@ -363,9 +471,11 @@ export function Room3D({
         className="w-full touch-none"
         role="img"
         aria-label={
-          inside
-            ? `Standing in ${room.name}, looking around`
-            : `${room.name} in three dimensions`
+          lookUp
+            ? `The ceiling of ${room.name}, seen from below with the walls dropped away`
+            : inside
+              ? `Standing in ${room.name}, looking around`
+              : `${room.name} in three dimensions`
         }
         onPointerDown={(event) => {
           // Nothing is captured here. See `move`: capture goes on once the
@@ -389,7 +499,7 @@ export function Room3D({
           zoomAbout(event.deltaY < 0 ? 1.12 : 1 / 1.12, at);
         }}
       >
-        {view.projection.facets.map((facet, i) => {
+        {drawn.map((facet, i) => {
           const isWall = facet.kind !== 'floor' && facet.kind !== 'object';
           const isSelected = isWall && facet.wallId === selected;
           return (
@@ -400,9 +510,14 @@ export function Room3D({
                 facet.kind === 'floor'
                   // The ceiling arrives as a floor-kind facet called `ceiling`.
                   // Drawn paler than the floor so a room seen from inside does
-                  // not read as two identical slabs.
+                  // not read as two identical slabs — except while it is the
+                  // only thing on the screen, where the pale fill on the page's
+                  // own ground is a shape with no substance to it. Lit like a
+                  // wall, it reads as a surface somebody is standing under.
                   ? facet.wallId === 'ceiling'
-                    ? 'rgb(var(--c-sunk))'
+                    ? lookUp
+                      ? ink(0.86, false)
+                      : 'rgb(var(--c-sunk))'
                     : 'rgb(var(--c-sunk))'
                   : facet.kind === 'object'
                     // Warm and pale against the room's cool slate, so a box
@@ -499,6 +614,47 @@ export function Room3D({
           );
         })}
 
+        {/*
+            Which wall is which end of the ceiling.
+
+            A ceiling on its own is a quadrilateral with nothing to orient it —
+            "the stain is over there" is unsayable about a blank shape. The
+            walls are what a person orients by, so their names go round the
+            edge, and each one goes on the edge that is actually that wall.
+
+            The correspondence is `projectFrom`'s own: the ceiling face is the
+            room's corners in room order, so the edge from corner i to corner
+            i+1 is `room.walls[i]` — the same indexing it walks the walls with.
+            It only holds while every corner is in front of the eye, which is
+            why the count is checked rather than assumed. A clipped face would
+            silently shift every name by one, and a wall name on the wrong wall
+            is worse than no names at all.
+        */}
+        {lookUp &&
+          ceilingEdges.map((edge) => (
+            <text
+              key={edge.wallId}
+              x={edge.x}
+              y={edge.y}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={34}
+              fontWeight={600}
+              fill="rgb(var(--c-ink))"
+              stroke="rgb(var(--c-ground))"
+              strokeWidth={8}
+              paintOrder="stroke"
+              strokeLinejoin="round"
+              className="pointer-events-none select-none"
+              aria-hidden="true"
+            >
+              <tspan x={edge.x} dy="0">{edge.wallId}</tspan>
+              <tspan x={edge.x} dy={30} fontSize={28} fontWeight={500}>
+                {edge.length}
+              </tspan>
+            </text>
+          ))}
+
         {/* Doors and windows, with what they measure printed on them. They are
             already drawn as real holes; this is the size an estimator needs to
             read off one without opening another screen. */}
@@ -544,29 +700,79 @@ export function Room3D({
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
         <p>
-          {inside
-            ? 'Drag to look around. Pinch or scroll to zoom. Tap a wall to measure it.'
-            : 'Drag to walk around it. Pinch or scroll to zoom. Tap a wall to measure it.'}
+          {lookUp
+            ? 'The ceiling on its own, from underneath and far enough back to get all of it in. ' +
+              'Drag to look around it, pinch or scroll to zoom. The walls are dropped away, not ' +
+              'changed — every one of them is still measured and still on the sheet.'
+            : inside
+              ? 'Drag to look around. Pinch or scroll to zoom. Tap a wall to measure it.'
+              : 'Drag to walk around it. Pinch or scroll to zoom. Tap a wall to measure it.'}
           {' '}
           {/* The one dimension that is nowhere else on this view, and that
               every wall's area is multiplied by. Read off the room rather than
-              worked out here. */}
+              worked out here — and beside it, while the ceiling is the subject,
+              how much of it there is: the takeoff's own ceiling line, asked for
+              this room, so the picture and the sheet cannot disagree. */}
           <span className="font-mono tabular-nums">
-            Ceiling {len(room.ceilingHeight.value)}.
+            Ceiling {len(room.ceilingHeight.value)}
+            {lookUp ? `, ${ceilingArea(room)} sq ft.` : '.'}
           </span>
+          {lookUp && (
+            <>
+              {' '}Everything else about the ceiling — what is being done to it, what is wrong
+              with it, what was measured on it — is on the ceiling panel.
+            </>
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setInside(inside ? null : standingInside(room))}
-            aria-pressed={inside !== null}
+            onClick={() => {
+              // Leaving look-up mode as well, because "back outside" from a
+              // ceiling with no walls under it has to put the room back, not
+              // put the viewer outside a drawing that is still only a lid.
+              setLookUp(false);
+              setInside(inside && !lookUp ? null : standingInside(room));
+            }}
+            aria-pressed={inside !== null && !lookUp}
             className={`min-h-11 rounded-md px-3 font-medium ${
-              inside
+              inside && !lookUp
                 ? 'bg-slate-900 text-white active:bg-slate-700'
                 : 'border border-slate-300 text-slate-700 active:bg-slate-100'
             }`}
           >
-            {inside ? 'Back outside' : 'Stand inside'}
+            {inside && !lookUp ? 'Back outside' : 'Stand inside'}
+          </button>
+          {/*
+              The mirror of the view Sam already likes, and never the default.
+
+              The orbit takes the ceiling off so you can see into the room; this
+              takes the walls off so you can see the ceiling. It is a mode with
+              a name on it rather than something that happens when the camera
+              passes under the floor, because the whole reason the default is
+              good is that nobody has to think about it.
+          */}
+          <button
+            type="button"
+            onClick={() => {
+              if (lookUp) {
+                setLookUp(false);
+                setInside(null);
+                setBox({ x: 0, y: 0, size: SIZE });
+                return;
+              }
+              setLookUp(true);
+              setInside(lyingDown(room));
+              setBox({ x: 0, y: 0, size: SIZE });
+            }}
+            aria-pressed={lookUp}
+            className={`min-h-11 rounded-md px-3 font-medium ${
+              lookUp
+                ? 'bg-slate-900 text-white active:bg-slate-700'
+                : 'border border-slate-300 text-slate-700 active:bg-slate-100'
+            }`}
+          >
+            {lookUp ? 'Put the walls back' : 'Look up'}
           </button>
           {/* Buttons as well as the gesture, because a gesture nobody is told
               about is a feature nobody has. These zoom about the middle, which
@@ -595,7 +801,12 @@ export function Room3D({
               // The zoom goes back with the angle. Straightening the view and
               // leaving it magnified eight times is not straightening it.
               setBox({ x: 0, y: 0, size: SIZE });
-              if (inside) setInside(standingInside(room));
+              // Straightening up while looking up means looking straight up
+              // again, not standing back up: the mode is what the button is
+              // inside of, and a control that quietly left it would be a
+              // control that turned a feature off by accident.
+              if (lookUp) setInside(lyingDown(room));
+              else if (inside) setInside(standingInside(room));
               else setCamera(DEFAULT_CAMERA);
             }}
             className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700 active:bg-slate-100"
@@ -603,7 +814,10 @@ export function Room3D({
             Straighten up
           </button>
         </div>
-        {view.projection.hidden.length > 0 && (
+        {/* Not while looking up: every wall is off, and "4 walls behind you"
+            beside a picture with no walls in it reads as a fault rather than as
+            the point. What is said instead is in the sentence above. */}
+        {!lookUp && view.projection.hidden.length > 0 && (
           <p>
             {view.projection.hidden.length} wall
             {view.projection.hidden.length === 1 ? '' : 's'}{' '}
