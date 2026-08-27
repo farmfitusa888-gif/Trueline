@@ -62,11 +62,34 @@ check('a moved wall goes where it was put', moved.some((l) => /behind the washer
 // "Moved by hand" is a provenance of its own now -- `adjusted` in the token
 // source -- rather than a violet somebody picked. The claim is the same: a wall
 // somebody dragged is drawn as neither scanned nor measured.
+// Deselected first, and that is the point of the two lines below.
+//
+// A selected wall is now drawn in the picked colour outright — Sam asked for
+// that twice — so reading the drawing with the moved wall still under the
+// finger measures the SELECTION, not the edit. This part is about whether the
+// edit persisted, so it looks at the wall at rest, which is the state anybody
+// else ever sees it in. What a picked wall looks like is A29's job.
+//
+// The first attempt at this widened the check to accept the wall's own number
+// as well as its line. That version passed a build where the moved wall was
+// drawn as SCANNED — the number alone satisfied it — so it was thrown away.
+// A check that cannot fail on the mistake it names is worse than no check.
+// Read while the wall is still open, because this sentence lives in the panel
+// that the deselection below closes.
+const saidWhileOpen = await page.locator('body').innerText();
+
+await page.keyboard.press('Escape');
+await page.locator('[data-panel="plan"] svg').first().click({ position: { x: 5, y: 5 } });
+await page.waitForTimeout(400);
+
 check('a wall moved by hand is drawn as neither scanned nor measured',
-  (await page.locator('svg line[stroke="rgb(var(--c-adjusted))"]').count()) === 1);
+  (await page.locator('svg line[stroke="rgb(var(--c-adjusted))"]').count()) === 1,
+  `${await page.locator('svg line[stroke="rgb(var(--c-adjusted))"]').count()} lines in the `
+  + 'moved-by-hand colour');
+
 check('the key names it', (await page.locator('ul.flex-wrap').first().innerText()).includes('Moved by hand'));
-t = await page.locator('body').innerText();
-check('a moved wall never reads as measured', /moved by hand, which is not the same as measured/.test(t));
+check('a moved wall never reads as measured',
+  /moved by hand, which is not the same as measured/.test(saidWhileOpen));
 // The room's own verdict lives with the checks, a tab away from the drawing.
 // That it is a tab away is the point: a wall dragged on the Plan must not have
 // quietly changed what the Room section says about the whole room.

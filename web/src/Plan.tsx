@@ -835,8 +835,24 @@ export function Plan({
               y1={y1}
               x2={x2}
               y2={y2}
-              stroke={stroke}
-              strokeWidth={drawnWidth}
+              // A picked wall is drawn in the picked colour outright. Sam,
+              // twice, and the second time after a build: "I TOLD TO MAKE THE
+              // WALL WHITE WHEN YOU TAP IT, IN BLUEPRINT."
+              //
+              // The arrangement above — band underneath, wall's own colour on
+              // top — was written to keep provenance visible while a wall is
+              // selected, and the reasoning was sound. It is still sound, and
+              // it is not worth what it costs here: a thin coloured line down
+              // the middle of the band is most of what a person sees, so the
+              // wall never read as picked, which is the thing being asked for.
+              //
+              // Provenance does not disappear. It is on this wall's own
+              // dimension text, which is drawn in the same four colours and is
+              // right beside it; on every other wall on the sheet; in the
+              // legend; and in the panel that opens underneath. What is gone is
+              // one line, on one wall, for as long as a finger is on it.
+              stroke={isSelected ? PICKED : stroke}
+              strokeWidth={isSelected ? pickedWidth : drawnWidth}
               strokeLinecap={w.thicknessAssumed ? 'round' : 'butt'}
               strokeDasharray={w.open ? '2 10' : undefined}
             />
@@ -868,11 +884,29 @@ export function Plan({
                 const inx = -o.outward.x;
                 const iny = o.outward.y;
                 const band = Math.max(7, w.thicknessAssumed ? 7 : w.thickness * scale);
-                // What the gap has to erase. On a picked wall that is the amber
-                // band, not the wall: a gap sized to the wall alone would rub
-                // out the middle of the doorway and leave amber across it, so a
-                // door on the wall somebody just tapped would read as filled in.
-                const gap = (isSelected ? pickedWidth : band) + 1;
+                // What the gap erases: THE WALL, and never the selection.
+                //
+                // It used to erase the whole picked band, on the reasoning that
+                // a doorway with the band still drawn across it reads as filled
+                // in. That reasoning is wrong, and it is wrong in a way that
+                // undid the entire feature.
+                //
+                // Sam, twice: "the tap a wall on the blueprint is still not
+                // noticeable at all." Screenshotting it finally showed why. On
+                // wall-9 of his own dining room — 24 ft 10 in, with a door and
+                // two windows — the openings are **18 ft 1 in, 73% of the
+                // wall**. Erasing the band across every one of them left the
+                // selection visible on two short stubs at the ends and nothing
+                // in between, which is exactly "not noticeable at all".
+                //
+                // An opening is a hole in the WALL. It is not a hole in the
+                // selection: tapping a wall selects the whole run, doorway
+                // included, and the drawing has to say so along the whole run.
+                // So the gap is sized to the wall's own line, which is all it
+                // ever needed to erase, and the picked band goes on underneath
+                // it — a white wall with its openings marked as slots in it,
+                // rather than a white wall with 73% of it rubbed out.
+                const gap = band + 1;
 
                 return (
                   <g key={o.id}>

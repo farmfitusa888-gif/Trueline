@@ -207,6 +207,23 @@ const picked = await wall(page, 'Wall wall-1,');
 const other = await wall(page, 'Wall wall-3,');
 const after = await sheet(page);
 
+/**
+ * What colour the picked wall's own dimension number is drawn in.
+ *
+ * This is where provenance lives while a wall is selected, so it is read from
+ * the DOM rather than assumed. `Label` draws two elements — a halo and the
+ * text — so the fill is taken from the one that is not the halo.
+ */
+const pickedLabel = await page.evaluate(() => {
+  const group = [...document.querySelectorAll('[data-panel="plan"] g[role="button"]')]
+    .find((g) => (g.getAttribute('aria-label') || '').startsWith('Wall wall-1,'));
+  if (!group) return null;
+  const texts = [...group.querySelectorAll('text')];
+  const inked = texts.map((n) => getComputedStyle(n).fill)
+    .filter((f) => f && f !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(f));
+  return inked.length > 0 ? inked[inked.length - 1] : null;
+});
+
 check('the keyboard picks a wall and the wall says so',
   picked.pressed === 'true' && other.pressed === 'false',
   `picked ${picked.pressed}, other ${other.pressed}`);
@@ -230,22 +247,32 @@ check('and it is thicker than the wall opposite is, right now, on the same drawi
 check('no unpicked wall has a band',
   other.band === null, JSON.stringify(other.band));
 
-// The check `a6-persist` would have caught, written here so it is caught in the
-// part that owns the behaviour. The first version of this feature painted the
-// wall's own line amber outright, and a wall somebody had DRAGGED stopped being
-// drawn in `--c-adjusted` for exactly as long as it was selected — so the
-// drawing stopped saying "this one was moved by hand" about the wall a person
-// was in the middle of moving by hand. Selection is a state of the screen;
-// provenance is a fact about the building, and a screen state must not overwrite
-// one.
-check("and the wall's own line inside it still says where its number came from",
-  picked.body?.stroke === restingPicked.body?.stroke
-  && picked.body?.width === restingPicked.body?.width,
-  `${restingPicked.body?.stroke} at ${restingPicked.body?.width} before,`
-  + ` ${picked.body?.stroke} at ${picked.body?.width} while picked`);
-check('so the band is genuinely behind that line rather than instead of it',
-  picked.band?.width > picked.body?.width,
-  `band ${picked.band?.width}, line ${picked.body?.width}`);
+// Provenance, and where it went.
+//
+// The first version of this feature painted the wall's own line amber outright
+// and `a6-persist` caught it: a wall somebody had DRAGGED stopped being drawn in
+// `--c-adjusted` for as long as it was selected, so the drawing stopped saying
+// "this one was moved by hand" about the wall a person was moving by hand.
+//
+// The answer then was to keep the wall's own line on top of the band. That was
+// sound, and it cost the feature: a thin coloured line down the middle of a
+// white band is most of what a person sees, and Sam said twice — the second
+// time after building it — that a tapped wall was still not noticeable.
+//
+// So the picked wall IS drawn in the picked colour now, and provenance moved
+// rather than disappearing: this wall's own dimension number is drawn in its
+// confidence colour, right beside it, and every other wall on the sheet still
+// carries its own. The invariant is "a picked wall still says where its number
+// came from", not "the wall's own line is untouched" — so that is what is
+// checked, and it is checked on the thing that actually carries it.
+check('the picked wall is drawn in the picked colour outright, not just banded',
+  picked.body?.stroke === PICKED,
+  `${picked.body?.stroke}, wanted ${PICKED}`);
+check('and it is thick with it, not a hairline',
+  picked.body?.width >= 24, `${picked.body?.width}`);
+check("and the wall's own number still says where the measurement came from",
+  pickedLabel !== null && pickedLabel === restingPicked.body?.stroke,
+  `label ${pickedLabel}, wall was ${restingPicked.body?.stroke}`);
 
 check('there is a casing round the band as well, in the same ink and wider still',
   picked.casing !== null && picked.casing?.stroke === PICKED
