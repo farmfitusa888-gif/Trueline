@@ -85,6 +85,10 @@ struct ScanScreen: View {
     /// off the moment a pin is kept.
     @State private var marking: Bool
     @State private var saying = ""
+    /// A tidy-up in flight, so the button says so rather than looking dead.
+    @State private var tidying = false
+    /// Whether what is in the box was written by the phone and not yet read.
+    @State private var tidied = false
     @State private var kind = "water"
 
     /// The damage kinds, as `core/src/damage.ts` names them. Its words, not a
@@ -407,6 +411,41 @@ extension ScanScreen {
                     TextField("Staining behind the boiler", text: $saying, axis: .vertical)
                         .lineLimit(2...4)
                         .submitLabel(.done)
+
+                    // Speaking is already free — the keyboard has a microphone
+                    // on it. What was missing is the bit after: a mark is
+                    // refused without words, and what somebody says out loud in
+                    // a wet basement is not a sentence an adjuster reads.
+                    //
+                    // So this tidies what is in the box, on the phone, keeping
+                    // their own words where it can. It is offered only when the
+                    // model can run and only when there is something to tidy —
+                    // and it changes the TEXT and nothing else. The kind stays
+                    // the picker's, above, because a damage kind decides what
+                    // goes in a claim's categories and that is a finding rather
+                    // than a phrasing.
+                    if Draftsman.isAvailable && !saying.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Button {
+                            let said = saying
+                            tidying = true
+                            Task { @MainActor in
+                                let written = await Draftsman().draft(.mark, from: said)
+                                if let written { saying = written; tidied = true }
+                                tidying = false
+                            }
+                        } label: {
+                            Label(tidying ? "Tidying…" : "Tidy it up", systemImage: "text.badge.checkmark")
+                        }
+                        .disabled(tidying)
+                        if tidied {
+                            Text(
+                                "Written on this phone from what you said. Read it — it goes on "
+                                + "the claim in your name."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(Ink.scanned)
+                        }
+                    }
                 }
 
                 if let waiting = model.session.pending, waiting.found == .planeInfinite {
@@ -432,6 +471,7 @@ extension ScanScreen {
                     Button("Throw it away") {
                         model.session.forgetPending()
                         saying = ""
+                        tidied = false
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -439,6 +479,7 @@ extension ScanScreen {
                         model.session.keep(kind: kind, note: saying)
                         if model.session.pending == nil {
                             saying = ""
+                            tidied = false
                             // Marking turns itself off after a pin is kept.
                             // Leaving it on is how somebody walking with the
                             // phone out ends up with pins they never meant.

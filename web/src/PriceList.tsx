@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { DraftButton } from './Draft.tsx';
 import {
   type ImportResult,
   type Mapping,
@@ -59,6 +60,42 @@ function Column({
       </select>
     </label>
   );
+}
+
+/**
+ * Turns `item = Description` lines into column numbers.
+ *
+ * Deliberately unforgiving in one direction and forgiving in the other: a
+ * heading it cannot find is skipped and whatever was already picked stays. A
+ * guess that half-lands leaves the other half as it was, and every one of them
+ * is still shown in a picker before anything is imported.
+ *
+ * Nothing here can produce a price. It produces at most five small integers,
+ * each of which is an index into the file's own headings.
+ */
+function readGuess(
+  text: string,
+  headers: readonly string[],
+  already: Partial<Mapping>
+): Partial<Mapping> {
+  const fields = ['item', 'unit', 'price', 'code', 'coverage'] as const;
+  // Built as a mutable record and handed back as the readonly shape: `Mapping`
+  // is readonly for the right reason -- nothing downstream may edit a mapping
+  // out from under the pickers -- and this is the one place that assembles one.
+  const next: { -readonly [K in keyof Mapping]?: Mapping[K] } = { ...already };
+  for (const line of text.split('\n')) {
+    const [left, right] = line.split('=');
+    if (left === undefined || right === undefined) continue;
+    const said = left.trim().toLowerCase();
+    const field = fields.find((f) => said.startsWith(f));
+    if (!field) continue;
+    const wanted = right.trim().toLowerCase();
+    if (wanted === '' || wanted === 'none') continue;
+    const at = headers.findIndex((header) => header.trim().toLowerCase() === wanted);
+    if (at === -1) continue;
+    next[field] = at;
+  }
+  return next;
 }
 
 export function PriceList() {
@@ -162,6 +199,33 @@ export function PriceList() {
                          focus:border-sky-500 focus:outline-none"
             />
           </label>
+
+          {/* The mapping, guessed. It is only ever a SUGGESTION: the pickers
+              below are what decides, the rows underneath show what the choice
+              means, and nothing is imported until somebody presses the button.
+              This turns a ten-minute job into ten seconds and moves no number
+              -- every price still comes out of the file. */}
+          <div className="mt-3">
+            <DraftButton
+              job="columns"
+              label="Guess the columns"
+              busyLabel="Reading the headings…"
+              notes={() =>
+                [
+                  'Headings in the file:',
+                  ...list.headers.map((header, i) => `- ${header || `column ${i + 1}`}`),
+                  '',
+                  'App items to match:',
+                  '- item (what the thing is)',
+                  '- unit (what it is priced per)',
+                  '- price',
+                  '- code (the supplier’s own code)',
+                  '- coverage (how much one of them covers)',
+                ].join('\n')
+              }
+              onWritten={(text) => setMapping(readGuess(text, list.headers, mapping))}
+            />
+          </div>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Column

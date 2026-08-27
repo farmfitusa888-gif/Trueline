@@ -14,6 +14,11 @@
 #
 # Add `--no-pull` to build exactly what is on your Mac right now, without
 # fetching. Add `--open` to open Xcode instead of building.
+#
+# Add `--sim` to run it in the iPhone 17 Pro Max simulator instead of on a
+# phone. That needs no cable, no signing team and no device, and it is the
+# fastest way to click through every screen -- but read what it CANNOT do,
+# under "the simulator" below, before trusting anything it shows you.
 
 set -uo pipefail
 
@@ -26,11 +31,15 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 root="$(pwd)"
 
 pull=yes
+sim=no
+simulator="iPhone 17 Pro Max"
 for arg in "$@"; do
   case "$arg" in
     --no-pull) pull=no ;;
     --open)    exec bash setup-mac.sh ;;
-    *) bad "I do not know the option $arg. Try --no-pull or --open."; exit 2 ;;
+    --sim)     sim=yes ;;
+    --sim=*)   sim=yes; simulator="${arg#--sim=}" ;;
+    *) bad "I do not know the option $arg. Try --no-pull, --open or --sim."; exit 2 ;;
   esac
 done
 
@@ -51,12 +60,109 @@ if [ "$pull" = yes ]; then
   fi
 fi
 
-say "Your phone"
 if ! command -v xcodebuild >/dev/null 2>&1; then
   bad "Xcode's command line tools are not on the path."
   echo "     Open Xcode once, then: Xcode → Settings → Locations → Command Line Tools"
   exit 1
 fi
+
+# ---------------------------------------------------------------- the simulator
+#
+# What it is for: clicking through every screen, fast, with no cable and no
+# signing team. The whole web half of this app -- the plan, the takeoff, the
+# price, the proposal, the claim, the drawing screen -- runs in a web view and
+# is identical on a simulator and on a phone, so a click-through there is a real
+# click-through of most of the product.
+#
+# What it CANNOT do, and none of these is a bug in the simulator:
+#
+#   - **Scan.** RoomPlan needs LiDAR. `RoomCaptureSession.isSupported` is false
+#     and the Scan tab says so.
+#   - **Measure.** ARKit world tracking needs a camera. There is none.
+#   - **North on the plan.** No magnetometer.
+#   - **Apple Intelligence.** A simulator reports the model unavailable, so
+#     every draft button is absent -- which is exactly what an older iPhone
+#     sees, and worth seeing on purpose.
+#   - **StoreKit against the real store.** The scheme's `Trueline.storekit`
+#     handles that: local products, real purchase flow, no money.
+#
+# So: click through everything, and take anything a sensor would have produced
+# from a real phone.
+if [ "$sim" = yes ]; then
+  say "The simulator"
+  udid="$(xcrun simctl list devices available \
+    | grep -F "$simulator (" | head -1 \
+    | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}')"
+  if [ -z "$udid" ]; then
+    bad "No simulator called \"$simulator\" is installed."
+    echo "     Xcode → Settings → Components installs the iOS runtimes, and each"
+    echo "     runtime brings its own set of devices."
+    echo
+    echo "     What this Mac has:"
+    xcrun simctl list devices available | grep -E '^\s+iPhone' | sed 's/^/       /' | head -12
+    echo
+    echo "     Pick one of those with:  bash build.sh --sim=\"iPhone 17 Pro\""
+    exit 1
+  fi
+  ok "$simulator ($udid)"
+  xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+  open -a Simulator >/dev/null 2>&1 || true
+
+  say "Building for the simulator"
+  derived="$root/.build-sim"
+  log="$derived/last-build.log"
+  mkdir -p "$derived"
+  # No signing team and no provisioning: a simulator build needs neither, which
+  # is the other reason this path exists.
+  if xcodebuild \
+    -project ios/Trueline.xcodeproj \
+    -scheme Trueline \
+    -configuration Debug \
+    -destination "id=$udid" \
+    -derivedDataPath "$derived" \
+    CODE_SIGNING_ALLOWED=NO \
+    -quiet \
+    build >"$log" 2>&1; then
+    ok "compiled"
+  else
+    bad "It did not compile. The errors, in order:"
+    grep -E 'error:' "$log" | sed 's/^/       /' | head -20
+    echo
+    echo "     The whole log:  $log"
+    exit 1
+  fi
+
+  app="$(find "$derived/Build/Products" -maxdepth 2 -name 'Trueline.app' -print -quit)"
+  if [ -z "$app" ]; then
+    bad "It compiled and I cannot find Trueline.app under $derived/Build/Products."
+    exit 1
+  fi
+
+  say "Installing"
+  if xcrun simctl install "$udid" "$app" >"$derived/install.log" 2>&1; then
+    ok "installed"
+  else
+    bad "It would not install."
+    sed 's/^/       /' "$derived/install.log" | head -12
+    exit 1
+  fi
+
+  bundle="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist" 2>/dev/null)"
+  if xcrun simctl launch "$udid" "${bundle:-com.sunnyacres.trueline}" >/dev/null 2>&1; then
+    ok "launched"
+  else
+    warn "It is installed. Tap it on the simulator's home screen."
+  fi
+  say "Click through it"
+  echo "  Rooms → Draw a room → tap four corners → Open it → Plan, Room, Takeoff,"
+  echo "  Price (set a rate), Agreement, Work, Insurance, Files."
+  echo
+  echo "  Scan and Measure will say what they need. That is right: a simulator has"
+  echo "  no LiDAR and no camera, so there is nothing for them to do."
+  exit 0
+fi
+
+say "Your phone"
 
 # `devicectl` is the modern one and is what Xcode 15 and later use. The older
 # `xctrace` listing is kept as the fallback, because a Mac that has only ever

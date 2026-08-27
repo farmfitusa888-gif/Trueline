@@ -12,6 +12,7 @@ import {
 import { useUnits } from './units.tsx';
 import { ReportPhotos } from './ReportPhotos.tsx';
 import { canMarkAgain, markAgain } from './bridge.ts';
+import { DraftButton, DraftedNote } from './Draft.tsx';
 
 /**
  * Insurance mode: the switch, the claim's own facts, and the document.
@@ -128,6 +129,8 @@ export function Claim({
 }) {
   const { area, len } = useUnits();
   const [showing, setShowing] = useState<'details' | 'report'>('details');
+  /** Whether the loss description was drafted by the phone and not yet read. */
+  const [drafted, setDrafted] = useState(false);
 
   const report = useMemo(
     () =>
@@ -243,6 +246,55 @@ export function Claim({
             </div>
 
             <Field label="Property address" value={claim.address ?? ''} onChange={(v) => set('address', v)} />
+
+            {/* The loss description. It has been on the claim document since
+                the document was written -- `claim.ts` prints it under "Notes"
+                -- and there has never been a box to type it in. Another
+                finished, unreachable field. */}
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">What happened</span>
+              <textarea
+                value={claim.note ?? ''}
+                onChange={(event) => { set('note', event.target.value); setDrafted(false); }}
+                rows={4}
+                aria-label="What happened"
+                placeholder="The supply line under the sink let go overnight."
+                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2
+                           leading-relaxed focus:border-sky-500 focus:outline-none"
+              />
+            </label>
+            <p className="text-xs leading-relaxed text-slate-500">
+              The first thing an adjuster reads. It goes at the top of the claim document, in
+              your words.
+            </p>
+            <DraftedNote showing={drafted && (claim.note ?? '') !== ''} />
+            {/* What goes across is what is already on this claim: the cause,
+                the dates, and every mark with its kind, its category and its
+                measured area. The model writes two paragraphs out of them and
+                is told never to touch a figure. */}
+            <DraftButton
+              job="loss"
+              label="Draft what happened"
+              notes={() =>
+                [
+                  claim.cause ? `Cause: ${claim.cause}.` : '',
+                  claim.dateOfLoss ? `Date of loss: ${claim.dateOfLoss}.` : '',
+                  claim.foundOn ? `Found on: ${claim.foundOn}.` : '',
+                  `Room: ${room.name}.`,
+                  damages.length === 0
+                    ? 'Nothing has been marked in this room yet.'
+                    : 'Marked in this room:',
+                  ...damages.map((damage) => {
+                    const where = damage.shape.kind === 'pin' ? 'a marked spot' : 'an area';
+                    const category = damage.category ? `, category ${damage.category}` : '';
+                    return `- ${damage.kind}${category}, on ${where}: ${damage.note}`;
+                  }),
+                ]
+                  .filter((line) => line !== '')
+                  .join('\n')
+              }
+              onWritten={(text) => { set('note', text); setDrafted(true); }}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
                 label="Owner"

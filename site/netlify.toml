@@ -1,0 +1,21 @@
+# The website. Separate from the app's own deploy on purpose.
+#
+# `../netlify.toml` at the top of the repo publishes `web/dist` — the correction
+# screens themselves, which are what the iPhone app loads and what somebody can
+# open a scan in from a browser. That is the product, not a page about it.
+#
+# This is the page about it. One static file, no build step, no JavaScript, no
+# fonts fetched from anywhere. Point a second Netlify site at this directory
+# with a base of `site` and it deploys in seconds.
+[build]
+  base = "site"
+  command = "echo 'One file. Nothing to build.'"
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Nothing on this page loads from anywhere else, so nothing may.
+    Content-Security-Policy = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"

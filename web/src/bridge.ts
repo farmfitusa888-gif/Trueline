@@ -33,6 +33,19 @@ export interface HandOver {
   company?: string;
   /** Whether StoreKit says this person has paid. */
   subscribed?: boolean;
+  /**
+   * Whether this phone can write a sentence for somebody.
+   *
+   * True only when the app was built against an SDK that has Apple's
+   * Foundation Models framework, the phone is on iOS 26, the hardware supports
+   * Apple Intelligence and the model has finished downloading — `Draftsman`
+   * asks all four at once.
+   *
+   * A screen offers a draft only when this is true. Not greyed, not explained:
+   * absent. Somebody whose phone cannot do it never learns the button exists,
+   * which is the only version that does not read as a missing feature.
+   */
+  draftable?: boolean;
   /** What has gone wrong on this phone, as `Diagnostics.asJSON` writes it. */
   reports?: string;
   /** Every corrected room on the phone, for the floor. */
@@ -148,6 +161,15 @@ export interface TruelineBridge {
    * it drains what was parked. Two copies of that order was the bug.
    */
   take(payload: HandOver): void;
+  /**
+   * One draft, back from the phone.
+   *
+   * The only call in this contract that the app makes *in answer to* something
+   * the page asked, rather than to tell it something. `text` is null when the
+   * model was busy, unavailable, or would not answer — an ordinary outcome,
+   * not an error.
+   */
+  drafted(id: string, text: string | null): void;
   /** Version of this contract, so a mismatched app build can say so. */
   readonly version: 1;
 }
@@ -357,6 +379,82 @@ export function markAgain(): boolean {
 /** Whether this build of the app can open a marking pass. */
 export function canMarkAgain(): boolean {
   return handler('mark') !== undefined;
+}
+
+/* ------------------------------------------------------------ drafting */
+
+/**
+ * Whether the app said it can write a sentence. Set once, when the app speaks.
+ */
+let canWrite = false;
+
+/** Whoever is showing a screen when the answer arrives. */
+const draftListeners = new Set<() => void>();
+
+export function onDraftable(listen: () => void): () => void {
+  draftListeners.add(listen);
+  return () => draftListeners.delete(listen);
+}
+
+/**
+ * Whether to offer a draft at all.
+ *
+ * Two things, both required: an app to ask (`handler`) and a phone that can
+ * answer (`canWrite`). A browser has neither and shows nothing extra, which is
+ * also what an older phone gets.
+ */
+export function canDraft(): boolean {
+  return canWrite && handler('draft') !== undefined;
+}
+
+/** Asks in flight, by id, so an answer can find the question it belongs to. */
+const waitingForDraft = new Map<string, (written: string | null) => void>();
+let nextDraft = 0;
+
+/**
+ * Asks the phone to write one thing, from figures this page already has.
+ *
+ * ## What may and may not go in `notes`
+ *
+ * Facts. Lines this page worked out from `core/` — quantities, room names,
+ * damage kinds, meter readings. **Never an instruction**: what the model is
+ * told to do lives in `Draftsman.Job` on the Swift side, one per job, and
+ * cannot be supplied from here. These screens run in a web view, a web view
+ * runs whatever HTML it is given, and a channel that carried its own
+ * instruction would be a channel that carried any instruction.
+ *
+ * Resolves to `null` rather than rejecting when there is no app, no model, or
+ * the model would not answer. Every caller treats that the same way: the box
+ * somebody types in was already there and is still there.
+ */
+export function askForDraft(
+  job: 'scope' | 'loss' | 'mark' | 'columns',
+  notes: string
+): Promise<string | null> {
+  const post = handler('draft');
+  if (!post || !canWrite) return Promise.resolve(null);
+  nextDraft += 1;
+  const id = `draft-${nextDraft}`;
+  return new Promise((resolve) => {
+    // Nothing here waits forever. A model that never answers -- an app killed
+    // mid-draft, a build whose Swift half does not know this message -- would
+    // otherwise leave a button saying "Writing..." for as long as the page is
+    // open.
+    const timer = window.setTimeout(() => {
+      if (waitingForDraft.delete(id)) resolve(null);
+    }, 30_000);
+    waitingForDraft.set(id, (written) => {
+      window.clearTimeout(timer);
+      resolve(written);
+    });
+    try {
+      post.postMessage({ id, job, notes, version: BRIDGE_VERSION });
+    } catch {
+      window.clearTimeout(timer);
+      waitingForDraft.delete(id);
+      resolve(null);
+    }
+  });
 }
 
 export function handBack(fileName: string, project: string): void {
@@ -613,6 +711,13 @@ export function installBridge(dispatch: (action: Action) => void): void {
     setEntitlement(paid === true);
   };
 
+  const drafted = (id: string, text: string | null) => {
+    const waiting = waitingForDraft.get(id);
+    if (!waiting) return;
+    waitingForDraft.delete(id);
+    waiting(typeof text === 'string' && text.trim() !== '' ? text : null);
+  };
+
   /**
    * Everything the app has to say, applied in the one order that is correct.
    *
@@ -637,6 +742,10 @@ export function installBridge(dispatch: (action: Action) => void): void {
     }
     if (typeof payload.subscribed === 'boolean') {
       setSubscribed(payload.subscribed);
+    }
+    if (typeof payload.draftable === 'boolean') {
+      canWrite = payload.draftable;
+      for (const listen of draftListeners) listen();
     }
     if (typeof payload.reports === 'string') {
       openReports(payload.reports);
@@ -671,6 +780,7 @@ export function installBridge(dispatch: (action: Action) => void): void {
     openReports,
     putRooms,
     setSubscribed,
+    drafted,
     take,
     version: BRIDGE_VERSION,
   };

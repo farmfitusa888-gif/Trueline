@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trueline — measure a room, price it, get it signed</title>
+<meta name="description" content="Scan a room with an iPhone, put a tape on one wall each way, and the takeoff, the price, the proposal and the claim come out of the same measurements. No server, no account.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23B8590A'/%3E%3Cpath d='M7 22h18M7 22V10' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --ground:#FBFAF8; --sunk:#F1EEE9; --ink:#1A1714; --quiet:#5D554C;
+    --line:#E2DCD3; --accent:#B8590A; --scanned:#946200; --measured:#1F6B3A;
+    --shadow:0 1px 2px rgba(26,23,20,.06), 0 8px 24px rgba(26,23,20,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ground:#141210; --sunk:#1E1A17; --ink:#F5F1EC; --quiet:#A79C90;
+      --line:#2E2823; --accent:#E8873A; --scanned:#D8A02A; --measured:#5FBF85;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font:16px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-feature-settings:"kern";
+  }
+  .wrap{max-width:64rem; margin:0 auto; padding:0 1.25rem}
+  header{padding:3.5rem 0 1rem}
+  .mark{display:flex; align-items:center; gap:.6rem; font-weight:800; letter-spacing:-.01em; font-size:1.15rem}
+  .mark svg{width:1.6rem; height:1.6rem; flex:none}
+  h1{
+    margin:2.5rem 0 0; font-size:clamp(2.1rem, 6vw, 3.4rem); line-height:1.1;
+    letter-spacing:-.03em; font-weight:800; text-wrap:balance; max-width:20ch;
+  }
+  .lede{margin:1.1rem 0 0; font-size:clamp(1.05rem,2.4vw,1.25rem); color:var(--quiet); max-width:46ch}
+  .rule{border:0; border-top:1px solid var(--line); margin:3rem 0}
+  section{padding:.5rem 0 0}
+  h2{font-size:1.35rem; letter-spacing:-.015em; margin:0 0 .3rem; font-weight:750}
+  h3{font-size:1rem; margin:0 0 .25rem; font-weight:700}
+  p{margin:.6rem 0}
+  .quiet{color:var(--quiet)}
+  .small{font-size:.9rem}
+  .grid{display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); margin-top:1.5rem}
+  .card{background:var(--sunk); border:1px solid var(--line); border-radius:.75rem; padding:1.1rem}
+  .card p{margin:.35rem 0 0; color:var(--quiet); font-size:.95rem}
+  ol.steps{counter-reset:s; list-style:none; margin:1.5rem 0 0; padding:0; display:grid; gap:1.1rem}
+  ol.steps li{counter-increment:s; display:grid; grid-template-columns:2rem 1fr; gap:.9rem; align-items:start}
+  ol.steps li::before{
+    content:counter(s); font-variant-numeric:tabular-nums; font-weight:700; font-size:.85rem;
+    width:2rem; height:2rem; display:grid; place-items:center; border-radius:50%;
+    background:var(--accent); color:#fff;
+  }
+  .tag{
+    display:inline-block; font-size:.7rem; font-weight:800; letter-spacing:.08em;
+    text-transform:uppercase; padding:.15rem .45rem; border-radius:.3rem; vertical-align:.1em;
+  }
+  .tag.scanned{background:color-mix(in srgb, var(--scanned) 16%, transparent); color:var(--scanned)}
+  .tag.measured{background:color-mix(in srgb, var(--measured) 16%, transparent); color:var(--measured)}
+  /* A min-width plus the scrolling wrapper, rather than three columns squeezed
+     into a phone. Three words stacked one letter wide is not a table. */
+  table{border-collapse:collapse; width:100%; min-width:34rem; margin-top:1rem; font-size:.95rem}
+  th,td{text-align:left; padding:.6rem .5rem; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-weight:700; color:var(--quiet); font-size:.8rem; text-transform:uppercase; letter-spacing:.05em}
+  td:first-child{font-weight:650}
+  .scroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+  .note{
+    border-left:3px solid var(--accent); padding:.1rem 0 .1rem 1rem; margin:1.5rem 0;
+    color:var(--quiet);
+  }
+  footer{padding:3rem 0 4rem; color:var(--quiet); font-size:.9rem}
+  a{color:var(--accent)}
+  code{background:var(--sunk); padding:.1em .35em; border-radius:.25rem; font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="mark">
+    <svg viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="7" fill="var(--accent)"/>
+      <path d="M7 22h18M7 22V10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <span>True<span style="color:var(--accent)">line</span></span>
+  </div>
+
+  <h1>Measure a room. Price it. Get it signed.</h1>
+  <p class="lede">
+    Walk a room with an iPhone and the walls, the doors and the windows come back as
+    numbers. Put a tape on one wall running each way, and the takeoff, the price, the
+    proposal and the insurance document all come out of the same measurements — so they
+    cannot disagree with each other.
+  </p>
+</header>
+
+<hr class="rule">
+
+<section>
+  <h2>The one thing it will not do</h2>
+  <p>
+    Tell you a scan is a measurement.
+  </p>
+  <p class="quiet">
+    Every length in this app carries where it came from, and the words are on the drawing.
+    A length the phone found is <span class="tag scanned">Scanned</span>. A length you put a
+    tape on is <span class="tag measured">Measured</span>. A room drawn on a grid says
+    <span class="tag scanned">Drawn</span>. Until a tape has been on one wall running each
+    way, every document says so, on its face, where a client will read it.
+  </p>
+  <p class="quiet">
+    That is the whole product. A number you cannot defend to a homeowner line by line is
+    worse than no number.
+  </p>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>How a job goes through it</h2>
+  <ol class="steps">
+    <li><div><h3>Walk the room</h3><p class="quiet">The phone finds the walls, the doors and the windows. No LiDAR? Tap the corners onto a grid, or point at each one through the camera.</p></div></li>
+    <li><div><h3>Put a tape on it</h3><p class="quiet">One wall running each way is enough. The app tells you which walls are worth it and why — an error on the longest wall costs the most floor.</p></div></li>
+    <li><div><h3>Take it off</h3><p class="quiet">Floor, ceiling, wall face, baseboard, framing, every door and window taken off. The arithmetic is shown, not hidden.</p></div></li>
+    <li><div><h3>Price it from your own book</h3><p class="quiet">Your rates, typed once. No averages, no market data, nothing guessing what drywall costs where you are. Every line is a number you set times a number the room measured.</p></div></li>
+    <li><div><h3>Get it signed</h3><p class="quiet">A proposal in sentences, what is not included, and somewhere to sign — with a record of who signed, when, the exact words they agreed to, and a fingerprint of the document.</p></div></li>
+    <li><div><h3>Bill against what was signed</h3><p class="quiet">Deposits, progress payments and the final, all built from the signed scope. Anything that changes becomes a change order, signed before it starts.</p></div></li>
+  </ol>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>What is in it</h2>
+  <div class="grid">
+    <div class="card"><h3>The drawing</h3><p>A plan with real dimension lines, doors, windows, north, and your letterhead on it. Blueprint or 3D — walk through the room, or take the roof off the whole floor.</p></div>
+    <div class="card"><h3>The takeoff</h3><p>Every quantity, with its workings, as a sheet you can send, copy, or open in a spreadsheet.</p></div>
+    <div class="card"><h3>Insurance</h3><p>Mark the damage while you are standing in front of it. Photographs, moisture readings over time, a claim document, and ESX for Xactimate.</p></div>
+    <div class="card"><h3>Scheduling and invoicing</h3><p>Days into your own calendar. Invoices off the signed scope. A QuickBooks export. No monthly service behind any of it.</p></div>
+    <div class="card"><h3>Your business, once</h3><p>Licence number, insurance, logo and rates typed one time and on every document after that.</p></div>
+    <div class="card"><h3>Written on the phone</h3><p>On an iPhone that supports Apple Intelligence, the app will draft the scope paragraph and the loss description from the figures it already has — free, offline, and nothing leaves the device. You read every word before it goes out.</p></div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Where your work lives</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Thing</th><th>Where it is</th><th>What that means</th></tr></thead>
+      <tbody>
+        <tr><td>The rooms</td><td>A folder per scan on your phone</td><td>Visible in the Files app. AirDrop one, mail one, copy one off. No account needed to read your own work.</td></tr>
+        <tr><td>The backup</td><td>Your own iCloud</td><td>Not ours — yours. A corrected room is about 6 kB, so a free iCloud account holds a very large number of them.</td></tr>
+        <tr><td>The photographs</td><td>On the phone</td><td>A scan's pictures run to tens of megabytes. Sending them up would fill your iCloud with one job, so that is a decision per job rather than a default.</td></tr>
+        <tr><td>Everything else</td><td>Nowhere</td><td>There is no Trueline server. Nothing is uploaded, nothing is analysed, and there is no way for one person's house to reach another's.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>What it costs</h2>
+  <p>
+    Measuring, the drawing and the 3D view are <strong>free</strong>, and will stay free.
+    The takeoff, the pricing, the proposal, the change orders, the claim document and the
+    exports are the subscription: <strong>$78 a month, or $780 a year</strong>.
+  </p>
+  <p class="quiet">
+    One seat. No per-project fee, no per-scan fee, and no charge for a client to open
+    something you sent them.
+  </p>
+  <div class="note">
+    <p class="small">
+      <strong>Not on the App Store yet.</strong> Trueline is in testing with working
+      contractors. The prices above are what it will be sold for; nothing is on sale
+      today, and this page will say so until it is.
+    </p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<footer>
+  <p>
+    <strong>Trueline</strong> — questions, or you want to try it:
+    <a href="mailto:support@trueline.tools">support@trueline.tools</a>
+  </p>
+  <p class="small">
+    Built for a remodelling contractor, by the person who kept having to answer
+    “how do you know that is twelve foot?”
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

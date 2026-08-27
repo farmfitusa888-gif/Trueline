@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		636BC546D48C8AD2147E3EA2 /* Draftsman.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC48A9F7B40767D61D502C94 /* Draftsman.swift */; };
 		9FE8167762B0BEEEE03B8017 /* RoomCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5100806B34DBEDCE10842638 /* RoomCard.swift */; };
 		C02BF52EA80B0C4E9EC95FDE /* DrawScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC0C9101520AA217046DA3C /* DrawScreen.swift */; };
 		5C867CE20C5C4BA4F555D470 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AD5B3997BF82C119A063163 /* Diagnostics.swift */; };
@@ -43,6 +44,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AC48A9F7B40767D61D502C94 /* Draftsman.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draftsman.swift; sourceTree = "<group>"; };
 		5100806B34DBEDCE10842638 /* RoomCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomCard.swift; sourceTree = "<group>"; };
 		CDC0C9101520AA217046DA3C /* DrawScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawScreen.swift; sourceTree = "<group>"; };
 		4AD5B3997BF82C119A063163 /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 				4AD5B3997BF82C119A063163 /* Diagnostics.swift */,
 				CDC0C9101520AA217046DA3C /* DrawScreen.swift */,
 				5100806B34DBEDCE10842638 /* RoomCard.swift */,
+				AC48A9F7B40767D61D502C94 /* Draftsman.swift */,
 				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
 				6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */,
 				DA1B9D64EFC2ED4C64672F34 /* Web */,
@@ -246,6 +249,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */,
+				636BC546D48C8AD2147E3EA2 /* Draftsman.swift in Sources */,
 				9FE8167762B0BEEEE03B8017 /* RoomCard.swift in Sources */,
 				C02BF52EA80B0C4E9EC95FDE /* DrawScreen.swift in Sources */,
 				5C867CE20C5C4BA4F555D470 /* Diagnostics.swift in Sources */,

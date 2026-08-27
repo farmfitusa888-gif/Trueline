@@ -46,6 +46,8 @@ import {
   sign,
 } from '../../core/src/signature.ts';
 import { useQuote } from './quoteOf.ts';
+import { takeoff as buildTakeoff } from '../../core/src/takeoff.ts';
+import { DraftButton, DraftedNote } from './Draft.tsx';
 import { useUnits } from './units.tsx';
 
 function Field({
@@ -213,6 +215,21 @@ export function Agree({
   // the disagreement would be found by the client.
   const { quote: current } = useQuote(room, overrides, company);
   const roomName = room.name;
+  /**
+   * Whether the line in the box was written by the phone and not yet read.
+   *
+   * Cleared the moment somebody types in the box, because from then on it is
+   * their sentence — which is the whole distinction this flag exists to draw.
+   */
+  const [drafted, setDrafted] = useState(false);
+  /**
+   * The work in this room, as quantities. Built here rather than taken from the
+   * quote so a scope paragraph can be drafted before a single rate is typed.
+   */
+  const scope = useMemo(
+    () => buildTakeoff(room, new Date().toLocaleString(), { company: company.name }),
+    [room, company.name]
+  );
   const [client, setClient] = useState<Party>(proposal?.client ?? NOBODY);
   const [validUntil, setValidUntil] = useState(proposal?.validUntil ?? '');
   const [optionName, setOptionName] = useState('As measured');
@@ -265,8 +282,54 @@ export function Agree({
         <div className="mt-3 space-y-3">
           <Field label="What to call this option" value={optionName} onChange={setOptionName}
             placeholder="As measured" />
-          <Field label="One line on what it covers" value={optionNote} onChange={setOptionNote}
-            placeholder="Everything measured in this room, finished." />
+          <div>
+            <Field
+              label="One line on what it covers"
+              value={optionNote}
+              // Typing in it makes it theirs, and the draft note goes.
+              onChange={(v) => { setOptionNote(v); setDrafted(false); }}
+              placeholder="Everything measured in this room, finished."
+            />
+            <DraftedNote showing={drafted && optionNote !== ''} />
+            <div className="mt-2">
+              {/* The hardest box on this screen to write and the most-read line
+                  on the document. What goes across is the room's name and the
+                  priced lines with their quantities -- figures this app already
+                  worked out. The model puts them in a sentence and is told, in
+                  as many words, never to touch a number. */}
+              <DraftButton
+                job="scope"
+                label="Draft this line"
+                notes={() =>
+                  [
+                    `Room: ${roomName}.`,
+                    `Option: ${optionName || 'As measured'}.`,
+                    'The work, and how much of each:',
+                    // The TAKEOFF, not the priced lines. Two reasons, and the
+                    // second is the one that matters: a scope paragraph
+                    // describes work rather than money, and the takeoff exists
+                    // whether or not anybody has typed a rate yet. Drafting off
+                    // the priced lines meant that a contractor with an empty
+                    // rate book handed the model a heading and no work at all —
+                    // and a paragraph written from nothing is exactly the thing
+                    // this whole feature is not allowed to produce.
+                    // The unit is on every line, never left to be inferred.
+                    // `TakeoffLine` keeps the number and the unit apart, and a
+                    // fact sheet that said "Floor: 420.0" would be handing a
+                    // model a bare number to guess the meaning of — which is
+                    // the exact failure this file's whole rule exists to stop.
+                    ...scope.lines.map(
+                      (line) => `- ${line.what}: ${line.quantity} ${line.unit}`
+                    ),
+                  ].join('\n')
+                }
+                onWritten={(text) => {
+                  setOptionNote(text);
+                  setDrafted(true);
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         {current.unpriced.length > 0 ? (

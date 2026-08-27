@@ -179,6 +179,12 @@ struct CorrectView: UIViewRepresentable {
         // could name a folder would be a screen that could name any folder on
         // the phone. This one runs whatever HTML it is given.
         configuration.userContentController.add(context.coordinator, name: "mark")
+        // A fact sheet, and which of four jobs to do with it. The answer goes
+        // back through `window.trueline.drafted`. See `Draftsman` for why the
+        // instruction is written in Swift rather than sent from the page: a web
+        // view runs whatever HTML it is given, and a channel that carried its
+        // own instruction would be a channel that carried any instruction.
+        configuration.userContentController.add(context.coordinator, name: "draft")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -257,6 +263,32 @@ struct CorrectView: UIViewRepresentable {
 
             case "mark":
                 parent.onMarkAgain()
+
+            case "draft":
+                guard
+                    let id = body["id"] as? String,
+                    let job = (body["job"] as? String).flatMap(Draftsman.Job.init(rawValue:)),
+                    let notes = body["notes"] as? String,
+                    let webView = message.webView
+                else { return }
+                Task { @MainActor [weak self] in
+                    // Built here rather than held as a property: `Draftsman` is
+                    // @MainActor and this coordinator is not, so a stored one
+                    // could not be constructed. It carries no state between
+                    // asks -- each draft is its own session, so one job cannot
+                    // see another job's notes.
+                    let written = await Draftsman().draft(job, from: notes)
+                    guard let self else { return }
+                    // Back through the same hook everything else arrives on.
+                    // `null` is an ordinary answer -- the model was busy, or
+                    // refused -- and the far side turns it into "no draft this
+                    // time" rather than into an error.
+                    let quotedText = written.map { self.quoted($0) } ?? "null"
+                    webView.evaluateJavaScript(
+                        "window.trueline && window.trueline.drafted"
+                        + "(\(self.quoted(id)), \(quotedText))"
+                    )
+                }
 
             case "calendar":
                 // Handed over as JSON rather than as a dictionary, so the shape
@@ -416,6 +448,17 @@ struct CorrectView: UIViewRepresentable {
                 payload["company"] = quoted(company)
             }
             payload["subscribed"] = parent.subscribed ? "true" : "false"
+            // Whether this phone can write a sentence for somebody. Handed
+            // across rather than asked for, like the subscription and for the
+            // same reason: `SystemLanguageModel` is on this side and a web view
+            // cannot reach it.
+            //
+            // It decides whether a screen offers a draft AT ALL. On a phone
+            // that cannot run the model there is no button, no greyed control
+            // and no explanation -- see `Draftsman`. Somebody who cannot have
+            // it never learns it exists, which is the only version that does
+            // not read as a missing feature.
+            payload["draftable"] = Draftsman.isAvailable ? "true" : "false"
             if let reports = String(data: parent.reportsJSON, encoding: .utf8), !reports.isEmpty {
                 payload["reports"] = quoted(reports)
             }
