@@ -100,6 +100,46 @@ if (there === 1) {
     /sill plate is soft under the window/.test(body), body.slice(-700));
 }
 
+/* ==========================================================================
+   The mark, once made, has to lead somewhere — and say so.
+   ========================================================================== */
+
+// Sam: "I CAN ADD A MARK BUT CANNOT ATTACH A PHOTOGRAPH TO IT." He could. The
+// photograph control lives inside the mark's own row, and the closed row said
+// nothing about it: one word, "Open", in 12px grey beside an em-dash, and no
+// `aria-expanded` for anybody listening rather than looking. A control nobody
+// can find is a control that does not exist — and on a damage mark the
+// photograph is the single thing that cannot be taken again once the wall is
+// boarded.
+const row = page.getByRole('button', { name: /sill plate is soft under the window/ }).first();
+check('the mark it made is listed', (await row.count()) === 1);
+
+if (await row.count()) {
+  const shut = await row.getAttribute('aria-expanded');
+  check('the row says out loud that it opens, for anybody not looking at it',
+    shut === 'false', `aria-expanded=${shut}`);
+  check('and it says what is missing without being opened at all',
+    /No photograph yet/.test(await row.innerText()), await row.innerText());
+  check('there is no way to photograph it while the row is shut',
+    (await page.getByRole('button', { name: /Photograph it|^Another$/ }).count()) === 0);
+
+  await row.click();
+  await page.waitForTimeout(500);
+  check('opening it reaches the camera',
+    (await page.getByRole('button', { name: /Photograph it|^Another$/ }).count()) === 1);
+  check('and the row now says it is open',
+    (await row.getAttribute('aria-expanded')) === 'true');
+  // Sam: "WHEN YOU DROPDOWN ANY MENU, HAVE A WAY TO COLLAPSE THEM BACK."
+  check('and offers the way back, in that word',
+    /Close/.test(await row.innerText()), await row.innerText());
+
+  await row.click();
+  await page.waitForTimeout(400);
+  check('which shuts it again',
+    (await row.getAttribute('aria-expanded')) === 'false'
+    && (await page.getByRole('button', { name: /Photograph it|^Another$/ }).count()) === 0);
+}
+
 check('no console or page errors across the whole run', problems.length === 0, problems.join(' | '));
 
 const bad = report('A31 — the mark button, on a real scan');

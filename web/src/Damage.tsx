@@ -278,12 +278,37 @@ export function DamageOnWall({
                 <button
                   type="button"
                   onClick={() => setOpen(showing ? null : damage.id)}
-                  className="flex min-h-11 w-full items-baseline justify-between gap-3 text-left"
+                  // A disclosure has to say that it is one, and to what it is
+                  // open. This row did neither: the only sign was the word
+                  // "Open" in 12px grey beside an em-dash, and no
+                  // `aria-expanded` at all — so a screen reader announced a
+                  // button that gave no hint anything was behind it.
+                  //
+                  // Sam: "I CAN ADD A MARK BUT CANNOT ATTACH A PHOTOGRAPH TO
+                  // IT." He could. "Photograph it" is inside this row, and
+                  // nothing on the closed row said so. A control nobody can
+                  // find is a control that does not exist, and the photograph
+                  // is the one thing on a damage mark that cannot be taken
+                  // again once the wall is boarded.
+                  aria-expanded={showing}
+                  className="flex min-h-12 w-full items-center justify-between gap-3 text-left"
                 >
                   <span className="text-slate-800">
                     {damage.kind}
                     {damage.category ? ` — ${WATER_CATEGORY[damage.category].plain}` : ''}
                     <span className="block text-xs text-slate-500">{damage.note}</span>
+                    {/* On the closed row, because it is what a person needs to
+                        know without opening anything: a mark with no
+                        photograph on it is the one that loses an argument. */}
+                    <span
+                      className={`mt-0.5 block text-xs ${
+                        damage.photos.length === 0 ? 'font-medium text-amber-800' : 'text-slate-500'
+                      }`}
+                    >
+                      {damage.photos.length === 0
+                        ? 'No photograph yet — open it to take one'
+                        : `${damage.photos.length} photograph${damage.photos.length === 1 ? '' : 's'}`}
+                    </span>
                   </span>
                   <span className="shrink-0 text-right font-mono tabular-nums text-slate-900">
                     {/* An area is what a claim is arguing about. On an ordinary
@@ -300,8 +325,19 @@ export function DamageOnWall({
                     {onClaim && isLoss(damage.kind) && q.faceArea > 0n
                       ? area(2n * q.faceArea)
                       : '—'}
-                    <span className="ml-2 text-xs text-slate-500 underline underline-offset-4">
-                      {showing ? 'Done' : 'Open'}
+                    {/* "Close", not "Done" — Sam asked for a way to collapse
+                        every menu back, and "Done" beside a damage mark reads
+                        like finishing the mark rather than shutting a drawer. */}
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-md border
+                                     border-slate-300 px-2 py-1 text-xs font-medium text-slate-700">
+                      {showing ? 'Close' : 'Open'}
+                      <svg
+                        viewBox="0 0 16 16" aria-hidden="true"
+                        className={`h-3 w-3 transition-transform ${showing ? 'rotate-180' : ''}`}
+                      >
+                        <path d="M3 6l5 5 5-5" fill="none" stroke="currentColor"
+                              strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     </span>
                   </span>
                 </button>
