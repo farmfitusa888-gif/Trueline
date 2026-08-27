@@ -100,13 +100,14 @@ function shell({ title, description, path, body, jsonLd, ogType = 'website', hea
 <meta name="twitter:title" content="${esc(title)}">
 <meta name="twitter:description" content="${esc(description)}">
 <meta name="twitter:image" content="${url('/img/plan.png')}">
-<meta name="theme-color" content="#F7F3EA" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#10171E" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#E7E9EA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14181B" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="dark light">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
 ${head}${structured}
 </head>
@@ -114,18 +115,19 @@ ${head}${structured}
 <header class="bar">
   <div class="wrap">
     <a class="mark" href="/">
-      <svg viewBox="0 0 32 32" aria-hidden="true">
-        <rect width="32" height="32" rx="6" fill="currentColor"/>
-        <path d="M7 23h18M7 23V9" stroke="var(--paper)" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M11 23v-4M16 23v-8M21 23v-6" stroke="var(--amber)" stroke-width="1.6" stroke-linecap="round"/>
+      <svg viewBox="0 0 32 32" aria-hidden="true" fill="none">
+        <path d="M3 24h26" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/>
+        <path d="M7 24v-5M12 24v-8M17 24v-5M27 24v-5" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M22 24V11" stroke="var(--yellow)" stroke-width="2.6"/>
       </svg>
-      <span>True<span style="color:var(--amber)">line</span></span>
+      <span>True<span class="b">line</span></span>
     </a>
     <nav aria-label="Sections">
         ${nav}
     </nav>
   </div>
 </header>
+<div class="scale" data-scale aria-hidden="true" hidden><svg xmlns="http://www.w3.org/2000/svg"></svg></div>
 <main id="main">
 ${body}
 </main>
@@ -160,7 +162,7 @@ ${body}
     </p>
   </div>
 </footer>
-<script type="module" src="/room3d.js"></script>
+<script type="module" src="/site.js"></script>
 </body>
 </html>
 `;
@@ -829,7 +831,7 @@ for (const page of pages) write(page);
 
 /* Assets. */
 cpSync(join(HERE, 'src/style.css'), join(DIST, 'style.css'));
-cpSync(join(HERE, 'src/room3d.js'), join(DIST, 'room3d.js'));
+cpSync(join(HERE, 'src/site.js'), join(DIST, 'site.js'));
 // The films, if they have been shot. `node site/tools/film.mjs` makes them,
 // and the page above degrades to a download link rather than a broken player
 // when they are absent — which is what a checkout with no films in it looks

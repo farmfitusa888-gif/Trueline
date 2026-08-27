@@ -434,36 +434,6 @@ export function Agree({
           )}
         </div>
 
-        {/* Sending it.
-            
-            The app could write a proposal, price it, take a signature on the
-            phone and freeze the agreed scope -- and there was no way to send it
-            to anybody. Files sends a CLIENT FILE: the drawing, the room, what
-            it takes. That is not a proposal. A proposal is what somebody says
-            yes to, and one that cannot leave the phone is one nobody signs.
-            
-            It goes out whether or not it has been signed, because an unsigned
-            proposal is exactly the thing you send in order to get it signed --
-            and the document says which it is, in its own words, at the top. */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={sending}
-            onClick={() => void sendProposal()}
-            className="min-h-11 rounded-md bg-slate-900 px-4 font-semibold text-white
-                       active:bg-slate-700 disabled:opacity-50"
-          >
-            {sending ? 'Making it…' : baseline ? 'Send the signed proposal' : 'Send this proposal'}
-          </button>
-          <p className="text-xs leading-relaxed text-slate-500">
-            One file: every option in full, what is not included, and — once it is signed — who
-            signed, when, on what, and the fingerprint that proves nothing moved since.
-            It opens on anything, with no app and no signal.
-          </p>
-        </div>
-        {sent && (
-          <p role="status" className="mt-2 text-sm text-slate-700">{sent}</p>
-        )}
 
         {/* The proposal in one sentence, the way the document opens.
             It says whether the numbers are measured in the same breath as the
@@ -547,6 +517,37 @@ export function Agree({
             <li key={term}>{term}</li>
           ))}
         </ul>
+
+        {/* Sending it, at the FOOT of the proposal.
+            
+            It was at the top, beside the heading, which is where a control goes
+            when nobody has thought about when it is used. Nobody sends a
+            proposal before reading it: you read the options, you read what is
+            not included, and then you send it. So it is here, under the last
+            line of the document, which is where somebody's thumb already is.
+            
+            It goes out whether or not it has been signed, because an unsigned
+            proposal is exactly the thing you send in order to get it signed --
+            and the document says which it is, at the top, in its own words. */}
+        <div className="mt-5 border-t border-slate-200 pt-4">
+          <button
+            type="button"
+            disabled={sending}
+            onClick={() => void sendProposal()}
+            className="min-h-11 w-full rounded-md bg-slate-900 px-4 font-semibold text-white
+                       active:bg-slate-700 disabled:opacity-50"
+          >
+            {sending ? 'Making it…' : baseline ? 'Send the signed proposal' : 'Send this proposal'}
+          </button>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
+            One file: every option in full, what is not included, and — once it is signed — who
+            signed, when, on what, and the fingerprint that proves nothing moved since. It opens
+            on anything, with no app and no signal.
+          </p>
+          {sent && (
+            <p role="status" className="mt-2 text-sm text-slate-700">{sent}</p>
+          )}
+        </div>
       </section>
 
       {/* ----------------------------------------------------- signing */}
