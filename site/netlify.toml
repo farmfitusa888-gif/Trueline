@@ -1,21 +1,44 @@
-# The website. Separate from the app's own deploy on purpose.
+# The website. A separate Netlify site from the app's own deploy.
 #
 # `../netlify.toml` at the top of the repo publishes `web/dist` — the correction
-# screens themselves, which are what the iPhone app loads and what somebody can
-# open a scan in from a browser. That is the product, not a page about it.
+# screens themselves, which are what the iPhone app loads. That is the product.
+# This is the site about it.
 #
-# This is the page about it. One static file, no build step, no JavaScript, no
-# fonts fetched from anywhere. Point a second Netlify site at this directory
-# with a base of `site` and it deploys in seconds.
+# In Netlify: add a new site from the same repository, set the base directory to
+# `site`, and everything below is picked up automatically.
 [build]
   base = "site"
-  command = "echo 'One file. Nothing to build.'"
-  publish = "."
+  command = "node build.mjs && node tools/check.mjs"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# The checker is part of the build on purpose. A deploy that would ship a dead
+# internal link, an unparseable piece of structured data or a guide nothing
+# links to fails here rather than going live and being found by a crawler.
 
 [[headers]]
   for = "/*"
   [headers.values]
-    # Nothing on this page loads from anywhere else, so nothing may.
-    Content-Security-Policy = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-    Referrer-Policy = "no-referrer"
+    # Google Fonts is the only outside host this site touches, and it is named
+    # rather than allowed by category. Everything else — scripts, images, styles
+    # — is our own origin.
+    Content-Security-Policy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+    Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+[[headers]]
+  for = "/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/downloads/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+# The forms come with the HTML — `data-netlify="true"` on the sign-up form is
+# all Netlify needs. Submissions land in the site's Forms tab; nothing is
+# emailed anywhere until somebody sets that up.

@@ -1,0 +1,345 @@
+/*
+ * Trueline — the drafting table.
+ *
+ * ## The direction, and why this one
+ *
+ * The product makes drawings. So the site is a drawing: drafting-paper cream
+ * and blueprint ink, hairline rules that behave like a grid, real dimension
+ * lines with arrowheads and a gap in the middle for the figure, and every
+ * number set in a mono face with tabular figures so columns line up the way
+ * they do on a sheet.
+ *
+ * It is deliberately not the near-black page with one acid accent that almost
+ * every developer-built product site in 2026 arrives at, and it is not the
+ * warm-cream-plus-serif look either. Both of those are a house style now. This
+ * borrows from the one place nobody else in this market is looking: the paper
+ * the trade already reads.
+ *
+ * ## Type
+ *
+ * - Archivo for headings — a grotesque with real width to it, set tight.
+ * - Newsreader for body — a serif, because these are documents.
+ * - IBM Plex Mono for every figure, dimension and label, tabular.
+ *
+ * ## Colour
+ *
+ * Two grounds and one accent. The accent is Trueline's own amber, the same one
+ * the app paints a scanned wall with — so a scanned length on the site and a
+ * scanned length in the app are the same colour, which is not a coincidence
+ * anybody will notice and is the kind of thing that makes a thing feel made.
+ */
+
+:root {
+  --paper:      #F7F3EA;
+  --paper-sunk: #EFE9DC;
+  --ink:        #16212B;
+  --ink-quiet:  #56606A;
+  --rule:       #D9CFBC;
+  --rule-faint: #E7E0D2;
+  --blue:       #1F4E79;   /* blueprint */
+  --amber:      #B8590A;   /* scanned, and the accent */
+  --green:      #1F6B3A;   /* measured */
+  --shadow: 0 1px 1px rgb(22 33 43 / .04), 0 10px 30px rgb(22 33 43 / .06);
+  --grid: rgb(31 78 121 / .055);
+
+  --f-display: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --f-body: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --measure: 68ch;
+  --gutter: clamp(1.15rem, 4vw, 2.5rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper:      #10171E;
+    --paper-sunk: #16202A;
+    --ink:        #EDE6D8;
+    --ink-quiet:  #9AA5B0;
+    --rule:       #2A3742;
+    --rule-faint: #1E2831;
+    --blue:       #7FB3E0;
+    --amber:      #E8873A;
+    --green:      #5FBF85;
+    --shadow: 0 1px 1px rgb(0 0 0 / .4), 0 10px 30px rgb(0 0 0 / .35);
+    --grid: rgb(127 179 224 / .06);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1.0625rem/1.65 var(--f-body);
+  font-synthesis-weight: none;
+  /* The drafting grid. Two hairlines, quarter-inch and inch, faint enough to
+     read as paper rather than as a pattern. */
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 6rem 6rem, 6rem 6rem;
+}
+
+/* ------------------------------------------------------------------ layout */
+
+.wrap { max-width: 72rem; margin-inline: auto; padding-inline: var(--gutter); }
+.narrow { max-width: 44rem; margin-inline: auto; }
+.stack > * + * { margin-top: 1.15rem; }
+
+/* ------------------------------------------------------------------- type */
+
+h1, h2, h3, h4 {
+  font-family: var(--f-display);
+  font-weight: 700;
+  letter-spacing: -.022em;
+  line-height: 1.08;
+  text-wrap: balance;
+  margin: 0;
+}
+h1 { font-size: clamp(2.15rem, 5.2vw, 3.6rem); font-weight: 800; }
+h2 { font-size: clamp(1.5rem, 3vw, 2.05rem); margin-top: 2.75rem; }
+h3 { font-size: 1.1rem; letter-spacing: -.01em; }
+p { margin: 0 0 1.05rem; max-width: var(--measure); }
+a { color: var(--blue); text-underline-offset: .18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--amber); }
+a:focus-visible, button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 2px;
+}
+strong { font-weight: 600; }
+code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: .92em; }
+
+/* The eyebrow. Set like a drawing's field label: mono, small, letterspaced,
+   with a rule running off it the way a title block does. */
+.eyebrow {
+  font-family: var(--f-mono); font-size: .68rem; font-weight: 500;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-quiet);
+  display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem;
+}
+.eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
+
+.lede { font-size: clamp(1.1rem, 2.1vw, 1.3rem); color: var(--ink-quiet); max-width: 46ch; }
+
+/* -------------------------------------------------------------- title bar */
+
+.bar {
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule);
+}
+.bar .wrap { display: flex; align-items: center; gap: 1.5rem; min-height: 3.75rem; }
+.mark {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font-family: var(--f-display); font-weight: 800; letter-spacing: -.03em;
+  font-size: 1.1rem; color: var(--ink); text-decoration: none;
+}
+.mark svg { width: 1.35rem; height: 1.35rem; }
+.bar nav { margin-left: auto; display: flex; gap: 1.35rem; align-items: center; }
+.bar nav a {
+  font-family: var(--f-mono); font-size: .78rem; letter-spacing: .04em;
+  color: var(--ink-quiet); text-decoration: none;
+}
+.bar nav a:hover, .bar nav a[aria-current] { color: var(--ink); }
+.bar nav a[aria-current] { text-decoration: underline; text-decoration-color: var(--amber); text-underline-offset: .4em; }
+@media (max-width: 46rem) { .bar nav a.hide-sm { display: none; } }
+
+/* ----------------------------------------------------------------- the hero */
+
+.hero { padding: clamp(2.5rem, 7vw, 5rem) 0 1rem; }
+.hero-grid { display: grid; gap: clamp(1.5rem, 4vw, 3rem); align-items: center; }
+@media (min-width: 60rem) { .hero-grid { grid-template-columns: 1fr 1.05fr; } }
+
+/* The WebGL room, with its dimension lines drawn over it in SVG so the figures
+   stay crisp and look like a drawing rather than like a 3D label. */
+.stage {
+  position: relative; aspect-ratio: 4 / 3; width: 100%;
+  border: 1px solid var(--rule); border-radius: .35rem;
+  background: var(--paper-sunk); box-shadow: var(--shadow);
+  overflow: hidden; touch-action: none; cursor: grab;
+}
+.stage:active { cursor: grabbing; }
+.stage canvas, .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage svg { pointer-events: none; }
+.stage .hint {
+  /* Along the top rather than the bottom. The dimension figures are projected
+     onto the floor plane, which puts them low in the frame at most angles —
+     and a label chip sitting there collided with the "20'" on the east wall. */
+  position: absolute; left: .7rem; top: .6rem; z-index: 2;
+  font-family: var(--f-mono); font-size: .66rem; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-quiet);
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  padding: .2rem .45rem; border-radius: .2rem;
+}
+/* A title block, bottom right, like a real sheet. */
+.stage .block {
+  position: absolute; right: .7rem; top: .6rem; z-index: 2; text-align: right;
+  font-family: var(--f-mono); font-size: .66rem; line-height: 1.5; color: var(--ink-quiet);
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  padding: .3rem .5rem; border-radius: .2rem; border: 1px solid var(--rule-faint);
+}
+.stage .block b { color: var(--amber); font-weight: 600; letter-spacing: .1em; }
+
+/* ------------------------------------------------------------------ pieces */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  font-family: var(--f-display); font-weight: 600; font-size: .95rem;
+  min-height: 2.9rem; padding-inline: 1.35rem; border-radius: .3rem;
+  border: 1px solid transparent; text-decoration: none; cursor: pointer;
+  transition: transform .12s ease, background-color .12s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn-solid { background: var(--ink); color: var(--paper); }
+.btn-solid:hover { background: var(--amber); color: #fff; }
+.btn-line { border-color: var(--rule); color: var(--ink); background: transparent; }
+.btn-line:hover { border-color: var(--amber); color: var(--amber); }
+
+.tag {
+  display: inline-block; font-family: var(--f-mono); font-size: .64rem; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; padding: .18rem .42rem; border-radius: .18rem;
+  vertical-align: .12em;
+}
+.tag-scanned  { background: color-mix(in srgb, var(--amber) 15%, transparent); color: var(--amber); }
+.tag-measured { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
+.tag-blue     { background: color-mix(in srgb, var(--blue) 13%, transparent);  color: var(--blue); }
+
+.card {
+  border: 1px solid var(--rule); border-radius: .35rem; padding: 1.2rem;
+  background: var(--paper); box-shadow: var(--shadow);
+}
+.cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.card h3 { margin-bottom: .3rem; }
+.card p { font-size: .95rem; color: var(--ink-quiet); margin: 0; }
+
+/* A figure: a real screenshot, mounted like a plate on a sheet. */
+figure { margin: 2rem 0; }
+figure img {
+  display: block; width: 100%; height: auto; border: 1px solid var(--rule);
+  border-radius: .3rem; background: var(--paper-sunk); box-shadow: var(--shadow);
+}
+figcaption {
+  font-family: var(--f-mono); font-size: .74rem; line-height: 1.55; color: var(--ink-quiet);
+  margin-top: .6rem; padding-left: 1.6rem; position: relative; max-width: var(--measure);
+}
+figcaption::before {
+  content: ''; position: absolute; left: 0; top: .55em; width: 1.05rem; height: 1px; background: var(--amber);
+}
+
+table { border-collapse: collapse; width: 100%; min-width: 32rem; font-size: .95rem; }
+.scroll { overflow-x: auto; margin: 1.4rem 0; }
+th, td { text-align: left; padding: .62rem .55rem; border-bottom: 1px solid var(--rule-faint); vertical-align: top; }
+th {
+  font-family: var(--f-mono); font-size: .68rem; font-weight: 500; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-quiet); border-bottom-color: var(--rule);
+}
+td:first-child { font-weight: 500; }
+
+/* The formula block, set like a calculation on a drawing. */
+.formula {
+  border-left: 2px solid var(--amber); padding: .8rem 0 .8rem 1.1rem; margin: 1.6rem 0;
+}
+.formula .eq { font-family: var(--f-mono); font-size: 1.02rem; color: var(--ink); }
+.formula .why { font-family: var(--f-mono); font-size: .8rem; color: var(--ink-quiet); margin-top: .4rem; }
+
+.note {
+  background: var(--paper-sunk); border: 1px solid var(--rule-faint);
+  border-radius: .3rem; padding: .95rem 1.1rem; margin: 1.6rem 0;
+  font-size: .97rem; color: var(--ink-quiet); max-width: var(--measure);
+}
+.note p:last-child { margin-bottom: 0; }
+
+ol.steps { counter-reset: s; list-style: none; margin: 1.5rem 0; padding: 0; }
+ol.steps > li {
+  counter-increment: s; display: grid; grid-template-columns: 2.1rem 1fr; gap: .9rem;
+  padding-bottom: 1.25rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--rule-faint);
+}
+ol.steps > li:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+ol.steps > li::before {
+  content: counter(s, decimal-leading-zero);
+  font-family: var(--f-mono); font-size: .72rem; font-weight: 500; color: var(--amber);
+  letter-spacing: .04em; padding-top: .35em;
+}
+ol.steps h3 { margin-bottom: .25rem; }
+ol.steps p { margin: 0; color: var(--ink-quiet); font-size: .97rem; }
+
+ul.plain { padding-left: 1.15rem; max-width: var(--measure); }
+ul.plain li { margin-bottom: .55rem; }
+ul.plain li::marker { color: var(--amber); }
+
+hr.rule { border: 0; border-top: 1px solid var(--rule); margin: clamp(2.5rem, 6vw, 4rem) 0; }
+
+/* ------------------------------------------------------------ guide layout */
+
+.guide-head { padding: clamp(2rem, 5vw, 3.5rem) 0 0; }
+.meta {
+  font-family: var(--f-mono); font-size: .72rem; letter-spacing: .05em; color: var(--ink-quiet);
+  display: flex; flex-wrap: wrap; gap: .5rem 1.1rem; margin-top: 1.5rem;
+  padding-top: 1rem; border-top: 1px solid var(--rule);
+}
+.byline { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: baseline; }
+
+.toc {
+  border: 1px solid var(--rule); border-radius: .35rem; padding: 1rem 1.2rem;
+  background: var(--paper-sunk); margin: 2rem 0;
+}
+.toc p { font-family: var(--f-mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+         color: var(--ink-quiet); margin: 0 0 .5rem; }
+.toc ol { margin: 0; padding-left: 1.15rem; font-size: .95rem; }
+.toc li { margin-bottom: .3rem; }
+.toc li::marker { font-family: var(--f-mono); font-size: .8rem; color: var(--ink-quiet); }
+
+.faq dt { font-family: var(--f-display); font-weight: 600; font-size: 1.05rem; margin-top: 1.6rem; }
+.faq dd { margin: .4rem 0 0; color: var(--ink-quiet); max-width: var(--measure); }
+
+.next { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.next a {
+  display: block; border: 1px solid var(--rule); border-radius: .35rem; padding: 1rem;
+  text-decoration: none; color: var(--ink); background: var(--paper);
+}
+.next a:hover { border-color: var(--amber); }
+.next .k { font-family: var(--f-mono); font-size: .64rem; letter-spacing: .12em;
+           text-transform: uppercase; color: var(--ink-quiet); display: block; margin-bottom: .35rem; }
+.next .t { font-family: var(--f-display); font-weight: 600; font-size: 1rem; line-height: 1.25; }
+
+/* ------------------------------------------------------------------ signup */
+
+.signup {
+  border: 1px solid var(--rule); border-radius: .35rem; padding: clamp(1.2rem, 3vw, 2rem);
+  background: var(--paper-sunk); margin: 2rem 0;
+}
+.signup form { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.signup input[type=email], .signup input[type=text] {
+  flex: 1 1 13rem; min-height: 2.9rem; padding: .5rem .8rem; border-radius: .3rem;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+  font: inherit; font-size: .98rem;
+}
+.signup input::placeholder { color: var(--ink-quiet); opacity: .75; }
+.signup .fine { font-family: var(--f-mono); font-size: .72rem; color: var(--ink-quiet); margin: .7rem 0 0; }
+
+/* ------------------------------------------------------------------ footer */
+
+footer { border-top: 1px solid var(--rule); margin-top: clamp(3rem, 8vw, 6rem); padding: 2.5rem 0 4rem; }
+footer .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+footer h4 { font-family: var(--f-mono); font-size: .68rem; letter-spacing: .12em;
+            text-transform: uppercase; color: var(--ink-quiet); font-weight: 500; margin-bottom: .7rem; }
+footer ul { list-style: none; margin: 0; padding: 0; font-size: .92rem; }
+footer li { margin-bottom: .4rem; }
+footer a { color: var(--ink-quiet); text-decoration: none; }
+footer a:hover { color: var(--amber); }
+footer .fine { font-family: var(--f-mono); font-size: .72rem; color: var(--ink-quiet); margin-top: 2rem; }
+
+/* ------------------------------------------------------------- animation */
+
+/* Everything that moves does one thing: arrives. No parallax, no counters, no
+   scroll-jacking. The 3D room is the motion on this site and anything else
+   competing with it is noise. */
+.rise { opacity: 0; transform: translateY(14px); transition: opacity .55s ease, transform .55s ease; }
+.rise.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .rise { opacity: 1; transform: none; } }
