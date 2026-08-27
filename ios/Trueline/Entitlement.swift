@@ -35,7 +35,7 @@ enum Entitlement {
     static let paid: [Feature] = [.takeoff, .pricing, .proposal, .signature, .changeOrders, .insurance, .exports, .priceList, .unlimitedRooms]
 
     /// How many rooms are kept without a subscription.
-    static let freeRooms = 2
+    static let freeRooms = 1
 
     static func isFree(_ feature: Feature) -> Bool { free.contains(feature) }
 
@@ -80,7 +80,7 @@ enum Entitlement {
         case .insurance: return "Mark the damage on the wall, log the moisture readings, attach the photographs, and send the adjuster one document."
         case .exports: return "The drawing, the client file, CAD, the field sheet, the claim PDF and the whole job in one archive."
         case .priceList: return "Import a supplier's price list and price against what you actually pay."
-        case .unlimitedRooms: return "More than 2 rooms kept at once."
+        case .unlimitedRooms: return "More than one room kept at once. Every room already on the phone stays there and stays readable — this is about writing down a new one, never about taking away work somebody has already done."
         }
     }
 }

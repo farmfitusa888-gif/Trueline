@@ -164,3 +164,90 @@ export function asDataUrl(blob: Blob): Promise<string> {
     reader.readAsDataURL(blob);
   });
 }
+
+/**
+ * Which of these photographs this device is actually holding the bytes for.
+ *
+ * Asked before a delete, and only there. A name on a mark is not proof of a
+ * picture: a claim opened on a second phone names every photograph and holds
+ * none of them, because the bytes are in the scan's folder on the phone that
+ * took them. Deleting the name in that state loses the only thing that pointed
+ * at the file, and the person deleting it should be told which case they are in
+ * before it happens rather than after.
+ *
+ * A store that will not open answers "none", which is the safe way round: the
+ * screen then says nothing about copies it cannot see instead of promising one.
+ */
+export async function heldPhotos(names: readonly string[]): Promise<ReadonlySet<string>> {
+  const keys = await run<IDBValidKey[]>('readonly', (store) => store.getAllKeys());
+  if (keys === null) return new Set();
+  const here = new Set(keys.map((key) => String(key)));
+  return new Set(names.filter((name) => here.has(name)));
+}
+
+/* ------------------------------------ what is on the claim document, right now */
+
+/**
+ * The photographs a claim document is showing at this moment.
+ *
+ * ## Why a register and not a flag
+ *
+ * The mark and the claim document are two different screens that carry the same
+ * photographs, and the screen a person deletes from is not the screen the
+ * photograph is evidence on. Before a batch delete goes ahead, the confirmation
+ * has to be able to say "3 of these are on the claim" — and the honest source
+ * for that is the component that actually prints them, not a boolean passed
+ * down a tree that could drift from what the document really has on it.
+ *
+ * So `ReportPhotos` — the claim document's own photograph list — says what it is
+ * showing, for as long as it is showing it, and anything about to delete one can
+ * ask.
+ *
+ * ## What it can and cannot get wrong
+ *
+ * It can only ever **understate**. A claim report nobody has opened has
+ * registered nothing, so the count comes back lower than the truth and the
+ * confirmation falls back to the sentence that is true either way — that a
+ * document already sent keeps what went with it. It cannot overstate: a name is
+ * in here only because a live claim document has it on the page. Understating a
+ * use makes the warning quieter; inventing one would make every warning worth
+ * less, which is worse.
+ */
+const shownOnClaim = new Map<string, number>();
+const watchers = new Set<() => void>();
+let claimNames: ReadonlySet<string> = new Set();
+
+function republish(): void {
+  claimNames = new Set(shownOnClaim.keys());
+  for (const watcher of watchers) watcher();
+}
+
+/** Says these are on the claim document. The returned function takes it back. */
+export function showingOnClaim(names: readonly string[]): () => void {
+  for (const name of names) shownOnClaim.set(name, (shownOnClaim.get(name) ?? 0) + 1);
+  republish();
+  return () => {
+    for (const name of names) {
+      const left = (shownOnClaim.get(name) ?? 0) - 1;
+      if (left > 0) shownOnClaim.set(name, left);
+      else shownOnClaim.delete(name);
+    }
+    republish();
+  };
+}
+
+/**
+ * The current set, as one object that only changes when the set does — so it
+ * can be read straight by `useSyncExternalStore` without re-rendering forever.
+ */
+export function photosOnClaim(): ReadonlySet<string> {
+  return claimNames;
+}
+
+/** Tells you when that set changes. */
+export function watchClaimPhotos(tell: () => void): () => void {
+  watchers.add(tell);
+  return () => {
+    watchers.delete(tell);
+  };
+}

@@ -20,6 +20,18 @@ struct PaywallView: View {
     let asking: Entitlement.Feature?
     let onClose: () -> Void
 
+    /// Whether Apple's redemption sheet is up.
+    ///
+    /// The sheet is Apple's own and this app never sees the code: it is typed
+    /// into StoreKit, checked by the App Store, and comes back as an ordinary
+    /// transaction that `Transaction.updates` picks up like any other. That is
+    /// the whole reason to use it rather than a code list of our own -- a code
+    /// this app checked would be a code anybody could read out of the binary.
+    @State private var redeeming = false
+
+    /// What happened to the last free run somebody tried to start, or nothing.
+    @State private var runSaid: String?
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -36,6 +48,31 @@ struct PaywallView: View {
                     } else {
                         Text("Everything the measurements are for")
                             .font(.title2.weight(.bold))
+                    }
+
+                    // While Trueline is not on sale, this whole screen is a
+                    // description of what is coming rather than a gate, and it
+                    // has to say so. A mode nobody can see on the screen is a
+                    // mode that ships still switched on -- see
+                    // `Subscription.onSale`, which is the one line that decides
+                    // this.
+                    if Subscription.freeUntilLaunch {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Everything is on, free, right now")
+                                .font(.subheadline.weight(.semibold))
+                            Text(
+                                "Trueline is not on the App Store yet, so there is nothing to "
+                                + "buy and nothing is being withheld. Every part of it below is "
+                                + "working on this phone today. When it does go on sale, "
+                                + "measuring, the drawing, the 3D view and your first room stay "
+                                + "free — the rest is what this page is about."
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                     }
 
                     Divider()
@@ -97,8 +134,33 @@ struct PaywallView: View {
                         .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
                     }
 
-                    if subscription.products.isEmpty {
+                    // Three states, and the middle one is the one that gets an
+                    // app rejected. `Product.products` returns an EMPTY LIST and
+                    // no error at all while the in-app purchases are still
+                    // waiting to be approved in App Store Connect, so a screen
+                    // that draws a spinner whenever the list is empty draws it
+                    // forever, in front of an App Review tester looking for the
+                    // subscription. Silence and emptiness are different answers
+                    // and this says which one it got.
+                    if !subscription.productsKnown {
                         ProgressView().frame(maxWidth: .infinity)
+                    } else if subscription.products.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("The plans are not showing")
+                                .font(.subheadline.weight(.semibold))
+                            Text(
+                                "The App Store has not given this app anything to sell. That is "
+                                + "either no signal, or the subscription is still being approved. "
+                                + "Nothing is wrong with what you have measured, and everything "
+                                + "you have already paid for still works — try this screen again "
+                                + "in a little while."
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
                     } else {
                         VStack(spacing: 10) {
                             ForEach(subscription.products, id: \.id) { product in
@@ -132,6 +194,49 @@ struct PaywallView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
+                    // A set time on the house. Two ways in, and the order is
+                    // deliberate: the code first, because a code is somebody
+                    // being handed something by name and Apple stops it being
+                    // used twice; the run on the phone second, because it works
+                    // with no App Store at all, which is where this app is
+                    // until the products are approved.
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let said = subscription.freeRunSaid {
+                            Text(said)
+                                .font(.footnote.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else if !subscription.subscribed && !subscription.freeRunTaken {
+                            Button("Try everything free for \(Subscription.freeRunOffered) days") {
+                                Task {
+                                    let started = await subscription.giveFreeRun(
+                                        days: Subscription.freeRunOffered,
+                                        why: "the free run from this screen"
+                                    )
+                                    runSaid = started
+                                        ? nil
+                                        : "This phone has already had its free run."
+                                }
+                            }
+                            .font(.footnote.weight(.semibold))
+                        } else if subscription.freeRunTaken && !subscription.subscribed {
+                            Text("The free run on this phone has finished.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Button("Redeem a code") { redeeming = true }
+                            .font(.footnote)
+                            .disabled(subscription.working)
+
+                        if let runSaid {
+                            Text(runSaid)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
                     Button("Already paid? Put it back") {
                         Task { await subscription.restore() }
                     }
@@ -163,5 +268,14 @@ struct PaywallView: View {
             }
         }
         .task { await subscription.load() }
+        // Apple's own sheet. The code goes to the App Store and comes back as
+        // an ordinary transaction, which `Transaction.updates` in `Subscription`
+        // already listens for -- so nothing here has to unlock anything, and
+        // there is no code list in this app for anybody to read out of it.
+        .offerCodeRedemption(isPresented: $redeeming) { outcome in
+            if case .failure(let error) = outcome {
+                runSaid = "That code could not be used: \(error.localizedDescription)"
+            }
+        }
     }
 }

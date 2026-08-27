@@ -27,6 +27,25 @@
  * It is also the line the App Store cares about. Guideline 4.2 rejects an app
  * that is a login wall with no standalone value; an app that measures a room
  * properly and for free is not that, whatever it charges for afterwards.
+ *
+ * ## Free until launch — and where that switch is NOT
+ *
+ * Everything is on for everybody until Trueline goes on sale on the App Store.
+ * That switch is deliberately **not** in this file. It is one `let` in
+ * `ios/Trueline/Subscription.swift` — `Subscription.onSale` — because that is
+ * the one place in this app where the question "is this person entitled?" is
+ * decided, and the giveaway is an answer to that question rather than a
+ * different question. Everything downstream, these screens included, gets the
+ * answer handed to it across the bridge and needs to know nothing about why.
+ *
+ * Putting the switch here as well would have put it in two languages, which is
+ * the exact failure the rest of this file exists to prevent, and it would have
+ * broken the web half's own gate: `web/audit/a10-gate.mjs` proves the takeoff
+ * is shut when the app says nobody has paid, and it has to keep proving that
+ * on the day the giveaway ends.
+ *
+ * `core/tools/check-paywall.py --release` refuses to let a build go on sale
+ * with the giveaway still on.
  */
 
 export type Feature =
@@ -59,14 +78,94 @@ export const FREE: readonly Feature[] = [
 ];
 
 /**
- * How many rooms are kept without a subscription.
+ * How many rooms are kept at once without a subscription.
  *
- * Two rather than one, deliberately. One is a demonstration; two is enough to
- * measure a kitchen and the hall beside it and see that the app is real. It is
- * also the number at which somebody pricing a whole house discovers they need
- * the subscription, which is the honest moment to ask.
+ * One, and Sam decided it in those words: *"CHANGE IT TO 1 FREE ROOM
+ * EVERYWHERE AND BUILD IT!"*
+ *
+ * One room is the whole product on one room. Scan it, walk it, correct it,
+ * look at it in 3D, read its dimensions — and, with a subscription, take it
+ * off, price it, propose it and get it signed. Nothing about the app is hidden
+ * from somebody holding one room, which is also the answer to an App Store
+ * reviewer asking what the free app is for.
+ *
+ * ## What this number does NOT mean
+ *
+ * It is not a cap on how many rooms a phone may hold, and it must never become
+ * one. See `mayKeepRoom` below: this limits KEEPING A NEW ROOM, and nothing
+ * else, ever. Somebody who scanned five rooms while everything was free keeps
+ * all five, opens all five and exports all five for as long as the app is on
+ * the phone. A limit that reached backwards and took work away would be theft
+ * of somebody's afternoon, and this project has already lost a contractor 53
+ * photographs once.
  */
-export const FREE_ROOMS = 2;
+export const FREE_ROOMS = 1;
+
+/**
+ * A small count in the words a person says, because "1 room" reads as a form.
+ *
+ * Only the handful of numbers this is ever asked for. Anything larger falls
+ * back to the digits, which is right — nobody says "twenty-three rooms" in a
+ * sentence about a limit they are about to hit.
+ */
+const COUNTED = ['no', 'one', 'two', 'three', 'four', 'five', 'six'] as const;
+
+function inWords(count: number): string {
+  return COUNTED[count] ?? String(count);
+}
+
+/**
+ * Whether one more room may be written down on this device, and why not.
+ *
+ * ## The only thing this is allowed to stop
+ *
+ * Keeping a room that is not already kept. That is the entire gate. Reading,
+ * opening, correcting, drawing, exporting and re-saving a room that is already
+ * on the device are never refused by this function and never will be — a room
+ * on somebody's phone is their record of a building they stood in, and no
+ * billing decision gets to take it.
+ *
+ * So there are three ways past it and each one matters:
+ *
+ *   1. A subscription. The obvious one.
+ *   2. The room is already kept. Re-saving is how corrections are written
+ *      down; refusing it would lose ten minutes of work at a tape measure and
+ *      would fire on the FIRST room of somebody who has never paid.
+ *   3. Fewer than `FREE_ROOMS` rooms are kept.
+ *
+ * The refusal says what is still true — the rooms already there are untouched
+ * — because a person meeting this has just measured a building and needs to
+ * know, in the same sentence, that nothing has been taken from him.
+ */
+export interface Keeping {
+  /** Whether this room may be written down on this device. */
+  readonly keep: boolean;
+  /** Why not, in plain words. Empty when it may be kept. */
+  readonly because: string;
+}
+
+export function mayKeepRoom(
+  alreadyKept: readonly string[],
+  fileName: string,
+  subscribed: boolean
+): Keeping {
+  const open = { keep: true, because: '' };
+  if (subscribed) return open;
+  // Already on this device. Saving it again is a correction, not a new room,
+  // and this is the branch that stops the gate eating somebody's work.
+  if (alreadyKept.includes(fileName)) return open;
+  if (alreadyKept.length < FREE_ROOMS) return open;
+
+  const kept = alreadyKept.length;
+  return {
+    keep: false,
+    because:
+      `Keeping more than ${inWords(FREE_ROOMS)} room at once is part of the subscription. ` +
+      `The ${inWords(kept)} ${kept === 1 ? 'room' : 'rooms'} already on this phone ` +
+      `${kept === 1 ? 'is' : 'are'} untouched — open, read, correct and send ` +
+      `${kept === 1 ? 'it' : 'any of them'} as usual. This is about writing down a new one.`,
+  };
+}
 
 export function isFree(feature: Feature): boolean {
   return FREE.includes(feature);
@@ -135,7 +234,10 @@ export const WHAT_IT_DOES: Readonly<Record<Feature, string>> = {
     'job in one archive.',
   priceList:
     "Import a supplier's price list and price against what you actually pay.",
-  unlimitedRooms: `More than ${FREE_ROOMS} rooms kept at once.`,
+  unlimitedRooms:
+    `More than ${inWords(FREE_ROOMS)} room kept at once. Every room already on the ` +
+    `phone stays there and stays readable — this is about writing down a new one, ` +
+    `never about taking away work somebody has already done.`,
 };
 
 /**

@@ -60,6 +60,8 @@ import { type Payment } from '../../core/src/payment.ts';
 import { type Invoice } from '../../core/src/invoice.ts';
 import { type Proposal } from '../../core/src/proposal.ts';
 import { type Visit } from '../../core/src/schedule.ts';
+import { type Keeping } from '../../core/src/entitlement.ts';
+import { mayKeepRoomHere } from './entitlementStore.ts';
 import { handBack } from './bridge.ts';
 
 /**
@@ -1645,7 +1647,9 @@ export function reduce(state: State, action: Action): State {
           lastEdit:
             after > before
               ? `Photographed the damage — ${after} on this mark now.`
-              : `Took a photograph off. ${after} left on this mark.`,
+              : before - after === 1
+                ? `Took a photograph off. ${after} left on this mark.`
+                : `Took ${before - after} photographs off. ${after} left on this mark.`,
         },
       };
     }
@@ -1740,8 +1744,46 @@ export function reduce(state: State, action: Action): State {
  * screen down — but it must not be silent either. Somebody who thinks their work
  * is saved and finds it gone has been lied to.
  */
+/**
+ * The rooms already written down in this browser, by name.
+ *
+ * A browser that refuses to list its own storage cannot be counted, and a count
+ * nobody can take must never become a refusal — so a failure here leaves the
+ * gate open. Being wrong in that direction costs a room somebody did not pay
+ * for; being wrong in the other costs somebody an afternoon's work.
+ */
+function keptRoomNames(): string[] {
+  const names: string[] = [];
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith(STORAGE_PREFIX)) names.push(key.slice(STORAGE_PREFIX.length));
+    }
+  } catch {
+    // Counted as none, which refuses nothing.
+  }
+  return names;
+}
+
+/**
+ * Whether this room may be written down, and why not.
+ *
+ * Exported so the screen can say so in its own words before `persist` quietly
+ * declines to write. See `RoomLimit` in `Locked.tsx`.
+ */
+export function mayKeep(loaded: Loaded): Keeping {
+  return mayKeepRoomHere(keptRoomNames(), loaded.fileName);
+}
+
 export function persist(loaded: Loaded, at: string): string | null {
   try {
+    // One room is kept without a subscription, decided here because this is the
+    // only path to storage. It stops a NEW room being written and nothing else:
+    // re-saving a room already on this device always goes through, and nothing
+    // already written is ever removed or hidden by this.
+    const may = mayKeep(loaded);
+    if (!may.keep) return may.because;
+
     const project = saveProject({
       savedAt: at,
       fileName: loaded.fileName,

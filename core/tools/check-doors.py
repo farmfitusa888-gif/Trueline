@@ -158,6 +158,74 @@ def handled(source: str, case: str) -> bool:
     return re.search(rf'case\s+\.{re.escape(case)}\b', source) is not None
 
 
+
+# ---------------------------------------------------------------- screens
+
+# The one screen nothing else may construct, because the app itself is what
+# puts it up. Anything added here needs a sentence saying who presents it.
+PRESENTED_BY_THE_APP = {
+    'RootTabs': 'TruelineApp makes it the window\'s root, so no other file names it.',
+}
+
+
+def screens() -> list[tuple[str, Path]]:
+    """Every top-level screen: a `struct X: View` in its own `X.swift`.
+
+    Deliberately not every View in the tree. Small helper views live inside the
+    file that uses them and are *supposed* to be named nowhere else; asking them
+    to be constructed elsewhere would report thirty things and therefore report
+    nothing. A view that has been given its own file is a screen somebody meant
+    to be able to reach.
+    """
+    found = []
+    for path in sorted((ROOT / 'ios' / 'Trueline').glob('*.swift')):
+        name = path.stem
+        if re.search(rf'^struct {re.escape(name)}: View', path.read_text(encoding='utf-8'), re.M):
+            found.append((name, path))
+    return found
+
+
+def constructedElsewhere(name: str, mine: Path) -> bool:
+    """Whether any other Swift file actually builds one."""
+    for path in sorted((ROOT / 'ios').rglob('*.swift')):
+        if path == mine:
+            continue
+        if re.search(rf'\b{re.escape(name)}\s*\(', strip(path.read_text(encoding='utf-8'))):
+            return True
+    return False
+
+
+def checkScreens() -> int:
+    """A screen in its own file that nothing else ever builds.
+
+    Written because `PaywallView` was exactly that. It compiled, it was in the
+    target, `check-swift` was happy, and the two route enums above knew nothing
+    about it because it is presented from a `.sheet` rather than pushed as a
+    Route. So every gate in the app refused a contractor and offered him no way
+    to buy — a lost sale on each one, and, the day the app goes on sale, a
+    rejection under App Store guideline 3.1.1 for having a paid tier with no
+    purchase path.
+
+    The route check above answers "can this case be reached". This answers the
+    other half: "does anything, anywhere, put this screen on the glass".
+    """
+    bad = 0
+    all = screens()
+    for name, path in all:
+        if name in PRESENTED_BY_THE_APP:
+            continue
+        if not constructedElsewhere(name, path):
+            bad += 1
+            print(f'{path.relative_to(ROOT)}: `{name}` is a screen nothing ever presents')
+            print('    It compiles, it is in the target, and no phone can show it. Give it')
+            print('    a button, a sheet or a destination — or delete the file.')
+    if bad:
+        return bad
+    print(f'{len(all)} screens in their own file: every one of them is presented '
+          'by something')
+    return 0
+
+
 def main(argv: list[str]) -> int:
     bad = 0
     everywhere = '\n'.join(
@@ -191,9 +259,11 @@ def main(argv: list[str]) -> int:
                 print(f'{rel}: `{label}.{case}` has a door onto nothing — no branch '
                       'in navigationDestination')
 
+    bad += checkScreens()
+
     if bad:
         print()
-        print(f'{bad} route(s) with no way in or no screen behind them.')
+        print(f'{bad} route(s) or screen(s) with no way in or nothing behind them.')
         return 1
     print(f'{total} routes: every one of them has something that opens it, '
           'and something behind it')

@@ -11,7 +11,7 @@
  * gate reads, so this cannot advertise something the app does not unlock.
  */
 import { useEffect, useState } from 'react';
-import { type Feature, TITLE, describeLock } from '../../core/src/entitlement.ts';
+import { type Feature, FREE_ROOMS, TITLE, describeLock } from '../../core/src/entitlement.ts';
 import { onEntitlement, unlocked, waiting } from './entitlementStore.ts';
 
 /** Re-renders whatever uses it when the app hands the answer across. */
@@ -31,7 +31,8 @@ export function Locked({ feature }: { readonly feature: Feature }) {
       <p className="mt-1 text-sm leading-relaxed text-slate-600">{describeLock(feature)}</p>
       <p className="mt-3 text-sm font-medium text-slate-700">
         This one is part of the subscription. Measuring, the drawing and the 3D view are not,
-        and never will be.
+        and never will be, and neither is{' '}
+        {FREE_ROOMS === 1 ? 'the first room you keep' : `the first ${FREE_ROOMS} rooms you keep`}.
       </p>
       <p className="mt-1 text-xs text-slate-500">
         Open it from the projects list to see what it costs.
@@ -83,4 +84,40 @@ export function Gate({
 
   if (pending && !waitedLongEnough) return null;
   return open ? <>{children}</> : <Locked feature={feature} />;
+}
+
+/**
+ * Said when a NEW room could not be written down, and never said about an old one.
+ *
+ * ## The failure this wording exists to prevent
+ *
+ * A limit on rooms reads, to anybody who has ever met one, as "your rooms are
+ * going away". They are not. Everything already on this device stays on it,
+ * opens, reads, corrects and exports, subscription or no subscription — and the
+ * moment somebody is not sure of that, he stops trusting the app with a
+ * building he is standing in. This project has already lost a contractor 53
+ * photographs once; nothing here is allowed to look like the start of that.
+ *
+ * So the sentence leads with what happened to the new room, and says in the
+ * same breath what did not happen to the old ones. `because` comes from
+ * `mayKeepRoom`, so this screen cannot say a different number from the one the
+ * gate counted.
+ */
+export function RoomLimit({ because }: { readonly because: string }) {
+  return (
+    <section
+      role="alert"
+      data-sheet="no"
+      className="rounded-xl border border-amber-300 bg-amber-50 p-4"
+    >
+      <h2 className="font-semibold text-amber-900">This new room was not kept</h2>
+      <p className="mt-1 text-sm leading-relaxed text-amber-900">{because}</p>
+      <p className="mt-2 text-sm text-amber-900">
+        Nothing has been deleted. Every room already on this phone is still there, still
+        opens, and still exports. What is on the screen right now is still on the screen —
+        it is only the writing-down that has stopped, so send it out from Files before you
+        move on if you want to keep it.
+      </p>
+    </section>
+  );
 }

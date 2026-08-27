@@ -528,6 +528,29 @@ def doors(bench: Bench) -> None:
            fires=True, saying='Opening.draw')
     bench.restore(rel)
 
+    # 4. A screen in its own file that nothing ever presents.
+    #
+    # The fourth time. `PaywallView` compiled, was in the target, passed every
+    # Swift checker, and no phone could show it: it is presented from a `.sheet`
+    # rather than pushed as a `Route`, so the two enums above knew nothing about
+    # it. Every gate in the app refused a contractor and offered him no way to
+    # buy — a lost sale on each one, and a 3.1.1 rejection the day it goes on
+    # sale. The route half asks "can this case be reached"; this asks the other
+    # half, "does anything put this screen on the glass".
+    rel = 'ios/Trueline/ProjectsScreen.swift'
+    was = bench.read(rel)
+    at = was.find('.sheet(isPresented: $showingPaywall) {')
+    if at < 0:
+        failures.append('could not find the paywall sheet to remove')
+        print(f'  {RED}✗{OFF} the paywall left with nothing presenting it (no sheet found)')
+    else:
+        end = was.find('        }\n', was.find('onClose: { showingPaywall = false }', at))
+        bench.write(rel, was[:at] + was[end + len('        }\n'):])
+        code, out = bench.run('check-doors.py')
+        expect('the paywall left with nothing presenting it', code, out,
+               fires=True, saying='nothing ever presents')
+        bench.restore(rel)
+
 
 # ----------------------------------------------------------------- portable
 

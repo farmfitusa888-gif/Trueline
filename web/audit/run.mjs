@@ -59,6 +59,8 @@ const parts = [
   'a22-voice.mjs',
   'a23-scope.mjs',
   'a24-change.mjs',
+  'a25-entitlement.mjs',
+  'a28-photos.mjs',
   'a31-mark.mjs',
 ];
 

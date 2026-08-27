@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { fetchPhoto } from './photoStore.ts';
+import { fetchPhoto, showingOnClaim } from './photoStore.ts';
 
 /**
  * The photographs, on the document, at the size somebody argues from.
@@ -65,6 +65,13 @@ function Big({ name }: { readonly name: string }) {
 }
 
 export function ReportPhotos({ photos }: { readonly photos: readonly string[] }) {
+  // Says, out loud, which photographs are on the claim document while it is on
+  // the page. The screen a person deletes a photograph from is not this one, and
+  // before a batch delete goes through it has to be able to say "3 of these are
+  // on the claim." The honest answer to that comes from the list that actually
+  // prints them, which is this one. See `showingOnClaim`.
+  useEffect(() => showingOnClaim(photos), [photos]);
+
   if (photos.length === 0) return null;
   return (
     <ul className="mt-3 space-y-3">

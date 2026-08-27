@@ -291,3 +291,173 @@ export function unphotographedWalls(photos: readonly Photo[], room: Room): strin
   }
   return room.walls.map((w) => w.id).filter((id) => !seen.has(id));
 }
+
+/* ------------------------------------------- taking photographs off a mark */
+
+/**
+ * What a batch delete is about to do, said in words before it happens.
+ *
+ * ## The 53 photographs
+ *
+ * Sam lost a room with 53 photographs in it. Not to a bug in the delete — to a
+ * delete that never said what it was about to take. A rename had not reached the
+ * room screen, so the thing on screen was not the thing that went, and there was
+ * no way to tell one file from another before it was too late. Nothing has ever
+ * brought those photographs back, and nothing ever will: a water line that has
+ * been cut out and boarded over cannot be re-photographed by anybody.
+ *
+ * A batch delete is the most destructive control in this product. So the
+ * sentence in front of it is not decoration and it is not a screen's private
+ * business — it is worked out here, from the lists themselves, and it is tested.
+ * The count comes from the set that is actually going, never from what happens
+ * to be highlighted, because a count a person has to work out by looking at
+ * highlighting is the 53-photograph failure all over again.
+ *
+ * ## It never reassures
+ *
+ * Everything below is a fact about the lists it was handed. A caller that does
+ * not know whether these photographs are on a claim passes nothing, and gets the
+ * sentence that is true either way rather than a comfortable one. The rule is
+ * that a use may be **understated** — a screen cannot always know — and must
+ * never be invented, and that nothing is ever called undoable that is not.
+ *
+ * The photographs here are damage photographs, which are known by name: the
+ * model carries a file name and never the bytes. See `web/src/photoStore.ts`.
+ */
+
+export interface DeletionRequest {
+  /** Every photograph on the mark, in the order the strip shows them. */
+  readonly onMark: readonly string[];
+  /** The ones somebody has actually ticked. */
+  readonly picked: readonly string[];
+  /**
+   * Of the mark's photographs, the ones a claim document is showing.
+   *
+   * Empty when the caller does not know, which is not the same as knowing there
+   * are none — hence the wording it produces, which names the consequence
+   * without claiming a number nobody established.
+   */
+  readonly onClaim?: readonly string[];
+  /** Of the mark's photographs, the ones whose bytes this device is holding. */
+  readonly held: readonly string[];
+  /** Whether an app is here that filed a copy of each one with the scan. */
+  readonly filedWithScan: boolean;
+}
+
+export interface Deletion {
+  /** Exactly what goes, in the strip's own order. */
+  readonly going: readonly string[];
+  /** Exactly what is left, in the strip's own order. */
+  readonly staying: readonly string[];
+  /** "Delete 14 photographs." — the count, in words, before anything goes. */
+  readonly headline: string;
+  /** Every true sentence about what these photographs are doing. */
+  readonly inUse: readonly string[];
+  /** What can be taken back, and what cannot. Never implies a net that is not there. */
+  readonly finality: string;
+}
+
+/** How many photographs, written the way somebody says it out loud. */
+function photographs(n: number): string {
+  return n === 1 ? '1 photograph' : `${n} photographs`;
+}
+
+/**
+ * Works out the delete, or refuses it.
+ *
+ * Three refusals, and every one of them is the 53 photographs in a different
+ * costume: a delete aimed at a photograph the mark does not have is aimed at
+ * something else; a photograph ticked twice makes "delete 14" take 13; and a
+ * delete of nothing is a button that did something the person cannot see.
+ */
+export function plannedDeletion(request: DeletionRequest): Deletion {
+  const onMark = request.onMark;
+  const wanted = new Set(request.picked);
+
+  if (wanted.size !== request.picked.length) {
+    throw new PhotoError(
+      'The same photograph is ticked twice. That would delete fewer than it says it will, ' +
+        'and the number in front of somebody is the whole point of this.'
+    );
+  }
+  if (wanted.size === 0) {
+    throw new PhotoError('Nothing is picked, so there is nothing to delete.');
+  }
+  const strays = request.picked.filter((name) => !onMark.includes(name));
+  if (strays.length > 0) {
+    throw new PhotoError(
+      `${strays.join(', ')} ${strays.length === 1 ? 'is' : 'are'} not on this mark, so this ` +
+        'delete is pointed at something other than what is on the screen. Nothing has been ' +
+        'taken off.'
+    );
+  }
+
+  // Both lists in the strip's order rather than the order somebody tapped
+  // things. What the sentence says and what the record shows have to be the
+  // same list read the same way round.
+  const going = onMark.filter((name) => wanted.has(name));
+  const staying = onMark.filter((name) => !wanted.has(name));
+
+  const held = new Set(request.held);
+  const claimed = (request.onClaim ?? []).filter((name) => wanted.has(name));
+  const onlyHere = going.filter((name) => held.has(name));
+  const notHere = going.filter((name) => !held.has(name));
+
+  const inUse: string[] = [];
+
+  if (claimed.length > 0) {
+    inUse.push(
+      `${claimed.length} of these ${claimed.length === 1 ? 'is' : 'are'} on the claim. ` +
+        `${claimed.length === 1 ? 'It comes' : 'They come'} off the claim document with them.`
+    );
+  }
+
+  if (staying.length === 0) {
+    inUse.push(
+      'That is every photograph on this mark. The mark stays on the job and there will be ' +
+        'nothing on it to look at.'
+    );
+  } else {
+    inUse.push(
+      `${photographs(staying.length)} ${staying.length === 1 ? 'stays' : 'stay'} on this mark.`
+    );
+  }
+
+  // Where the bytes are is the only thing that differs photograph by
+  // photograph, and it is the part that decides whether "deleted" means gone.
+  if (request.filedWithScan) {
+    inUse.push(
+      "The app filed a copy of each one with the scan. That copy stays in the scan's folder — " +
+        'but nothing on this mark will point at it any more.'
+    );
+  } else if (onlyHere.length > 0) {
+    inUse.push(
+      `${onlyHere.length === 1 ? 'One of them is' : `${onlyHere.length} of them are`} on this ` +
+        'browser only. Nothing else has a copy.'
+    );
+  }
+  if (!request.filedWithScan && notHere.length > 0) {
+    inUse.push(
+      `${photographs(notHere.length)} ${notHere.length === 1 ? 'is' : 'are'} not on this device ` +
+        "at all — in the scan's folder on the phone that took them, which this cannot reach."
+    );
+  }
+
+  // The honest answer to "is it already out there". This app writes documents
+  // and hands them over; it keeps no record of what was sent, to whom, or when,
+  // so it must not pretend it can reach one back.
+  inUse.push(
+    'A claim document or an archive that has already gone out keeps the photographs that went ' +
+      'with it. Nothing this app makes from now on will have them.'
+  );
+
+  return {
+    going,
+    staying,
+    headline: `Delete ${photographs(going.length)}.`,
+    inUse,
+    finality:
+      'You can put them back until you leave this screen. After that the pictures this browser ' +
+      'is holding are dropped for good.',
+  };
+}

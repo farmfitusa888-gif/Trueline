@@ -9,7 +9,7 @@ import { extent } from '../../core/src/health.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
 import { missingFromClaim } from '../../core/src/claim.ts';
 import { missingFromProposal } from '../../core/src/proposal.ts';
-import { EMPTY, persist, reduce } from './state.ts';
+import { EMPTY, mayKeep, persist, reduce } from './state.ts';
 import { installBridge } from './bridge.ts';
 import { Plan, legendFor } from './Plan.tsx';
 import { Corrections } from './Corrections.tsx';
@@ -21,7 +21,7 @@ import { Thickness } from './Thickness.tsx';
 import { Measure } from './Measure.tsx';
 import { planThumbnail } from './sheet.ts';
 import { Agree } from './Agree.tsx';
-import { Gate } from './Locked.tsx';
+import { Gate, RoomLimit } from './Locked.tsx';
 import { Work } from './Work.tsx';
 import { Tags } from './Tags.tsx';
 import { Zones } from './Zones.tsx';
@@ -212,6 +212,8 @@ export function App() {
   const { len, area: showArea, borrow } = useUnits();
   const [state, dispatch] = useReducer(reduce, EMPTY);
   const [saveTrouble, setSaveTrouble] = useState<string | null>(null);
+  /** Why a new room was not written down, or nothing. Never about an old one. */
+  const [roomLimit, setRoomLimit] = useState<string | null>(null);
   // Plan or room. The same model, the same selection, the same tape box under
   // both — switching view never changes what is being measured.
   const [look, setLook] = useState<'plan' | 'room'>('plan');
@@ -375,6 +377,14 @@ export function App() {
   // tablet must not be lost because the phone rang.
   useEffect(() => {
     if (!loaded) return;
+    // Asked first so the screen can explain in its own words. `persist` refuses
+    // on its own as well — that is the safety net, not the message.
+    const may = mayKeep(loaded);
+    setRoomLimit(may.keep ? null : may.because);
+    if (!may.keep) {
+      setSaveTrouble(null);
+      return;
+    }
     setSaveTrouble(persist(loaded, new Date().toISOString()));
   }, [loaded]);
 
@@ -576,6 +586,8 @@ export function App() {
           {openedOn === 'business' && <Trouble />}
         </div>
       )}
+
+      {roomLimit && <RoomLimit because={roomLimit} />}
 
       {saveTrouble && (
         <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">

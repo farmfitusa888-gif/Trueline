@@ -20,6 +20,7 @@
  * there is no store, no purchase and nobody to charge, so everything is open
  * and the gate is the app's job.
  */
+import { type Keeping, mayKeepRoom } from '../../core/src/entitlement.ts';
 import { insideApp } from './bridge.ts';
 
 type Known = boolean | 'unknown';
@@ -57,4 +58,26 @@ export function waiting(): boolean {
 export function onEntitlement(listen: (paid: Known) => void): () => void {
   listeners.add(listen);
   return () => listeners.delete(listen);
+}
+
+/**
+ * Whether one more room may be written down in this browser, and why not.
+ *
+ * The room names are passed in rather than read here on purpose: the code that
+ * saves a room already knows what is on this device and under which keys, and a
+ * second copy of that knowledge in this file is a second thing to get wrong the
+ * day the storage key changes.
+ *
+ * What this adds is the only part that belongs here — who is asking. Outside
+ * the app there is nothing to buy and nobody to charge, so `unlocked()` is true
+ * and nothing is ever refused; inside it, the answer is whatever the app said.
+ *
+ * **This can refuse to keep a NEW room and nothing else.** Re-saving a room
+ * that is already on the device always goes through, so a correction made
+ * standing in a half-built kitchen is never the thing that hits a paywall. See
+ * `mayKeepRoom` in `core/src/entitlement.ts` for the rule and for why it is
+ * written the way round it is.
+ */
+export function mayKeepRoomHere(alreadyKept: readonly string[], fileName: string): Keeping {
+  return mayKeepRoom(alreadyKept, fileName, unlocked());
 }

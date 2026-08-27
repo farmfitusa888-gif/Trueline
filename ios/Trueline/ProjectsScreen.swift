@@ -57,6 +57,15 @@ struct ProjectsScreen: View {
     /// is full. A rename that silently did not happen is worse than one that
     /// failed out loud.
     @State private var trouble: String?
+    /// Whether the subscription sheet is up.
+    ///
+    /// `PaywallView` compiled, was in the target, and **nothing in the app ever
+    /// presented it** -- `grep -rn PaywallView ios/ --include=*.swift` returned
+    /// its own declaration and nothing else. Every gate in the app therefore
+    /// refused without offering a way to buy: a lost sale on every one of them,
+    /// and, the day the app goes on sale, a 3.1.1 rejection for having a paid
+    /// tier with no purchase path. This is the way in.
+    @State private var showingPaywall = false
 
     /// The rooms to show, after the search box and the archive switch.
     private var showing: [ProjectStore.Entry] {
@@ -367,6 +376,28 @@ struct ProjectsScreen: View {
             }
 
             Section {
+                Button {
+                    showingPaywall = true
+                } label: {
+                    // Three different true sentences, because there are three
+                    // different situations and one wording for all of them
+                    // would be untrue in two.
+                    if Subscription.freeUntilLaunch {
+                        Label(
+                            "Everything is on, free, until Trueline reaches the App Store. "
+                            + "See what it will cost.",
+                            systemImage: "gift"
+                        )
+                    } else if subscription.subscribed {
+                        Label("Your subscription", systemImage: "checkmark.seal")
+                    } else {
+                        Label("Subscribe to Trueline", systemImage: "lock.open")
+                    }
+                }
+                .font(.footnote)
+            }
+
+            Section {
                 // What is true about the copy, said plainly, whichever way it
                 // is. An app that quietly fails to back up is worse than one
                 // that never claimed to, so "unavailable" gets as many words as
@@ -459,6 +490,20 @@ struct ProjectsScreen: View {
                 }
             }
             HandbookButton()
+        }
+        // The subscription, reachable from the first screen of the app rather
+        // than only from whatever refused. A person who has just been told they
+        // cannot do something needs somewhere to go, and until now there was
+        // nowhere.
+        .sheet(isPresented: $showingPaywall) {
+            PaywallView(
+                subscription: subscription,
+                // Nothing in particular was tapped to get here, so the sheet
+                // opens on the subscription itself rather than pretending to
+                // know which feature somebody wanted.
+                asking: nil,
+                onClose: { showingPaywall = false }
+            )
         }
         // Renaming and filing, in one sheet, because they are the same thought:
         // what is this and whose is it.
