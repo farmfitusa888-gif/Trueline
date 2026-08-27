@@ -123,8 +123,9 @@ struct ProjectsScreen: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Label("Bring a room in from Files", systemImage: "square.and.arrow.down")
                         Text(
-                            "A scan folder somebody sent you, or the room.json inside one. "
-                            + "Unzip it first if it arrived as a zip, then pick the folder."
+                            "Unzip it first if it arrived as a zip. Then open the scan's "
+                            + "folder, tap Select, Select All, and Open — the room and its "
+                            + "photographs come in together."
                         )
                         .font(.caption)
                         .foregroundStyle(Ink.quiet)
@@ -519,15 +520,18 @@ struct ProjectsScreen: View {
             // A folder is the whole scan -- the room, the card, the
             // photographs, the USDZ. A bare JSON is the room on its own, which
             // is what somebody has when a zip was unpacked badly.
-            allowedContentTypes: [.folder, .json],
-            allowsMultipleSelection: false
+            allowedContentTypes: [.folder, .json, .image],
+            // Many, because iOS will not let you SELECT a folder -- tapping one
+            // opens it. Selecting every file inside a folder is easy: Select,
+            // Select All, Open. `bringIn` puts them back where they belong.
+            allowsMultipleSelection: true
         ) { result in
             switch result {
             case .failure(let why):
                 brought = why.localizedDescription
             case .success(let picked):
-                guard let one = picked.first else { return }
-                switch store.bringIn(one) {
+                guard !picked.isEmpty else { return }
+                switch store.bringIn(picked) {
                 case .took(let name):
                     brought = "\(name) is on this phone now."
                 case .alreadyHere(let name):

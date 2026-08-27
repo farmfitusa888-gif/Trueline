@@ -49,6 +49,8 @@ import { useQuote } from './quoteOf.ts';
 import { takeoff as buildTakeoff } from '../../core/src/takeoff.ts';
 import { DraftButton, DraftedNote } from './Draft.tsx';
 import { useUnits } from './units.tsx';
+import { proposalFile } from './proposalFile.ts';
+import { fileNameFor, sendFile } from './sheet.ts';
 
 function Field({
   label,
@@ -222,6 +224,41 @@ export function Agree({
    * their sentence — which is the whole distinction this flag exists to draw.
    */
   const [drafted, setDrafted] = useState(false);
+  /** True while the proposal document is being built, so the button says so. */
+  const [sending, setSending] = useState(false);
+  /** What happened to the last send, or nothing. */
+  const [sent, setSent] = useState<string | null>(null);
+
+  /**
+   * The proposal, as a file, out through whatever the phone shares with.
+   *
+   * `sendFile` puts it into Messages or Mail on an iPhone and falls back to a
+   * download everywhere else, which is the same path the client file and the
+   * claim already take.
+   */
+  async function sendProposal(): Promise<void> {
+    if (!proposal) return;
+    setSending(true);
+    setSent(null);
+    try {
+      const html = proposalFile({
+        proposal,
+        company,
+        baseline,
+        at: new Date().toLocaleDateString(),
+      });
+      const said = await sendFile(
+        new Blob([html], { type: 'text/html;charset=utf-8' }),
+        fileNameFor(proposal.roomName, 'html', 'proposal'),
+        `${proposal.roomName} — proposal`
+      );
+      if (said) setSent(said);
+    } catch (error) {
+      setSent(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSending(false);
+    }
+  }
   /**
    * The work in this room, as quantities. Built here rather than taken from the
    * quote so a scope paragraph can be drafted before a single rate is typed.
@@ -396,6 +433,37 @@ export function Agree({
             </button>
           )}
         </div>
+
+        {/* Sending it.
+            
+            The app could write a proposal, price it, take a signature on the
+            phone and freeze the agreed scope -- and there was no way to send it
+            to anybody. Files sends a CLIENT FILE: the drawing, the room, what
+            it takes. That is not a proposal. A proposal is what somebody says
+            yes to, and one that cannot leave the phone is one nobody signs.
+            
+            It goes out whether or not it has been signed, because an unsigned
+            proposal is exactly the thing you send in order to get it signed --
+            and the document says which it is, in its own words, at the top. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={sending}
+            onClick={() => void sendProposal()}
+            className="min-h-11 rounded-md bg-slate-900 px-4 font-semibold text-white
+                       active:bg-slate-700 disabled:opacity-50"
+          >
+            {sending ? 'Making it…' : baseline ? 'Send the signed proposal' : 'Send this proposal'}
+          </button>
+          <p className="text-xs leading-relaxed text-slate-500">
+            One file: every option in full, what is not included, and — once it is signed — who
+            signed, when, on what, and the fingerprint that proves nothing moved since.
+            It opens on anything, with no app and no signal.
+          </p>
+        </div>
+        {sent && (
+          <p role="status" className="mt-2 text-sm text-slate-700">{sent}</p>
+        )}
 
         {/* The proposal in one sentence, the way the document opens.
             It says whether the numbers are measured in the same breath as the

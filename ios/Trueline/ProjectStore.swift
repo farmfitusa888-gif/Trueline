@@ -406,6 +406,71 @@ final class ProjectStore: ObservableObject {
     /// A folder already here under the same name is left completely alone and
     /// said so, rather than merged: merging two versions of one room silently
     /// is how somebody loses the half they wanted.
+    /// Several files at once, reassembled into one scan folder.
+    ///
+    /// ## Why this exists as well as `bringIn`
+    ///
+    /// iOS will not let you SELECT a folder in the Files picker. Tapping one
+    /// opens it. There is a way -- a long press, or the Open button on some
+    /// screens -- and it is not a way anybody finds while standing on a job
+    /// with a phone in one hand. Sam went through it and came out with only
+    /// `room.json`, so the room came back and 53 photographs did not.
+    ///
+    /// Selecting many files IS easy: tap Select, tap Select All, Open. So the
+    /// picker takes as many as you like and this puts them back where they
+    /// belong -- the room, the trace, the corrections and the card at the top
+    /// of the folder, and every photograph into `photos/`, which is where the
+    /// rest of the app looks for them.
+    func bringIn(_ picked: [URL]) -> Brought {
+        if picked.count == 1 { return bringIn(picked[0]) }
+        let manager = FileManager.default
+
+        // What names the folder, and what proves these files are a scan.
+        let roomish = ["room.json", "trace.json", Self.correctedFile]
+        guard let spine = picked.first(where: { roomish.contains($0.lastPathComponent.lowercased()) })
+        else {
+            return .notARoom(
+                "None of those files is a room.json, a trace.json or a corrected.json, so they "
+                + "are not a scan. Select everything inside the scan's folder, including the "
+                + "photos.")
+        }
+
+        let reachable = spine.startAccessingSecurityScopedResource()
+        defer { if reachable { spine.stopAccessingSecurityScopedResource() } }
+        let named = (try? Data(contentsOf: spine)).map { RoomCard.name(inside: $0) } ?? "Room"
+        let folderName = CaptureWriter.folderName(
+            for: named == "Room" ? spine.deletingLastPathComponent().lastPathComponent : named,
+            at: Date())
+        let into = folder(named: folderName)
+        if manager.fileExists(atPath: into.path) { return .alreadyHere(name: folderName) }
+
+        let pictures = into.appendingPathComponent("photos", isDirectory: true)
+        do {
+            try manager.createDirectory(at: pictures, withIntermediateDirectories: true)
+        } catch {
+            return .notARoom("A folder for it could not be made: \(error.localizedDescription)")
+        }
+
+        var took = 0
+        for file in picked {
+            let open = file.startAccessingSecurityScopedResource()
+            defer { if open { file.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: file), !data.isEmpty else { continue }
+            let name = file.lastPathComponent
+            let isPicture = ["jpg", "jpeg", "png", "heic"].contains(file.pathExtension.lowercased())
+            let where_ = isPicture ? pictures : into
+            if (try? data.write(to: where_.appendingPathComponent(name), options: .atomic)) != nil {
+                took += 1
+            }
+        }
+        guard took > 0 else {
+            try? manager.removeItem(at: into)
+            return .notARoom("None of those files could be read.")
+        }
+        refresh()
+        return .took(name: folderName)
+    }
+
     func bringIn(_ picked: URL) -> Brought {
         let reachable = picked.startAccessingSecurityScopedResource()
         defer { if reachable { picked.stopAccessingSecurityScopedResource() } }
