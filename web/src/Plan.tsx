@@ -110,21 +110,33 @@ const DIM_INK = 'rgb(var(--c-derived))';
  * state of the screen; provenance is a fact about the building, and a screen
  * state does not get to overwrite one.
  *
- * ## Why the accent amber and not the scanned amber
+ * ## Why ink and not the accent amber
  *
- * There are two ambers in `design.ts` and they are not interchangeable.
- * `--c-scanned` means *the sensor guessed this and nobody has checked it*, and
- * that meaning is the whole product. `--c-accent` is the one the palette hands
- * to "a control that ACTS rather than a state", which is exactly what a wall
- * somebody has tapped is.
+ * It was `--c-accent` first, and Sam said plainly what he wanted instead:
+ * "when wall is tapped in blueprint the wall changes color to WHITE."
  *
- * That distinction is thinner than it should be to rely on alone — the two
- * ambers are 1.4:1 apart — which is the other reason the wall's own line stays
- * on top of the band rather than being replaced by it. The band says PICKED;
- * the line and the number both go on saying where the measurement came from,
- * and no colour is asked to carry two meanings.
+ * He is looking at a dark sheet, and there are three good reasons that is the
+ * right answer rather than a preference to be argued with:
+ *
+ *   1. **Every other colour on this drawing already means something.**
+ *      `--c-scanned` is *the sensor guessed this*, `--c-measured` is *a tape
+ *      went on it*, `--c-adjusted` is *somebody dragged it*, `--c-derived` is
+ *      *worked out from the others*. Amber was the fifth amber-ish thing on a
+ *      sheet whose whole job is that colour carries meaning — and the two
+ *      ambers sit 1.4:1 apart, which is not a distinction to bet a job on.
+ *   2. **Ink is the only colour on the sheet that is not a provenance.** It is
+ *      what the drawing is drawn in. Borrowing it for one wall says PICKED and
+ *      cannot be mistaken for a claim about where the number came from.
+ *   3. **It is the furthest thing from the sheet on either ground** — near
+ *      white on dark, near black on light. That is what "white" means on a
+ *      phone at arm's length in daylight, and it does not disappear for
+ *      somebody working in light mode.
+ *
+ * The wall's own line still sits ON TOP of the band, unchanged, for the reason
+ * above it: the band says PICKED and the line goes on saying where the
+ * measurement came from. No colour is asked to carry two meanings.
  */
-const PICKED = 'rgb(var(--c-accent))';
+const PICKED = 'rgb(var(--c-ink))';
 
 /**
  * How far back the rest of the BUILDING drops when a wall is picked.

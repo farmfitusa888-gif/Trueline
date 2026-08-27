@@ -157,6 +157,10 @@ async function sheet(page) {
       ),
       titleBlock: opacity('svg g[transform^="translate(0 "]'),
       accent: root.getPropertyValue('--c-accent'),
+      // What a picked wall is drawn in: the one colour on this sheet that is
+      // not a provenance, and the furthest thing from the ground on either
+      // theme — near white on dark, which is what Sam asked for.
+      ink: root.getPropertyValue('--c-ink'),
       raise: root.getPropertyValue('--c-raise'),
       scanned: root.getPropertyValue('--c-scanned'),
     };
@@ -173,7 +177,7 @@ await section(page, 'Plan');
 await page.waitForTimeout(400);
 
 const paint = await sheet(page);
-const ACCENT = tone(paint.accent);
+const PICKED = tone(paint.ink);
 const SHEET = tone(paint.raise);
 
 check('nothing is selected, so the drawing carries no selection stylesheet at all',
@@ -211,11 +215,11 @@ check('and it is still a named button afterwards',
 
 /* --------------------------------------------- the mark AT the wall changed */
 
-check('the tapped wall is drawn inside a thick amber band, at the wall itself',
-  picked.band?.stroke === ACCENT, `${picked.band?.stroke}, wanted ${ACCENT}`);
+check('the tapped wall is drawn inside a thick band of ink — near white on a dark sheet, at the wall itself',
+  picked.band?.stroke === PICKED, `${picked.band?.stroke}, wanted ${PICKED}`);
 check('and it is the palette’s own accent rather than a hex somebody typed here',
-  /^rgb\(\d+, \d+, \d+\)$/.test(ACCENT) && ACCENT !== tone(paint.scanned),
-  `--c-accent ${ACCENT}, --c-scanned ${tone(paint.scanned)}`);
+  /^rgb\(\d+, \d+, \d+\)$/.test(PICKED) && PICKED !== tone(paint.scanned),
+  `--c-ink ${PICKED}, --c-scanned ${tone(paint.scanned)}`);
 
 const grew = picked.band?.width / restingPicked.body?.width;
 check('the mark at that wall gets thick — a measured multiple of what was there',
@@ -243,8 +247,8 @@ check('so the band is genuinely behind that line rather than instead of it',
   picked.band?.width > picked.body?.width,
   `band ${picked.band?.width}, line ${picked.body?.width}`);
 
-check('there is a casing round the band as well, in the same amber and wider still',
-  picked.casing !== null && picked.casing?.stroke === ACCENT
+check('there is a casing round the band as well, in the same ink and wider still',
+  picked.casing !== null && picked.casing?.stroke === PICKED
   && picked.casing?.width > picked.band?.width,
   JSON.stringify(picked.casing));
 check('so a picked wall is a hit target, a casing, a band and a line — four, not two',
@@ -253,8 +257,8 @@ check('and no unpicked wall has a casing',
   other.casing === null, JSON.stringify(other.casing));
 
 check('the amber is legible against the sheet it is drawn on',
-  contrast(ACCENT, SHEET) >= READABLE,
-  `${contrast(ACCENT, SHEET).toFixed(2)}:1 against ${SHEET}`);
+  contrast(PICKED, SHEET) >= READABLE,
+  `${contrast(PICKED, SHEET).toFixed(2)}:1 against ${SHEET}`);
 
 /* ------------------------------------------------------- everything else dims */
 
@@ -342,17 +346,17 @@ check('no console or page errors while picking walls', noise().length === 0, noi
   await night.page.waitForTimeout(1400);
 
   const paintDark = await sheet(night.page);
-  const AMBER = tone(paintDark.accent);
+  const PICKED_DARK = tone(paintDark.ink);
   const GROUND = tone(paintDark.raise);
   const lit = await wall(night.page, 'Wall wall-1,');
   const dark = await wall(night.page, 'Wall wall-3,');
 
-  check('in the dark the picked wall is still the palette’s amber, and thick with it',
-    lit.band?.stroke === AMBER && lit.band?.width === picked.band?.width,
+  check('in the dark the picked wall is near white, and thick with it',
+    lit.band?.stroke === PICKED_DARK && lit.band?.width === picked.band?.width,
     `${lit.band?.stroke} at ${lit.band?.width} on ${GROUND}`);
   check('and that amber is legible against the dark sheet as well',
-    contrast(AMBER, GROUND) >= READABLE,
-    `${contrast(AMBER, GROUND).toFixed(2)}:1, ${AMBER} on ${GROUND}`);
+    contrast(PICKED_DARK, GROUND) >= READABLE,
+    `${contrast(PICKED_DARK, GROUND).toFixed(2)}:1, ${PICKED_DARK} on ${GROUND}`);
 
   const nightDim = composited(dark.body?.stroke, dark.opacity, GROUND);
   const nightReadable = contrast(nightDim, GROUND);
@@ -394,12 +398,12 @@ check('no console or page errors while picking walls', noise().length === 0, noi
   // Both halves of this: the same as the moving version, AND actually the
   // amber. Written only as a comparison it goes green on any build where the
   // two agree, including one where neither of them does anything.
-  check('reduced motion: the wall is still thick and amber, to the same numbers',
+  check('reduced motion: the wall is still thick and inked, to the same numbers',
     quiet.band?.stroke === picked.band?.stroke && quiet.band?.width === picked.band?.width
-    && quiet.band?.stroke === ACCENT && quiet.band?.width >= 24,
-    `${quiet.band?.stroke} at ${quiet.band?.width}, wanted ${picked.band?.stroke} at ${picked.band?.width}`);
+    && quiet.band?.stroke === PICKED && quiet.band?.width >= 24,
+    `${quiet.band?.stroke} at ${quiet.band?.width}, wanted ${PICKED} at 24 or more`);
   check('reduced motion: the casing is still there, at its resting width',
-    quiet.casing?.width === quiet.band?.width + 14 && quiet.casing?.stroke === ACCENT,
+    quiet.casing?.width === quiet.band?.width + 14 && quiet.casing?.stroke === PICKED,
     `${quiet.casing?.width} in ${quiet.casing?.stroke}`);
   check('reduced motion: the rest of the drawing still drops back',
     quietOther.opacity === other.opacity && quietOther.opacity < 1,
@@ -498,8 +502,8 @@ await browser.close();
   await pick(plainPage, /^Wall wall-1,/);
   await plainPage.waitForTimeout(500);
   const outside = await wall(plainPage, 'Wall wall-1,');
-  check('and the wall still picks, thick and amber, with nothing to tap the finger',
-    outside.pressed === 'true' && outside.band?.stroke === ACCENT
+  check('and the wall still picks, thick and inked, with nothing to tap the finger',
+    outside.pressed === 'true' && outside.band?.stroke === PICKED
     && outside.band?.width === picked.band?.width,
     JSON.stringify(outside.band));
   check('asking for a feeling that cannot happen throws nothing',
