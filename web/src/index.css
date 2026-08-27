@@ -158,3 +158,14 @@
     }
   }
 }
+
+/* The ring the guided tour draws round whatever a stop is about.
+   An attribute rather than a class so nothing in a component has to know the
+   tour exists, and so removing it can never leave a component's own styling
+   half-applied. */
+[data-tour-ring] {
+  outline: 3px solid rgb(var(--c-accent));
+  outline-offset: 4px;
+  border-radius: 0.5rem;
+  scroll-margin-block: 30vh;
+}

@@ -55,6 +55,7 @@ const parts = [
   'a18-handover.mjs',
   'a19-money.mjs',
   'a20-drafts.mjs',
+  'a21-tour.mjs',
 ];
 
 function run(part) {

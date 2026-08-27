@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
+} from 'react';
 import type { Nanometres } from '../../core/src/length.ts';
 import {
   type Company,
@@ -43,6 +45,30 @@ export interface Units {
   readonly area: (halfSquareNanometres: bigint, places?: number) => string;
   /** A run for a takeoff line — linear feet, or metres. */
   readonly run: (value: Nanometres, places?: number) => string;
+  /**
+   * Read somebody else's profile for a while, and never write it down.
+   *
+   * ## Why this exists
+   *
+   * The worked example is a project file, and a project file does not carry a
+   * rate book — the book belongs to the contractor, not to the room. So the
+   * example opened on a phone that had never had a rate typed into it, every
+   * priced line came back empty, and `changesSince` correctly reported that
+   * every line of the signed scope had been removed: the Work screen said
+   * **"Agreed $0.00"** under an invoice for $2,889.45, and the Agreement screen
+   * offered a change order that deleted the job.
+   *
+   * Nothing was wrong with the app. The example was simply missing half of what
+   * made it, so this lends the other half back.
+   *
+   * Passing `null` gives the contractor's own profile back. Nothing borrowed is
+   * ever written to storage or handed to the phone — including edits made while
+   * it is borrowed, which is what lets the example say that nothing you change
+   * in it matters and be telling the truth.
+   */
+  readonly borrow: (text: string | null) => void;
+  /** True while a borrowed profile is in front of the real one. */
+  readonly borrowed: boolean;
 }
 
 const Context = createContext<Units | null>(null);
@@ -50,7 +76,21 @@ const Context = createContext<Units | null>(null);
 /** Reads the profile back, or hands back an empty one. Never throws. */
 export function loadCompany(): Company {
   try {
-    const text = window.localStorage.getItem(KEY);
+    return readCompany(window.localStorage.getItem(KEY));
+  } catch {
+    return EMPTY_COMPANY;
+  }
+}
+
+/**
+ * A profile out of a string, field by field.
+ *
+ * Split out of `loadCompany` so the same reading applies to a profile that
+ * never came from this browser's storage — the one the worked example carries.
+ * There is exactly one set of fallbacks and one shape check, which is the point.
+ */
+export function readCompany(text: string | null): Company {
+  try {
     if (!text) return EMPTY_COMPANY;
     // `decode`, not `JSON.parse`. Money is `bigint` cents, and plain JSON turns
     // one into `{"$nm":"875"}` on the way out and leaves it as an object on the
@@ -112,6 +152,22 @@ function isBook(value: unknown): value is Company['prices'] {
 
 export function UnitsProvider({ children }: { children: ReactNode }) {
   const [company, setCompany] = useState<Company>(() => loadCompany());
+  // The example's profile, when one is open. Never written anywhere.
+  const [lent, setLent] = useState<Company | null>(null);
+
+  /**
+   * Stable, on purpose.
+   *
+   * The screen that borrows a profile does it in an effect, and gives it back
+   * in that effect's cleanup. If this were rebuilt on every render it would be
+   * a new dependency every time, so the effect would tear down and set up on
+   * every render — borrow, give back, borrow, give back — and the example
+   * would flicker between its own rates and an empty book. It did.
+   */
+  const borrow = useCallback(
+    (text: string | null) => setLent(text === null ? null : readCompany(text)),
+    []
+  );
 
   // A profile the app is keeping outranks whatever is in this browser's
   // storage: it is the one that came back from iCloud, and it is the one that
@@ -132,8 +188,15 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Units>(
     () => ({
-      company,
+      company: lent ?? company,
+      borrowed: lent !== null,
+      borrow,
       save: (next) => {
+        // Editing a borrowed profile edits the borrowed copy and nothing else.
+        // A rate typed while the worked example is open must move the example's
+        // numbers on screen — otherwise the box is dead — and must not touch
+        // the contractor's own book, his phone, or his iCloud.
+        if (lent !== null) { setLent(next); return; }
         setCompany(next);
         // `encode`, not `JSON.stringify`. Money is `bigint` cents and
         // `JSON.stringify` throws on a bigint — which it was doing, outside the
@@ -160,11 +223,11 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
         // per phone.
         handBackCompany(text);
       },
-      len: (v) => showLength(v, company.units),
-      area: (v, places) => showArea(v, company.units, places),
-      run: (v, places) => showRun(v, company.units, places),
+      len: (v) => showLength(v, (lent ?? company).units),
+      area: (v, places) => showArea(v, (lent ?? company).units, places),
+      run: (v, places) => showRun(v, (lent ?? company).units, places),
     }),
-    [company]
+    [company, lent, borrow]
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;

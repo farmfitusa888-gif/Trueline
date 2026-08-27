@@ -1782,6 +1782,26 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   (`scanned` / `walked` / `drawn`), and a record written before that field
   existed reads as `scanned`, which is what every one of them actually was.
 
+- **The worked example opened without the rate book that priced it.** A project
+  file holds a room; the rate book belongs to the contractor, so `#demo` on a
+  phone that had never had a rate typed into it priced every line at nothing.
+  `changesSince` then correctly reported that the whole signed scope had been
+  removed: the Work screen read *"Agreed $0.00"* under an invoice for $2,889.45,
+  and the Agreement screen offered a change order deleting the job. Nothing was
+  wrong with the app -- the example was half of what made it. `site/tools/demo.mjs`
+  now saves the profile beside the project, and `Units.borrow` lends it to the
+  screen for as long as the example is open. Nothing borrowed is written to
+  storage or handed to the phone, edits while borrowed stay in memory, and the
+  contractor's own profile comes back whichever way somebody leaves. Locked by
+  `a21-tour.mjs`, which sets a real profile, opens the example, and checks the
+  stored one is untouched to the character.
+
+- **`borrow` had to be stable.** Built fresh on each render it was a new
+  dependency every render, so the effect that borrows -- and gives back in its
+  cleanup -- tore down and set up continuously: borrow, give back, borrow. Same
+  shape one level up: the borrowing effect must depend on the ROUTE only, never
+  on `loaded`, which changes the instant the example opens.
+
 Everything else: build proceeds.
 
 ## Standing constraints carried from Plumbline

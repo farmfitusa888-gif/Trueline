@@ -113,6 +113,44 @@ struct ProjectsScreen: View {
                 }
             }
 
+            // The example and the tour.
+            //
+            // Everything this app is worth showing somebody happens after a
+            // scan, and a scan needs a LiDAR phone, a room and ten minutes. So
+            // an empty first screen was the whole first impression: a list with
+            // nothing in it and an instruction to go and find a kitchen.
+            //
+            // These two rows are the answer, and they are permanent rather than
+            // only shown while the list is empty — the takeoff workings and the
+            // change-order screen are worth a second look long after somebody
+            // has scanned their first room.
+            Section {
+                NavigationLink(value: Route.tour) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Take the tour", systemImage: "figure.walk.motion")
+                        Text(
+                            "Every screen in the app, over a finished kitchen, in the order "
+                            + "of a job — the drawing, the takeoff, the price, the proposal, "
+                            + "the signature, the claim and the files. Nothing on your phone "
+                            + "is touched."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(Ink.quiet)
+                    }
+                }
+                NavigationLink(value: Route.example) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Open the worked example", systemImage: "doc.text.magnifyingglass")
+                        Text(
+                            "The same kitchen, without the tour. Scanned, taped on two walls, "
+                            + "priced, written up, signed and invoiced."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(Ink.quiet)
+                    }
+                }
+            }
+
             if store.scans.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
@@ -435,6 +473,20 @@ struct ProjectsScreen: View {
                 )
             case .newMeasure:
                 ARMeasureScreen(store: store, backup: backup, onFinished: show)
+            case .example:
+                WebScreen(
+                    opensOn: .demo,
+                    title: "Worked example",
+                    store: store,
+                    backup: backup
+                )
+            case .tour:
+                WebScreen(
+                    opensOn: .tour,
+                    title: "Guided tour",
+                    store: store,
+                    backup: backup
+                )
             case .newDraw:
                 // Same contract as the other two ways in: it makes a room, and
                 // the room takes this screen's place in the stack rather than
@@ -521,5 +573,10 @@ struct ProjectsScreen: View {
         case dead(ProjectStore.Entry)
         /// The camera again, for marks only, over a room that already exists.
         case markAgain(SavedScan)
+        /// A finished job to look at, and a guided tour over the top of it.
+        /// Neither touches this phone's rooms: the example is a file in the
+        /// bundle, and the tour only moves between screens.
+        case example
+        case tour
     }
 }

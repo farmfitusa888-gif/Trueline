@@ -25,6 +25,7 @@ import { Work } from './Work.tsx';
 import { Tags } from './Tags.tsx';
 import { Zones } from './Zones.tsx';
 import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Sections.tsx';
+import { Tour, TOUR } from './Tour.tsx';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
 import { Ceiling } from './Ceiling.tsx';
@@ -190,18 +191,21 @@ function NothingHere({ onDraw }: { onDraw: () => void }) {
  * Anything unrecognised opens the room, which is the old behaviour and the
  * right default: a bad route should cost nothing.
  */
-export function openedAt(): 'room' | 'floor' | 'business' | 'draw' {
+export function openedAt(): 'room' | 'floor' | 'business' | 'draw' | 'demo' | 'tour' {
   let hash = '';
   try {
     hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
   } catch {
     return 'room';
   }
-  return hash === 'floor' || hash === 'business' || hash === 'draw' ? hash : 'room';
+  return hash === 'floor' || hash === 'business' || hash === 'draw' || hash === 'demo'
+    || hash === 'tour'
+    ? hash
+    : 'room';
 }
 
 export function App() {
-  const { len, area: showArea } = useUnits();
+  const { len, area: showArea, borrow } = useUnits();
   const [state, dispatch] = useReducer(reduce, EMPTY);
   const [saveTrouble, setSaveTrouble] = useState<string | null>(null);
   // Plan or room. The same model, the same selection, the same tape box under
@@ -250,7 +254,106 @@ export function App() {
     // straight back off the screen.
     if (openedOn === 'draw') setDrawing(true);
   }, [openedOn]);
+
   const loaded = state.loaded;
+  /**
+   * The worked example.
+   *
+   * ## Why there is a demo at all
+   *
+   * Everything in this app happens after a scan, and a scan needs a LiDAR
+   * phone, a room, and ten minutes. So the first thing anybody sees is an empty
+   * screen and an instruction — which is a bad way to find out whether a
+   * takeoff is any good.
+   *
+   * `#demo` loads one finished job: a kitchen that was scanned, had a tape put
+   * on two walls, was priced off a real rate book, written up as a proposal,
+   * signed, and invoiced. Every screen is populated and every number is one the
+   * app worked out.
+   *
+   * It is not a hand-written fixture. `site/tools/demo.mjs` builds it by
+   * driving the real app through that whole path in a browser and saving
+   * whatever came out — so it cannot drift away from what the app actually
+   * does, and rebuilding it is how you find out that it has.
+   */
+  const [demo, setDemo] = useState(false);
+  useEffect(() => {
+    if ((openedOn !== 'demo' && openedOn !== 'tour') || loaded) return;
+    let dropped = false;
+    void import('./demo.json')
+      .then((file) => {
+        if (dropped) return;
+        const example = file.default ?? file;
+        dispatch({ type: 'openSaved', project: JSON.stringify(example.project) });
+        setDemo(true);
+      })
+      .catch(() => {
+        // A build with no example in it. The screen is what it would have been
+        // anyway, which is the right failure: nothing here is load-bearing.
+      });
+    return () => { dropped = true; };
+  }, [openedOn, loaded]);
+
+  /**
+   * The rate book that priced the example, lent to the screen.
+   *
+   * ## Why the example needs one at all
+   *
+   * A project file does not carry rates — the book belongs to the contractor,
+   * not to the room. So the example opened on a phone that had never had a rate
+   * typed into it: every priced line came back empty, and the app correctly
+   * reported that every line of the signed scope had been removed. The Work
+   * screen read **"Agreed $0.00"** under an invoice for $2,889.45, and the
+   * Agreement screen offered a change order that deleted the job.
+   *
+   * ## Why this is its own effect
+   *
+   * It depends on the ROUTE and nothing else. Folded into the loading effect
+   * above it would also depend on `loaded`, which goes from nothing to a room
+   * the instant that effect runs — so the cleanup would fire immediately and
+   * hand the book straight back, one render after borrowing it.
+   *
+   * Nothing borrowed is written to storage or handed to the phone, and the
+   * contractor's own profile comes back whichever way somebody leaves.
+   */
+  useEffect(() => {
+    if (openedOn !== 'demo' && openedOn !== 'tour') return;
+    let dropped = false;
+    void import('./demo.json')
+      .then((file) => {
+        if (dropped) return;
+        borrow((file.default ?? file).company);
+      })
+      .catch(() => {
+        // No example in this build. Then there is no book to lend and the
+        // screen is the contractor's own, which is the right failure.
+      });
+    return () => { dropped = true; borrow(null); };
+  }, [openedOn, borrow]);
+
+  /**
+   * The guided tour.
+   *
+   * ## What it is for
+   *
+   * Twenty stops, in the order of a job rather than the order of the tab bar:
+   * the drawing, the room, the takeoff, the money, the paperwork, the claim,
+   * the files. It moves the app to each screen and says what is on it.
+   *
+   * ## Why it runs on the example and not on your room
+   *
+   * A tour of an empty app is a tour of the word "Nothing". Every stop needs
+   * something real to point at, and only the worked example is guaranteed to
+   * have one -- so `#tour` loads the example first, by the same effect above,
+   * and starts here once there is a room to look at.
+   *
+   * It reads and never writes. No stop taps a control on anybody's behalf,
+   * because a tour that edits your work is a tour nobody starts twice.
+   */
+  const [touring, setTouring] = useState(false);
+  useEffect(() => {
+    if (openedOn === 'tour') setTouring(true);
+  }, [openedOn]);
 
   // Let the scanner in — and pick up whatever was being corrected last time.
   // A capture handed over at start-up wins: somebody who has just finished
@@ -464,6 +567,31 @@ export function App() {
           >
             Close
           </button>
+        </div>
+      )}
+
+      {demo && loaded && (
+        <div
+          role="note"
+          className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm
+                     leading-relaxed text-amber-900"
+        >
+          <strong>This is the worked example.</strong> A kitchen that was scanned, had a tape
+          put on two walls, was priced off a rate book, written up, signed and invoiced — every
+          number on every screen came out of it. It is not your work and nothing you change here
+          matters. Tap <em>Rooms</em> below to start your own.
+          {!touring && (
+            <p className="mt-3">
+              <button
+                type="button"
+                onClick={() => setTouring(true)}
+                className="min-h-11 rounded-md border border-amber-400 bg-white px-4
+                           font-semibold text-amber-900 active:bg-amber-100"
+              >
+                Take the tour — {TOUR.length} stops
+              </button>
+            </p>
+          )}
         </div>
       )}
 
@@ -992,8 +1120,23 @@ export function App() {
               {loaded.fileName} · imported from RoomPlan v{loaded.report.sourceVersion ?? '?'} ·
               nothing here left this device · kept in this browser only, so it is not a backup
             </p>
+
+            {/* Room for the tour card, which is fixed to the bottom of the
+                window. Without it the last stop's ring lands underneath the
+                card that is telling you to look at it. */}
+            {touring && <div aria-hidden="true" className="h-56 print:hidden" />}
           </div>
         )
+      )}
+
+      {touring && loaded && (
+        <Tour
+          onGo={(stop) => {
+            setSection(stop.section);
+            if (stop.look) setLook(stop.look);
+          }}
+          onDone={() => setTouring(false)}
+        />
       )}
     </main>
   );

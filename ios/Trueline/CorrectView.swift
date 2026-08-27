@@ -42,6 +42,11 @@ struct CorrectView: UIViewRepresentable {
         case floor = "floor"
         case business = "business"
         case draw = "draw"
+        /// The worked example, and the same example with the tour running over
+        /// it. Both load a finished kitchen the app itself produced, so every
+        /// screen has real numbers on it before anybody has scanned anything.
+        case demo = "demo"
+        case tour = "tour"
 
         var url: URL {
             self == .room
