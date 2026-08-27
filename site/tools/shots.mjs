@@ -6,11 +6,9 @@
  * matters, whether the page scrolls sideways, whether WebGL came up, and
  * whether anything threw.
  */
-import { chromium } from 'playwright';
+import { openChromium } from '../../core/tools/browser.mjs';
 import { mkdirSync } from 'node:fs';
 
-const CHROME = process.env.TRUELINE_CHROME
-  ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 // Over HTTP, not file://. Absolute paths like /style.css resolve to the
 // filesystem root under file://, and a module script is blocked by CORS — so a
 // file:// run reports a perfectly good site as broken in every way at once.
@@ -30,7 +28,7 @@ const contrast = (a, b) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await openChromium();
 const pages = [
   ['home', 'index.html'],
   ['guides', 'guides/index.html'],

@@ -37,12 +37,12 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { chromium } from 'playwright';
+import { openChromium } from '../../core/tools/browser.mjs';
+import { ffmpegPath } from '../../core/tools/ffmpeg.mjs';
 
-const CHROME = process.env.TRUELINE_CHROME
-  ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const FFMPEG = process.env.TRUELINE_FFMPEG
-  ?? '/opt/ff/imageio_ffmpeg/binaries/ffmpeg-linux-x86_64-v7.0.2';
+// Resolved for this machine, and checked for libx264 before it is used --
+// see core/tools/ffmpeg.mjs for why the one inside Playwright will not do.
+const FFMPEG = ffmpegPath();
 const SITE = process.env.TRUELINE_AUDIT_URL ?? 'http://127.0.0.1:4173/';
 const HERE = new globalThis.URL('.', import.meta.url).pathname;
 const FIXTURES = `${HERE}../../web/audit/`;
@@ -64,7 +64,7 @@ if (existsSync(RAW)) rmSync(RAW, { recursive: true });
 mkdirSync(RAW, { recursive: true });
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await openChromium();
 
 /**
  * The caption bar and the title card, injected before anything loads.

@@ -14,10 +14,8 @@
  *   npm run build && (cd web && npx vite preview --port 4173 &) && node site/tools/capture.mjs
  */
 import { readFileSync, mkdirSync } from 'node:fs';
-import { chromium } from 'playwright';
+import { openChromium } from '../../core/tools/browser.mjs';
 
-const CHROME = process.env.TRUELINE_CHROME
-  ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = process.env.TRUELINE_AUDIT_URL ?? 'http://127.0.0.1:4173/';
 const OUT = new globalThis.URL('../src/shots/', import.meta.url).pathname;
 const FIXTURES = new globalThis.URL('../../web/audit/', import.meta.url).pathname;
@@ -32,7 +30,7 @@ const RATES = [
   ['Baseboard rate', '6.00'], ['Doors rate', '450.00'], ['Windows rate', '300.00'],
 ];
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await openChromium();
 
 /** One profile, typed once, handed to every later page the way the app does. */
 async function profile() {

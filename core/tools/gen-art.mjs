@@ -31,7 +31,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { chromium } from 'playwright';
+import { openChromium } from './browser.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -191,10 +191,7 @@ for (const bit of mine) {
 /* ------------------------------------------------------------------ draw */
 
 const check = process.argv.includes('--check');
-const browser = await chromium.launch({
-  executablePath: process.env.TRUELINE_CHROME
-    ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-});
+const browser = await openChromium();
 let bad = false;
 
 for (const [path, json] of Object.entries(CONTENTS)) {

@@ -1802,6 +1802,26 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   shape one level up: the borrowing effect must depend on the ROUTE only, never
   on `loaded`, which changes the instant the example opens.
 
+- **`npm run verify` could not pass on the Mac the app is built on.** Eight
+  tools had grown the same copied line -- `process.env.TRUELINE_CHROME ??
+  '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'` -- a path that is real
+  inside one Linux container and nowhere else. Harmless until `check-art` went
+  into `verify`, which is the command Sam runs before he builds; then the one
+  command that says whether the repository is sound died at
+  *"Failed to launch chromium because executable doesn't exist at ..."*.
+  `core/tools/browser.mjs` and `browser.py` now resolve it -- what was asked
+  for, then what Playwright says if it is on disk, then any unpacked build
+  highest-number-first, then a message naming `npx playwright install
+  chromium`. Trusting `executablePath()` alone would not have done: in this
+  container it returns 1234 and what is installed is 1194, so a resolver that
+  believed it would have moved the failure rather than fixed it.
+  `core/tools/ffmpeg.mjs` does the same for the films and additionally proves
+  the build it picked can write H.264, because Playwright ships a VP8-only one
+  and a WebM is a coin toss in Safari. `setup-mac.sh` fetches the browser once.
+  Locked by `check-portable.py` in `verify`, watched failing in
+  `check-the-checks.py`, and the resolver's own branches tested against fake
+  disks describing machines that are not this one.
+
 Everything else: build proceeds.
 
 ## Standing constraints carried from Plumbline

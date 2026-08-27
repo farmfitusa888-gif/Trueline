@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { chromium } from 'playwright';
+import { openChromium } from '../../core/tools/browser.mjs';
 
 import { SP, URL, check, report } from './lib.mjs';
 
@@ -28,10 +28,8 @@ const EXPECTED = (source.match(/^      \{ t: /gm) ?? []).length;
  * The rest is what a guide has to be able to do: be got to from the app, be
  * searched, and let somebody back out again.
  */
-const CHROME =
-  process.env.TRUELINE_CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await openChromium();
 const ctx = await browser.newContext({ viewport: { width: 430, height: 1600 } });
 const page = await ctx.newPage();
 

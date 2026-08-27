@@ -15,10 +15,8 @@
  * Writes `web/src/demo.json`, which the app ships and loads on `#demo`.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { chromium } from 'playwright';
+import { openChromium } from '../../core/tools/browser.mjs';
 
-const CHROME = process.env.TRUELINE_CHROME
-  ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const URL = process.env.TRUELINE_AUDIT_URL ?? 'http://127.0.0.1:4173/';
 const FIXTURES = new globalThis.URL('../../web/audit/', import.meta.url).pathname;
 const OUT = new globalThis.URL('../../web/src/demo.json', import.meta.url).pathname;
@@ -31,7 +29,7 @@ const RATES = [
   ['Cased openings rate', '180.00'], ['Opening wrap rate', '5.00'],
 ];
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await openChromium();
 
 async function open(payload) {
   const ctx = await browser.newContext({ viewport: { width: 430, height: 1600 } });

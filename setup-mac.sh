@@ -390,6 +390,21 @@ ok "present ($(find ios/Trueline/Web -type f | wc -l | tr -d ' ') files)"
 if command -v node >/dev/null 2>&1; then
   ok "node $(node -v) — checking the bundle is current"
   npm ci --silent >/dev/null 2>&1 || npm install --silent >/dev/null 2>&1
+  # The browser the checks drive. `npm ci` installs the Playwright PACKAGE; the
+  # browser it drives is a separate download, and without it `npm run verify`
+  # stops at check-art with "Failed to launch chromium". One command, once per
+  # Mac, and it is a no-op every time after that.
+  if ! node -e "import('./core/tools/browser.mjs').then(m=>m.chromePath())" >/dev/null 2>&1; then
+    warn "no Chromium for the checks yet — fetching it (once)"
+    if npx --yes playwright install chromium >/dev/null 2>&1; then
+      ok "Chromium installed"
+    else
+      warn "could not fetch it. 'npm run verify' will stop at check-art until you run:"
+      echo "       npx playwright install chromium"
+    fi
+  else
+    ok "Chromium for the checks is present"
+  fi
   npm run build --silent >/dev/null 2>&1
   if diff -r web/dist ios/Trueline/Web >/dev/null 2>&1; then
     ok "the bundle matches the source"

@@ -2,7 +2,15 @@ import re, subprocess, os, sys
 import pypdfium2 as pdfium
 from diagrams import STAND, HOLD, WALK, FURNITURE, OPENPLAN, PLANKEY, WALKTAP
 
-CH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
+import sys as _sys
+_sys.path.insert(0, __import__('os').path.join(
+    __import__('os').path.dirname(__import__('os').path.dirname(
+        __import__('os').path.dirname(__import__('os').path.abspath(__file__)))),
+    'core', 'tools'))
+from browser import chromePath  # noqa: E402  -- resolved above, not on sys.path by default
+
+# The browser this machine actually has -- see core/tools/browser.py.
+CH = chromePath()
 ROW = '      <tr><td class="b"></td><td class="b"></td><td class="b"></td><td class="b"></td><td class="b"></td></tr>\n'
 
 def css(body_pt, lead):

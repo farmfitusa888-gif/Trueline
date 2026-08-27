@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { openChromium } from '../../core/tools/browser.mjs';
 
 /**
  * Driving the whole app in a real browser, feature by feature.
@@ -28,8 +28,6 @@ import { fileURLToPath } from 'node:url';
 /** The fixtures live beside these scripts, so the audit needs nothing else. */
 export const SP = dirname(fileURLToPath(import.meta.url));
 export const URL = process.env.TRUELINE_AUDIT_URL ?? 'http://127.0.0.1:4173/';
-const CHROME =
-  process.env.TRUELINE_CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 export const results = [];
 let problems = [];
@@ -39,7 +37,7 @@ export function check(name, condition, detail = '') {
 }
 
 export async function open() {
-  const browser = await chromium.launch({ executablePath: CHROME });
+  const browser = await openChromium();
   const ctx = await browser.newContext({ viewport: { width: 430, height: 1600 }, acceptDownloads: true });
   const page = await ctx.newPage();
   problems = [];
@@ -84,7 +82,7 @@ export async function sentTo(page, name) {
  * app never says. Nothing should ever be blank in it.
  */
 export async function openAsApp(payload, { scheme = 'light' } = {}) {
-  const browser = await chromium.launch({ executablePath: CHROME });
+  const browser = await openChromium();
   const ctx = await browser.newContext({
     viewport: { width: 430, height: 1600 },
     acceptDownloads: true,

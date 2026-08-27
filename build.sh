@@ -39,7 +39,14 @@ for arg in "$@"; do
     --open)    exec bash setup-mac.sh ;;
     --sim)     sim=yes ;;
     --sim=*)   sim=yes; simulator="${arg#--sim=}" ;;
-    *) bad "I do not know the option $arg. Try --no-pull, --open or --sim."; exit 2 ;;
+    *)
+      bad "I do not know the option $arg. Try --no-pull, --open or --sim."
+      # Options are read before the pull, so an old copy of this script rejects
+      # a flag that the current one understands -- and pulling is what fixes it.
+      # It has happened, with --sim.
+      echo "     If you were told this option exists, this script is out of date:"
+      echo "       git pull origin main && bash build.sh $arg"
+      exit 2 ;;
   esac
 done
 

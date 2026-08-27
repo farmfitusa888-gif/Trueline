@@ -25,7 +25,15 @@ import sys
 
 import pypdfium2 as pdfium
 
-CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
+import sys as _sys
+_sys.path.insert(0, __import__('os').path.join(
+    __import__('os').path.dirname(__import__('os').path.dirname(
+        __import__('os').path.dirname(__import__('os').path.abspath(__file__)))),
+    'core', 'tools'))
+from browser import chromePath  # noqa: E402  -- resolved above, not on sys.path by default
+
+# The browser this machine actually has -- see core/tools/browser.py.
+CHROME = chromePath()
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE = os.path.join(HERE, 'handbook.html')
 OUT = os.path.join(HERE, 'handbook.pdf')

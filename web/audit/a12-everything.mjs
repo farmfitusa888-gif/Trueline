@@ -1,9 +1,7 @@
-import { chromium } from 'playwright';
+import { openChromium } from '../../core/tools/browser.mjs';
 
 import { URL, check, loadScan, report, section } from './lib.mjs';
 
-const CHROME =
-  process.env.TRUELINE_CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 /**
  * The complete click-through: every control in the app, pressed.
@@ -64,7 +62,7 @@ let SHARED;
 const errors = [];
 
 async function fresh() {
-  SHARED ??= await chromium.launch({ executablePath: CHROME });
+  SHARED ??= await openChromium();
   const ctx = await SHARED.newContext({
     viewport: { width: 430, height: 1600 }, acceptDownloads: true,
   });

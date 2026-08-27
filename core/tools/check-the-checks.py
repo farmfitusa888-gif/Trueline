@@ -529,6 +529,73 @@ def doors(bench: Bench) -> None:
     bench.restore(rel)
 
 
+# ----------------------------------------------------------------- portable
+
+def portable(bench: Bench) -> None:
+    """A container path baked into a tool that runs on a Mac.
+
+    The mistake, exactly as it happened: eight tools each grew the same line,
+
+        process.env.TRUELINE_CHROME ?? '/opt/pw-browsers/chromium-1194/...'
+
+    which is real inside one Linux container and nowhere else. It was harmless
+    until `check-art` went into `npm run verify` -- the command Sam runs on his
+    Mac before he builds -- and that command then could not pass on the machine
+    that ships the app.
+
+    This one gets its own small tree rather than the shared bench: the checker
+    reads every tracked source file in a repository, and pointing it at the
+    whole copy would make it slow and would couple this test to whatever else
+    happens to be in the working tree.
+    """
+    print('check-portable.py — a container path in code that runs on a Mac')
+
+    where = bench.where / 'portable'
+    (where / 'site' / 'tools').mkdir(parents=True, exist_ok=True)
+    clean = "const CHROME = process.env.TRUELINE_CHROME ?? null;\n"
+    tool = where / 'site' / 'tools' / 'shots.mjs'
+    tool.write_text(clean, encoding='utf-8')
+
+    def run() -> tuple[int, str]:
+        done = subprocess.run(
+            [sys.executable, str(ROOT / 'core' / 'tools' / 'check-portable.py'), str(where)],
+            capture_output=True, text=True,
+        )
+        return done.returncode, done.stdout + done.stderr
+
+    code, out = run()
+    expect('says nothing about a tool that resolves its browser at run time',
+           code, out, fires=False)
+
+    tool.write_text(
+        "const CHROME = process.env.TRUELINE_CHROME\n"
+        "  ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';\n",
+        encoding='utf-8')
+    code, out = run()
+    expect('the exact line that stopped npm run verify on the Mac', code, out,
+           fires=True, saying='/opt/pw-browsers')
+
+    # And the two other shapes of the same mistake.
+    tool.write_text("const OUT = '/workspace/trueline/site/film';\n", encoding='utf-8')
+    code, out = run()
+    expect('a path under the container\'s checkout', code, out,
+           fires=True, saying='/workspace/trueline')
+
+    tool.write_text("const KEY = '/home/somebody/.ssh/id_ed25519';\n", encoding='utf-8')
+    code, out = run()
+    expect('somebody\'s home directory', code, out, fires=True, saying='/home/somebody')
+
+    # The one file allowed to name them, because knowing about machines is its
+    # whole job -- and only under its real name, not any file that copies it.
+    (where / 'core' / 'tools').mkdir(parents=True, exist_ok=True)
+    (where / 'core' / 'tools' / 'browser.mjs').write_text(
+        "const CONTAINER = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';\n",
+        encoding='utf-8')
+    tool.write_text(clean, encoding='utf-8')
+    code, out = run()
+    expect('and the resolver itself is allowed to name them', code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -539,6 +606,8 @@ def main() -> int:
         pbxproj(bench)
         print()
         xcscheme(bench)
+        print()
+        portable(bench)
 
     print()
     if failures:
