@@ -60,7 +60,9 @@ const parts = [
   'a23-scope.mjs',
   'a24-change.mjs',
   'a25-entitlement.mjs',
+  'a27-signed-back.mjs',
   'a28-photos.mjs',
+  'a29-tapped.mjs',
   'a31-mark.mjs',
 ];
 

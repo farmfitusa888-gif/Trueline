@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WebKit
 
 /// Everything after the scan.
@@ -201,6 +202,12 @@ struct CorrectView: UIViewRepresentable {
         // that could write anywhere on the phone. This one runs whatever HTML
         // it is given.
         configuration.userContentController.add(context.coordinator, name: "voice")
+        // "Tap the finger that just did that." The capture screens have had
+        // haptics from the start and the correction screens had none, which is
+        // why picking a wall felt like nothing had happened. No payload and no
+        // style on the wire: the app decides what a tap feels like, so a page
+        // cannot use this channel to buzz a phone in somebody's pocket.
+        configuration.userContentController.add(context.coordinator, name: "haptic")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -289,6 +296,26 @@ struct CorrectView: UIViewRepresentable {
 
             case "mark":
                 parent.onMarkAgain()
+
+            case "haptic":
+                // `.rigid`, which is the same one `ScanScreen` uses when a mark
+                // lands and `ARMeasureScreen` uses to take a corner back: a
+                // short, hard tick that reads as "that registered" rather than
+                // as a notification. One feeling for one meaning, on both sides
+                // of the web view, for the same reason the palette is generated
+                // rather than typed twice.
+                //
+                // Inside a `Task { @MainActor }` like every other case in here
+                // that touches UIKit. `UIImpactFeedbackGenerator` is main-actor
+                // isolated and this coordinator is not, and the compiler that
+                // says so is on Sam's Mac rather than on this machine.
+                //
+                // No `[weak self]`: nothing in here reaches back into the
+                // coordinator, so there is nothing to keep alive and nothing to
+                // guard against.
+                Task { @MainActor in
+                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                }
 
             case "draft":
                 guard

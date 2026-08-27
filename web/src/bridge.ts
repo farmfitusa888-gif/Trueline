@@ -417,6 +417,51 @@ export function canMarkAgain(): boolean {
   return handler('mark') !== undefined;
 }
 
+/* -------------------------------------------------------------- the skin */
+
+/**
+ * Asks the phone to tap the finger that just did something.
+ *
+ * ## Why the web half needs this at all
+ *
+ * > "WHEN YOU SELECT THE WALL TO MAKE CHANGES TO … YOU DONT EVEN KNOW THAT YOU
+ * >  CLICKED IT."
+ *
+ * The native half has had haptics since the first capture screen — putting a
+ * corner down in `ARMeasureScreen` and marking damage in `ScanScreen` both tap
+ * the hand. Everything after the scan is these pages, and they had no way to
+ * ask. So the one moment in this app where a thumb is physically covering the
+ * thing that changed had the least feedback of anywhere in it.
+ *
+ * ## Why there is no payload and no style on the wire
+ *
+ * The app decides what a tap feels like, the same way it decides where a
+ * recording is written and what a marking pass captures. A channel that carried
+ * its own intensity would be a channel a page could use to buzz a phone in a
+ * pocket, and this web view runs whatever HTML it is given. One message, one
+ * meaning: *that landed on something*.
+ *
+ * ## Outside the app
+ *
+ * A browser has no phone to ask, so there is no handler and this returns
+ * `false` having done nothing. It is deliberately not an error and deliberately
+ * not something a caller has to guard: a wall on a laptop is picked exactly as
+ * well as a wall on a phone, it just does not buzz. The return value is there
+ * for a screen that wants to say so, and every current caller ignores it.
+ */
+export function tapBack(): boolean {
+  const post = handler('haptic');
+  if (!post) return false;
+  try {
+    post.postMessage({ version: BRIDGE_VERSION });
+    return true;
+  } catch {
+    // A feeling that did not happen is not a failure worth interrupting a tap
+    // for. The wall is still selected and the screen still says so.
+    return false;
+  }
+}
+
 /* ------------------------------------------------------------ drafting */
 
 /**

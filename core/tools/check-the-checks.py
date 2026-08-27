@@ -58,6 +58,13 @@ class Bench:
         shutil.copytree(ROOT / 'core' / 'tools', where / 'core' / 'tools',
                         ignore=shutil.ignore_patterns('__pycache__'))
         shutil.copytree(ROOT / 'ios', where / 'ios')
+        # The two web files `check-bridge.py` compares against the app. Copied
+        # one by one rather than the whole of `web/`, which carries node_modules
+        # and a build directory and would make every run of this harness a
+        # several-second file copy.
+        for rel in ('web/src/bridge.ts', 'web/audit/lib.mjs'):
+            (where / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / rel, where / rel)
 
     def read(self, rel: str) -> str:
         return (self.where / rel).read_text(encoding='utf-8')
@@ -552,6 +559,60 @@ def doors(bench: Bench) -> None:
         bench.restore(rel)
 
 
+# ------------------------------------------------------------------- bridge
+
+def bridge(bench: Bench) -> None:
+    """A channel name that does not match on both sides.
+
+    The page talks to the app through named message handlers. The name is a
+    string in three places written months apart — `handler('x')` in
+    `bridge.ts`, `add(..., name: "x")` and `case "x":` in `CorrectView.swift` —
+    and a fourth, the fake handler list in `web/audit/lib.mjs` that every
+    browser audit installs.
+
+    Nothing compared them until `haptic` became the tenth channel. A typo on any
+    one of the four compiles, ships, passes every test, and does nothing on a
+    phone: `handler()` returns undefined for a name nobody registered, and every
+    caller correctly and quietly does nothing. That politeness is right in a
+    browser, where there is no app, and it is exactly what hides the mistake.
+
+    Four mutations, one per list.
+    """
+    print('check-bridge.py — a channel name that does not match on both sides')
+
+    code, out = bench.run('check-bridge.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    native = 'ios/Trueline/CorrectView.swift'
+    web = 'web/src/bridge.ts'
+    fakes = 'web/audit/lib.mjs'
+
+    bench.write(native, bench.read(native).replace(
+        'add(context.coordinator, name: "haptic")', 'add(context.coordinator, name: "hpatic")'))
+    code, out = bench.run('check-bridge.py')
+    expect('a typo in the app\'s registration', code, out,
+           fires=True, saying='never registers it')
+    bench.restore(native)
+
+    bench.write(native, bench.read(native).replace('case "haptic":', 'case "hpatic":'))
+    code, out = bench.run('check-bridge.py')
+    expect('registered, but the switch spells it differently', code, out,
+           fires=True, saying='handles nothing when it arrives')
+    bench.restore(native)
+
+    bench.write(web, bench.read(web).replace("handler('haptic')", "handler('hpatic')"))
+    code, out = bench.run('check-bridge.py')
+    expect('the page posting to a name nobody registered', code, out,
+           fires=True, saying='never registers it')
+    bench.restore(web)
+
+    bench.write(fakes, bench.read(fakes).replace("'voice', 'haptic']", "'voice']"))
+    code, out = bench.run('check-bridge.py')
+    expect('a channel no browser audit can see', code, out,
+           fires=True, saying='no browser audit can see it')
+    bench.restore(fakes)
+
+
 # ----------------------------------------------------------------- portable
 
 def portable(bench: Bench) -> None:
@@ -834,6 +895,8 @@ def main() -> int:
         swiftNames(bench)
         print()
         doors(bench)
+        print()
+        bridge(bench)
         print()
         pbxproj(bench)
         print()

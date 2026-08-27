@@ -59,6 +59,8 @@ import { type AgreedChange, type ChangeDocument } from '../../core/src/change.ts
 import { type Payment } from '../../core/src/payment.ts';
 import { type Invoice } from '../../core/src/invoice.ts';
 import { type Proposal } from '../../core/src/proposal.ts';
+import { type SaleVenue } from '../../core/src/cooling.ts';
+import { type ReturnedDocument } from '../../core/src/countersign.ts';
 import { type Visit } from '../../core/src/schedule.ts';
 import { type Keeping } from '../../core/src/entitlement.ts';
 import { mayKeepRoomHere } from './entitlementStore.ts';
@@ -242,6 +244,31 @@ export interface Loaded {
    * is a change order, which is the entire point of keeping it.
    */
   readonly baseline: Baseline | null;
+  /**
+   * How the proposal was sent out, and when: the fingerprint of the document
+   * at the moment it left the phone.
+   *
+   * Without it a signed copy that comes back cannot be bound to the version
+   * that was signed, which is the whole of the evidence. `null` until the
+   * proposal has actually been sent. See `core/src/countersign.ts`.
+   */
+  readonly proposalSent: { readonly at: string; readonly hash: string } | null;
+  /**
+   * Where the client's agreement gets made, or `null` for not asked.
+   *
+   * Never defaulted, anywhere, including here. It decides whether the FTC's
+   * Cooling-Off Rule puts a three-day cancellation notice on the proposal, and
+   * the convenient answer is the one that gets a contractor sued. See
+   * `core/src/cooling.ts`.
+   */
+  readonly saleVenue: SaleVenue | null;
+  /**
+   * Signed copies of the proposal that came back — a photograph, a PDF, a scan.
+   *
+   * Appended, never edited, like `agreedChanges`. Deliberately NOT a
+   * `Signature` and deliberately not enough on its own to freeze a baseline.
+   */
+  readonly returnedCopies: readonly ReturnedDocument[];
   /**
    * Change orders the client has signed, in the order they were agreed.
    *
@@ -452,6 +479,9 @@ export type Action =
   | { type: 'proposal'; proposal: Proposal | null }
   | { type: 'baseline'; baseline: Baseline }
   | { type: 'agreedChanges'; agreedChanges: readonly AgreedChange[] }
+  | { type: 'proposalSent'; sent: { at: string; hash: string } }
+  | { type: 'saleVenue'; venue: SaleVenue | null }
+  | { type: 'returnedCopies'; returnedCopies: readonly ReturnedDocument[] }
   | { type: 'raisedChange'; raisedChange: ChangeDocument | null }
   | { type: 'visits'; visits: readonly Visit[] }
   | { type: 'invoices'; invoices: readonly Invoice[] }
@@ -503,6 +533,9 @@ function restored(saved: SavedProject, note: string): State {
     proposal?: Proposal;
     baseline?: Baseline;
     agreedChanges?: readonly AgreedChange[];
+    proposalSent?: { at: string; hash: string };
+    saleVenue?: SaleVenue;
+    returnedCopies?: readonly ReturnedDocument[];
     raisedChange?: ChangeDocument;
     visits?: readonly Visit[];
     invoices?: readonly Invoice[];
@@ -547,6 +580,12 @@ function restored(saved: SavedProject, note: string): State {
       // list is right for one: nobody signed anything, rather than something
       // that could not be read.
       agreedChanges: extras.agreedChanges ?? [],
+      proposalSent: extras.proposalSent ?? null,
+      // Absent, not "at the seller's place of business". A job saved before the
+      // question existed has not been asked it, and guessing the answer is the
+      // one that skips a notice the law requires.
+      saleVenue: extras.saleVenue ?? null,
+      returnedCopies: extras.returnedCopies ?? [],
       raisedChange: extras.raisedChange ?? null,
       visits: extras.visits ?? [],
       invoices: extras.invoices ?? [],
@@ -665,6 +704,9 @@ export function reduce(state: State, action: Action): State {
             baseline: null,
             agreedChanges: [],
             raisedChange: null,
+            proposalSent: null,
+            saleVenue: null,
+            returnedCopies: [],
             visits: [],
             invoices: [],
             payments: [],
@@ -749,6 +791,9 @@ export function reduce(state: State, action: Action): State {
             baseline: null,
             agreedChanges: [],
             raisedChange: null,
+            proposalSent: null,
+            saleVenue: null,
+            returnedCopies: [],
             visits: [],
             invoices: [],
             payments: [],
@@ -806,6 +851,9 @@ export function reduce(state: State, action: Action): State {
           baseline: null,
           agreedChanges: [],
           raisedChange: null,
+          proposalSent: null,
+          saleVenue: null,
+          returnedCopies: [],
           visits: [],
           invoices: [],
           payments: [],
@@ -1679,6 +1727,23 @@ export function reduce(state: State, action: Action): State {
         ? { ...state, loaded: { ...state.loaded, agreedChanges: action.agreedChanges } }
         : state;
 
+    case 'proposalSent':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, proposalSent: action.sent } }
+        : state;
+
+    case 'saleVenue':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, saleVenue: action.venue } }
+        : state;
+
+    // Appended, never edited: a signed copy that could be quietly swapped is
+    // worth nothing, and `checkReturned` would catch it anyway.
+    case 'returnedCopies':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, returnedCopies: action.returnedCopies } }
+        : state;
+
     // Written down, then either signed or torn up. Never edited in place: a
     // change order somebody is holding must not change under them.
     case 'raisedChange':
@@ -1802,6 +1867,9 @@ export function persist(loaded: Loaded, at: string): string | null {
         proposal: loaded.proposal,
         baseline: loaded.baseline,
         agreedChanges: loaded.agreedChanges,
+        proposalSent: loaded.proposalSent,
+        saleVenue: loaded.saleVenue,
+        returnedCopies: loaded.returnedCopies,
         raisedChange: loaded.raisedChange,
         visits: loaded.visits,
         invoices: loaded.invoices,

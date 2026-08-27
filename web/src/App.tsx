@@ -1130,8 +1130,15 @@ export function App() {
                 scope={loaded.scope}
                 proposal={loaded.proposal}
                 baseline={loaded.baseline}
+                proposalSent={loaded.proposalSent}
+                saleVenue={loaded.saleVenue}
+                returnedCopies={loaded.returnedCopies}
                 onProposal={(proposal) => dispatch({ type: 'proposal', proposal })}
                 onBaseline={(baseline) => dispatch({ type: 'baseline', baseline })}
+                onProposalSent={(sent) => dispatch({ type: 'proposalSent', sent })}
+                onSaleVenue={(venue) => dispatch({ type: 'saleVenue', venue })}
+                onReturnedCopies={(returnedCopies) =>
+                  dispatch({ type: 'returnedCopies', returnedCopies })}
               />
               </Gate>
             </Panel>

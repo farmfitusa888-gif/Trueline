@@ -1,5 +1,11 @@
 import { type Baseline } from '../../core/src/baseline.ts';
 import { type Company, letterhead } from '../../core/src/company.ts';
+import { type CancellationNotice, WHAT_THIS_DOES_NOT_KNOW } from '../../core/src/cooling.ts';
+import {
+  type ReturnedDocument,
+  CAME_BACK_SAYS,
+  describeReturned,
+} from '../../core/src/countersign.ts';
 import { money } from '../../core/src/price.ts';
 import { type Proposal, chosenOption } from '../../core/src/proposal.ts';
 
@@ -26,7 +32,24 @@ import { type Proposal, chosenOption } from '../../core/src/proposal.ts';
  *
  * Nothing is fetched, there are no scripts, and every value a person typed is
  * escaped on the way in — same rules as `clientFile.ts`, for the same reason:
- * this is a document that leaves the building.
+ * this is a document that leaves the building. That rule now covers a legal
+ * notice as well, which is a second reason it cannot be relaxed: a cancellation
+ * form that needs a stylesheet from somewhere is a cancellation form that is
+ * blank on the day it matters.
+ *
+ * ## Two more things it carries
+ *
+ * **Somewhere to sign by hand.** There are two ways to get a proposal agreed —
+ * on the phone, or send it and get it back signed — and until this document had
+ * a signature line the second one had nowhere to happen.
+ *
+ * **The federal three-day cancellation notice**, when the sale is one the FTC's
+ * Cooling-Off Rule covers. Not decoration: 16 CFR 429.1 makes the notice, the
+ * two completed cancellation forms and the bold sentence beside the buyer's
+ * signature the seller's own obligations, and a proposal signed in a kitchen
+ * for more than $25 is squarely inside the rule. What triggers it, what it
+ * says, and how the deadline is counted all live in `core/src/cooling.ts` with
+ * the regulation quoted; this file only lays it out.
  */
 
 /** Anything a person typed, safe to put in HTML. */
@@ -44,6 +67,64 @@ export interface ProposalFileParts {
   /** The signed record, when there is one. A draft has none. */
   readonly baseline: Baseline | null;
   readonly at: string;
+  /**
+   * The federal three-day cancellation notice, when the sale is one the FTC's
+   * Cooling-Off Rule covers.
+   *
+   * `null` when it is not — signed at the contractor's own place of business,
+   * or under the rule's dollar threshold — and the document then says nothing
+   * about cancelling. Silence is right there and a line saying "you have no
+   * right to cancel" would be wrong, because a state's own home-solicitation
+   * law may give one and this app has not checked any state's law.
+   *
+   * Worked out in `core/src/cooling.ts`, never typed here. See that file for
+   * what 16 CFR 429.1 actually requires, quoted.
+   */
+  readonly cooling: CancellationNotice | null;
+  /**
+   * Signed copies that came back — a photograph, a PDF, a scan of paper.
+   *
+   * On the document rather than only on the phone, because the record is worth
+   * keeping only if it can be produced. What it does and does not establish
+   * travels with it; see `core/src/countersign.ts`.
+   */
+  readonly returned: readonly ReturnedDocument[];
+}
+
+/**
+ * Somewhere to sign by hand, for the client who prints it.
+ *
+ * The change order has had one of these since it was built and the proposal
+ * never did, which meant the second of the two ways to get a proposal agreed —
+ * send it, get it back signed — had nowhere on the page to actually sign. A
+ * document sent out to be signed with no signature line on it is a document
+ * that comes back as a question.
+ */
+const BY_HAND = `
+  <div class="byhand">
+    <p class="line">Signature</p>
+    <p class="line">Printed name</p>
+    <p class="line">Date</p>
+  </div>`;
+
+/**
+ * One copy of the § 429.1(b) form.
+ *
+ * Two of these go on every proposal the rule covers, because the rule says "in
+ * duplicate": the buyer sends one back to cancel and keeps the other, and a
+ * buyer who has posted his only copy has kept no evidence that he cancelled.
+ */
+function cancellationForm(notice: CancellationNotice, which: string): string {
+  return `
+  <section class="notice">
+    <p class="which">${safe(which)}</p>
+    <h2 class="cap">NOTICE OF CANCELLATION</h2>
+    ${notice.form.map((line) => `<p class="ten">${safe(line)}</p>`).join('')}
+    <div class="byhand">
+      <p class="line">Date</p>
+      <p class="line">Buyer’s signature</p>
+    </div>
+  </section>`;
 }
 
 function optionBlock(
@@ -81,7 +162,14 @@ function optionBlock(
   </section>`;
 }
 
-export function proposalFile({ proposal, company, baseline, at }: ProposalFileParts): string {
+export function proposalFile({
+  proposal,
+  company,
+  baseline,
+  at,
+  cooling,
+  returned,
+}: ProposalFileParts): string {
   const head = letterhead(company);
   const taken = chosenOption(proposal);
   const terms = proposal.terms
@@ -114,7 +202,62 @@ export function proposalFile({ proposal, company, baseline, at }: ProposalFilePa
   <section class="unsigned">
     <h2>Not signed yet</h2>
     <p>This is a proposal, not an agreement. Nothing here is owed until somebody signs it.</p>
+    <p>
+      Two ways to agree to it: sign it on the phone together, or print this, sign below, and
+      send it back. Either one counts, and both are kept on the job.
+    </p>
+    ${BY_HAND}
   </section>`;
+
+  /**
+   * The sentence § 429.1(a) requires, immediately above the space for the
+   * buyer's signature and in bold face type of at least ten points.
+   *
+   * Its position on the page is part of the requirement — "in immediate
+   * proximity to the space reserved in the contract for the signature of the
+   * buyer" — so it is rendered here, attached to the signature area, rather
+   * than filed with the rest of the small print at the foot where nobody would
+   * read it and where it would not satisfy the rule.
+   */
+  const statement = cooling
+    ? `
+  <section class="stmt">
+    <p class="ten">${safe(cooling.statement)}</p>
+  </section>`
+    : '';
+
+  const notices = cooling
+    ? `
+  ${cancellationForm(cooling, 'Copy 1 of 2 — send this one back if you cancel')}
+  ${cancellationForm(cooling, 'Copy 2 of 2 — keep this one')}
+  <section class="caveat">
+    <h2>About that three-day right</h2>
+    <ul>${WHAT_THIS_DOES_NOT_KNOW.map((line) => `<li>${safe(line)}</li>`).join('')}</ul>
+  </section>`
+    : '';
+
+  const back = returned.length
+    ? `
+  <section class="back">
+    <h2>Signed copy${returned.length === 1 ? '' : 's'} on file</h2>
+    ${returned
+      .map(
+        (one) => `
+      <div class="one">
+        <p class="who">${safe(one.saysSignedBy)} — ${safe(CAME_BACK_SAYS[one.cameBackBy])}</p>
+        ${
+          one.copyType.startsWith('image/')
+            ? `<img alt="The signed copy that came back from ${safe(one.saysSignedBy)}" ` +
+              `src="${safe(one.copy)}">`
+            : '<p class="fine">The signed copy is a PDF and is kept on the job rather than ' +
+              'printed here.</p>'
+        }
+        <ul>${describeReturned(one).map((line) => `<li>${safe(line)}</li>`).join('')}</ul>
+      </div>`
+      )
+      .join('')}
+  </section>`
+    : '';
 
   return `<!doctype html>
 <html lang="en">
@@ -158,8 +301,36 @@ export function proposalFile({ proposal, company, baseline, at }: ProposalFilePa
   .who { font-weight: 600; margin: .3rem 0 0; }
   .fine { font-size: .78rem; color: #56606A; margin: .15rem 0; }
   code { font-size: .72rem; word-break: break-all; }
+  /* Ten points is the floor 16 CFR 429.1 sets for the statement and for the
+     cancellation form, so this is set in points rather than pixels and set a
+     point over the floor. A rem here would scale with a reader's own settings
+     and could land under it. */
+  .ten { font-size: 11pt; font-weight: 700; line-height: 1.5; margin: 0 0 .7rem; }
+  .stmt { border: 2px solid #16212B; padding: 12px 14px; margin: 26px 0 0; }
+  .stmt .ten { margin: 0; }
+  .notice { border: 2px solid #16212B; padding: 16px; margin: 22px 0 0; }
+  .notice .which { font-size: .74rem; letter-spacing: .06em; text-transform: uppercase;
+                   color: #56606A; margin: 0 0 .6rem; }
+  .cap { font-size: 1.05rem; letter-spacing: .04em; margin: 0 0 .9rem; }
+  .caveat { border-top: 2px solid #16212B; margin-top: 26px; padding-top: 14px; }
+  .caveat li { font-size: .85rem; color: #56606A; margin: .4rem 0; }
+  .byhand { margin-top: 22px; }
+  .byhand .line { border-bottom: 1px solid #16212B; margin: 0 0 26px; padding-bottom: 22px;
+                  font-size: .74rem; letter-spacing: .05em; text-transform: uppercase;
+                  color: #56606A; }
+  .back { border-top: 2px solid #16212B; margin-top: 26px; padding-top: 16px; }
+  .back .one { margin: 14px 0 22px; }
+  .back img { display: block; max-width: 320px; height: auto; border: 1px solid #D9CFBC; }
+  .back li { font-size: .8rem; color: #56606A; margin: .25rem 0; }
   footer { margin-top: 30px; font-size: .75rem; color: #56606A; }
-  @media print { body { padding: 0; } .opt { break-inside: avoid; } }
+  @media print {
+    body { padding: 0; }
+    .opt { break-inside: avoid; }
+    /* Each cancellation form on its own sheet, because the rule wants them
+       "easily detachable" and a form printed halfway down the back of the
+       price schedule is not. */
+    .notice { break-before: page; break-inside: avoid; }
+  }
 </style>
 <div class="head">
   <h1>${safe(head[0] ?? 'Proposal')}</h1>
@@ -180,7 +351,10 @@ ${proposal.options.map((o) => optionBlock(o, taken?.id === o.id)).join('')}
   <ul>${terms}</ul>
 </section>
 
+${statement}
 ${signed}
+${back}
+${notices}
 
 <footer>
   ${safe(proposal.roomName)} · measured and priced in Trueline · this document contains

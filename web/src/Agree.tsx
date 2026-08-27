@@ -15,6 +15,26 @@
  * Nothing here re-enters a number. Every figure comes from the same quote the
  * Price section shows, so a proposal cannot disagree with the takeoff it came
  * from — the failure that gets discovered by the client.
+ *
+ * ## Two ways to get it signed, and one legal question that decides the document
+ *
+ * A proposal gets agreed one of two ways. The client signs on the phone,
+ * standing there, and `signature.ts` records intent, consent, attribution,
+ * time, device and a fingerprint of the document. Or the contractor sends it,
+ * they print it, sign it at the kitchen table and send a photograph back — and
+ * that copy gets **filed against this proposal**, bound to the fingerprint the
+ * document had when it went out. The second is weaker evidence than the first,
+ * this screen says so in as many words, and `countersign.ts` makes the record
+ * itself say so too.
+ *
+ * The legal question is **where the client signs it**. If it is anywhere but
+ * the contractor's own place of business, the FTC's Cooling-Off Rule — 16 CFR
+ * Part 429 — gives the buyer until midnight of the third business day to
+ * cancel and makes putting the notice and two completed cancellation forms in
+ * the buyer's hands the seller's job. This screen asks, and it does not answer
+ * for him: the question has no default, because the only answer worth
+ * defaulting to is the one that says he owes nothing. `cooling.ts` holds the
+ * rule, the quotes and the arithmetic.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -44,8 +64,26 @@ import {
   CLIENT_INTENT,
   CONSENT,
   describeSignature,
+  hashOf,
   sign,
 } from '../../core/src/signature.ts';
+import {
+  type CancellationNotice,
+  type SaleVenue,
+  WHAT_THIS_DOES_NOT_KNOW,
+  cancellationNotice,
+  coolingApplies,
+  describeCooling,
+} from '../../core/src/cooling.ts';
+import {
+  type CameBackBy,
+  type ReturnedDocument,
+  CAME_BACK_SAYS,
+  WEAKER_THAN_SIGNING_HERE,
+  checkReturned,
+  describeReturned,
+  fileSignedBack,
+} from '../../core/src/countersign.ts';
 import { useQuote } from './quoteOf.ts';
 import { sheetOf } from './quoteOf.ts';
 import { DraftButton, DraftedNote } from './Draft.tsx';
@@ -83,14 +121,76 @@ function Field({
   );
 }
 
+/**
+ * Today, as a plain calendar date.
+ *
+ * Local rather than UTC on purpose: the date on a cancellation notice is the
+ * date the contractor and the client are both standing in, and a phone in
+ * Arizona at nine at night must not put tomorrow on a legal form.
+ */
+function today(): string {
+  const now = new Date();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/** A picked file, as a `data:` URL, so the copy travels inside the job. */
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () =>
+      reject(new Error('That file could not be read. Try the photograph again.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** One of a small set of answers, as buttons rather than a dropdown. */
+function Choice<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  readonly value: T | null;
+  readonly options: readonly (readonly [T, string])[];
+  readonly onChange: (value: T) => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {options.map(([option, label]) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={value === option}
+          onClick={() => onChange(option)}
+          className={`min-h-11 rounded-md px-4 text-sm font-semibold ${
+            value === option
+              ? 'bg-slate-900 text-white'
+              : 'border border-slate-300 text-slate-700 active:bg-slate-100'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Agree({
   room,
   overrides,
   scope,
   proposal,
   baseline,
+  proposalSent,
+  saleVenue,
+  returnedCopies,
   onProposal,
   onBaseline,
+  onProposalSent,
+  onSaleVenue,
+  onReturnedCopies,
 }: {
   readonly room: Room;
   readonly overrides: readonly Override[];
@@ -101,8 +201,17 @@ export function Agree({
   readonly scope: WorkScope | null;
   readonly proposal: Proposal | null;
   readonly baseline: Baseline | null;
+  /** The proposal as it went out: when, and its fingerprint then. */
+  readonly proposalSent: { readonly at: string; readonly hash: string } | null;
+  /** Where the agreement gets made, or `null` for not asked. Never defaulted. */
+  readonly saleVenue: SaleVenue | null;
+  /** Signed copies that have come back. */
+  readonly returnedCopies: readonly ReturnedDocument[];
   readonly onProposal: (proposal: Proposal | null) => void;
   readonly onBaseline: (baseline: Baseline) => void;
+  readonly onProposalSent: (sent: { at: string; hash: string }) => void;
+  readonly onSaleVenue: (venue: SaleVenue | null) => void;
+  readonly onReturnedCopies: (copies: readonly ReturnedDocument[]) => void;
 }) {
   const { company } = useUnits();
   // The same quote the Price section shows, from the same hook. A proposal that
@@ -139,12 +248,19 @@ export function Agree({
         company,
         baseline,
         at: new Date().toLocaleDateString(),
+        cooling: notice.ready,
+        returned: filed,
       });
       const said = await sendFile(
         new Blob([html], { type: 'text/html;charset=utf-8' }),
         fileNameFor(proposal.roomName, 'html', 'proposal'),
         `${proposal.roomName} — proposal`
       );
+      // The fingerprint of the document AT THE MOMENT IT WENT OUT, kept so a
+      // signed copy that comes back can be checked against it. Taken after the
+      // send rather than before, so a share the contractor cancelled does not
+      // leave a record saying a document is out when it is not.
+      setSentOut({ at: new Date().toISOString(), hash: await hashOf(proposal) });
       if (said) setSent(said);
     } catch (error) {
       setSent(error instanceof Error ? error.message : String(error));
@@ -175,8 +291,109 @@ export function Agree({
   const [trouble, setTrouble] = useState<string | null>(null);
   const [order, setOrder] = useState<ChangeOrder | null>(null);
 
+  /**
+   * Where the client's agreement gets made. No default, ever.
+   *
+   * `null` is "not asked", and it is a state the screen shows rather than
+   * resolves. Picking one for him would be picking one of two legal positions
+   * on his behalf, and the convenient one — his own office, no notice owed — is
+   * the one that gets a contractor sued.
+   */
+  // Kept beside the room rather than in this component, because a proposal
+  // reopened tomorrow has to remember where it is being signed. Losing the
+  // answer means asking again, and a question asked twice gets the convenient
+  // answer the second time.
+  const venue = saleVenue;
+  const setVenue = onSaleVenue;
+  /** The day it gets signed. Today until he says otherwise, and always shown. */
+  const [signingDay, setSigningDay] = useState(today());
+  /**
+   * Where a cancellation gets posted.
+   *
+   * Asked here because the company profile has no address on it, and 16 CFR
+   * 429.1(c) makes putting the seller's address on both cancellation forms the
+   * seller's own job. A form that tells a buyer to post his cancellation to
+   * nowhere is a defect in the contractor's paperwork.
+   */
+  const [sellerAddress, setSellerAddress] = useState('');
+  /**
+   * The proposal as it went out: when, and its fingerprint at that moment.
+   *
+   * The whole basis of filing a signed copy back. Without it there is nothing
+   * to check a returned sheet against, which is why the screen refuses to file
+   * one until the proposal has actually been sent from this phone.
+   */
+  const sentOut = proposalSent;
+  const setSentOut = onProposalSent;
+  /** Signed copies that have come back, in the order they arrived. */
+  const filed = returnedCopies;
+  const setFiled = onReturnedCopies;
+  const [backWho, setBackWho] = useState('');
+  const [backOn, setBackOn] = useState('');
+  const [backHow, setBackHow] = useState<CameBackBy | null>(null);
+  const [backNote, setBackNote] = useState('');
+  const [backCopy, setBackCopy] = useState<{ data: string; name: string } | null>(null);
+  const [backTrouble, setBackTrouble] = useState<string | null>(null);
+  /**
+   * Filed copies whose proposal has moved out from under them, by id.
+   *
+   * Checked continuously rather than only at the moment of filing, because the
+   * proposal can be edited afterwards — a name corrected, an address fixed —
+   * and from that instant the signed sheet in the folder is not the sheet the
+   * app is showing. Finding that out at the end of the job is finding it out
+   * too late, which is the same reason `changesSinceVerified` exists.
+   */
+  const [drifted, setDrifted] = useState<Record<string, string>>({});
+
   const missing = proposal ? missingFromProposal(proposal) : [];
   const taken = proposal ? chosenOption(proposal) : undefined;
+
+  /**
+   * What the buyer is agreeing to pay, for the rule's dollar threshold.
+   *
+   * The chosen option once there is one. Before that, the dearest option on the
+   * sheet — deliberately the largest rather than the smallest, because being
+   * over the threshold is the answer that makes work for the contractor and
+   * guessing low would quietly excuse him from a notice he owes.
+   */
+  const price = taken
+    ? taken.total
+    : (proposal?.options ?? []).reduce((most, option) =>
+        option.total > most ? option.total : most, 0n);
+
+  /**
+   * The date of the transaction: the day the buyer's agreement is made.
+   *
+   * Once it is signed on the phone that is a fact and is read off the frozen
+   * baseline. Before then it is whatever day the contractor says it will be
+   * signed, because a notice dated today and signed on Saturday carries a
+   * deadline three days short.
+   */
+  const transactionDay = baseline ? baseline.frozenAt.slice(0, 10) : signingDay;
+
+  const cooling = venue ? coolingApplies(venue, price) : null;
+
+  /**
+   * The completed notice, or what is stopping it being completed.
+   *
+   * `cancellationNotice` refuses rather than printing a form with a hole in it,
+   * and that refusal is a sentence the contractor can act on — so it is caught
+   * and shown rather than swallowed.
+   */
+  const notice = useMemo<{ ready: CancellationNotice | null; trouble: string | null }>(() => {
+    if (!cooling?.applies) return { ready: null, trouble: null };
+    try {
+      return {
+        ready: cancellationNotice(
+          { name: company.name, address: sellerAddress },
+          transactionDay
+        ),
+        trouble: null,
+      };
+    } catch (error) {
+      return { ready: null, trouble: error instanceof Error ? error.message : String(error) };
+    }
+  }, [cooling?.applies, company.name, sellerAddress, transactionDay]);
 
   // Everything that has moved since it was signed, re-read whenever the room
   // or the rates do. Asynchronous because verifying the seal is.
@@ -193,6 +410,28 @@ export function Agree({
       live = false;
     };
   }, [baseline, proposal, current]);
+
+  // Every filed copy re-checked against the proposal as it stands now.
+  // Asynchronous because hashing is; keyed by id so the alert sits on the copy
+  // it belongs to rather than at the top of a list.
+  useEffect(() => {
+    let live = true;
+    if (!proposal || filed.length === 0) {
+      setDrifted({});
+      return;
+    }
+    void Promise.all(
+      filed.map(async (one) => [one.id, await checkReturned(proposal, one)] as const)
+    ).then((seals) => {
+      if (!live) return;
+      const bad: Record<string, string> = {};
+      for (const [id, seal] of seals) if (!seal.ok) bad[id] = seal.why;
+      setDrifted(bad);
+    });
+    return () => {
+      live = false;
+    };
+  }, [proposal, filed]);
 
   const device = useMemo(
     () => (typeof navigator === 'undefined' ? 'not recorded' : navigator.userAgent),
@@ -408,12 +647,14 @@ export function Agree({
           })}
         </ul>
 
-        <h3 className="mt-4 text-sm font-semibold text-slate-900">What is not included</h3>
-        <ul className="mt-1 list-disc pl-5 text-sm text-slate-600">
-          {proposal.terms.map((term) => (
-            <li key={term}>{term}</li>
-          ))}
-        </ul>
+        <details className="mt-4">
+          <summary className="text-sm font-semibold text-slate-900">What is not included</summary>
+          <ul className="mt-1 list-disc pl-5 text-sm text-slate-600">
+            {proposal.terms.map((term) => (
+              <li key={term}>{term}</li>
+            ))}
+          </ul>
+        </details>
 
         {/* Sending it, at the FOOT of the proposal.
             
@@ -427,6 +668,25 @@ export function Agree({
             proposal is exactly the thing you send in order to get it signed --
             and the document says which it is, at the top, in its own words. */}
         <div className="mt-5 border-t border-slate-200 pt-4">
+          {/* Answered below, never here. This is only the reminder, put where
+              the thumb already is: the document that goes out is different
+              depending on the answer, and sending first and answering after
+              means the client is holding a proposal with no notice on it. One
+              line, because everything above the signature pad pushes it further
+              down a phone screen and the pad is what this screen is for. */}
+          {!venue && (
+            <p className="mb-2 text-sm font-medium text-amber-800">
+              Answer “where does this get signed?” below before you send it.
+            </p>
+          )}
+          {cooling && !cooling.applies && (
+            <p className="mb-3 text-xs leading-relaxed text-slate-500">{cooling.why}</p>
+          )}
+          {notice.trouble && (
+            <p role="alert" className="mb-3 rounded-md bg-red-50 p-3 text-sm text-red-900">
+              {notice.trouble} Until then this goes out without the cancellation forms.
+            </p>
+          )}
           <button
             type="button"
             disabled={sending}
@@ -444,7 +704,94 @@ export function Agree({
           {sent && (
             <p role="status" className="mt-2 text-sm text-slate-700">{sent}</p>
           )}
+          {sentOut && (
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              Sent {sentOut.at.slice(0, 10)}. The fingerprint of what went out is{' '}
+              <span className="font-mono">{sentOut.hash.slice(0, 16)}…</span>. A signed copy
+              that comes back gets checked against it.
+            </p>
+          )}
         </div>
+      </section>
+
+      {/* -------------------------------------- where it gets signed */}
+
+      {/*
+        One question, and the app must not answer it.
+
+        16 CFR 429.0(a) turns on where the buyer's agreement is made, not on who
+        rang whom: "including those in response to or following an invitation by
+        the buyer". A contractor invited to quote a kitchen and signing at that
+        kitchen table has made a sale the rule covers, and almost every
+        contractor believes the opposite because the rule is called door-to-door.
+
+        The three answers are the rule's three cases and the money is different
+        in each — $25 at the buyer's home, $130 away from it, nothing at the
+        seller's own premises. See `core/src/cooling.ts`.
+      */}
+      <section
+        data-sheet="no"
+        className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+      >
+        <h2 className="font-semibold text-slate-900">Where does this get signed?</h2>
+        <p className="mt-1 text-sm leading-relaxed text-slate-600">
+          {venue
+            ? 'This decides whether federal law puts a three-day cancellation notice on the ' +
+              'document. Your premises means your own permanent shop, yard or office.'
+            : 'Not answered, and Trueline will not guess it. Until you say, the proposal goes ' +
+              'out with no cancellation notice on it. Your premises means your own permanent ' +
+              'shop, yard or office.'}
+        </p>
+        <Choice<SaleVenue>
+          value={venue}
+          onChange={setVenue}
+          options={[
+            ['buyer-home', 'Their home'],
+            ['away-from-both', 'Somewhere else'],
+            ['seller-place', 'Your premises'],
+          ]}
+        />
+
+        {cooling?.applies && (
+          <div className="mt-3 space-y-3">
+            {!baseline && (
+              <Field
+                label="The day it gets signed"
+                value={signingDay}
+                onChange={setSigningDay}
+                type="date"
+              />
+            )}
+            <Field
+              label="Where a cancellation gets sent"
+              value={sellerAddress}
+              onChange={setSellerAddress}
+              placeholder="2200 Oak Street, Mesa AZ 85201"
+            />
+          </div>
+        )}
+
+        {cooling && (
+          <ul className="mt-3 space-y-2 text-sm leading-relaxed text-slate-700">
+            {describeCooling(cooling, notice.ready).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
+
+        {notice.trouble && (
+          <p role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-900">
+            {notice.trouble}
+          </p>
+        )}
+
+        {cooling?.applies && (
+          <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-500">
+            {WHAT_THIS_DOES_NOT_KNOW.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* ----------------------------------------------------- signing */}
@@ -476,6 +823,18 @@ export function Agree({
                   />
                   <span>{CONSENT}</span>
                 </label>
+                {/* 16 CFR 429.1(a) wants this sentence "in immediate proximity
+                    to the space reserved in the contract for the signature of
+                    the buyer", in bold face type of at least ten points. On a
+                    phone the space reserved for the signature is the pad, so it
+                    goes here, directly above it, and not with the small print
+                    at the foot where it would satisfy nobody. */}
+                {notice.ready && (
+                  <p className="rounded-md border-2 border-slate-900 p-3 text-[11pt]
+                                font-bold leading-relaxed text-slate-900">
+                    {notice.ready.statement}
+                  </p>
+                )}
                 <SignaturePad onChange={setMark} disabled={false} />
                 <button
                   type="button"
@@ -520,6 +879,176 @@ export function Agree({
               </p>
             </>
           )}
+        </section>
+      )}
+
+      {/* ------------------------------------ the other way: signed and sent back */}
+
+      {/*
+        The second of the two ways to get a proposal agreed.
+
+        It only appears once the proposal has actually gone out from this phone,
+        and that is the feature rather than a limitation: the fingerprint of the
+        document is taken at the moment it is sent, and without it there is
+        nothing to check a returned sheet against. A record that says "signed"
+        and cannot say WHICH VERSION was signed is the record that loses the
+        argument it was kept for.
+      */}
+      {sentOut && (
+        <section
+          data-sheet="no"
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+        >
+          <h2 className="font-semibold text-slate-900">A signed copy came back</h2>
+          <p className="mt-1 text-sm leading-relaxed text-slate-600">
+            They printed it, signed it and sent it back. File it here and it is kept on this
+            job, against this proposal, with the fingerprint of the version that went out.
+          </p>
+          <p className="mt-2 rounded-md bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
+            {WEAKER_THAN_SIGNING_HERE}
+          </p>
+
+          <div className="mt-3 space-y-3">
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">
+                The photograph or PDF they sent
+              </span>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                aria-label="The photograph or PDF they sent"
+                className="mt-1 block w-full text-sm text-slate-700"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  void (async () => {
+                    try {
+                      setBackTrouble(null);
+                      setBackCopy({ data: await readAsDataUrl(file), name: file.name });
+                      // What it is, taken from the file itself rather than
+                      // asked for twice. Still changeable below, because a
+                      // photograph OF a signed paper page is both.
+                      setBackHow(file.type === 'application/pdf' ? 'pdf' : 'photograph');
+                    } catch (error) {
+                      setBackTrouble(error instanceof Error ? error.message : String(error));
+                    }
+                  })();
+                }}
+              />
+              {backCopy && (
+                <span className="mt-1 block text-xs text-slate-500">{backCopy.name}</span>
+              )}
+            </label>
+
+            <Field
+              label="Who signed it"
+              value={backWho}
+              onChange={setBackWho}
+              placeholder="M. Alvarez"
+            />
+            <Field
+              label="The day they say they signed it"
+              value={backOn}
+              onChange={setBackOn}
+              type="date"
+            />
+
+            <div>
+              <span className="text-sm font-medium text-slate-700">How it got back to you</span>
+              <Choice<CameBackBy>
+                value={backHow}
+                onChange={setBackHow}
+                options={[
+                  ['photograph', 'A photograph'],
+                  ['pdf', 'A PDF'],
+                  ['paper', 'On paper'],
+                ]}
+              />
+            </div>
+
+            <Field
+              label="Anything worth putting on the record"
+              value={backNote}
+              onChange={setBackNote}
+              placeholder="Texted it Tuesday night."
+            />
+
+            <button
+              type="button"
+              onClick={() => {
+                void (async () => {
+                  try {
+                    setBackTrouble(null);
+                    if (!backHow) {
+                      throw new Error('Say how it got back to you.');
+                    }
+                    const one = await fileSignedBack(proposal, {
+                      id: `back-${Date.now()}`,
+                      jobName: proposal.roomName,
+                      documentId: proposal.id,
+                      documentKind: 'proposal',
+                      sentHash: sentOut.hash,
+                      sentAt: sentOut.at,
+                      saysSignedBy: backWho,
+                      saysSignedOn: backOn,
+                      cameBackAt: new Date().toISOString(),
+                      cameBackBy: backHow,
+                      copy: backCopy?.data ?? '',
+                      note: backNote,
+                    });
+                    setFiled([...filed, one]);
+                    setBackWho('');
+                    setBackOn('');
+                    setBackNote('');
+                    setBackCopy(null);
+                  } catch (error) {
+                    setBackTrouble(error instanceof Error ? error.message : String(error));
+                  }
+                })();
+              }}
+              className="min-h-12 w-full rounded-md bg-slate-900 px-5 font-semibold text-white
+                         active:bg-slate-700"
+            >
+              File the signed copy
+            </button>
+          </div>
+
+          {backTrouble && (
+            <p role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-900">
+              {backTrouble}
+            </p>
+          )}
+
+          {filed.map((one) => (
+            <div
+              key={one.id}
+              className="mt-4 rounded-lg border border-slate-200 p-3"
+            >
+              <h3 className="font-semibold text-slate-900">
+                Signed copy on file — {one.saysSignedBy}
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {CAME_BACK_SAYS[one.cameBackBy]}, filed {one.cameBackAt.slice(0, 10)}
+              </p>
+              {drifted[one.id] && (
+                <p role="alert" className="mt-2 rounded-md bg-red-50 p-3 text-sm text-red-900">
+                  {drifted[one.id]}
+                </p>
+              )}
+              {one.copyType.startsWith('image/') && (
+                <img
+                  src={one.copy}
+                  alt={`The signed copy that came back from ${one.saysSignedBy}`}
+                  className="mt-2 max-h-48 rounded border border-slate-200 bg-white"
+                />
+              )}
+              <ul className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600">
+                {describeReturned(one).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
       )}
 

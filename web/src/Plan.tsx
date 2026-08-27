@@ -13,6 +13,8 @@ import {
   damageRunOnPlan,
 } from '../../core/src/damage.ts';
 import { type Tag, CONDITION, describeTag } from '../../core/src/tag.ts';
+import type { CSSProperties } from 'react';
+import { tapBack } from './bridge.ts';
 
 /**
  * The plan, drawn from the render model and nothing else.
@@ -77,6 +79,171 @@ const DIM_OFFSET = 30;
 const DIM_TICK = 5;
 /** Dimension lines are thin and grey: they are notation, not building. */
 const DIM_INK = 'rgb(var(--c-derived))';
+
+/**
+ * The wall somebody just tapped, in the brand's amber.
+ *
+ * ## What was wrong with what this replaces
+ *
+ * A selected wall used to get one extra element: a `--c-focus` line at
+ * `strokeWidth={16}` and `strokeOpacity={0.28}` behind it, and nothing else on
+ * the drawing changed at all. On a phone, in daylight, with a finger sitting on
+ * top of the halo, that is not feedback — Sam could not tell a tap had
+ * registered.
+ *
+ * ## How it is drawn now, and why in three layers
+ *
+ * The mark AT the wall changes, not something offset behind it, because behind
+ * it is where a thumb goes. A picked wall is a casing, a band and its own line:
+ *
+ *   1. a casing at `pickedWidth + 14`, faint, which is the part that pulses;
+ *   2. the **band** — the wall drawn thick and amber, at the wall's own
+ *      position, at more than double its width;
+ *   3. the wall's **own line**, unchanged, on top of the band.
+ *
+ * Layer 3 is not a detail. The first version of this painted layer 2's amber
+ * onto the wall's own line instead, and `a6-persist` found it immediately: a
+ * wall somebody had DRAGGED stopped being drawn in `--c-adjusted` for as long as
+ * it was selected, so the drawing stopped saying *this one was moved by hand*
+ * about the wall a person was in the middle of moving by hand. Selection is a
+ * state of the screen; provenance is a fact about the building, and a screen
+ * state does not get to overwrite one.
+ *
+ * ## Why the accent amber and not the scanned amber
+ *
+ * There are two ambers in `design.ts` and they are not interchangeable.
+ * `--c-scanned` means *the sensor guessed this and nobody has checked it*, and
+ * that meaning is the whole product. `--c-accent` is the one the palette hands
+ * to "a control that ACTS rather than a state", which is exactly what a wall
+ * somebody has tapped is.
+ *
+ * That distinction is thinner than it should be to rely on alone — the two
+ * ambers are 1.4:1 apart — which is the other reason the wall's own line stays
+ * on top of the band rather than being replaced by it. The band says PICKED;
+ * the line and the number both go on saying where the measurement came from,
+ * and no colour is asked to carry two meanings.
+ */
+const PICKED = 'rgb(var(--c-accent))';
+
+/**
+ * How far back the rest of the BUILDING drops when a wall is picked.
+ *
+ * The point of dimming is that the eye lands on one wall. The point of the
+ * floor it is chosen against is that this is a working drawing: somebody
+ * comparing the wall they tapped to the one opposite still has to be able to
+ * read the one opposite, so "dimmed" must never become "gone".
+ *
+ * 0.7 is not a taste; it is the lowest number that survives the measurement,
+ * and the first value tried — 0.55 — did not. Each wall colour composited at
+ * this opacity over `--c-raise`, measured against `--c-raise`, on both grounds:
+ *
+ *   | wall            | light: full | at 0.7 | dark: full | at 0.7 |
+ *   | --------------- | ----------- | ------ | ---------- | ------ |
+ *   | `--c-ink`       |       17.85 |  6.60  |      13.08 |  7.08  |
+ *   | `--c-adjusted`  |        8.12 |  3.85  |       7.02 |  4.16  |
+ *   | `--c-scanned`   |        7.00 |  3.58  |       8.10 |  4.65  |
+ *   | `--c-derived`   |        5.95 |  3.10  |       5.44 |  3.38  |
+ *
+ * All four clear the 3:1 that WCAG 1.4.11 asks of a graphic somebody has to
+ * make out, on both grounds, and `--c-derived` on the light one clears it by
+ * 0.10 — which is what fixes the number here. At 0.65 it is 2.82, and a
+ * hand-drawn wall opposite the one being worked on stops being readable, which
+ * is the exact thing this must not do. Both grounds have to be checked and
+ * neither is the other one inverted: this app follows the phone from a driveway
+ * at one in the afternoon to a basement with one bulb.
+ *
+ * **The one exception, named rather than hidden:** an open span is drawn in
+ * `--c-faint`, which is 4.76 at full strength and 2.72 here. It is under the
+ * floor and it is meant to be — a dashed faint line is how this drawing says
+ * *there is nothing here*, and it is deliberately the least substantial mark on
+ * the sheet. Holding the whole drawing's dimming hostage to the one thing that
+ * is not a wall would be reading the rule instead of the room.
+ *
+ * `a29-tapped.mjs` reads these out of the live DOM, on both grounds, and
+ * asserts them. Nothing above is trusted because it is written down.
+ */
+const RECEDE = 0.7;
+
+/**
+ * And how far back the NOTATION drops, which is further.
+ *
+ * Two levels rather than one, because the drawing has two layers and only one
+ * of them is the building. The dimension lines and their ticks, the furniture
+ * footprints and the corner dots are all notation — grey hairlines and dashed
+ * boxes that are already the faintest things on the sheet, drawn at stroke
+ * opacities of 0.55 and 0.75 before any of this applies. Holding them at the
+ * building's floor would have left the drawing looking barely touched, and
+ * dropping the walls to *this* would have taken a hand-drawn wall opposite
+ * below the point somebody can read it.
+ *
+ * So the annotation layer carries the "everything else stepped back" that Sam
+ * asked for, and the walls carry the legibility. Nothing here is a measurement:
+ * an extension line is a pointer at one, and the number it points to is inside
+ * its own wall's group at `RECEDE`.
+ */
+const RECEDE_NOTE = 0.45;
+
+/**
+ * Two pulses on the wall somebody tapped, and then it stops.
+ *
+ * ## Why two and not forever
+ *
+ * A permanent animation on a drawing is a distraction on a job site — the eye
+ * keeps going back to a thing that is not saying anything new, on a screen
+ * somebody is trying to read dimensions off. Two beats say "this one" and then
+ * hand the drawing back. The settled state is already thick and amber, so
+ * nothing is carried by the movement alone.
+ *
+ * ## Why the stylesheet is inside the SVG
+ *
+ * `renderPlan.tsx` serialises this element whole to make the picture that goes
+ * into a claim file, and outside the page it inherits no stylesheet at all —
+ * the same reason `fontFamily` is named on the `<svg>` rather than left to the
+ * page. A rule in `index.css` would simply not exist in an export. It is
+ * rendered only while something is selected, and an export always passes
+ * `selected={null}`, so a saved drawing carries none of this.
+ *
+ * ## Reduced motion
+ *
+ * Somebody who asked for no movement gets none: the rule is switched off
+ * whole rather than shortened. Nothing is lost by that, which is the test a
+ * motion effect has to pass — the thick amber line, the amber casing and the
+ * dimmed drawing around it are all static, and they are what says "this one".
+ * The animation only ever added emphasis to a state that already reads.
+ *
+ * The keyframes start and end exactly where the element's own attributes are,
+ * so when the two beats finish and the rule stops applying, nothing jumps.
+ */
+const PICK_PULSE = `
+.trueline-picked-halo {
+  animation: trueline-picked 480ms ease-in-out 2;
+}
+@keyframes trueline-picked {
+  0%, 100% { stroke-width: var(--picked-halo); stroke-opacity: 0.32; }
+  50% { stroke-width: var(--picked-peak); stroke-opacity: 0.85; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trueline-picked-halo { animation: none; }
+}
+`;
+
+/**
+ * The two widths the pulse moves between, handed to the stylesheet above.
+ *
+ * They are custom properties rather than literals in the keyframes because a
+ * wall's drawn width comes off its own thickness and the sheet's scale, so
+ * there is no one number: a 2x4 partition in a small room and a 2x6 wall in a
+ * big one are different sizes of casing. Written as literals, every selected
+ * wall would pulse to the same absolute width and the thick ones would appear
+ * to shrink when tapped.
+ *
+ * The cast is React's: `CSSProperties` is `csstype`'s property list, which has
+ * no room in it for a name the CSS spec has never heard of. The values still
+ * arrive on the element as written.
+ */
+function pulseWidths(halo: number, peak: number): CSSProperties {
+  return { '--picked-halo': halo, '--picked-peak': peak } as CSSProperties;
+}
 
 export interface PlanProps {
   readonly room: Room;
@@ -229,6 +396,45 @@ export function Plan({
   const model = toRenderModel(room, [], { unit: 'ft' });
   const blocked = new Map(obstructions.map((o) => [o.wallId, o]));
 
+  /**
+   * Everything on the sheet that is not the wall somebody tapped, held back.
+   *
+   * `aside` is for the rest of the BUILDING -- the marks that are facts about
+   * this house whether or not anybody has tapped anything: damage, hidden
+   * conditions, the line an open plan is divided on. `asideNote` is for the
+   * NOTATION, which goes further back. `RECEDE` and `RECEDE_NOTE` carry the
+   * measurements that decide the two numbers.
+   *
+   * `undefined` and not `1` when nothing is selected, deliberately: React omits
+   * the attribute entirely, so a drawing with no selection serialises to exactly
+   * the bytes it did before any of this existed. An export is a document and its
+   * markup should not carry the state of a screen nobody is looking at.
+   */
+  const aside = selected === null ? undefined : RECEDE;
+  const asideNote = selected === null ? undefined : RECEDE_NOTE;
+  /** The same, for the dimension that belongs to one particular wall. */
+  const noteUnless = (wallId: string) =>
+    selected === null || selected === wallId ? undefined : RECEDE_NOTE;
+
+  /**
+   * Picking a wall, and the phone saying so under the finger that did it.
+   *
+   * The screen already answers — the wall goes thick and amber and the rest of
+   * the drawing drops back — but a thumb is sitting on top of the thing that
+   * changed, which is the failure this whole change exists for. A tap on the
+   * skin is the one channel a finger cannot cover.
+   *
+   * Only on picking, never on letting go. A haptic means *that landed on
+   * something*; firing one for a tap on bare paper would teach the opposite.
+   *
+   * `tapBack` is silent in a browser, so nothing here is conditional on being
+   * inside the app.
+   */
+  const choose = (wallId: string | null) => {
+    if (wallId !== null) tapBack();
+    onSelect(wallId);
+  };
+
   const xs = model.walls.flatMap((w) => [w.start.x, w.end.x]);
   const ys = model.walls.flatMap((w) => [w.start.y, w.end.y]);
   const minX = Math.min(...xs);
@@ -305,6 +511,10 @@ export function Plan({
     >
       <rect x="0" y="0" width={viewWidth} height={viewHeight} fill="rgb(var(--c-raise))" />
 
+      {/* Only while something is picked, so an exported drawing carries none of
+          it. See `PICK_PULSE` for why it lives inside the SVG at all. */}
+      {selected !== null && <style>{PICK_PULSE}</style>}
+
       {/*
         North, when the phone knew it — and its doubt beside it, always.
         Indoors a magnetometer sits in a steel-framed building full of
@@ -354,6 +564,10 @@ export function Plan({
       {(furniture ? footprints : []).map((f) => (
         <rect
           key={f.id}
+          // Furniture is not the building — it is what was standing in the
+          // room — so it goes back with the notation rather than with the
+          // walls, and it was already the faintest thing on the sheet.
+          opacity={asideNote}
           x={px(feet(f.min.x))}
           y={scaleY(feet(f.max.y))}
           width={Math.abs(px(feet(f.max.x)) - px(feet(f.min.x)))}
@@ -412,7 +626,10 @@ export function Plan({
         );
 
         return (
-          <g key={`${w.id}-dim`} aria-hidden="true">
+          // Its own wall's dimension stays bright with it: the number is half
+          // of what somebody tapped a wall to look at, and dimming it would
+          // hold back the thing being pointed to.
+          <g key={`${w.id}-dim`} aria-hidden="true" opacity={noteUnless(w.id)}>
             <line x1={ax + nx * 6} y1={ay + ny * 6}
                   x2={ax + nx * (off + 9)} y2={ay + ny * (off + 9)}
                   stroke={DIM_INK} strokeWidth={1} strokeOpacity={0.55} />
@@ -451,9 +668,28 @@ export function Plan({
                 : 'rgb(var(--c-scanned))';
         const share = blocked.get(w.id)?.blockedPerMille ?? 0n;
 
+        // How wide this wall is drawn when nobody has touched it: its own
+        // thickness at the sheet's scale, or a thin line where the thickness is
+        // a guess rather than something somebody said.
+        const drawnWidth = w.open ? 3 : w.thicknessAssumed ? 7 : Math.max(7, w.thickness * scale);
+        // And the amber band it is drawn inside when somebody has tapped it.
+        // Wide enough that the amber is what the eye gets rather than a rim:
+        // doubling leaves as much band as wall on each side of the line, and
+        // the floor of 24 is what makes a tap on the thinnest partition on the
+        // sheet unmistakable rather than proportionally invisible.
+        const pickedWidth = Math.max(24, drawnWidth * 2 + 10);
+        // The casing around that, and how far the two beats push the casing out.
+        const halo = pickedWidth + 14;
+        const haloPeak = halo + 20;
+
         return (
           <g
             key={w.id}
+            // Everything about this wall goes back together — the line, its
+            // openings, its dimension label — because they are one wall, and
+            // dimming a wall while leaving its number at full strength reads as
+            // a number that belongs to nothing.
+            opacity={selected === null || isSelected ? undefined : RECEDE}
             // A wall on the plan is a control, so it is one: named, reachable by
             // keyboard, and it says whether it is picked. Marking damage and
             // typing a tape reading both start by choosing a wall, and a plan
@@ -465,21 +701,78 @@ export function Plan({
             aria-pressed={isSelected}
             onClick={(event) => {
               event.stopPropagation();
-              onSelect(isSelected ? null : w.id);
+              choose(isSelected ? null : w.id);
             }}
+            // The keyboard goes through the same call, so everything a tap
+            // gets, Enter and Space get: the same amber, the same dimming, the
+            // same two beats, and the same tap on the phone when one is
+            // attached. A path that only some people can reach is half a fix.
             onKeyDown={(event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return;
               event.preventDefault();
               event.stopPropagation();
-              onSelect(isSelected ? null : w.id);
+              choose(isSelected ? null : w.id);
             }}
             className="cursor-pointer focus:outline-none focus-visible:outline focus-visible:outline-2
                        focus-visible:outline-offset-2 focus-visible:outline-sky-500"
           >
             {/* A fat invisible line so a finger can hit a wall on a phone. */}
             <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={34} />
+            {/*
+              The casing. It is what pulses — twice — and it is deliberately
+              NOT the only thing that changes: a halo is exactly the part of a
+              selection a thumb lands on top of, which is why the wall's own
+              line goes amber underneath it as well.
+            */}
             {isSelected && (
-              <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgb(var(--c-focus))" strokeWidth={16} strokeOpacity={0.28} />
+              <>
+                <line
+                  className="trueline-picked-halo"
+                  style={pulseWidths(halo, haloPeak)}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke={PICKED}
+                  strokeWidth={halo}
+                  strokeOpacity={0.32}
+                  strokeLinecap="round"
+                  strokeDasharray={w.open ? '2 10' : undefined}
+                />
+                {/*
+                  The band: the wall itself, drawn thick and amber, at the
+                  wall's own position rather than offset behind it.
+
+                  It goes UNDER the wall's own line rather than replacing it,
+                  and that is the whole point of the arrangement. Painting the
+                  wall amber outright is what the first version did, and
+                  `a6-persist` caught it inside a minute: a wall somebody had
+                  dragged stopped being drawn in `--c-adjusted` for as long as it
+                  was selected, so the drawing quietly stopped saying *this one
+                  was moved by hand* about the wall a person was in the middle of
+                  moving by hand. On a sheet where amber already means "the
+                  sensor guessed this", that is not a cosmetic regression — it is
+                  the app telling the exact lie it exists to prevent.
+
+                  So the band says PICKED and the line inside it goes on saying
+                  where the number came from. Nothing is traded for anything.
+                */}
+                <line
+                  className="trueline-picked-band"
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke={PICKED}
+                  strokeWidth={pickedWidth}
+                  strokeLinecap="round"
+                  // An open span is picked as an open span. A solid amber bar
+                  // where the drawing says there is no wall would be the sheet
+                  // inventing one, so the band is dashed exactly where the
+                  // thing it is highlighting is.
+                  strokeDasharray={w.open ? '2 10' : undefined}
+                />
+              </>
             )}
             {/*
               A wall somebody has given a thickness is drawn at that thickness,
@@ -495,7 +788,7 @@ export function Plan({
               x2={x2}
               y2={y2}
               stroke={stroke}
-              strokeWidth={w.open ? 3 : w.thicknessAssumed ? 7 : Math.max(7, w.thickness * scale)}
+              strokeWidth={drawnWidth}
               strokeLinecap={w.thicknessAssumed ? 'round' : 'butt'}
               strokeDasharray={w.open ? '2 10' : undefined}
             />
@@ -527,13 +820,18 @@ export function Plan({
                 const inx = -o.outward.x;
                 const iny = o.outward.y;
                 const band = Math.max(7, w.thicknessAssumed ? 7 : w.thickness * scale);
+                // What the gap has to erase. On a picked wall that is the amber
+                // band, not the wall: a gap sized to the wall alone would rub
+                // out the middle of the doorway and leave amber across it, so a
+                // door on the wall somebody just tapped would read as filled in.
+                const gap = (isSelected ? pickedWidth : band) + 1;
 
                 return (
                   <g key={o.id}>
                     {/* The gap: the wall stops here. */}
                     <line
                       x1={ax} y1={ay} x2={bx} y2={by}
-                      stroke="rgb(var(--c-raise))" strokeWidth={band + 1} strokeLinecap="butt"
+                      stroke="rgb(var(--c-raise))" strokeWidth={gap} strokeLinecap="butt"
                     />
                     {/* The two jambs, so the gap has ends rather than fading out. */}
                     <line
@@ -629,7 +927,17 @@ export function Plan({
       })}
 
       {model.walls.map((w) => (
-        <circle key={`${w.id}-corner`} cx={px(w.start.x)} cy={scaleY(w.start.y)} r={4} fill="rgb(var(--c-ink))" />
+        <circle
+          key={`${w.id}-corner`}
+          // Every dot belongs to two walls at once, so there is no such thing
+          // as the picked wall's corner: they all go back together rather than
+          // half of them staying bright on a wall nobody chose.
+          opacity={asideNote}
+          cx={px(w.start.x)}
+          cy={scaleY(w.start.y)}
+          r={4}
+          fill="rgb(var(--c-ink))"
+        />
       ))}
 
       {/*
@@ -656,7 +964,7 @@ export function Plan({
 
         if (run) {
           return (
-            <g key={damage.id} aria-label={label}>
+            <g key={damage.id} aria-label={label} opacity={aside}>
               <title>{label}</title>
               <line
                 x1={px(feet(run.from.x))}
@@ -675,7 +983,7 @@ export function Plan({
         const at = damageOnPlan(room, damage);
         if (!at) return null;
         return (
-          <g key={damage.id} aria-label={label}>
+          <g key={damage.id} aria-label={label} opacity={aside}>
             <title>{label}</title>
             <circle
               cx={px(feet(at.x))}
@@ -696,7 +1004,7 @@ export function Plan({
         would read as a wall, and a wall is exactly what it is not.
       */}
       {divide && (
-        <g aria-label={`Divided into ${divide.names[0]} and ${divide.names[1]}`}>
+        <g aria-label={`Divided into ${divide.names[0]} and ${divide.names[1]}`} opacity={aside}>
           <title>
             {divide.names[0]} / {divide.names[1]} — a line on the floor, not a wall
           </title>
@@ -728,7 +1036,7 @@ export function Plan({
         so a plan carrying both never lets a joist be read as a loss.
       */}
       {tags.map((tag) => (
-        <g key={tag.id} aria-label={describeTag(tag)}>
+        <g key={tag.id} aria-label={describeTag(tag)} opacity={aside}>
           <title>{describeTag(tag)}</title>
           <rect
             x={px(feet(tag.at.x)) - 8}
