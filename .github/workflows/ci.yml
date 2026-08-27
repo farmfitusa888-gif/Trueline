@@ -12,10 +12,29 @@ name: CI
 # minutes are for proving what landed on main, not for finding out whether the
 # thing you are about to push compiles.
 
+# ## Off by default, and that is deliberate
+#
+# Sam is building this on no budget and ran out of Actions minutes. A workflow
+# that fires on every push then does nothing except queue, fail and send an
+# email — so nothing here runs unless the repository variable `CI` is set to
+# `on`:
+#
+#     Settings → Secrets and variables → Actions → Variables → New variable
+#     Name: CI     Value: on
+#
+# Set it and everything below behaves normally again. Unset it and the cost is
+# zero. `workflow_dispatch` always works regardless, so a run can be started by
+# hand from the Actions tab whenever it is worth spending on.
+#
+# None of this is a substitute for the checks: `bash core/tools/install-hooks.sh`
+# runs the same suite before every push, on your own machine, for nothing — and
+# on a Mac it compiles the app too, which is the one thing no runner here can do
+# for free.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 # A push that supersedes another cancels it rather than paying for both. The
 # common case is three commits in a minute while somebody is iterating.
@@ -29,6 +48,9 @@ permissions:
 jobs:
   verify:
     name: Tests, typecheck, build, and the shipped bundle
+    # `CI` unset means this does not run at all. Started by hand from the
+    # Actions tab it always does, because that is somebody choosing to spend.
+    if: vars.CI == 'on' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # The suite is seconds. A stuck runner should not quietly bill an hour.
     timeout-minutes: 10
@@ -45,33 +67,22 @@ jobs:
       # not spend time resolving a tree that is already decided.
       - run: npm ci
 
-      - run: npm test
-      - run: npm run typecheck
-      - run: npm run build
+      # `npm run verify` and nothing else, deliberately: it is the exact
+      # command Sam runs on his Mac before he builds. A hand-listed subset here
+      # drifts from it, and the half that drifts is the half nobody notices.
+      # The tree-sitter grammar goes in first because `check-swift.py` inside
+      # it is optional-but-quiet without one.
+      - name: The Swift grammar, for check-swift.py
+        run: pip install --quiet tree_sitter tree_sitter_swift
 
-      # No Xcode here, and none on the machine this project is written on, so
-      # the project file is hand-edited and a hand-edited pbxproj is one typo
-      # away from "the project file cannot be parsed" — which reads, on the
-      # only Mac that matters, as the app being gone. This parses it and
-      # resolves every object id in it.
-      # There is no Swift compiler here and download.swift.org is refused by
-      # the network policy, so this is a grammar rather than a compiler: it
-      # says a file is not Swift, not that the code is wrong. Xcode is still
-      # the first real compiler. It catches the whole class of damage a
-      # scripted edit does, which is the class that was reaching the Mac.
+      - name: Everything Sam's own verify runs
+        run: npm run verify
+
       # The gate is one list. The Swift half is generated from the TypeScript
       # half, and a generated file that has gone stale is worse than none,
-      # because it looks maintained.
+      # because it looks maintained. Not inside `verify`, so it is named here.
       - name: The entitlement Swift matches the TypeScript
         run: node --experimental-strip-types core/tools/gen-entitlement.mjs --check
-
-      - name: The Swift parses
-        run: |
-          pip install --quiet tree_sitter tree_sitter_swift
-          python3 core/tools/check-swift.py
-
-      - name: The Xcode project file still parses
-        run: python3 core/tools/check-pbxproj.py
 
       # The built web app is committed under ios/Trueline/Web so that a Mac
       # with no Node on it still produces a working app — the correction
@@ -85,3 +96,125 @@ jobs:
             echo "Run: npm run ship-web"
             exit 1
           fi
+
+  # ------------------------------------------------------------------ compile
+  #
+  # ## Why this job exists, and what it costs
+  #
+  # There is no Swift compiler on the machine this project is written on, and
+  # there cannot be: SwiftUI, ARKit, RoomPlan, StoreKit and EventKit are not on
+  # Linux, so the most any checker there can do is read the code. Three build
+  # errors reached Sam's Mac that way, the last of them a `Hashable` conformance
+  # that stopped being synthesisable three files from where it broke:
+  #
+  #     ProjectStore.swift:15:12: error: type 'ProjectStore.Entry' does not
+  #     conform to protocol 'Hashable'
+  #
+  # Every one of them cost a round trip to the only Mac in the project. This is
+  # the compiler, and it runs before he does.
+  #
+  # ## And why it does not run on every push
+  #
+  # macOS minutes bill at TEN TIMES the Linux rate. A five-minute compile is
+  # fifty minutes of a two-thousand-minute monthly allowance, which is forty
+  # pushes. So it runs when the Swift could have changed and not otherwise --
+  # and `ios/Trueline/Web` is excluded, because that is the committed web
+  # bundle and changing a React screen cannot break a Swift build.
+  #
+  # When it cannot work out what changed it compiles. Spending minutes is the
+  # cheap mistake; missing a broken build is the expensive one.
+
+  swift-changed:
+    name: Did any Swift change?
+    if: vars.CI == 'on' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      yes: ${{ steps.look.outputs.yes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Two commits for a push, the whole history for a pull request --
+          # a PR is compared against where it branched from, not its parent.
+          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 2 }}
+      - id: look
+        run: |
+          set -u
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --quiet origin "${{ github.base_ref }}" || true
+            base="$(git merge-base "origin/${{ github.base_ref }}" HEAD 2>/dev/null || true)"
+          else
+            base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          fi
+          if [ -z "$base" ]; then
+            echo "Cannot tell what changed. Compiling, which is the cheap mistake."
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$base" HEAD)"
+          echo "Changed since $base:"
+          echo "$changed" | sed 's/^/  /'
+          native="$(echo "$changed" | grep '^ios/' | grep -v '^ios/Trueline/Web/' || true)"
+          workflow="$(echo "$changed" | grep '^\.github/workflows/ci\.yml$' || true)"
+          if [ -n "$native$workflow" ]; then
+            echo "Swift or the project file changed. Compiling."
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nothing native changed. Not spending macOS minutes."
+            echo "yes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  compile:
+    name: The app actually compiles
+    needs: swift-changed
+    # A SECOND switch, because these minutes cost ten times the others. `CI`
+    # being on is not enough: `CI_MAC` has to be on as well, so turning the
+    # cheap checks back on cannot switch the expensive one on by accident.
+    #
+    # On a PUBLIC repository none of this is metered at all — standard runners,
+    # including macOS, are unlimited and free — and this whole switch is then
+    # only about noise.
+    if: |
+      needs.swift-changed.outputs.yes == 'true'
+      && (vars.CI_MAC == 'on' || github.event_name == 'workflow_dispatch')
+    runs-on: macos-15
+    # A compile is minutes. A stuck runner on macOS bills at 10x, so this is
+    # deliberately tight enough to hurt before it costs.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Which Xcode
+        run: xcodebuild -version
+
+      # `generic/platform=iOS Simulator` rather than a named device: it needs no
+      # simulator booted, which is the slowest part of a cold macOS runner, and
+      # the question here is whether the code compiles rather than whether it
+      # launches. No signing, because a simulator build needs none -- the same
+      # reason `bash build.sh --sim` works on a Mac with no team set.
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/Trueline.xcodeproj \
+            -scheme Trueline \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath .build-ci \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet \
+            build 2>&1 | tee build.log || {
+              echo "::error::The app did not compile."
+              grep -E 'error:' build.log | head -40
+              exit 1
+            }
+
+      # The log, when it failed, so the error does not have to be read out of a
+      # folded step by somebody on a phone.
+      - name: Keep the log when it broke
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7

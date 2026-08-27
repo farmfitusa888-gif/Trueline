@@ -66,10 +66,70 @@ if ! diff -r web/dist ios/Trueline/Web >/dev/null 2>&1; then
   exit 1
 fi
 
+# ---------------------------------------------------------------- the compiler
+#
+# This is the important one, and it only exists on a Mac.
+#
+# There is no Swift compiler on the machine most of this is written on --
+# SwiftUI, ARKit, RoomPlan and StoreKit are not on Linux -- so everything above
+# READS the Swift and none of it compiles the Swift. Three build errors have
+# reached the Mac that way. The last was a `Hashable` conformance that stopped
+# being synthesisable three files from where it broke, and no amount of reading
+# would have found it before `check-swift-conform.py` was written for it
+# afterwards.
+#
+# On a Mac there IS a compiler, it is free, and it is right here. So on a Mac,
+# this compiles.
+#
+# It only does so when the push contains Swift or the project file: the web
+# bundle is committed under ios/Trueline/Web and a React screen cannot break a
+# Swift build, so a web-only push should not cost anybody four minutes.
+if command -v xcodebuild >/dev/null 2>&1; then
+  base="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
+  if [ -n "$base" ]; then
+    changed="$(git diff --name-only "$base"...HEAD 2>/dev/null || true)"
+  else
+    # No upstream yet -- a new branch. Everything in it is new, so compile.
+    changed="ios/"
+  fi
+  native="$(printf '%s\n' "$changed" | grep '^ios/' | grep -v '^ios/Trueline/Web/' || true)"
+  if [ -n "$native" ]; then
+    echo "→ compiling for the simulator (Swift changed in this push)"
+    log="$root/.build-hook/last-build.log"
+    mkdir -p "$(dirname "$log")"
+    if xcodebuild \
+      -project ios/Trueline.xcodeproj \
+      -scheme Trueline \
+      -configuration Debug \
+      -destination 'generic/platform=iOS Simulator' \
+      -derivedDataPath "$root/.build-hook" \
+      CODE_SIGNING_ALLOWED=NO \
+      -quiet \
+      build >"$log" 2>&1; then
+      echo "  ✓ it compiles"
+    else
+      echo
+      echo "✗ The app does not compile. The errors, in order:"
+      grep -E 'error:' "$log" | sed 's/^/    /' | head -20
+      echo
+      echo "  The whole log: $log"
+      echo "  To push anyway: git push --no-verify"
+      exit 1
+    fi
+  fi
+fi
+
 echo "✓ everything CI checks, checked"
 HOOK
 
 chmod +x "$hooks/pre-push"
 echo "Installed $hooks/pre-push"
 echo "It runs: npm run verify, and checks the bundle shipped in the iOS app."
+if command -v xcodebuild >/dev/null 2>&1; then
+  echo "This is a Mac, so it also COMPILES the app whenever a push contains Swift."
+  echo "That is the only real Swift compiler this project has, and it is free."
+else
+  echo "No xcodebuild here, so the Swift is read and not compiled. On a Mac this"
+  echo "same hook compiles it."
+fi
 echo "Skip it once with: git push --no-verify"

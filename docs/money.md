@@ -201,3 +201,33 @@ out loud.
 > pricing it before you get back in the truck. Every number says whether it came
 > off the scanner or off your tape — so when a client argues with one, you can
 > show them which.
+
+## What CI costs, and why it is switched off
+
+Checked on 2026-08-27 against GitHub's own billing documentation and the
+current published rates.
+
+- **A private repository on GitHub Free gets 2,000 Actions minutes a month.**
+  Linux counts 1× against that, Windows 2×, **macOS 10×**. So a four-minute
+  macOS compile is forty minutes of the allowance, and about fifty of those
+  pushes empties it.
+- **A public repository is not metered at all** on standard GitHub-hosted
+  runners — including macOS. Unlimited, free, no minute cap.
+- Beyond the allowance, the published per-minute rates as of January 2026 are
+  $0.006 Linux, $0.010 Windows, $0.062 macOS.
+
+This project is private and the budget is nothing, so **`.github/workflows/ci.yml`
+does not run unless the repository variable `CI` is set to `on`**, and the
+macOS compile needs a second variable, `CI_MAC`, on top of it. Unset, the cost
+is zero. Either can be started by hand from the Actions tab when a run is worth
+paying for.
+
+Nothing is lost by leaving them off. `bash core/tools/install-hooks.sh` runs the
+same suite before every push, on your own machine, for nothing — and on a Mac it
+also compiles the app, which is the one check no Linux runner can do at any
+price. That local compile is the real answer to Swift errors reaching the Mac;
+the runner is a convenience for proving what landed on `main`.
+
+**The one decision worth revisiting:** making the repository public would make
+all of it free forever, including macOS. It would also publish the source of
+something intended to be sold. That is a business call, not a technical one.
