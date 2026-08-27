@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import type { Damage } from '../../core/src/damage.ts';
 import type { Claim } from '../../core/src/claim.ts';
+import type { WorkScope } from '../../core/src/work.ts';
 import { type ClaimRoom, claimFile } from '../../core/src/claim-file.ts';
 import { claimReport } from '../../core/src/claim.ts';
 import { showArea, showLength } from '../../core/src/company.ts';
@@ -52,11 +53,19 @@ export function ClaimSend({
   fileName,
   damages,
   claim,
+  scope,
 }: {
   readonly room: Room;
   readonly fileName: string;
   readonly damages: readonly Damage[];
   readonly claim: Claim;
+  /**
+   * What is being done to each surface of the open room, or `null` when nobody
+   * has scoped it. The archive carries the open room's takeoff, so it carries
+   * this with it — otherwise the CSV in the zip prices a gut job while every
+   * screen in the app prices the real one.
+   */
+  readonly scope: WorkScope | null;
 }) {
   const { company } = useUnits();
   const [busy, setBusy] = useState<'html' | 'pdf' | 'job' | null>(null);
@@ -218,6 +227,7 @@ export function ClaimSend({
         html,
         ...(pdf ? { pdf } : {}),
         photos: bytes,
+        scope,
         at,
       });
       const said = await sendFile(

@@ -16,19 +16,44 @@ import {
   type ChangeOrder,
   changesSinceVerified,
 } from '../../core/src/baseline.ts';
+import {
+  type AgreedChange,
+  type ChangeDocument,
+  CHANGE_CLIENT_INTENT,
+  agreeToChange,
+  agreedDifference,
+  describeChangeDocument,
+  notYetAgreed,
+  raiseChange,
+} from '../../core/src/change.ts';
+import { CONSENT, sign } from '../../core/src/signature.ts';
 import { money } from '../../core/src/price.ts';
 import { type Override } from '../../core/src/override.ts';
 import { type Proposal } from '../../core/src/proposal.ts';
 import { type Room } from '../../core/src/room.ts';
+import type { WorkScope } from '../../core/src/work.ts';
 import {
   type Invoice,
   type Stage,
   STAGE_TITLE,
   describeInvoice,
-  invoiceOf,
+  invoiceOfVerified,
   missingFromInvoice,
   outstandingAfter,
+  whyNotBilled,
 } from '../../core/src/invoice.ts';
+import {
+  type Payment,
+  type HowPaid,
+  HOW_PAID_TITLE,
+  describeOwing,
+  describePayment,
+  owedOn,
+  owing,
+  paidOn,
+  recordPayment,
+  totalOwed,
+} from '../../core/src/payment.ts';
 import { quickbooksCsv, quickbooksName } from '../../core/src/quickbooks.ts';
 import {
   type Visit,
@@ -41,6 +66,8 @@ import {
   visitOf,
 } from '../../core/src/schedule.ts';
 import { handBackVisits } from './bridge.ts';
+import { SignaturePad } from './SignaturePad.tsx';
+import { changeFile, changeFileName } from './changeFile.ts';
 import { useQuote } from './quoteOf.ts';
 import { sendFile } from './sheet.ts';
 import { useUnits } from './units.tsx';
@@ -73,26 +100,47 @@ function Field({
 export function Work({
   room,
   overrides,
+  scope,
   proposal,
   baseline,
+  agreedChanges,
+  raisedChange,
   visits,
   invoices,
+  payments,
   onVisits,
+  onAgreedChanges,
+  onRaisedChange,
   onInvoices,
+  onPayments,
 }: {
   readonly room: Room;
   readonly overrides: readonly Override[];
+  /**
+   * What is being done to each surface, or `null` for a room nobody has
+   * scoped — which is priced exactly as this app has always priced one.
+   */
+  readonly scope: WorkScope | null;
   readonly proposal: Proposal | null;
   readonly baseline: Baseline | null;
+  /** Change orders the client has signed. The only extras an invoice may bill. */
+  readonly agreedChanges: readonly AgreedChange[];
+  /** A change order written down and waiting to be signed, when there is one. */
+  readonly raisedChange: ChangeDocument | null;
   readonly visits: readonly Visit[];
   readonly invoices: readonly Invoice[];
+  /** What has come in against them. Written down, never taken. */
+  readonly payments: readonly Payment[];
   readonly onVisits: (visits: readonly Visit[]) => void;
+  readonly onAgreedChanges: (agreed: readonly AgreedChange[]) => void;
+  readonly onRaisedChange: (raised: ChangeDocument | null) => void;
   readonly onInvoices: (invoices: readonly Invoice[]) => void;
+  readonly onPayments: (payments: readonly Payment[]) => void;
 }) {
   const { company } = useUnits();
   // The same quote every other screen shows. An invoice worked out from its own
   // arithmetic is an invoice that can disagree with the thing somebody signed.
-  const { quote: current } = useQuote(room, overrides, company);
+  const { quote: current } = useQuote(room, overrides, company, scope);
   const [kind, setKind] = useState<VisitKind>('work');
   const [what, setWhat] = useState('');
   const [day, setDay] = useState('');
@@ -115,10 +163,32 @@ export function Work({
    * wrong figure here is worse than no figure.
    */
   const [deposit, setDeposit] = useState('');
+  /**
+   * How much of the job is done, for a progress payment.
+   *
+   * Empty, like the deposit, because there is no honest default: the app has
+   * not been on the job site and does not know. `amountFor` refuses a progress
+   * payment that has not been told, rather than quietly asking for everything.
+   */
+  const [complete, setComplete] = useState('');
   const [dueAt, setDueAt] = useState('');
   const [payTo, setPayTo] = useState('');
   const [trouble, setTrouble] = useState<string | null>(null);
   const [calendarNote, setCalendarNote] = useState<string | null>(null);
+  const [coNumber, setCoNumber] = useState('');
+  const [coBecause, setCoBecause] = useState('');
+  const [coDays, setCoDays] = useState('0');
+  const [coWho, setCoWho] = useState('');
+  const [coMark, setCoMark] = useState('');
+  const [coConsent, setCoConsent] = useState(false);
+  const [coTrouble, setCoTrouble] = useState<string | null>(null);
+  /** Which invoice the money-in form is open against, if any. */
+  const [paying, setPaying] = useState<string | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payAt, setPayAt] = useState('');
+  const [payHow, setPayHow] = useState<HowPaid>('cheque');
+  const [payReference, setPayReference] = useState('');
+  const [payTrouble, setPayTrouble] = useState<string | null>(null);
 
   const where = proposal?.client.address ?? '';
   /**
@@ -154,6 +224,36 @@ export function Work({
   const billed = useMemo(
     () => invoices.reduce((sum, invoice) => sum + invoice.amount, 0n),
     [invoices]
+  );
+  /**
+   * What the signed change orders add, and what has moved that nobody signed.
+   *
+   * `agreedExtra` is what may be billed; `unsigned` is what may not, named on
+   * the screen so the difference between the two is visible rather than
+   * mysterious. See `core/src/change.ts`.
+   */
+  const agreedExtra = useMemo(() => {
+    if (!baseline) return 0n;
+    try {
+      return agreedDifference(baseline, agreedChanges);
+    } catch {
+      // A change order signed against a different agreement. The list says so;
+      // the total refuses to guess which of them is the real one.
+      return 0n;
+    }
+  }, [baseline, agreedChanges]);
+  const unsigned = useMemo(
+    () => (changes ? notYetAgreed(changes, agreedChanges) : []),
+    [changes, agreedChanges]
+  );
+  const unsignedWorth = useMemo(
+    () => unsigned.reduce((sum, one) => sum + one.difference, 0n),
+    [unsigned]
+  );
+  const out = useMemo(() => totalOwed(invoices, payments), [invoices, payments]);
+  const late = useMemo(
+    () => owing(invoices, payments, new Date().toISOString()),
+    [invoices, payments]
   );
   const upcoming = next(visits, new Date().toISOString());
 
@@ -302,6 +402,236 @@ export function Work({
         )}
       </section>
 
+
+      {/* -------------------------------------------------- change orders */}
+
+      <section data-sheet="no" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="font-semibold text-slate-900">Changes to what was signed</h2>
+
+        {!baseline || !changes ? (
+          <p className="mt-1 text-sm leading-relaxed text-slate-600">
+            Nothing to change yet. A change order amends something somebody signed, so there has
+            to be a signed agreement first — get one under Agreement.
+          </p>
+        ) : (
+          <>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+              Only a signed change order goes on a bill. Anything else that has moved on this
+              job stays off it, however obvious it looks, because a bill for work nobody agreed
+              to is the one accusation you cannot answer.
+            </p>
+
+            {agreedChanges.length > 0 && (
+              <ul className="mt-3 divide-y divide-slate-100">
+                {agreedChanges.map((one) => (
+                  <li key={one.document.id} className="py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-medium text-slate-900">
+                        Change order {one.document.number}
+                      </span>
+                      <span className="font-mono font-semibold tabular-nums text-emerald-800">
+                        {one.document.difference < 0n ? '−' : '+'}
+                        {money(
+                          one.document.difference < 0n
+                            ? -one.document.difference
+                            : one.document.difference
+                        )}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-emerald-800">
+                      Signed by {one.signatures.map((s) => s.who).join(' and ')} on{' '}
+                      {one.agreedAt.slice(0, 10)}. On the bill.
+                    </p>
+                    {describeChangeDocument(one.document).map((line, index) => (
+                      <p key={index} className="mt-0.5 text-xs text-slate-500">
+                        {line}
+                      </p>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void sendFile(
+                          new Blob([changeFile({ document: one.document, agreed: one, at: new Date().toISOString().slice(0, 10) })], {
+                            type: 'text/html',
+                          }),
+                          changeFileName(one.document),
+                          `Change order ${one.document.number} — ${room.name}`
+                        )
+                      }
+                      className="mt-2 min-h-11 rounded-md border border-slate-300 px-4 text-sm
+                                 font-medium text-slate-700 active:bg-slate-100"
+                    >
+                      Send the signed copy
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {!raisedChange && unsigned.length > 0 && (
+              <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3">
+                <p className="text-sm font-medium text-amber-900">
+                  {unsigned.length} thing{unsigned.length === 1 ? '' : 's'} moved since this was
+                  signed, worth {money(unsignedWorth < 0n ? -unsignedWorth : unsignedWorth)}.
+                  None of it is on a bill.
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {unsigned.map((one) => (
+                    <li key={`${one.item} ${one.unit}`} className="text-xs text-amber-900">
+                      {one.says}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 space-y-3">
+                  <Field label="Your change order number" value={coNumber} onChange={setCoNumber}
+                    placeholder="CO-1" />
+                  <Field label="Why this is happening" value={coBecause} onChange={setCoBecause}
+                    placeholder="The floor runs under the island, which nobody could see until it came out" />
+                  <Field label="Days this adds to the finish date" value={coDays}
+                    onChange={setCoDays} type="number" placeholder="0" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        setCoTrouble(null);
+                        onRaisedChange(
+                          raiseChange(baseline, changes, {
+                            id: `co-${Date.now()}`,
+                            number: coNumber,
+                            jobName: room.name,
+                            company,
+                            client: proposal?.client ?? { name: '', address: '', email: '', phone: '' },
+                            raisedAt: new Date().toISOString(),
+                            because: coBecause,
+                            extraDays: Number(coDays),
+                          })
+                        );
+                      } catch (error) {
+                        setCoTrouble(error instanceof Error ? error.message : String(error));
+                      }
+                    }}
+                    className="min-h-12 w-full rounded-md bg-slate-900 px-5 font-semibold text-white
+                               active:bg-slate-700"
+                  >
+                    Write the change order
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {raisedChange && (
+              <div className="mt-4 rounded-md border-2 border-amber-400 bg-white p-3">
+                <p className="text-sm font-semibold text-slate-900">
+                  Change order {raisedChange.number} — waiting to be signed
+                </p>
+                {describeChangeDocument(raisedChange).map((line, index) => (
+                  <p key={index} className="mt-0.5 text-xs text-slate-600">
+                    {line}
+                  </p>
+                ))}
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                  Two ways to get it agreed, and they count the same. Sign it here together, or
+                  send it and get it back signed. Until one of them happens, none of this is
+                  authorised and none of it is billable.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void sendFile(
+                      new Blob([changeFile({ document: raisedChange, agreed: null, at: new Date().toISOString().slice(0, 10) })], {
+                        type: 'text/html',
+                      }),
+                      changeFileName(raisedChange),
+                      `Change order ${raisedChange.number} — ${room.name}`
+                    )
+                  }
+                  className="mt-3 min-h-11 w-full rounded-md border border-slate-300 px-4 text-sm
+                             font-medium text-slate-700 active:bg-slate-100"
+                >
+                  Send it to be signed
+                </button>
+
+                <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+                  <Field label="Who is signing" value={coWho} onChange={setCoWho}
+                    placeholder="Their name, typed" />
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={coConsent}
+                      onChange={(event) => setCoConsent(event.target.checked)}
+                      className="mt-1 h-5 w-5"
+                    />
+                    <span className="text-sm text-slate-700">{CONSENT}</span>
+                  </label>
+                  <p className="text-sm text-slate-700">{CHANGE_CLIENT_INTENT}</p>
+                  <SignaturePad onChange={setCoMark} disabled={false} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoTrouble(null);
+                      void (async () => {
+                        try {
+                          const at = new Date().toISOString();
+                          const signature = await sign(raisedChange, {
+                            id: `sig-${Date.now()}`,
+                            who: coWho,
+                            role: 'client',
+                            intent: CHANGE_CLIENT_INTENT,
+                            consented: coConsent,
+                            mark: coMark,
+                            at,
+                            device: navigator.userAgent,
+                          });
+                          const agreed = await agreeToChange(raisedChange, [signature], at);
+                          onAgreedChanges([...agreedChanges, agreed]);
+                          onRaisedChange(null);
+                          setCoNumber('');
+                          setCoBecause('');
+                          setCoDays('0');
+                          setCoWho('');
+                          setCoMark('');
+                          setCoConsent(false);
+                        } catch (error) {
+                          setCoTrouble(error instanceof Error ? error.message : String(error));
+                        }
+                      })();
+                    }}
+                    className="min-h-12 w-full rounded-md bg-emerald-700 px-5 font-semibold
+                               text-white active:bg-emerald-800"
+                  >
+                    Agree to this change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onRaisedChange(null);
+                      setCoTrouble(null);
+                    }}
+                    className="min-h-11 w-full rounded-md border border-slate-300 px-4 text-sm
+                               font-medium text-slate-700 active:bg-slate-100"
+                  >
+                    Tear it up and start again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!raisedChange && unsigned.length === 0 && (
+              <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-900">
+                Nothing has moved on this job that somebody has not signed for.
+              </p>
+            )}
+
+            {coTrouble && (
+              <p role="alert" className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-900">
+                {coTrouble}
+              </p>
+            )}
+          </>
+        )}
+      </section>
+
       {/* ------------------------------------------------------ invoices */}
 
       <section data-sheet="no" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -316,9 +646,16 @@ export function Work({
         ) : (
           <>
             <p className="mt-1 text-sm text-slate-600">
-              Agreed {money(baseline.agreed.total + changes.difference)} · invoiced so far{' '}
+              Agreed {money(baseline.agreed.total + agreedExtra)} · invoiced so far{' '}
               {money(billed)}
             </p>
+            {unsigned.length > 0 && (
+              <p className="mt-1 text-sm text-amber-800">
+                {money(unsignedWorth < 0n ? -unsignedWorth : unsignedWorth)} has moved on this
+                job that nobody has signed for, and it is not in that figure. Raise a change
+                order above and it goes on the next invoice.
+              </p>
+            )}
 
             <div className="mt-3 space-y-3">
               <div>
@@ -347,6 +684,16 @@ export function Work({
                 <Field label="Deposit, per cent of the job" value={deposit}
                   onChange={setDeposit} placeholder="30" />
               )}
+              {stage === 'progress' && (
+                <>
+                  <Field label="How much of the job is done, per cent" value={complete}
+                    onChange={setComplete} placeholder="50" />
+                  <p className="text-xs text-slate-500">
+                    A progress payment is against work that has been done. Asking for the whole
+                    balance halfway through is the final invoice with the wrong word on top.
+                  </p>
+                </>
+              )}
               <Field label="When it is due" value={dueAt} onChange={setDueAt} type="date" />
               <Field label="How to pay you" value={payTo} onChange={setPayTo}
                 placeholder="A payment link, bank details, or a cheque to the address above" />
@@ -354,11 +701,14 @@ export function Work({
               <button
                 type="button"
                 onClick={() => {
-                  try {
-                    setTrouble(null);
-                    onInvoices([
-                      ...invoices,
-                      invoiceOf({
+                  setTrouble(null);
+                  void (async () => {
+                    try {
+                      // Verified, not `invoiceOf`: every signed change order is
+                      // re-hashed against its signature before a cent of it is
+                      // billed. One that has moved since it was agreed refuses,
+                      // loudly, here rather than in a dispute.
+                      const invoice = await invoiceOfVerified({
                         id: `inv-${Date.now()}`,
                         number,
                         stage,
@@ -366,18 +716,23 @@ export function Work({
                         client: proposal?.client ?? { name: '', address: '', email: '', phone: '' },
                         jobName: room.name,
                         baseline,
-                        changes,
+                        agreedChanges,
+                        moved: changes,
                         alreadyBilled: billed,
-                        depositPerCent: Number(deposit) || 0,
+                        share: {
+                          depositPerCent: Number(deposit) || undefined,
+                          completePerCent: Number(complete) || undefined,
+                        },
                         issuedAt: new Date().toISOString(),
                         dueAt,
                         payTo,
-                      }),
-                    ]);
-                    setNumber('');
-                  } catch (error) {
-                    setTrouble(error instanceof Error ? error.message : String(error));
-                  }
+                      });
+                      onInvoices([...invoices, invoice]);
+                      setNumber('');
+                    } catch (error) {
+                      setTrouble(error instanceof Error ? error.message : String(error));
+                    }
+                  })();
                 }}
                 className="min-h-12 w-full rounded-md bg-slate-900 px-5 font-semibold text-white
                            active:bg-slate-700"
@@ -390,6 +745,22 @@ export function Work({
 
         {invoices.length > 0 && (
           <>
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-semibold text-slate-900">
+                {out === 0n ? 'Everything asked for is in.' : `${money(out)} still out.`}
+              </p>
+              {late.slice(0, 3).map((row) => (
+                <p
+                  key={row.invoiceId}
+                  className={`mt-0.5 text-xs ${
+                    row.daysLate > 0 ? 'font-medium text-rose-800' : 'text-slate-600'
+                  }`}
+                >
+                  {STAGE_TITLE[row.stage]} {row.number} — {describeOwing(row)}
+                </p>
+              ))}
+            </div>
+
             <ul className="mt-4 divide-y divide-slate-100">
               {invoices.map((invoice) => (
                 <li key={invoice.id} className="py-3">
@@ -409,6 +780,126 @@ export function Work({
                   )}
                   {outstandingAfter(invoice) === 0n && (
                     <p className="mt-1 text-xs text-emerald-800">This settles the job.</p>
+                  )}
+                  {whyNotBilled(invoice) !== '' && (
+                    <p className="mt-1 text-xs text-amber-800">{whyNotBilled(invoice)}</p>
+                  )}
+
+                  {owedOn(invoice, payments) === 0n ? (
+                    <p className="mt-1 text-xs font-medium text-emerald-800">
+                      Paid in full — {money(paidOn(invoice, payments))} in.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-600">
+                      {paidOn(invoice, payments) > 0n
+                        ? `${money(paidOn(invoice, payments))} in, ${money(owedOn(invoice, payments))} still out.`
+                        : `${money(owedOn(invoice, payments))} out, none of it in.`}
+                    </p>
+                  )}
+
+                  {payments
+                    .filter((payment) => payment.invoiceId === invoice.id)
+                    .map((payment) => (
+                      <p key={payment.id} className="mt-0.5 text-xs text-emerald-800">
+                        {describePayment(payment)}
+                      </p>
+                    ))}
+
+                  {owedOn(invoice, payments) > 0n && paying !== invoice.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaying(invoice.id);
+                        setPayAmount('');
+                        setPayAt(new Date().toISOString().slice(0, 10));
+                        setPayReference('');
+                        setPayTrouble(null);
+                      }}
+                      className="mt-2 min-h-11 rounded-md border border-slate-300 px-4 text-sm
+                                 font-medium text-slate-700 active:bg-slate-100"
+                    >
+                      Money came in
+                    </button>
+                  )}
+
+                  {paying === invoice.id && (
+                    <div className="mt-2 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                      <Field label="How much came in" value={payAmount} onChange={setPayAmount}
+                        placeholder={money(owedOn(invoice, payments)).replace('$', '')} />
+                      <Field label="When it came in" value={payAt} onChange={setPayAt} type="date" />
+                      <div>
+                        <span className="text-sm font-medium text-slate-700">How it came in</span>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {(['cash', 'cheque', 'transfer', 'card', 'other'] as const).map((which) => (
+                            <button
+                              key={which}
+                              type="button"
+                              onClick={() => setPayHow(which)}
+                              aria-pressed={payHow === which}
+                              className={`min-h-11 rounded-md px-3 text-sm font-medium ${
+                                payHow === which
+                                  ? 'bg-slate-900 text-white'
+                                  : 'border border-slate-300 text-slate-700 active:bg-slate-100'
+                              }`}
+                            >
+                              {HOW_PAID_TITLE[which]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <Field label="Reference" value={payReference} onChange={setPayReference}
+                        placeholder="Cheque number, wire reference, or the last four" />
+                      <p className="text-xs text-slate-500">
+                        This app takes no payments and holds no card details — you are writing
+                        down what arrived. Never put a full card number here; it will refuse one.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            setPayTrouble(null);
+                            const cents = BigInt(
+                              Math.round(Number(payAmount.replace(/[^0-9.]/g, '')) * 100)
+                            );
+                            onPayments([
+                              ...payments,
+                              recordPayment(invoice, payments, {
+                                id: `pay-${Date.now()}`,
+                                amount: cents,
+                                receivedAt: payAt,
+                                how: payHow,
+                                reference: payReference,
+                              }),
+                            ]);
+                            setPaying(null);
+                            setPayAmount('');
+                            setPayReference('');
+                          } catch (error) {
+                            setPayTrouble(error instanceof Error ? error.message : String(error));
+                          }
+                        }}
+                        className="min-h-12 w-full rounded-md bg-emerald-700 px-5 font-semibold
+                                   text-white active:bg-emerald-800"
+                      >
+                        Write it down
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaying(null);
+                          setPayTrouble(null);
+                        }}
+                        className="min-h-11 w-full rounded-md border border-slate-300 px-4 text-sm
+                                   font-medium text-slate-700 active:bg-slate-100"
+                      >
+                        Not now
+                      </button>
+                      {payTrouble && (
+                        <p role="alert" className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">
+                          {payTrouble}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </li>
               ))}

@@ -829,7 +829,17 @@ export function Plan({
 export function legendFor(
   anyDamage: boolean,
   anyAdjusted = false,
-  furniture = true
+  furniture = true,
+  /**
+   * Whether this job is a claim, which decides one word in the key.
+   *
+   * The same stretch of wall is drawn either way — a mark is a mark — but
+   * calling it *Damaged* on a remodel would put a loss on a drawing where
+   * nobody has claimed one. On an ordinary job it is what it is: something
+   * somebody marked. A key that says more than the drawing knows is a key that
+   * lies, which is the rule the entry below it already keeps.
+   */
+  onClaim = true
 ): readonly { label: string; className: string }[] {
   return [
     { label: 'Measured', className: 'bg-slate-900' },
@@ -839,6 +849,8 @@ export function legendFor(
     { label: 'Something in the way', className: 'bg-red-600' },
     // A key entry for something that is not on the drawing is a key that lies.
     ...(furniture ? [{ label: 'What was in the room', className: 'bg-slate-300' }] : []),
-    ...(anyDamage ? [{ label: 'Damaged', className: 'bg-red-600/60' }] : []),
+    ...(anyDamage
+      ? [{ label: onClaim ? 'Damaged' : 'Marked', className: 'bg-red-600/60' }]
+      : []),
   ];
 }

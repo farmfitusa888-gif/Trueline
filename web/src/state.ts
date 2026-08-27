@@ -37,13 +37,26 @@ import {
 } from '../../core/src/capture.ts';
 import type { Photo } from '../../core/src/photo.ts';
 import type { Damage, Reading } from '../../core/src/damage.ts';
+import { type VoiceNote, spokenLength, validateVoiceNote } from '../../core/src/voice.ts';
 import { type PinImport, type PinManifest, importPins } from '../../core/src/pins.ts';
 import { type Tag, CONDITION, readConditions, tagAt } from '../../core/src/tag.ts';
 import { type Boundary, splitByBoundary } from '../../core/src/zone.ts';
 import { validateDamage } from '../../core/src/damage.ts';
 import { type Claim, NO_CLAIM } from '../../core/src/claim.ts';
 import { type Override, validateOverride } from '../../core/src/override.ts';
+import {
+  type Surface,
+  type WorkItem,
+  type WorkScope,
+  drop as dropWork,
+  everything,
+  nothing,
+  pick as pickWork,
+  surfaceName,
+} from '../../core/src/work.ts';
 import { type Baseline } from '../../core/src/baseline.ts';
+import { type AgreedChange, type ChangeDocument } from '../../core/src/change.ts';
+import { type Payment } from '../../core/src/payment.ts';
 import { type Invoice } from '../../core/src/invoice.ts';
 import { type Proposal } from '../../core/src/proposal.ts';
 import { type Visit } from '../../core/src/schedule.ts';
@@ -152,6 +165,21 @@ export interface Loaded {
    */
   readonly damages: readonly Damage[];
   /**
+   * What somebody said out loud about a wall, and what the phone made of it.
+   *
+   * Beside the room like the marks, and for the same reason: a recording is an
+   * observation about a building, not a property of one. Correcting a wall must
+   * not disturb what somebody said about it, and saying something must not touch
+   * a dimension.
+   *
+   * One list rather than one per wall, and rather than recordings hung inside
+   * the marks. A note about a wall and a note about a mark on that wall are the
+   * same thing said about a smaller subject, and two lists would have meant two
+   * things to save, two to hand across the bridge, and two places for the rule
+   * "a recording is never rewritten" to be got wrong.
+   */
+  readonly voice: readonly VoiceNote[];
+  /**
    * Hidden conditions somebody found and pinned: joists, the stack, the
    * knob-and-tube behind the closet.
    *
@@ -179,6 +207,23 @@ export interface Loaded {
    * waste factor must not touch a measurement.
    */
   readonly overrides: readonly Override[];
+  /**
+   * What is actually being done to each surface, once somebody has said.
+   *
+   * `null` is not "empty" and it is not a missing field: it is a room nobody
+   * has scoped, which is priced exactly the way this app has always priced one
+   * — every surface as if it were being replaced. Every project saved before
+   * this existed comes back this way and reads identically to the day it was
+   * saved, which is the whole reason the state is nullable rather than starting
+   * at an empty scope. An empty scope means "somebody decided nothing is
+   * happening here", and that is a completely different sheet.
+   *
+   * Beside the room rather than inside it, like the damage and the overrides:
+   * the room is a measurement of a building and a scope is a decision about
+   * what to do to it. Correcting a wall must not disturb what is being done to
+   * it, and changing what is being done must not touch a dimension.
+   */
+  readonly scope: WorkScope | null;
   readonly claim: Claim;
   /**
    * The document a client says yes to, once one has been written.
@@ -195,10 +240,35 @@ export interface Loaded {
    * is a change order, which is the entire point of keeping it.
    */
   readonly baseline: Baseline | null;
+  /**
+   * Change orders the client has signed, in the order they were agreed.
+   *
+   * The only things besides the baseline that an invoice may bill. A change
+   * nobody signed is not in here and never reaches a bill; see
+   * `core/src/change.ts`. Appended, never edited, for the same reason a
+   * baseline is never edited.
+   */
+  readonly agreedChanges: readonly AgreedChange[];
+  /**
+   * A change order written down and waiting to be signed.
+   *
+   * Kept rather than rebuilt, because rebuilding it is the bug: the room keeps
+   * moving while a client is deciding, and re-raising after it has moved
+   * produces a different document from the one that was sent out. The client
+   * would then be signing something nobody showed them.
+   */
+  readonly raisedChange: ChangeDocument | null;
   /** When the work happens. Beside the room, like everything else about a job. */
   readonly visits: readonly Visit[];
   /** What has been asked for, in the order it was asked. */
   readonly invoices: readonly Invoice[];
+  /**
+   * What has come in against those invoices.
+   *
+   * Written down, never taken: this app processes no payments and holds no card
+   * details. See `core/src/payment.ts`.
+   */
+  readonly payments: readonly Payment[];
   /** Rooms as they were before each edit, most recent last. */
   readonly undo: readonly Room[];
   /** What the last edit did, for the line under the plan. */
@@ -320,10 +390,44 @@ export type Action =
   | { type: 'divide'; boundary: Boundary; names: readonly [string, string] }
   | { type: 'undivide' }
   | { type: 'unmark'; damageId: string }
+  /**
+   * A recording, and everything that happens to it afterwards.
+   *
+   * One action rather than three — kept, transcribed, corrected — because all
+   * three hand over the whole note and the reducer's job is the same every
+   * time: check it against the room, and put it where the one with that id was.
+   * The recording itself is a file the app wrote and this never touches it.
+   */
+  | { type: 'voice'; note: VoiceNote }
+  | { type: 'unvoice'; noteId: string }
   /** A cut height decided, or taken off again. Seen and decided stay apart. */
   | { type: 'cutTo'; damageId: string; text: string | null }
   | { type: 'reading'; damageId: string; reading: Reading }
   | { type: 'damagePhotos'; damageId: string; photos: readonly string[] }
+  /**
+   * What is being done to one surface, turned on or off.
+   *
+   * `scopeAll` and `scopeNone` are how a room stops being priced as a full
+   * replacement: one starts from everything and lets somebody take work off,
+   * the other starts from nothing and lets them put work on. Both are real
+   * ways a contractor thinks — a gut job and a patch — and neither of them
+   * moves a number until he actually ticks something.
+   */
+  | {
+      type: 'pickWork' | 'dropWork';
+      surface: Surface;
+      item: WorkItem;
+      /**
+       * Everything this contractor can pick, so a room nobody has scoped yet
+       * can start from all of it rather than from an empty sheet.
+       */
+      items: readonly WorkItem[];
+      by: string;
+      at: string;
+    }
+  | { type: 'scopeAll'; items: readonly WorkItem[]; by: string; at: string }
+  | { type: 'scopeNone'; by: string; at: string }
+  | { type: 'unscope' }
   | { type: 'override'; override: Override }
   | { type: 'clearOverride'; item: string; unit: Override['unit'] }
   | { type: 'renameRoom'; name: string }
@@ -345,8 +449,11 @@ export type Action =
   | { type: 'claim'; claim: Claim }
   | { type: 'proposal'; proposal: Proposal | null }
   | { type: 'baseline'; baseline: Baseline }
+  | { type: 'agreedChanges'; agreedChanges: readonly AgreedChange[] }
+  | { type: 'raisedChange'; raisedChange: ChangeDocument | null }
   | { type: 'visits'; visits: readonly Visit[] }
   | { type: 'invoices'; invoices: readonly Invoice[] }
+  | { type: 'payments'; payments: readonly Payment[] }
   | { type: 'undo' }
   | { type: 'dismissError' }
   | { type: 'close' };
@@ -385,14 +492,19 @@ function restored(saved: SavedProject, note: string): State {
     frame?: RoomFrame;
     north?: NorthOnPlan;
     damages?: readonly Damage[];
+    voice?: readonly VoiceNote[];
     tags?: readonly Tag[];
     divide?: Loaded['divide'];
     overrides?: readonly Override[];
+    scope?: WorkScope;
     claim?: Claim;
     proposal?: Proposal;
     baseline?: Baseline;
+    agreedChanges?: readonly AgreedChange[];
+    raisedChange?: ChangeDocument;
     visits?: readonly Visit[];
     invoices?: readonly Invoice[];
+    payments?: readonly Payment[];
   };
   if (!extras.report) throw new Error('That saved room has no import report with it.');
   return {
@@ -409,6 +521,10 @@ function restored(saved: SavedProject, note: string): State {
       north: (extras.north as NorthOnPlan | undefined) ?? null,
       frame: extras.frame ?? NO_SCAN_FRAME,
       damages: extras.damages ?? [],
+      // Absent in every room saved before recordings existed, which is every
+      // room on anybody's phone today. An empty list is exactly right for one:
+      // nothing was said, rather than something that could not be read.
+      voice: extras.voice ?? [],
       // Read rather than taken as-is: a tag saved before 2026-08-26 carries a
       // single `condition`, and every one of those is on somebody's phone. See
       // `readConditions` — without this they would come back with no
@@ -419,11 +535,20 @@ function restored(saved: SavedProject, note: string): State {
       })),
       divide: extras.divide ?? null,
       overrides: extras.overrides ?? [],
+      // A file written before scopes existed has none, and comes back as a room
+      // priced the way it always was. Nothing is invented to fill the gap.
+      scope: extras.scope ?? null,
       claim: extras.claim ?? NO_CLAIM,
       proposal: extras.proposal ?? null,
       baseline: extras.baseline ?? null,
+      // Absent in every job saved before signed change orders existed. An empty
+      // list is right for one: nobody signed anything, rather than something
+      // that could not be read.
+      agreedChanges: extras.agreedChanges ?? [],
+      raisedChange: extras.raisedChange ?? null,
       visits: extras.visits ?? [],
       invoices: extras.invoices ?? [],
+      payments: extras.payments ?? [],
       undo: [],
       lastEdit: note,
       fileName: saved.fileName,
@@ -527,15 +652,20 @@ export function reduce(state: State, action: Action): State {
             north,
             frame,
             damages,
+            voice: [],
             tags: [],
             divide: null,
             refusedPins,
             overrides: [],
+            scope: null,
             claim: NO_CLAIM,
             proposal: null,
             baseline: null,
+            agreedChanges: [],
+            raisedChange: null,
             visits: [],
             invoices: [],
+            payments: [],
             undo: [],
             lastEdit: null,
             fileName: action.fileName,
@@ -607,14 +737,19 @@ export function reduce(state: State, action: Action): State {
             north: null,
             frame: NO_SCAN_FRAME,
             damages: [],
+            voice: [],
             tags: [],
             divide: null,
             overrides: [],
+            scope: null,
             claim: NO_CLAIM,
             proposal: null,
             baseline: null,
+            agreedChanges: [],
+            raisedChange: null,
             visits: [],
             invoices: [],
+            payments: [],
             undo: [],
             lastEdit: null,
             fileName: action.fileName,
@@ -659,14 +794,19 @@ export function reduce(state: State, action: Action): State {
           north: null,
           frame: NO_SCAN_FRAME,
           damages: [],
+          voice: [],
           tags: [],
           divide: null,
           overrides: [],
+          scope: null,
           claim: NO_CLAIM,
           proposal: null,
           baseline: null,
+          agreedChanges: [],
+          raisedChange: null,
           visits: [],
           invoices: [],
+          payments: [],
           undo: [],
           lastEdit: null,
           fileName: action.fileName,
@@ -779,6 +919,77 @@ export function reduce(state: State, action: Action): State {
       }
     }
 
+    /* ------------------------------------------------- what is being done */
+
+    case 'pickWork':
+    case 'dropWork': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      // Picking on a room nobody has scoped starts the scope at everything, so
+      // the first tick takes work OFF rather than throwing the rest away. A
+      // control whose first use empties the sheet is a control nobody presses
+      // twice.
+      const from = loaded.scope ?? everything(loaded.room, action.items, action.by, action.at);
+      const scope =
+        action.type === 'pickWork'
+          ? pickWork(from, action.surface, action.item, action.by, action.at)
+          : dropWork(from, action.surface, action.item, action.by, action.at);
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          scope,
+          lastEdit:
+            `${action.item.item} ${action.type === 'pickWork' ? 'is' : 'is not'} being done to ` +
+            `${surfaceName(action.surface)}.`,
+        },
+      };
+    }
+
+    case 'scopeAll': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          scope: everything(loaded.room, action.items, action.by, action.at),
+          lastEdit:
+            'Everything in this room is on the sheet. Take off whatever is not being done.',
+        },
+      };
+    }
+
+    case 'scopeNone': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          scope: nothing(action.by, action.at),
+          lastEdit: 'Nothing is on the sheet yet. Open a wall and say what is being done to it.',
+        },
+      };
+    }
+
+    case 'unscope': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          scope: null,
+          lastEdit: 'Back to pricing every surface as replaced.',
+        },
+      };
+    }
+
     /* -------------------------------------------------------- typed over */
 
     case 'override': {
@@ -857,12 +1068,18 @@ export function reduce(state: State, action: Action): State {
           }
           return damage;
         });
+        // And so does every recording. A note pointing at a wall that no longer
+        // exists is somebody's own voice, silently off every screen -- the same
+        // failure as a mark, one file bigger.
+        const voice = loaded.voice.map((note) =>
+          note.wallId === action.wallId ? { ...note, wallId: to } : note
+        );
         const next = edited(state, loaded, room, `That wall is called "${to}" now.`);
         return next.loaded
           ? {
               ...next,
               selected: state.selected === action.wallId ? to : state.selected,
-              loaded: { ...next.loaded, damages },
+              loaded: { ...next.loaded, damages, voice },
             }
           : next;
       } catch (error) {
@@ -999,6 +1216,12 @@ export function reduce(state: State, action: Action): State {
           return on !== action.wallId;
         });
         const lost = loaded.damages.length - kept.length;
+        // Every recording about that wall goes too, for the same reason and
+        // said out loud in the same sentence: a note about a wall that is not
+        // in the room any more can never be found again, and losing somebody's
+        // own voice silently is worse than losing a quantity.
+        const heardStill = loaded.voice.filter((note) => note.wallId !== action.wallId);
+        const unheard = loaded.voice.length - heardStill.length;
         const next = edited(
           state,
           loaded,
@@ -1007,13 +1230,16 @@ export function reduce(state: State, action: Action): State {
             (moved.length === 0
               ? 'Nothing else had to move.'
               : `${moved.map((a) => a.wallId).join(' and ')} moved to close the room back up.`) +
-            (lost > 0 ? ` ${lost} mark${lost === 1 ? '' : 's'} on it went with it.` : '')
+            (lost > 0 ? ` ${lost} mark${lost === 1 ? '' : 's'} on it went with it.` : '') +
+            (unheard > 0
+              ? ` ${unheard} recording${unheard === 1 ? '' : 's'} about it went too.`
+              : '')
         );
         return next.loaded
           ? {
               ...next,
               selected: state.selected === action.wallId ? null : state.selected,
-              loaded: { ...next.loaded, damages: kept },
+              loaded: { ...next.loaded, damages: kept, voice: heardStill },
             }
           : next;
       } catch (error) {
@@ -1283,13 +1509,77 @@ export function reduce(state: State, action: Action): State {
     case 'unmark': {
       const loaded = state.loaded;
       if (!loaded) return state;
+      // The recordings made ON this mark go with it. They are about a thing
+      // that is no longer in the room, and a note left behind would sit under a
+      // mark id nothing can resolve -- invisible on every screen, and still in
+      // the saved file. The wall's own recordings are untouched: they were
+      // never about this mark.
+      const said = loaded.voice.filter((note) => note.markId === action.damageId).length;
       return {
         ...state,
         error: null,
         loaded: {
           ...loaded,
           damages: loaded.damages.filter((d) => d.id !== action.damageId),
-          lastEdit: 'Took a mark off.',
+          voice: loaded.voice.filter((note) => note.markId !== action.damageId),
+          lastEdit:
+            'Took a mark off.' +
+            (said > 0 ? ` ${said} recording${said === 1 ? '' : 's'} on it went with it.` : ''),
+        },
+      };
+    }
+
+    /**
+     * A recording, and every later thing that happens to its words.
+     *
+     * The note arrives whole every time -- kept, then transcribed, then
+     * corrected by hand -- and replaces the one with its id. That is what makes
+     * the three moments one action instead of three: nothing here has to know
+     * which of them it is looking at.
+     *
+     * The audio file is the app's, written once into the scan's folder. Nothing
+     * in this reducer can touch it, which is exactly the property that makes
+     * editing a transcript safe.
+     */
+    case 'voice': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      try {
+        validateVoiceNote(loaded.room, action.note);
+        const already = loaded.voice.some((note) => note.id === action.note.id);
+        return {
+          ...state,
+          error: null,
+          loaded: {
+            ...loaded,
+            voice: already
+              ? loaded.voice.map((note) => (note.id === action.note.id ? action.note : note))
+              : [...loaded.voice, action.note],
+            lastEdit: already
+              ? action.note.transcript?.by === 'person'
+                ? 'That is what you said now, in your words.'
+                : 'Wrote down what was said.'
+              : `Recorded ${spokenLength(action.note.milliseconds)} about ${action.note.wallId}.`,
+          },
+        };
+      } catch (error) {
+        return { ...state, error: message(error) };
+      }
+    }
+
+    case 'unvoice': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          voice: loaded.voice.filter((note) => note.id !== action.noteId),
+          // The file itself stays in the scan's folder. Deleting somebody's own
+          // voice off a disk because they tidied a list is not this screen's
+          // decision to make.
+          lastEdit: 'Took a recording off the wall.',
         },
       };
     }
@@ -1378,6 +1668,20 @@ export function reduce(state: State, action: Action): State {
         ? { ...state, loaded: { ...state.loaded, baseline: action.baseline } }
         : state;
 
+    // Appended, never edited. A signed change order that could be quietly
+    // rewritten is worth nothing, and `verifyChange` would catch it anyway.
+    case 'agreedChanges':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, agreedChanges: action.agreedChanges } }
+        : state;
+
+    // Written down, then either signed or torn up. Never edited in place: a
+    // change order somebody is holding must not change under them.
+    case 'raisedChange':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, raisedChange: action.raisedChange } }
+        : state;
+
     case 'visits':
       return state.loaded
         ? { ...state, loaded: { ...state.loaded, visits: action.visits } }
@@ -1388,6 +1692,13 @@ export function reduce(state: State, action: Action): State {
     case 'invoices':
       return state.loaded
         ? { ...state, loaded: { ...state.loaded, invoices: action.invoices } }
+        : state;
+
+    // Appended, like the invoices they settle. A payment that has been recorded
+    // and then quietly changed is the record nobody can rely on.
+    case 'payments':
+      return state.loaded
+        ? { ...state, loaded: { ...state.loaded, payments: action.payments } }
         : state;
 
     case 'undo': {
@@ -1442,14 +1753,19 @@ export function persist(loaded: Loaded, at: string): string | null {
         frame: loaded.frame,
         north: loaded.north,
         damages: loaded.damages,
+        voice: loaded.voice,
         tags: loaded.tags,
         divide: loaded.divide,
         claim: loaded.claim,
         proposal: loaded.proposal,
         baseline: loaded.baseline,
+        agreedChanges: loaded.agreedChanges,
+        raisedChange: loaded.raisedChange,
         visits: loaded.visits,
         invoices: loaded.invoices,
+        payments: loaded.payments,
         overrides: loaded.overrides,
+        scope: loaded.scope,
       },
     });
     // The app first, and in its own right. It writes the room into the scan's

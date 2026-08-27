@@ -16,7 +16,7 @@
  * Price section shows, so a proposal cannot disagree with the takeoff it came
  * from — the failure that gets discovered by the client.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   type Baseline,
   type ChangeOrder,
@@ -38,6 +38,7 @@ import {
 } from '../../core/src/proposal.ts';
 import { type Override } from '../../core/src/override.ts';
 import { type Room } from '../../core/src/room.ts';
+import type { WorkScope } from '../../core/src/work.ts';
 import {
   type Signature,
   CLIENT_INTENT,
@@ -46,10 +47,11 @@ import {
   sign,
 } from '../../core/src/signature.ts';
 import { useQuote } from './quoteOf.ts';
-import { takeoff as buildTakeoff } from '../../core/src/takeoff.ts';
+import { sheetOf } from './quoteOf.ts';
 import { DraftButton, DraftedNote } from './Draft.tsx';
 import { useUnits } from './units.tsx';
 import { proposalFile } from './proposalFile.ts';
+import { SignaturePad } from './SignaturePad.tsx';
 import { fileNameFor, sendFile } from './sheet.ts';
 
 function Field({
@@ -81,124 +83,10 @@ function Field({
   );
 }
 
-/**
- * Somewhere to sign, with a finger.
- *
- * A canvas rather than a font: a typed name in a script face is not a
- * signature, it is a typed name, and everybody who has ever been shown one
- * knows it. The strokes are kept as points and drawn on every resize so the
- * mark survives the keyboard opening underneath it.
- */
-function SignaturePad({
-  onChange,
-  disabled,
-}: {
-  readonly onChange: (dataUrl: string) => void;
-  readonly disabled: boolean;
-}) {
-  const canvas = useRef<HTMLCanvasElement | null>(null);
-  const strokes = useRef<{ x: number; y: number }[][]>([]);
-  const drawing = useRef(false);
-  const [marked, setMarked] = useState(false);
-
-  const redraw = () => {
-    const element = canvas.current;
-    const context = element?.getContext('2d');
-    if (!element || !context) return;
-    context.clearRect(0, 0, element.width, element.height);
-    context.lineWidth = 2.5;
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.strokeStyle = 'rgb(var(--c-ink))';
-    for (const stroke of strokes.current) {
-      if (stroke.length < 2) continue;
-      context.beginPath();
-      context.moveTo(stroke[0]!.x, stroke[0]!.y);
-      for (const point of stroke.slice(1)) context.lineTo(point.x, point.y);
-      context.stroke();
-    }
-  };
-
-  useEffect(() => {
-    const element = canvas.current;
-    if (!element) return;
-    const fit = () => {
-      const box = element.getBoundingClientRect();
-      const ratio = window.devicePixelRatio || 1;
-      element.width = Math.round(box.width * ratio);
-      element.height = Math.round(box.height * ratio);
-      const context = element.getContext('2d');
-      context?.setTransform(ratio, 0, 0, ratio, 0, 0);
-      redraw();
-    };
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, []);
-
-  const at = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    return { x: event.clientX - box.left, y: event.clientY - box.top };
-  };
-
-  const finish = () => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    const element = canvas.current;
-    if (!element) return;
-    setMarked(true);
-    onChange(element.toDataURL('image/png'));
-  };
-
-  return (
-    <div>
-      <canvas
-        ref={canvas}
-        className={`h-40 w-full touch-none rounded-md border-2 border-dashed bg-white
-                    ${disabled ? 'border-slate-200 opacity-50' : 'border-slate-400'}`}
-        aria-label="Sign here with your finger"
-        role="img"
-        onPointerDown={(event) => {
-          if (disabled) return;
-          event.currentTarget.setPointerCapture(event.pointerId);
-          drawing.current = true;
-          strokes.current.push([at(event)]);
-          redraw();
-        }}
-        onPointerMove={(event) => {
-          if (!drawing.current || disabled) return;
-          strokes.current[strokes.current.length - 1]?.push(at(event));
-          redraw();
-        }}
-        onPointerUp={finish}
-        onPointerLeave={finish}
-        onPointerCancel={finish}
-      />
-      <div className="mt-1 flex items-center justify-between gap-3">
-        <p className="text-xs text-slate-500">
-          {marked ? 'Signed above.' : 'Sign above with a finger.'}
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            strokes.current = [];
-            setMarked(false);
-            onChange('');
-            redraw();
-          }}
-          className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium
-                     text-slate-700 active:bg-slate-100"
-        >
-          Start again
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function Agree({
   room,
   overrides,
+  scope,
   proposal,
   baseline,
   onProposal,
@@ -206,6 +94,11 @@ export function Agree({
 }: {
   readonly room: Room;
   readonly overrides: readonly Override[];
+  /**
+   * What is being done to each surface, or `null` for a room nobody has
+   * scoped — which is priced exactly as this app has always priced one.
+   */
+  readonly scope: WorkScope | null;
   readonly proposal: Proposal | null;
   readonly baseline: Baseline | null;
   readonly onProposal: (proposal: Proposal | null) => void;
@@ -215,7 +108,7 @@ export function Agree({
   // The same quote the Price section shows, from the same hook. A proposal that
   // worked its own total out could disagree with the sheet it came from, and
   // the disagreement would be found by the client.
-  const { quote: current } = useQuote(room, overrides, company);
+  const { quote: current } = useQuote(room, overrides, company, scope);
   const roomName = room.name;
   /**
    * Whether the line in the box was written by the phone and not yet read.
@@ -262,10 +155,14 @@ export function Agree({
   /**
    * The work in this room, as quantities. Built here rather than taken from the
    * quote so a scope paragraph can be drafted before a single rate is typed.
+   *
+   * Named `sheet` rather than `scope`, which it used to be called: a scope is
+   * now a real thing in this app — what is being done to each surface — and two
+   * meanings of one word in one file is how the wrong one gets read.
    */
-  const scope = useMemo(
-    () => buildTakeoff(room, new Date().toLocaleString(), { company: company.name }),
-    [room, company.name]
+  const sheet = useMemo(
+    () => sheetOf(room, company, scope, new Date().toLocaleString()),
+    [room, company, scope]
   );
   const [client, setClient] = useState<Party>(proposal?.client ?? NOBODY);
   const [validUntil, setValidUntil] = useState(proposal?.validUntil ?? '');
@@ -355,7 +252,7 @@ export function Agree({
                     // fact sheet that said "Floor: 420.0" would be handing a
                     // model a bare number to guess the meaning of — which is
                     // the exact failure this file's whole rule exists to stop.
-                    ...scope.lines.map(
+                    ...sheet.lines.map(
                       (line) => `- ${line.what}: ${line.quantity} ${line.unit}`
                     ),
                   ].join('\n')

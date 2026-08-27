@@ -156,6 +156,11 @@ struct CorrectView: UIViewRepresentable {
         // Which capture's photographs this page may show — one folder, the one
         // being looked at, and nothing else on the disk.
         context.coordinator.bundle.photos = folder?.appendingPathComponent("photos", isDirectory: true)
+        // And the recordings made about its walls, under the same rule: one
+        // folder, set by the screen that opened the scan, so the page is a
+        // reader of this room and never of the disk.
+        context.coordinator.bundle.voice = folder?.appendingPathComponent(
+            VoiceRecorder.folderName, isDirectory: true)
 
         let configuration = WKWebViewConfiguration()
         // The channel the correction screens save through. Without it a room
@@ -190,6 +195,12 @@ struct CorrectView: UIViewRepresentable {
         // view runs whatever HTML it is given, and a channel that carried its
         // own instruction would be a channel that carried any instruction.
         configuration.userContentController.add(context.coordinator, name: "draft")
+        // Start recording, and stop. Two words on the wire and no payload but
+        // an id: the app already knows which room is open, it chooses the file
+        // name itself, and a screen that could name a file would be a screen
+        // that could write anywhere on the phone. This one runs whatever HTML
+        // it is given.
+        configuration.userContentController.add(context.coordinator, name: "voice")
         // The bundle is served under its own scheme rather than from `file://`.
         // See `WebBundle` for why: modules do not load from an opaque origin,
         // and the failure looks exactly like a hang.
@@ -236,6 +247,16 @@ struct CorrectView: UIViewRepresentable {
         var parent: CorrectView
         /// Held here because the configuration does not retain it.
         let bundle = WebBundle()
+        /// The microphone, for as long as one recording lasts.
+        ///
+        /// Held rather than made per message, and that is the whole reason it is
+        /// a property: start and stop arrive as two separate messages, and a
+        /// recorder built fresh for the second one would have nothing to stop.
+        /// Built lazily inside a main-actor task because `VoiceRecorder` is
+        /// `@MainActor` and this coordinator is not — the same arrangement
+        /// `Draftsman` is built under, one step longer because this one has to
+        /// survive between two messages.
+        var voice: VoiceRecorder?
 
         init(_ parent: CorrectView) {
             self.parent = parent
@@ -309,6 +330,21 @@ struct CorrectView: UIViewRepresentable {
                         "window.trueline && window.trueline.drafted"
                         + "(\(self.quoted(id)), \(quotedText))"
                     )
+                }
+
+            case "voice":
+                // Two words, `start` and `stop`, and an id to tie the answers
+                // back to the question. Everything else about a recording is
+                // decided here: where it is written, what it is called, how
+                // long it may run, and whether this phone may listen at all.
+                guard
+                    let id = body["id"] as? String,
+                    let action = body["action"] as? String,
+                    let webView = message.webView
+                else { return }
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    await self.record(action, id: id, on: webView)
                 }
 
             case "calendar":
@@ -401,6 +437,93 @@ struct CorrectView: UIViewRepresentable {
             }
         }
 
+        /// Starting and stopping one recording, and writing down what was said.
+        ///
+        /// ## The order here is the whole design
+        ///
+        /// On `stop` the file is finished and **reported to the page before
+        /// transcription is even attempted**. A recogniser that is missing,
+        /// refused or slow then costs a transcript and never the recording —
+        /// which is the one thing in this app that cannot be made again, because
+        /// nobody can go back and say the same sentence in the same room six
+        /// weeks later.
+        ///
+        /// Every ending is a sentence rather than a silence. A refused
+        /// microphone is the one that matters most: it comes back with the
+        /// switch to turn on, and every other control on the screen goes on
+        /// working. A dead Record button that says nothing is exactly the
+        /// failure this app has been bitten by before.
+        @MainActor
+        private func record(_ action: String, id: String, on webView: WKWebView) async {
+            guard let folder = parent.folder else {
+                // The Floor and Business tabs. No room is open, so there is
+                // nowhere to write a recording -- and the page was never told it
+                // could record, so nothing should have asked.
+                await answer(["refused": "There is no room open to record about."], id: id, on: webView)
+                return
+            }
+
+            switch action {
+            case "start":
+                let recorder = voice ?? VoiceRecorder()
+                voice = recorder
+                switch await recorder.start(into: folder) {
+                case .running:
+                    await answer(["started": true], id: id, on: webView)
+                case .refused(let why):
+                    voice = nil
+                    await answer(["refused": why], id: id, on: webView)
+                }
+
+            case "stop":
+                guard let recorder = voice, let kept = recorder.stop() else {
+                    voice = nil
+                    await answer(
+                        ["refused": "Nothing was recording, so nothing was kept."],
+                        id: id, on: webView)
+                    return
+                }
+                voice = nil
+                // The recording, first and on its own. Everything after this
+                // line is a convenience.
+                await answer(
+                    ["kept": ["fileName": kept.fileName, "milliseconds": kept.milliseconds]],
+                    id: id, on: webView)
+
+                switch await recorder.transcribe(kept.fileName, in: folder) {
+                case .words(let said):
+                    await answer(["transcript": said], id: id, on: webView)
+                case .cannot(let why):
+                    await answer(["noTranscript": why], id: id, on: webView)
+                }
+
+            default:
+                return
+            }
+        }
+
+        /// One answer, back through the same hook everything else arrives on.
+        ///
+        /// Built with `JSONSerialization` rather than by writing JavaScript by
+        /// hand, for the reason `quoted` exists: the first sentence somebody
+        /// records with an apostrophe in it is what finds a hand-escaped
+        /// literal, and a note somebody spoke is exactly the field most likely
+        /// to have one.
+        @MainActor
+        private func answer(_ payload: [String: Any], id: String, on webView: WKWebView) async {
+            guard
+                let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+                let json = String(data: data, encoding: .utf8)
+            else { return }
+            // `try? await`, both load-bearing -- see the draft handler above for
+            // the two compiler errors this shape is the answer to. The page
+            // having gone away mid-recording is ordinary and there is nothing
+            // useful to do about it but stop.
+            _ = try? await webView.evaluateJavaScript(
+                "window.trueline && window.trueline.heard(\(quoted(id)), \(json))"
+            )
+        }
+
         /// Whether a name the page chose may be used as a file name.
         ///
         /// Letters, digits, dash and underscore, then exactly `.jpg`. No dots
@@ -480,6 +603,19 @@ struct CorrectView: UIViewRepresentable {
             // it never learns it exists, which is the only version that does
             // not read as a missing feature.
             payload["draftable"] = Draftsman.isAvailable ? "true" : "false"
+            // Whether somebody can talk at a wall here, and whether the phone
+            // will write down what they said. Two answers rather than one,
+            // because they fail separately: a phone with no on-device speech
+            // model still records perfectly well, and telling the page there is
+            // no microphone because there is no language model would take away
+            // the half that works.
+            //
+            // Recording needs somewhere to put the file, so it is false on the
+            // Floor and Business tabs -- there is no room open there, and a
+            // Record button with nowhere to write would be the dead button this
+            // whole arrangement exists to avoid.
+            payload["recordable"] = parent.folder != nil ? "true" : "false"
+            payload["transcribes"] = VoiceRecorder.canTranscribe ? "true" : "false"
             if let reports = String(data: parent.reportsJSON, encoding: .utf8), !reports.isEmpty {
                 payload["reports"] = quoted(reports)
             }

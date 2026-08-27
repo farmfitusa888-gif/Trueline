@@ -296,12 +296,40 @@ function overlap(
   return hi > lo ? hi - lo : 0n;
 }
 
-export function quantities(zone: Zone, room: Room): Quantities {
+/**
+ * What one wall of a zone contributes, on its own.
+ *
+ * The same arithmetic `quantities()` has always done, kept per wall instead of
+ * folded away — because the moment a contractor can say "three of these four
+ * walls get boarded and the fourth is left alone", the totals have to be built
+ * out of walls rather than out of a room. See `work.ts`.
+ *
+ * It is the *same* arithmetic rather than a second copy of it, on purpose:
+ * `quantities()` below is now this, added up. Two derivations of one wall face
+ * is two chances to disagree, and the one that would be wrong is the one on the
+ * quote.
+ */
+export interface WallQuantities {
+  readonly wallId: string;
+  /** How much of this wall is inside the zone. */
+  readonly run: Nanometres;
+  /** That run, less doors and cased openings. A window does not interrupt base. */
+  readonly baseboardRun: Nanometres;
+  /** Run x height, less every opening, in plain square nanometres. */
+  readonly wallFaceArea: bigint;
+  /** Openings of each kind falling inside this stretch of wall. */
+  readonly doors: number;
+  readonly windows: number;
+  readonly cased: number;
+}
+
+export function byWall(zone: Zone, room: Room): readonly WallQuantities[] {
   const byId = new Map(room.walls.map((w) => [w.id, w]));
-  let baseboard = 0n;
-  let face = 0n;
+  const out: WallQuantities[] = [];
 
   for (const edge of zone.edges) {
+    // An open span carries no drywall, no paint and no baseboard, and a virtual
+    // edge was never built at all. Neither of them is a wall to be counted.
     if (edge.kind !== 'built') continue;
     const wall = byId.get(edge.wallId);
     if (!wall) throw new ZoneError(`Zone "${zone.id}" names wall "${edge.wallId}", which is not in the room.`);
@@ -311,8 +339,11 @@ export function quantities(zone: Zone, room: Room): Quantities {
     const run = hi - lo;
     const height = (wall.height ?? room.ceilingHeight).value;
 
-    baseboard += run;
-    face += run * height;
+    let baseboard = run;
+    let face = run * height;
+    let doors = 0;
+    let windows = 0;
+    let cased = 0;
 
     for (const opening of wall.openings ?? []) {
       const oStart = opening.offsetFromStart.value;
@@ -322,15 +353,35 @@ export function quantities(zone: Zone, room: Room): Quantities {
       // A window leaves the baseboard alone; a door or a cased opening does not.
       if (opening.kind !== 'window') baseboard -= shared;
       face -= shared * opening.height.value;
+      // Counted against the stretch it actually falls in, so a door in a wall
+      // split between two zones is not counted twice and is not lost.
+      if (opening.kind === 'door') doors += 1;
+      else if (opening.kind === 'window') windows += 1;
+      else cased += 1;
     }
+
+    out.push({
+      wallId: wall.id,
+      run,
+      baseboardRun: baseboard,
+      wallFaceArea: face,
+      doors,
+      windows,
+      cased,
+    });
   }
 
+  return out;
+}
+
+export function quantities(zone: Zone, room: Room): Quantities {
+  const walls = byWall(zone, room);
   const floor = zoneArea(zone);
   return {
     floorArea: floor,
     ceilingArea: floor,
-    baseboardRun: baseboard,
-    wallFaceArea: face,
+    baseboardRun: add(...walls.map((w) => w.baseboardRun)),
+    wallFaceArea: walls.reduce((total, w) => total + w.wallFaceArea, 0n),
     virtualRun: virtualPerimeter(zone),
     openRun: openPerimeter(zone),
   };

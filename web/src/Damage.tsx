@@ -4,15 +4,21 @@ import type { Room, Wall } from '../../core/src/room.ts';
 import { runLength } from '../../core/src/room.ts';
 import {
   type Damage as Mark,
-  type DamageKind,
+  type MarkKind,
   type Reading,
   type WaterCategory,
+  CONDITION_KINDS,
+  LOSS_KINDS,
   WATER_CATEGORY,
   damageQuantity,
   drying,
+  isLoss,
   suggestedCut,
 } from '../../core/src/damage.ts';
+import type { VoiceNote } from '../../core/src/voice.ts';
+import { notesOnMark } from '../../core/src/voice.ts';
 import { DamagePhotos } from './DamagePhotos.tsx';
+import { VoiceNotes } from './Voice.tsx';
 import { forget } from './photoStore.ts';
 import { Measure, Wants } from './Measure.tsx';
 import { useUnits } from './units.tsx';
@@ -25,36 +31,76 @@ import { useUnits } from './units.tsx';
  * square feet of board and nine feet of base, worked out while somebody is
  * still standing in front of it, from a length nobody has to remember.
  *
- * The shapes are three because damage is three things. A **patch** for the
- * region water actually makes. A **whole wall** for one that has gone. A **pin**
- * for a hole or a stain, which produces no area at all and says so — a marker is
- * not a measurement, and giving it square feet would be inventing one.
+ * The shapes are three because what is wrong with a wall is three things. A
+ * **patch** for the region water actually makes. A **whole wall** for one that
+ * has gone. A **pin** for a hole or a stain, which produces no area at all and
+ * says so — a marker is not a measurement, and giving it square feet would be
+ * inventing one.
+ *
+ * ## One screen, two jobs
+ *
+ * This used to be behind the insurance switch, and that was wrong. Marking is
+ * not an insurance feature: a remodeler finds a soft sill plate, a wall out of
+ * plumb, a chase he cannot get at, and wants exactly these three boxes on
+ * exactly this wall. What differs is not the act but what happens afterwards —
+ * a claim prices it as tear-out, an ordinary job puts it on the sheet somebody
+ * carries and on nothing else.
+ *
+ * So `onClaim` changes three things and nothing else:
+ *
+ *   - **which words are offered.** A cause-of-loss list is what an adjuster
+ *     reads and is the wrong list for a remodel; see `ConditionKind`.
+ *   - **whether a cut height is asked for.** Where to cut is a tear-out
+ *     decision, and nobody is tearing out a wall because it is out of plumb.
+ *   - **whether an area is shown.** A square-foot figure on an ordinary job
+ *     reads as work somebody has agreed to, and noticing rot is not buying its
+ *     removal. The geometry is still recorded, exactly; it is simply not put in
+ *     front of somebody as a quantity.
+ *
+ * Everything else — the shape, the note, the photograph, the recording — is the
+ * same code, because it is the same thing.
  */
 
-const KINDS: readonly { value: DamageKind; label: string }[] = [
-  { value: 'water', label: 'Water' },
-  { value: 'fire', label: 'Fire' },
-  { value: 'smoke', label: 'Smoke' },
-  { value: 'mould', label: 'Mould' },
-  { value: 'impact', label: 'Impact' },
-  { value: 'wind', label: 'Wind' },
-  { value: 'other', label: 'Other' },
-];
+const LABEL: Record<MarkKind, string> = {
+  water: 'Water',
+  fire: 'Fire',
+  smoke: 'Smoke',
+  mould: 'Mould',
+  impact: 'Impact',
+  wind: 'Wind',
+  other: 'Other',
+  rot: 'Rot',
+  cracked: 'Cracked',
+  'out of plumb': 'Out of plumb',
+  'out of level': 'Out of level',
+  'previous repair': 'Previous repair',
+  'no access': 'No access',
+  'asbestos suspect': 'Asbestos suspect',
+  note: 'Just a note',
+};
 
 export function DamageOnWall({
   room,
   wall,
   damages,
+  voice,
+  onClaim,
   scanName,
   onMark,
   onUnmark,
   onCutTo,
   onReading,
   onPhotos,
+  onNote,
+  onForget,
 }: {
   readonly room: Room;
   readonly wall: Wall;
   readonly damages: readonly Mark[];
+  /** What was said out loud, so a mark can carry its own recordings. */
+  readonly voice: readonly VoiceNote[];
+  /** Whether this job is a claim. It changes the words, not the record. */
+  readonly onClaim: boolean;
   /** Which scan this is, so a photograph is filed with the room it belongs to. */
   readonly scanName: string;
   readonly onMark: (damage: Mark) => void;
@@ -62,10 +108,16 @@ export function DamageOnWall({
   readonly onCutTo: (id: string, text: string | null) => void;
   readonly onReading: (id: string, reading: Reading) => void;
   readonly onPhotos: (id: string, photos: readonly string[]) => void;
+  readonly onNote: (note: VoiceNote) => void;
+  readonly onForget: (noteId: string) => void;
 }) {
   const { len, area } = useUnits();
   const [adding, setAdding] = useState<'patch' | 'whole' | 'pin' | null>(null);
-  const [kind, setKind] = useState<DamageKind>('water');
+  // Water on a claim, because it is most of them. On an ordinary job the
+  // default commits to nothing — somebody marking a wall has not yet said what
+  // is wrong with it, and starting them on "rot" would put a word in their
+  // mouth that ends up on a sheet.
+  const [kind, setKind] = useState<MarkKind>(onClaim ? 'water' : 'note');
   const [category, setCategory] = useState<WaterCategory>(1);
   const [note, setNote] = useState('');
   const [wants, setWants] = useState<string | null>(null);
@@ -115,18 +167,18 @@ export function DamageOnWall({
     <>
       <Wants say={wants} />
       <div className="mt-2 flex flex-wrap gap-2">
-        {KINDS.map((k) => (
+        {(onClaim ? LOSS_KINDS : CONDITION_KINDS).map((k) => (
           <button
-            key={k.value}
+            key={k}
             type="button"
-            onClick={() => setKind(k.value)}
+            onClick={() => setKind(k)}
             className={`min-h-11 rounded-md px-3 text-sm font-semibold ${
-              kind === k.value
+              kind === k
                 ? 'bg-slate-900 text-white'
                 : 'border border-slate-300 text-slate-700 active:bg-slate-100'
             }`}
           >
-            {k.label}
+            {LABEL[k]}
           </button>
         ))}
       </div>
@@ -160,7 +212,11 @@ export function DamageOnWall({
         <input
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          placeholder="water line along the bottom of the wall"
+          placeholder={
+            onClaim
+              ? 'water line along the bottom of the wall'
+              : 'sill plate is soft under the window'
+          }
           className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2
                      focus:border-sky-500 focus:outline-none"
         />
@@ -172,12 +228,19 @@ export function DamageOnWall({
   );
 
   return (
-    <div className="mt-4 border-t border-sky-200 pt-3" data-sheet="no">
+    <div className="mt-4 border-t border-sky-200 pt-3" data-sheet="no" data-marks={wall.id}>
       <h3 className="text-sm font-semibold text-slate-900">
         {mine.length === 0
           ? 'Nothing marked on this wall'
           : `${mine.length} mark${mine.length === 1 ? '' : 's'} on this wall`}
       </h3>
+      {mine.length === 0 && !onClaim && (
+        <p className="mt-1 text-sm text-slate-600">
+          Rot, a crack, a wall out of plumb, something you cannot get at. It goes on the sheet
+          you carry and on nothing you price — the wall is already measured, so all it needs is
+          where along it and how high.
+        </p>
+      )}
 
       {mine.length > 0 && (
         <ul className="mt-2 divide-y divide-sky-200">
@@ -206,7 +269,20 @@ export function DamageOnWall({
                     <span className="block text-xs text-slate-500">{damage.note}</span>
                   </span>
                   <span className="shrink-0 text-right font-mono tabular-nums text-slate-900">
-                    {q.faceArea > 0n ? area(2n * q.faceArea) : '—'}
+                    {/* An area is what a claim is arguing about. On an ordinary
+                        job a square-foot figure beside a note reads as work
+                        somebody has agreed to, and nobody has agreed to
+                        anything by noticing rot. The geometry is recorded
+                        either way and the workings say where it is.
+                        `isLoss` as well as the job, because a claim turned on
+                        over a room somebody already walked still carries the
+                        condition notes they made — and `losses()` keeps those
+                        off every insurance screen. An area shown here for a
+                        mark that will never reach the claim would be a figure
+                        promising work nobody is going to be paid for. */}
+                    {onClaim && isLoss(damage.kind) && q.faceArea > 0n
+                      ? area(2n * q.faceArea)
+                      : '—'}
                     <span className="ml-2 text-xs text-slate-500 underline underline-offset-4">
                       {showing ? 'Done' : 'Open'}
                     </span>
@@ -222,7 +298,7 @@ export function DamageOnWall({
                       </p>
                     )}
 
-                    {patch && (
+                    {patch && onClaim && isLoss(damage.kind) && (
                       <div className="mt-3">
                         <span className="text-sm font-medium text-slate-700">Cut to</span>
                         <p className="mt-1 text-xs text-slate-500">
@@ -260,6 +336,10 @@ export function DamageOnWall({
                       </div>
                     )}
 
+                    {/* A drying curve is a water-claim instrument. Absent on
+                        an ordinary job rather than greyed out — the same rule
+                        the draft button keeps. */}
+                    {onClaim && isLoss(damage.kind) && (
                     <div className="mt-3">
                       <span className="text-sm font-medium text-slate-700">Moisture readings</span>
                       {curve.readings.length > 0 && (
@@ -294,12 +374,24 @@ export function DamageOnWall({
                       </p>
                       <ReadingBox onAdd={(reading) => onReading(damage.id, reading)} />
                     </div>
+                    )}
 
                     <DamagePhotos
                       damageId={damage.id}
                       scanName={scanName}
                       photos={damage.photos}
                       onChange={(next) => onPhotos(damage.id, next)}
+                    />
+
+                    {/* And what he said about it, which is the half a
+                        photograph cannot carry: why it matters, what is behind
+                        it, and what he wants done. */}
+                    <VoiceNotes
+                      notes={notesOnMark(voice, damage.id)}
+                      wallId={wall.id}
+                      markId={damage.id}
+                      onNote={onNote}
+                      onForget={onForget}
                     />
 
                     <button
@@ -334,7 +426,7 @@ export function DamageOnWall({
                 className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium
                            text-slate-700 active:bg-slate-100"
               >
-                + damaged area
+                {onClaim ? '+ damaged area' : '+ part of this wall'}
               </button>
               <button
                 type="button"

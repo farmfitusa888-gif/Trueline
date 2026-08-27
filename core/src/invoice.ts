@@ -1,4 +1,5 @@
-import { type Baseline, type ChangeOrder } from './baseline.ts';
+import { type Baseline, type Change, type ChangeOrder } from './baseline.ts';
+import { type AgreedChange, agreedDifference, notYetAgreed, verifyChange } from './change.ts';
 import { type Company } from './company.ts';
 import { type Cents, money } from './price.ts';
 import { type Party } from './proposal.ts';
@@ -57,6 +58,11 @@ export interface Invoice {
   readonly client: Party;
   readonly jobName: string;
   readonly lines: readonly InvoiceLine[];
+  /**
+   * What has moved on the job that nobody signed for, and so is not on this
+   * bill. Empty on a job that is running to its agreement.
+   */
+  readonly notBilled: readonly Change[];
   /** What this one asks for. */
   readonly amount: Cents;
   /** The whole job, agreed, so the client can see where this sits. */
@@ -80,18 +86,33 @@ export interface Invoice {
 }
 
 /**
- * The amount a stage asks for.
+ * How much of the job a stage is being asked for.
  *
- * A deposit is a share of what was agreed. Progress and final are whatever is
- * left after what has already been asked for -- which is the only definition
- * that cannot double-bill, and double-billing is the failure that costs a
- * contractor a customer rather than a morning.
+ * A deposit is a share of what was agreed. A progress payment is against the
+ * work that has actually been done, so it has to be told how much that is --
+ * either as the share of the job complete or as a figure the contractor names.
+ * The final is the rest.
+ *
+ * The first version treated progress and final identically: both asked for
+ * everything outstanding. That is not a progress payment, it is the final
+ * invoice with the wrong word at the top, and sending one halfway through a job
+ * asks a homeowner for the whole balance before the work is done.
  */
+export interface StageShare {
+  /** Deposit: what share of the agreed total it is. */
+  readonly depositPerCent?: number;
+  /** Progress: how much of the job is done, as a percentage. */
+  readonly completePerCent?: number;
+  /** Progress: a figure the contractor names instead, in cents. */
+  readonly amount?: Cents;
+}
+
+/** The amount a stage asks for. */
 export function amountFor(
   stage: Stage,
   agreed: Cents,
   alreadyBilled: Cents,
-  depositPerCent = 0
+  share: StageShare = {}
 ): Cents {
   const outstanding = agreed - alreadyBilled;
   if (outstanding <= 0n) {
@@ -101,15 +122,52 @@ export function amountFor(
         'the same work is how a job ends badly.'
     );
   }
-  if (stage !== 'deposit') return outstanding;
+  if (stage === 'final') return outstanding;
 
-  if (depositPerCent <= 0 || depositPerCent >= 100) {
-    throw new InvoiceError('A deposit has to be somewhere between 0 and 100 per cent of the job.');
+  if (stage === 'deposit') {
+    const perCent = share.depositPerCent ?? 0;
+    if (perCent <= 0 || perCent >= 100) {
+      throw new InvoiceError('A deposit has to be somewhere between 0 and 100 per cent of the job.');
+    }
+    // Rounded half away from zero, in cents, so the deposit and the final add up
+    // to exactly the agreed figure with nothing left over.
+    const part = (agreed * BigInt(Math.round(perCent * 100)) + 5000n) / 10000n;
+    return part > outstanding ? outstanding : part;
   }
-  // Rounded half away from zero, in cents, so the deposit and the final add up
-  // to exactly the agreed figure with nothing left over.
-  const share = (agreed * BigInt(Math.round(depositPerCent * 100)) + 5000n) / 10000n;
-  return share > outstanding ? outstanding : share;
+
+  if (share.amount !== undefined) {
+    if (share.amount <= 0n) {
+      throw new InvoiceError('A progress payment has to ask for something.');
+    }
+    if (share.amount > outstanding) {
+      throw new InvoiceError(
+        `${money(share.amount)} is more than the ${money(outstanding)} left on this job. ` +
+          'A progress payment cannot ask for work that is not in the agreement.'
+      );
+    }
+    return share.amount;
+  }
+
+  const complete = share.completePerCent;
+  if (complete === undefined) {
+    throw new InvoiceError(
+      'A progress payment is against work that has been done, so say how much of the job ' +
+        'is done or name the figure. Asking for everything outstanding halfway through is ' +
+        'the final invoice with the wrong word at the top.'
+    );
+  }
+  if (complete <= 0 || complete > 100) {
+    throw new InvoiceError('How much of the job is done has to be more than 0 and at most 100 per cent.');
+  }
+  const earned = (agreed * BigInt(Math.round(complete * 100)) + 5000n) / 10000n;
+  const due = earned - alreadyBilled;
+  if (due <= 0n) {
+    throw new InvoiceError(
+      `At ${complete}% complete this job has earned ${money(earned)}, and ` +
+        `${money(alreadyBilled)} has already been invoiced. There is nothing to ask for yet.`
+    );
+  }
+  return due > outstanding ? outstanding : due;
 }
 
 export interface InvoiceRequest {
@@ -120,10 +178,22 @@ export interface InvoiceRequest {
   readonly client: Party;
   readonly jobName: string;
   readonly baseline: Baseline;
-  /** Changes agreed since signing. An empty order is fine and common. */
-  readonly changes: ChangeOrder;
+  /**
+   * Change orders the client has signed. Only these are billed.
+   *
+   * An empty list is fine and common: most jobs run without a change order, and
+   * a job with one that nobody signed bills the same as a job with none.
+   */
+  readonly agreedChanges: readonly AgreedChange[];
+  /**
+   * What has moved on the job since it was signed, whether or not anybody has
+   * agreed to it. Never billed. Named on the invoice so the contractor can see
+   * exactly what is not on it, and raise a change order for the parts he means
+   * to be paid for.
+   */
+  readonly moved?: ChangeOrder;
   readonly alreadyBilled: Cents;
-  readonly depositPerCent?: number;
+  readonly share?: StageShare;
   readonly issuedAt: string;
   readonly dueAt?: string;
   readonly payTo?: string;
@@ -131,31 +201,33 @@ export interface InvoiceRequest {
 }
 
 /**
- * An invoice, from what was signed and what has been agreed since.
+ * An invoice, from what was signed and from the change orders that were signed
+ * since. Nothing else.
  *
- * Refuses a change order that has not been agreed to. A change appearing on an
- * invoice before anybody said yes to it is exactly the behaviour a contractor
- * is accused of, and this app should be the reason he can prove he does not do
- * it.
+ * This is the rule the file used to claim and not keep. `request.moved` can say
+ * the job is now worth twice what was agreed; not one cent of it reaches
+ * `amount` until there is an `AgreedChange` carrying a client signature sealed
+ * to the change order document. What is unsigned comes back on `notBilled`, so
+ * the contractor sees it and can go and get it signed.
+ *
+ * Synchronous, so every screen that shows a total can call it. The seals on the
+ * signed change orders are checked by `invoiceOfVerified`, which is the one
+ * anything sends.
  */
 export function invoiceOf(request: InvoiceRequest): Invoice {
   if (!request.number.trim()) {
     throw new InvoiceError('An invoice needs a number, or two of them cannot be told apart.');
   }
-  if (request.changes.tampered) {
+  if (request.moved?.tampered) {
     throw new InvoiceError(
       'The agreed document no longer matches what was signed, so nothing can be invoiced ' +
-        'against it until that is sorted out. ' + request.changes.tamperNote
+        'against it until that is sorted out. ' + request.moved.tamperNote
     );
   }
 
-  const agreed = request.baseline.agreed.total + request.changes.difference;
-  const amount = amountFor(
-    request.stage,
-    agreed,
-    request.alreadyBilled,
-    request.depositPerCent ?? 0
-  );
+  const difference = agreedDifference(request.baseline, request.agreedChanges);
+  const agreed = request.baseline.agreed.total + difference;
+  const amount = amountFor(request.stage, agreed, request.alreadyBilled, request.share ?? {});
 
   const lines: InvoiceLine[] = [
     {
@@ -166,9 +238,20 @@ export function invoiceOf(request: InvoiceRequest): Invoice {
       amount: request.baseline.agreed.total,
     },
   ];
-  for (const change of request.changes.changes) {
-    lines.push({ what: `Change: ${change.item}`, detail: change.says, amount: change.difference });
+  for (const one of request.agreedChanges) {
+    const doc = one.document;
+    for (const change of doc.changes) {
+      lines.push({
+        what: `Change ${doc.number}: ${change.item}`,
+        detail:
+          `${change.says} Agreed ${one.agreedAt.slice(0, 10)}, signed by ` +
+          `${one.signatures.map((s) => s.who).join(' and ')}.`,
+        amount: change.difference,
+      });
+    }
   }
+
+  const notBilled = request.moved ? notYetAgreed(request.moved, request.agreedChanges) : [];
 
   return {
     id: request.id,
@@ -178,6 +261,7 @@ export function invoiceOf(request: InvoiceRequest): Invoice {
     client: request.client,
     jobName: request.jobName,
     lines,
+    notBilled,
     amount,
     agreed,
     alreadyBilled: request.alreadyBilled,
@@ -186,6 +270,26 @@ export function invoiceOf(request: InvoiceRequest): Invoice {
     payTo: request.payTo ?? '',
     note: request.note ?? '',
   };
+}
+
+/**
+ * The same, with every signed change order's seal checked first.
+ *
+ * Separate for the same reason `changesSinceVerified` is separate from
+ * `changesSince`: checking a hash is asynchronous and a total on a screen is
+ * not. Anything that sends an invoice, or shows one to a client, uses this one.
+ */
+export async function invoiceOfVerified(request: InvoiceRequest): Promise<Invoice> {
+  for (const one of request.agreedChanges) {
+    const seal = await verifyChange(one);
+    if (!seal.ok) {
+      throw new InvoiceError(
+        `Change order ${one.document.number} no longer matches what was signed, so it cannot ` +
+          'be billed. ' + seal.why
+      );
+    }
+  }
+  return invoiceOf(request);
 }
 
 /** What is still owed after this one is paid. */
@@ -216,4 +320,29 @@ export function missingFromInvoice(invoice: Invoice): string[] {
   if (!invoice.dueAt.trim()) missing.push('when it is due');
   if (!invoice.payTo.trim()) missing.push('how to pay you');
   return missing;
+}
+
+/**
+ * What is on the job but not on the bill, said out loud.
+ *
+ * The contractor reads this, not the client. He is owed an explanation for
+ * every dollar the app declined to ask for on his behalf, and "it is not
+ * signed" is the whole of it.
+ */
+export function whyNotBilled(invoice: Invoice): string {
+  // Read defensively, because every invoice written before change orders were
+  // separated from the live quote has no `notBilled` on it, and every one of
+  // those is inside a saved job on somebody's phone. Absent is not empty by
+  // accident here -- it is exactly right: nothing was held back, because
+  // holding things back is what this release introduced.
+  const held = invoice.notBilled ?? [];
+  if (held.length === 0) return '';
+  const total = held.reduce((sum, c) => sum + c.difference, 0n);
+  const size = total < 0n ? -total : total;
+  const count = held.length;
+  return (
+    `${count} thing${count === 1 ? '' : 's'} ${count === 1 ? 'has' : 'have'} changed on this ` +
+    `job that nobody has signed for, worth ${money(size)}. ${count === 1 ? 'It is' : 'They are'} ` +
+    'not on this invoice. Raise a change order, get it signed, and it goes on the next one.'
+  );
 }

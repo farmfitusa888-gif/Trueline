@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { area, isDiagonal, runLength } from '../../core/src/room.ts';
 import { isAdjusted } from '../../core/src/measurement.ts';
 import { EditWall, RenameRoom } from './Edit.tsx';
+import { WorkOnRoom, WorkOnWall, type WorkOnProps } from './WorkOn.tsx';
 import { useUnits } from './units.tsx';
 import { readiness } from '../../core/src/issue.ts';
 import { extent } from '../../core/src/health.ts';
@@ -40,6 +41,9 @@ import { JobStatus } from './JobStatus.tsx';
 import { Floor } from './Floor.tsx';
 import { Draw } from './Draw.tsx';
 import { WallPhotos } from './WallPhotos.tsx';
+import { VoiceNotes } from './Voice.tsx';
+import { notesOnWall } from '../../core/src/voice.ts';
+import { losses } from '../../core/src/damage.ts';
 import { Elevation } from './Elevation.tsx';
 import { DamageOnWall } from './Damage.tsx';
 import { Claim } from './Claim.tsx';
@@ -432,6 +436,28 @@ export function App() {
 
   const selectedWall = loaded && state.selected ? loaded.room.walls.find((w) => w.id === state.selected) : undefined;
 
+  /**
+   * What is being done, wired once and handed to both places it is decided.
+   *
+   * The wall panel and the Room panel are two doors onto one record. Two copies
+   * of these handlers is two chances for one of them to write a scope the other
+   * cannot read, which is the same reason the takeoff and the proposal share
+   * one quote rather than each working out a total.
+   */
+  const workProps: WorkOnProps | null = loaded && {
+    room: loaded.room,
+    scope: loaded.scope,
+    onPick: (surface, item, items) =>
+      dispatch({ type: 'pickWork', surface, item, items, by: 'me', at: new Date().toISOString() }),
+    onDrop: (surface, item, items) =>
+      dispatch({ type: 'dropWork', surface, item, items, by: 'me', at: new Date().toISOString() }),
+    onStartFromEverything: (items) =>
+      dispatch({ type: 'scopeAll', items, by: 'me', at: new Date().toISOString() }),
+    onStartFromNothing: () =>
+      dispatch({ type: 'scopeNone', by: 'me', at: new Date().toISOString() }),
+    onPriceEverything: () => dispatch({ type: 'unscope' }),
+  };
+
   const native = insideApp();
 
   return (
@@ -713,11 +739,15 @@ export function App() {
                       obstructions={derived.obstructions}
                       footprints={loaded.footprints}
                       furniture={furniture}
-                      damages={loaded.claim.on ? loaded.damages : []}
-                      // Always drawn, claim or no claim. Damage is only on the
-                      // drawing when the job is an insurance job; what is
-                      // behind the wall is on it always, because it is true
-                      // either way.
+                      // Every mark, claim or no claim. A stretch of wall
+                      // somebody marked is a fact about the building — where
+                      // it lands afterwards is what the job decides, and a
+                      // drawing that hid a rotten sill plate because nobody is
+                      // claiming for it would be hiding the thing the drawing
+                      // was made to show.
+                      damages={loaded.damages}
+                      // Always drawn too, for the same reason: what is behind
+                      // the wall is true either way.
                       tags={loaded.tags}
                       divide={loaded.divide}
                       onSelect={(wallId) => dispatch({ type: 'select', wallId })}
@@ -747,9 +777,10 @@ export function App() {
                     )}
                     <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-slate-500">
                       {legendFor(
-                        loaded.claim.on && loaded.damages.length > 0,
+                        loaded.damages.length > 0,
                         loaded.room.walls.some((wall) => isAdjusted(wall.length)),
-                        furniture && loaded.footprints.length > 0
+                        furniture && loaded.footprints.length > 0,
+                        loaded.claim.on
                       ).map((item) => (
                         <li key={item.label} className="flex items-center gap-1.5">
                           <span className={`inline-block h-2 w-4 rounded-sm ${item.className}`} />
@@ -868,27 +899,43 @@ export function App() {
                     }
                   />
 
+                  {/* What is actually being done to this wall. High on the
+                      panel on purpose: it is the decision that changes the
+                      money, and it used to be a decision the app made for
+                      everybody — everything replaced, every time. */}
+                  {!selectedWall.open && workProps && (
+                    <WorkOnWall {...workProps} wallId={selectedWall.id} />
+                  )}
+
                   {!selectedWall.open && (
                     <Elevation room={loaded.room} wall={selectedWall} damages={loaded.damages} />
                   )}
 
-                  {loaded.claim.on && (
-                    <DamageOnWall
-                      room={loaded.room}
-                      wall={selectedWall}
-                      damages={loaded.damages}
-                      scanName={loaded.fileName}
-                      onMark={(damage) => dispatch({ type: 'mark', damage })}
-                      onUnmark={(damageId) => dispatch({ type: 'unmark', damageId })}
-                      onCutTo={(damageId, text) => dispatch({ type: 'cutTo', damageId, text })}
-                      onReading={(damageId, reading) =>
-                        dispatch({ type: 'reading', damageId, reading })
-                      }
-                      onPhotos={(damageId, photos) =>
-                        dispatch({ type: 'damagePhotos', damageId, photos })
-                      }
-                    />
-                  )}
+                  {/* Marking is not an insurance feature and never was. It
+                      was behind the claim switch because the claim was the
+                      only thing that read a mark; a remodeler finding rot in a
+                      sill plate wants the same three boxes, and what changes
+                      is where it lands afterwards. `onClaim` decides which
+                      vocabulary is offered — see `ConditionKind`. */}
+                  <DamageOnWall
+                    room={loaded.room}
+                    wall={selectedWall}
+                    damages={loaded.damages}
+                    voice={loaded.voice}
+                    onClaim={loaded.claim.on}
+                    scanName={loaded.fileName}
+                    onMark={(damage) => dispatch({ type: 'mark', damage })}
+                    onUnmark={(damageId) => dispatch({ type: 'unmark', damageId })}
+                    onCutTo={(damageId, text) => dispatch({ type: 'cutTo', damageId, text })}
+                    onReading={(damageId, reading) =>
+                      dispatch({ type: 'reading', damageId, reading })
+                    }
+                    onPhotos={(damageId, photos) =>
+                      dispatch({ type: 'damagePhotos', damageId, photos })
+                    }
+                    onNote={(note) => dispatch({ type: 'voice', note })}
+                    onForget={(noteId) => dispatch({ type: 'unvoice', noteId })}
+                  />
 
                   <EditWall
                     room={loaded.room}
@@ -943,6 +990,18 @@ export function App() {
 
                   <WallPhotos room={loaded.room} wallId={selectedWall.id} photos={loaded.photos} />
 
+                  {/* What somebody said about this wall, as opposed to about
+                      something marked on it. Beside the photographs because
+                      they are the same kind of thing: the record of what was
+                      actually in front of somebody, which no dimension can
+                      carry. */}
+                  <VoiceNotes
+                    notes={notesOnWall(loaded.voice, selectedWall.id)}
+                    wallId={selectedWall.id}
+                    onNote={(note) => dispatch({ type: 'voice', note })}
+                    onForget={(noteId) => dispatch({ type: 'unvoice', noteId })}
+                  />
+
                   {!selectedWall.open && (
                     <button
                       type="button"
@@ -978,6 +1037,8 @@ export function App() {
                   dispatch({ type: 'ceiling', text, how, by: 'me', at: new Date().toISOString() })
                 }
               />
+
+              {workProps && <WorkOnRoom {...workProps} />}
 
               <Thickness
                 room={loaded.room}
@@ -1038,7 +1099,13 @@ export function App() {
               <Gate feature="takeoff">
               <div data-sheet="yes">
                 <Takeoff
-                  onSetThickness={() => setSection('room')} room={loaded.room} readiness={derived.state} divide={loaded.divide} />
+                  onSetThickness={() => setSection('room')}
+                  onScope={() => setSection('room')}
+                  scope={loaded.scope}
+                  room={loaded.room}
+                  readiness={derived.state}
+                  divide={loaded.divide}
+                />
               </div>
               </Gate>
             </Panel>
@@ -1048,6 +1115,7 @@ export function App() {
               <Agree
                 room={loaded.room}
                 overrides={loaded.overrides}
+                scope={loaded.scope}
                 proposal={loaded.proposal}
                 baseline={loaded.baseline}
                 onProposal={(proposal) => dispatch({ type: 'proposal', proposal })}
@@ -1061,11 +1129,12 @@ export function App() {
               <Price
                 room={loaded.room}
                 overrides={loaded.overrides}
+                scope={loaded.scope}
                 onOverride={(override) => dispatch({ type: 'override', override })}
                 onClearOverride={(item, unit) => dispatch({ type: 'clearOverride', item, unit })}
               />
 
-              <JobStatus room={loaded.room} fileName={loaded.fileName} />
+              <JobStatus room={loaded.room} fileName={loaded.fileName} scope={loaded.scope} />
               </Gate>
             </Panel>
 
@@ -1074,35 +1143,47 @@ export function App() {
                 <Work
                   room={loaded.room}
                   overrides={loaded.overrides}
+                  scope={loaded.scope}
                   proposal={loaded.proposal}
                   baseline={loaded.baseline}
+                  agreedChanges={loaded.agreedChanges}
+                  raisedChange={loaded.raisedChange}
                   visits={loaded.visits}
                   invoices={loaded.invoices}
+                  payments={loaded.payments}
                   onVisits={(visits) => dispatch({ type: 'visits', visits })}
+                  onAgreedChanges={(agreedChanges) => dispatch({ type: 'agreedChanges', agreedChanges })}
+                  onRaisedChange={(raisedChange) => dispatch({ type: 'raisedChange', raisedChange })}
                   onInvoices={(invoices) => dispatch({ type: 'invoices', invoices })}
+                  onPayments={(payments) => dispatch({ type: 'payments', payments })}
                 />
               </Gate>
             </Panel>
 
             <Panel section="claim" active={section}>
               <Gate feature="insurance">
+              {/* Losses only, on every insurance screen. A condition note
+                  somebody wrote on the same wall is not part of the loss and
+                  must never appear on an insurer's estimate as though it
+                  were — see `losses` in `core/src/damage.ts`. */}
               <Claim
                 room={loaded.room}
-                damages={loaded.damages}
+                damages={losses(loaded.damages)}
                 claim={loaded.claim}
                 onChange={(claim) => dispatch({ type: 'claim', claim })}
               />
 
               {/* The restoration sheet, only on a job that is one, and never
                   folded into the takeoff above it. Two payers, two sheets. */}
-              {loaded.claim.on && <Scope room={loaded.room} damages={loaded.damages} />}
+              {loaded.claim.on && <Scope room={loaded.room} damages={losses(loaded.damages)} />}
 
               {loaded.claim.on && (
                 <ClaimSend
                   room={loaded.room}
                   fileName={loaded.fileName}
-                  damages={loaded.damages}
+                  damages={losses(loaded.damages)}
                   claim={loaded.claim}
+                  scope={loaded.scope}
                 />
               )}
               </Gate>
@@ -1110,9 +1191,19 @@ export function App() {
 
             <Panel section="files" active={section}>
               <Gate feature="exports">
-              <Sheet room={loaded.room} photos={loaded.photos} overrides={loaded.overrides} />
+              <Sheet
+                room={loaded.room}
+                photos={loaded.photos}
+                overrides={loaded.overrides}
+                scope={loaded.scope}
+              />
 
-              <FieldSheet room={loaded.room} footprints={loaded.footprints} />
+              <FieldSheet
+                room={loaded.room}
+                footprints={loaded.footprints}
+                marks={loaded.damages}
+                voice={loaded.voice}
+              />
               </Gate>
             </Panel>
 

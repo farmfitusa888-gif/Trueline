@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import { useUnits } from './units.tsx';
 import { type Boundary, report, roomQuantities, splitByBoundary } from '../../core/src/zone.ts';
-import { takeoff as buildTakeoff, wallSchedule } from '../../core/src/takeoff.ts';
+import { wallSchedule } from '../../core/src/takeoff.ts';
+import { type WorkScope, describeScope } from '../../core/src/work.ts';
+import { sheetOf } from './quoteOf.ts';
 import { type Readiness, trustLabel } from '../../core/src/issue.ts';
 import { order, tradeOf, wordFor } from '../../core/src/trade.ts';
 
@@ -32,10 +34,24 @@ export function Takeoff({
   room,
   readiness,
   divide = null,
+  scope = null,
   onSetThickness,
+  onScope,
 }: {
   readonly room: Room;
   readonly readiness: Readiness;
+  /**
+   * What is actually being done to each surface, once somebody has said.
+   *
+   * `null` is a room nobody has scoped, and it is priced the way this app has
+   * always priced one: every surface as if it were being replaced. That is the
+   * right answer for a room nobody has said anything about, and it is the wrong
+   * answer for most jobs — so the sheet says which of the two it is rather than
+   * letting a full-replacement figure pass for a considered one.
+   */
+  readonly scope?: WorkScope | null;
+  /** Takes somebody to where what-is-being-done is decided. */
+  readonly onScope?: () => void;
   /**
    * Takes somebody to where a wall's thickness is set.
    *
@@ -55,8 +71,8 @@ export function Takeoff({
   const [open, setOpen] = useState(false);
   const [told, setTold] = useState<string | null>(null);
   const sheet = useMemo(
-    () => buildTakeoff(room, new Date().toLocaleString(), { company: company.name }),
-    [room, company.name]
+    () => sheetOf(room, company, scope, new Date().toLocaleString()),
+    [room, company, scope]
   );
 
   /**
@@ -189,9 +205,25 @@ export function Takeoff({
       Baseboard: run(q.it!.baseboardRun),
       'Open span': run(q.it!.openRun),
     };
+    /**
+     * A scoped line carries its own exact value and is converted from that.
+     *
+     * `inMyUnits` above re-renders the WHOLE room's four figures over the top
+     * of the line names, which was harmless while every sheet was the whole
+     * room. On a scoped sheet it would print four walls of area beside three
+     * walls of money. So the line's own number wins wherever it has one.
+     */
+    const mine = (line: (typeof sheet.lines)[number]): string | undefined => {
+      if (!line.exact) return inMyUnits[line.what];
+      if (line.exact.kind === 'area') return area(line.exact.halfSquares);
+      if (line.exact.kind === 'run') return run(line.exact.nanometres);
+      // A count is a count in any country, and a number somebody typed is his
+      // own — converting either would be inventing a measurement.
+      return undefined;
+    };
     return sheet.lines.map((line) => ({
       ...line,
-      value: inMyUnits[line.what] ?? `${line.quantity} ${line.unit}`,
+      value: mine(line) ?? `${line.quantity} ${line.unit}`,
       /** True for the ones somebody orders material against by the sheet. */
       big: line.unit === 'sq ft' || line.what === 'Baseboard',
     }));
@@ -246,6 +278,63 @@ export function Takeoff({
           {open ? 'Less' : 'More'}
         </button>
       </div>
+
+      {/* Which kind of sheet this is, said before any number on it is read.
+          A full-replacement takeoff and a scoped one look identical and are
+          completely different claims about a job. */}
+      {!sheet.scoped ? (
+        <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <span className="font-semibold">Everything in this room is priced as replaced</span> —
+          the whole floor, the whole ceiling, every wall face and all the baseboard. Nothing has
+          been left out.
+          {onScope && (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={onScope}
+                className="min-h-11 font-semibold underline underline-offset-4"
+              >
+                Say what is actually being done
+              </button>
+            </>
+          )}
+        </p>
+      ) : (
+        <p className="mt-2 rounded-md bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          {/* The sentence comes from the model, not from this screen. The
+              takeoff's own text prints the same thing, and two files writing
+              the same sentence is two files that will eventually say different
+              things about one job. */}
+          {scope ? describeScope(room, scope) : ''}
+          {onScope && (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={onScope}
+                className="min-h-11 font-semibold underline underline-offset-4"
+              >
+                Change it
+              </button>
+            </>
+          )}
+        </p>
+      )}
+
+      {sheet.measuresNothing.length > 0 && (
+        <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Picked, and there is none of it there: {sheet.measuresNothing.join('; ')}. Left off the
+          sheet rather than put on it at nothing.
+        </p>
+      )}
+
+      {sheet.stranded.length > 0 && (
+        <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Picked on part of the room that is not there any more, so it is not counted:{' '}
+          {sheet.stranded.join('; ')}. The room changed after you decided this.
+        </p>
+      )}
 
       {blocks.map((block) => (
         <div key={block.name || 'finishes'}>

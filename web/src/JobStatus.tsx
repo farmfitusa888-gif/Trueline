@@ -1,6 +1,7 @@
 import type { Room } from '../../core/src/room.ts';
 import { pricing } from '../../core/src/company.ts';
-import { takeoff } from '../../core/src/takeoff.ts';
+import type { WorkScope } from '../../core/src/work.ts';
+import { sheetOf } from './quoteOf.ts';
 import { type JobRecord, type Outcome, money, quote } from '../../core/src/price.ts';
 import { useUnits } from './units.tsx';
 
@@ -25,12 +26,24 @@ const OUTCOMES: readonly { value: Outcome; label: string; why: string }[] = [
   { value: 'lost', label: 'Lost', why: 'kept, and never learned from' },
 ];
 
-export function JobStatus({ room, fileName }: { readonly room: Room; readonly fileName: string }) {
+export function JobStatus({
+  room,
+  fileName,
+  scope,
+}: {
+  readonly room: Room;
+  readonly fileName: string;
+  /**
+   * What is being done to each surface, or `null` for a room nobody has
+   * scoped — which is priced exactly as this app has always priced one.
+   */
+  readonly scope: WorkScope | null;
+}) {
   const { company, save } = useUnits();
   const jobs = company.jobs ?? [];
   const existing = jobs.find((job) => job.id === fileName);
   const { book } = pricing(company);
-  const priced = quote(takeoff(room, '', { company: company.name }).lines, book);
+  const priced = quote(sheetOf(room, company, scope, '').lines, book);
 
   function mark(outcome: Outcome) {
     const record: JobRecord = {

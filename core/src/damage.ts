@@ -40,12 +40,108 @@ import { roomQuantities } from './zone.ts';
  * that decided a wet wall needs its insulation replaced would be guessing at
  * somebody's building from a phone, and it would be wrong the first time the
  * wall turned out to be a partition.
+ *
+ * ## And the same three shapes on a job nobody is claiming for
+ *
+ * A remodeler finds a soft sill plate, a wall out of plumb, a chase he cannot
+ * get at. That is the same act on the same measured wall, so it is the same
+ * record — see `ConditionKind` for why one model carries both, and `losses` for
+ * the one line that keeps a condition note off an insurer's estimate.
  */
 
 export class DamageError extends RoomError {}
 
 /** What happened. Plain words, because a homeowner reads the report too. */
 export type DamageKind = 'water' | 'fire' | 'smoke' | 'mould' | 'impact' | 'wind' | 'other';
+
+/**
+ * What is wrong with a wall on a job nobody is claiming for.
+ *
+ * ## Why this is the same feature and not a second one
+ *
+ * A remodeler walks a room and finds a soft sill plate, a wall out of plumb at
+ * the top, a chase he cannot get at. He wants to do exactly what a restoration
+ * contractor does with a water line: say where it is along the wall, how high it
+ * reaches, photograph it, and talk at it. That is the same act, on the same
+ * measured wall, with the same three things to fill in.
+ *
+ * A second model for it would have meant a second screen to learn, a second
+ * thing to save, a second thing to draw on the elevation, and two definitions of
+ * "how far along the wall" that would eventually disagree. So there is one mark,
+ * and the **job** decides where it lands:
+ *
+ *   - on a claim it is a damage line and prices as tear-out — `scope.ts`;
+ *   - on an ordinary remodel it is a condition note, on the field sheet and
+ *     nowhere else. It never reaches the takeoff, because nobody asked for it to
+ *     be fixed. Somebody noticing rot is not somebody buying its removal.
+ *
+ * The vocabulary is what differs, and it has to. A cause-of-loss list is what an
+ * adjuster reads and it is the wrong list for a remodel: forcing "the wall is
+ * out of plumb at the top" into *other* throws away the one word that made the
+ * note worth taking.
+ *
+ * Nothing here is a diagnosis. `asbestos suspect` says somebody wants it tested
+ * before anybody cuts into it — not that it is asbestos, which is a laboratory's
+ * answer and never an app's.
+ */
+export type ConditionKind =
+  | 'rot'
+  | 'cracked'
+  | 'out of plumb'
+  | 'out of level'
+  | 'previous repair'
+  | 'no access'
+  | 'asbestos suspect'
+  | 'note';
+
+/**
+ * What a mark can be, either way round.
+ *
+ * One union rather than a separate field naming which list a kind came from. The
+ * kind already says: `isLoss` answers it from the word itself, so a mark cannot
+ * be saved with a cause of loss and a flag beside it disagreeing about whether
+ * it is one.
+ */
+export type MarkKind = DamageKind | ConditionKind;
+
+/** The cause-of-loss words, in the order a claim screen offers them. */
+export const LOSS_KINDS: readonly DamageKind[] = [
+  'water',
+  'fire',
+  'smoke',
+  'mould',
+  'impact',
+  'wind',
+  'other',
+];
+
+/** And the condition words, for a job that is not a claim. */
+export const CONDITION_KINDS: readonly ConditionKind[] = [
+  'rot',
+  'cracked',
+  'out of plumb',
+  'out of level',
+  'previous repair',
+  'no access',
+  'asbestos suspect',
+  'note',
+];
+
+/** Whether this word is a cause of loss rather than a condition. */
+export function isLoss(kind: MarkKind): kind is DamageKind {
+  return (LOSS_KINDS as readonly string[]).includes(kind);
+}
+
+/**
+ * What to call one, on a screen or a sheet.
+ *
+ * "water damage" and "rot" — a loss takes the word *damage* after it because
+ * that is what a claim calls it, and a condition does not, because "out of plumb
+ * damage" is not something anybody says.
+ */
+export function markWord(kind: MarkKind): string {
+  return isLoss(kind) ? `${kind} damage` : kind;
+}
 
 /**
  * How dirty the water was, on the scale the industry uses.
@@ -138,7 +234,11 @@ export interface Reading {
 
 export interface Damage {
   readonly id: string;
-  readonly kind: DamageKind;
+  /**
+   * A cause of loss, or a condition. See `ConditionKind` for why one field
+   * carries both: it is one mark, and the job it is on decides where it lands.
+   */
+  readonly kind: MarkKind;
   readonly shape: DamageShape;
   /** What it is, in the words the person standing there used. */
   readonly note: string;
@@ -192,6 +292,38 @@ export interface Damage {
    */
   readonly found?: HowFound;
 }
+
+/**
+ * The same thing, under the name the screens call it.
+ *
+ * A **mark** is what a contractor makes: he points at part of a wall and says
+ * what is wrong with it. On a claim that mark is a damage; on a remodel it is a
+ * condition note. One record, two audiences, and the name each audience uses.
+ *
+ * An alias rather than a rename because `Damage` is what the claim, the scope
+ * and the saved file have called it since they were written, and renaming a type
+ * across a saved format buys nothing that a sentence does not.
+ */
+export type Mark = Damage;
+
+/**
+ * The marks that price as tear-out, and the ones that do not.
+ *
+ * Split here rather than inside `scope.ts` on purpose: the scope's job is to
+ * turn damage into work, and "is this damage at all" is a question about the
+ * mark. Anything building a restoration scope passes `losses(marks)`, so a
+ * condition note somebody wrote on the same wall cannot quietly become a line
+ * item on an insurer's estimate.
+ */
+export function losses(marks: readonly Mark[]): Mark[] {
+  return marks.filter((mark) => isLoss(mark.kind));
+}
+
+// There is deliberately no `conditions()` beside it. The complement is
+// `isLoss` negated, and every screen that wants the other half wants **every**
+// mark rather than the ones that are not losses -- a field sheet carries the
+// water damage as well. An export nothing calls is a feature nobody can reach,
+// which is what `check-reachable.py` exists to say.
 
 /**
  * How the phone found the point under a finger, when a damage came off a tap.
@@ -255,8 +387,8 @@ export function validateDamage(room: Room, damage: Damage): void {
   validate(room);
   if (damage.note.trim() === '') {
     throw new DamageError(
-      `The ${damage.kind} damage has no note on it. A mark on a plan that nobody described is ` +
-        `a mark nobody can act on three days later.`
+      `The ${markWord(damage.kind)} has no note on it. A mark on a plan that nobody described ` +
+        `is a mark nobody can act on three days later.`
     );
   }
   if (damage.category !== undefined && damage.kind !== 'water') {
@@ -355,7 +487,7 @@ export function damageQuantity(room: Room, damage: Damage): DamageQuantity {
   if (shape.kind === 'pin') {
     return {
       damageId: damage.id,
-      what: `${damage.kind} damage, marked`,
+      what: `${markWord(damage.kind)}, marked`,
       faceArea: 0n,
       baseboardRun: 0n,
       flatArea: 0n,
@@ -394,7 +526,7 @@ export function damageQuantity(room: Room, damage: Damage): DamageQuantity {
 
     return {
       damageId: damage.id,
-      what: `${damage.kind} damage to ${shape.wallId}`,
+      what: `${markWord(damage.kind)} to ${shape.wallId}`,
       faceArea: face < 0n ? 0n : face,
       baseboardRun: base < 0n ? 0n : base,
       flatArea: 0n,
@@ -424,7 +556,7 @@ export function damageQuantity(room: Room, damage: Damage): DamageQuantity {
     );
     return {
       damageId: damage.id,
-      what: `${damage.kind} damage — all of ${shape.wallId}`,
+      what: `${markWord(damage.kind)} — all of ${shape.wallId}`,
       faceArea: length * height - holes,
       baseboardRun: length - doors,
       flatArea: 0n,
@@ -436,7 +568,7 @@ export function damageQuantity(room: Room, damage: Damage): DamageQuantity {
   const q = roomQuantities(room);
   return {
     damageId: damage.id,
-    what: `${damage.kind} damage — the whole ${shape.surface}`,
+    what: `${markWord(damage.kind)} — the whole ${shape.surface}`,
     faceArea: 0n,
     baseboardRun: shape.surface === 'floor' ? q.baseboardRun : 0n,
     flatArea: shape.surface === 'ceiling' ? q.ceilingArea : q.floorArea,
@@ -672,7 +804,7 @@ export function describeDamage(room: Room, damage: Damage): string {
     damage.kind === 'water' && damage.category
       ? ` (${WATER_CATEGORY[damage.category].plain})`
       : '';
-  return `${damage.kind}${category} — ${q.workings}`;
+  return `${markWord(damage.kind)}${category} — ${q.workings}`;
 }
 
 /** How far a damage reaches up the wall, for sorting a report. */

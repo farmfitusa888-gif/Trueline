@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
+import type { WorkScope } from '../../core/src/work.ts';
 import { money } from '../../core/src/price.ts';
 import {
   type Override,
@@ -28,11 +29,18 @@ import { RateBook } from './Rates.tsx';
 export function Price({
   room,
   overrides,
+  scope,
   onOverride,
   onClearOverride,
 }: {
   readonly room: Room;
   readonly overrides: readonly Override[];
+  /**
+   * What is being done to each surface, or `null` for a room nobody has
+   * scoped — which is priced exactly as this app has always priced one.
+   */
+  readonly scope: WorkScope | null;
+
   readonly onOverride: (override: Override) => void;
   readonly onClearOverride: (item: string, unit: Override['unit']) => void;
 }) {
@@ -48,7 +56,7 @@ export function Price({
   // out of them. Shared with the proposal rather than worked out twice: two
   // screens that add the same column up are two screens that can disagree, and
   // the one that disagrees is the one in front of the client.
-  const { applied, quote: priced, book, suggestions } = useQuote(room, overrides, company);
+  const { applied, quote: priced, book, suggestions } = useQuote(room, overrides, company, scope);
   const byItem = useMemo(
     () => new Map(applied.lines.map((line) => [`${line.what}|${line.unit}`, line])),
     [applied]

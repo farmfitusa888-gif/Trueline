@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		89B128B1B7DC1695F13E5F7E /* VoiceRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA3CB69F6F2B7111ECDB82F1 /* VoiceRecorder.swift */; };
 		636BC546D48C8AD2147E3EA2 /* Draftsman.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC48A9F7B40767D61D502C94 /* Draftsman.swift */; };
 		9FE8167762B0BEEEE03B8017 /* RoomCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5100806B34DBEDCE10842638 /* RoomCard.swift */; };
 		C02BF52EA80B0C4E9EC95FDE /* DrawScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC0C9101520AA217046DA3C /* DrawScreen.swift */; };
@@ -44,6 +45,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		CA3CB69F6F2B7111ECDB82F1 /* VoiceRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecorder.swift; sourceTree = "<group>"; };
 		AC48A9F7B40767D61D502C94 /* Draftsman.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draftsman.swift; sourceTree = "<group>"; };
 		5100806B34DBEDCE10842638 /* RoomCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomCard.swift; sourceTree = "<group>"; };
 		CDC0C9101520AA217046DA3C /* DrawScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawScreen.swift; sourceTree = "<group>"; };
@@ -139,6 +141,7 @@
 				CDC0C9101520AA217046DA3C /* DrawScreen.swift */,
 				5100806B34DBEDCE10842638 /* RoomCard.swift */,
 				AC48A9F7B40767D61D502C94 /* Draftsman.swift */,
+				CA3CB69F6F2B7111ECDB82F1 /* VoiceRecorder.swift */,
 				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
 				6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */,
 				DA1B9D64EFC2ED4C64672F34 /* Web */,
@@ -249,6 +252,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				220223ADBC47100E168B1B71 /* TruelineApp.swift in Sources */,
+				89B128B1B7DC1695F13E5F7E /* VoiceRecorder.swift in Sources */,
 				636BC546D48C8AD2147E3EA2 /* Draftsman.swift in Sources */,
 				9FE8167762B0BEEEE03B8017 /* RoomCard.swift in Sources */,
 				C02BF52EA80B0C4E9EC95FDE /* DrawScreen.swift in Sources */,

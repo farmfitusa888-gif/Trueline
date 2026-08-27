@@ -1705,6 +1705,151 @@ in a browser, a 2 ft alcove swallowed a 14'6" wall and took its name.
 So `insertWall` is gone and `notchCorner` replaces it: two walls, out and back,
 paid for by the two beside the corner, and the room does not change size.
 
+## Voice notes, and one mark for both kinds of job
+
+Two things asked for together because on a phone they are one moment: somebody
+standing in front of a wall, pointing at what is wrong with it and saying why.
+
+### Keep the recording AND the transcript, and let only the text be changed
+
+A contractor has a tape in one hand and a phone in the other. Typing is the
+thing he is least able to do; talking is free. So the note gets spoken — and
+then two things have to be true about it at once, and neither one alone is
+enough.
+
+The **recording is the record.** It is his voice, on the day, in the room, and
+six weeks later in an argument about what was agreed it is the only artefact
+that settles anything. The **transcript is what makes it usable** — a folder of
+audio clips is a folder nobody opens, and text is what goes on a sheet.
+
+The transcript is **editable**, and that is the decision worth writing down. A
+remodeler's vocabulary is exactly where speech recognition slips: *jamb*,
+*soffit*, *kerf*, *R-13*, *sill plate*, *bullnose*. A sheet that says "gym"
+where somebody said "jamb" is worse than a sheet with nothing on it. Editing is
+safe **because the audio is not editable**: correcting the words changes what is
+printed and leaves what was actually said untouched. Until somebody has read it,
+the screen says the phone wrote it, in as many words.
+
+**No confidence number.** `SFSpeechRecognizer` exposes one, and on an on-device
+recognition it is very often exactly zero — not because the phone was unsure,
+but because that path does not fill it in. A field reading "0% confident" over a
+word-perfect transcript is worse than no field, and this app does not print
+numbers it cannot vouch for.
+
+### On the device, free, and offline — and therefore native
+
+`SFSpeechRecognizer` with `requiresOnDeviceRecognition` set: no key, no account,
+no per-word bill, and it works with no signal, which is the condition the person
+using this is actually in. Nothing said inside somebody's house leaves their
+phone. If the local model is missing the recogniser is **refused rather than
+allowed to fall back to Apple's servers** — a promise made on the app's own
+screens is not one to break quietly.
+
+That forces it native, the same way `Draftsman` is native. `MediaRecorder` in a
+`WKWebView` would leave the audio in the web view's own storage — a cache the
+operating system may reclaim — and cannot reach the recogniser at all. So the
+page asks, `VoiceRecorder.swift` does it, and the answer comes back through
+`window.trueline.heard`.
+
+**The recording is written to disk and reported to the page before transcription
+is attempted.** A recogniser that is missing, refused or slow then costs a
+transcript and never somebody's own voice. That ordering is the whole design of
+the message contract, which is why it answers more than once for one question.
+
+Audio lands in `voice/` inside the scan's own folder, beside `photos/`. A scan is
+a folder, and a folder is what gets AirDropped, copied out of the Files app and
+brought back — so `bringIn` learned to put an `.m4a` back where `WebBundle` will
+serve it from, and `WebBundle` learned to answer a `Range:` request, because
+WebKit asks a media element for byte ranges rather than for a whole file.
+
+**Not in iCloud, and said out loud rather than implied.** Damage photographs are
+pushed to CloudKit; recordings are not. They travel with the folder and they are
+on the phone that took them, and the screen says exactly that rather than
+implying a backup nobody made. `Backup.swift` is on the parse-gap excuse list and
+adding an asset type to it is a separate, deliberate piece of work.
+
+### Absent, not greyed — and two absences, not one
+
+The rule `Draft.tsx` already keeps. A browser and an older iPhone see exactly the
+screens they have always seen: no Record button and not a word about recording.
+
+But recording and transcribing fail **separately**, so they are two answers on
+the bridge and not one. A phone with a microphone and no on-device language
+model records perfectly well, and hiding the microphone behind a missing model
+would take away the half that works. That phone is told, *before* somebody talks
+for a minute, that there will be no transcript — being told afterwards reads as a
+failure rather than as what the phone is.
+
+A refused microphone is a third thing again and it is the one that must never
+become a dead button: the sentence names the switch in Settings, the Record
+button comes back, and every other control on the screen goes on working.
+
+Recordings already made are shown **whether or not this device can record**. A
+room corrected on a phone and opened on a laptop keeps its transcripts; hiding
+somebody's own words from them because the laptop has no microphone would be
+absurd. Same rule `WallPhotos.tsx` keeps.
+
+### One mark, and the job decides where it lands — extended, not wrapped
+
+Asked directly: extend the damage model, or wrap it? **Extended**, and here is
+the argument.
+
+A remodeler finds a soft sill plate, a wall out of plumb, a chase he cannot get
+at. That is the same act a restoration contractor performs on a water line: point
+at a stretch of a measured wall, say how far along and how high, photograph it,
+talk at it. Same shape, same wall, same three boxes. A parallel model would have
+meant a second screen to learn, a second thing to save, a second thing to draw on
+the elevation, and two definitions of "how far along the wall" that would
+eventually disagree.
+
+So `Damage` gained a wider `kind` — `MarkKind = DamageKind | ConditionKind` —
+and nothing else. No flag saying which kind of thing it is: the word already
+says, and `isLoss` reads it, so a mark cannot be saved with a cause of loss and a
+flag beside it disagreeing.
+
+What the job changes is **three things and no more**:
+
+- **Which words are offered.** A cause-of-loss list is what an adjuster reads
+  and it is the wrong list for a remodel. Forcing "out of plumb" into *other*
+  throws away the one word that made the note worth taking.
+- **Whether a cut height and a drying curve are asked for.** Both are tear-out
+  instruments. Nobody cuts a wall out because it is out of plumb.
+- **Whether an area is shown.** The geometry is recorded exactly either way —
+  the wall is measured, so a 9 ft mark 2 ft high is 18 square feet whether or not
+  anybody is paying for it. What changes is that on an ordinary job that figure
+  is **not put in front of somebody**, because a square-foot number beside a note
+  reads as work somebody has agreed to, and noticing rot is not buying its
+  removal.
+
+The line that keeps it honest is `losses()`. Every insurance screen — the claim,
+the restoration scope, the document that goes to an adjuster — is handed
+`losses(marks)` at the call site, so a condition note written on the same wall
+can never appear on an insurer's estimate. `core/src/scope.ts` is untouched:
+the scope's job is turning damage into work, and "is this damage at all" is a
+question about the mark.
+
+A condition note lands on the **field sheet**, which is the sheet that already
+goes into a pocket. It prints where it is and what was said about it and never an
+area, and the sheet now shows up for a room with marks on it even when every wall
+has been measured — which is exactly the state a finished remodel walk is in.
+
+### What only a real iPhone can prove
+
+Written down because none of it was run here, and none of it can be:
+
+- that the app compiles at all — `VoiceRecorder.swift` has never met a compiler;
+- that `AVAudioRecorder` produces a playable `.m4a` at these settings, and that
+  `currentTime` read immediately before `stop()` is the length a person hears;
+- that `SFSpeechRecognizer` has an on-device model on the test phone, and what
+  it actually makes of *jamb*, *soffit*, *kerf* and *R-13* — which is the whole
+  reason the text is editable;
+- that the microphone and speech permission prompts appear with the Info.plist
+  sentences on them, and that refusing each one leaves the screen working;
+- that `<audio>` inside `WKWebView` plays and seeks a recording served from the
+  `trueline://` scheme with the new `Range:` handling;
+- that the audio session switching to `playAndRecord` and back does not disturb
+  anything else the app is doing.
+
 ## Still open
 
 Updated 2026-08-25, after the first compiler this project has ever met.
@@ -1908,3 +2053,35 @@ Everything else: build proceeds.
 - No stubs, placeholders or TODOs shipped as done.
 - AI writes language, never facts and never money. Every figure comes from geometry or SQL.
 - All questions asked through the question pop-up, four at a time, never buried in prose.
+
+## Costing what is actually being done, rather than a gut job
+
+Sam, on reading a takeoff:
+
+> "How are we costing everything down like it all needs to be replaced by each
+>  line item? Maybe have an area inside each wall page when you click on it with
+>  what is actually being done, and figure out how to let the user pick or decide
+>  that. And if there's things not in the costing option yet, let them make it and
+>  it also goes into their cost options."
+
+| Decision | Answer |
+|---|---|
+| What a decision is made about | A **surface**: a wall face, the floor, or the ceiling. Not "a wall" — boarding a wall while reusing its base is two decisions about one wall. |
+| Where the choices come from | The contractor's own rate book, plus the seven items the takeoff has always produced. **Never an enum invented in the code.** |
+| What makes a home-made item useful | It names **where its quantity comes from** — the wall face, the base run, the floor, the opening count, or a number he types. A measured one moves when the room does. |
+| Unselected work | **Absent, never zero.** A `0.0 sq ft` line says the work is in the job and costs nothing, which is a different and dangerous claim. Surfaces with nothing on them are named on the sheet instead. |
+| A room saved before this existed | Has no scope, opens priced as a full replacement, and its takeoff text and CSV are byte-identical to what they were. The screen says which kind of sheet it is; the sheet itself is untouched. |
+| What the first tap does | Starts from **everything ticked**, so no number moves until somebody takes work off. "Start from nothing" is the other door, for a patch. His own items start unticked — a button that quietly added a skim coat to thirteen surfaces would do the unasked-for thing first. |
+| Provenance | A line is `measured` only when the room has been taped **and** every wall behind that line has. One wall each way makes a room's shape trustworthy; it is not a promise about the wall nobody touched. |
+| The signed baseline | Untouched. Changing a scope after signing produces a change order naming the item, the two quantities and the money, exactly as changing a measurement does. Verified in `work-scope.test.ts`. |
+| Framing and openings | Follow the walls that have been given a **thickness**, not what is picked on a surface — a jamb belongs to the wall it goes through. Said on the sheet rather than left to be discovered. |
+
+Built as `core/src/work.ts` (`scope.ts` was already the restoration scope, which
+is a different sheet for a different payer and stays that way). `quantities()` in
+`zone.ts` is now `byWall()` added up, so the per-wall figures and the room's are
+one derivation rather than two. The four quantity formatters moved to
+`core/src/quantity.ts` for the same reason.
+
+Verified: 881 core tests, typecheck clean, and `web/audit/a23-scope.mjs` — 35
+checks driving the real app in Chromium, every figure worked out on the audit's
+own side from the numbers the app printed beside its tick boxes.

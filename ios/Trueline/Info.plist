@@ -20,6 +20,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Trueline uses the camera to measure the room and to photograph it while you walk, so every dimension has a picture behind it. Nothing leaves this device.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Trueline records what you say about a wall, so you can talk instead of typing while you are holding a tape. Each recording is kept in that scan's own folder on this device, alongside its photographs, and is never sent anywhere. You can play it back, and delete it, from the wall it is about.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Trueline writes down what you said about a wall so the words can go on a field sheet. The transcription runs on this iPhone and nothing you record is sent to Apple or to anyone else. If you say no, recording still works — you just get the audio without a transcript.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>Trueline puts the days you have scheduled into your own calendar, in a calendar of its own that you can switch off. It only adds — it never reads what else is in there.</string>
 	<key>NSCalendarsUsageDescription</key>

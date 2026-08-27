@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import type { Footprint } from '../../core/src/obstruction.ts';
+import type { Mark } from '../../core/src/damage.ts';
+import type { VoiceNote } from '../../core/src/voice.ts';
 import { fieldList } from '../../core/src/fieldlist.ts';
 
 /**
@@ -18,16 +20,34 @@ import { fieldList } from '../../core/src/fieldlist.ts';
 export interface FieldSheetProps {
   readonly room: Room;
   readonly footprints: readonly Footprint[];
+  /**
+   * What is marked on the walls, so it goes back into the room with somebody.
+   *
+   * On a claim the marks are also on the claim document, which an adjuster reads
+   * at a desk. On an ordinary job there is no such document, and until this the
+   * only way to read a condition note was to tap the wall it is on — which is
+   * not something anybody does while standing on a ladder.
+   */
+  readonly marks?: readonly Mark[];
+  /** And what was said out loud about each of them. */
+  readonly voice?: readonly VoiceNote[];
 }
 
 type Told = 'copied' | 'nope' | null;
 
-export function FieldSheet({ room, footprints }: FieldSheetProps) {
+export function FieldSheet({ room, footprints, marks = [], voice = [] }: FieldSheetProps) {
   const [open, setOpen] = useState(false);
   const [told, setTold] = useState<Told>(null);
-  const list = fieldList(room, footprints, { at: new Date().toLocaleDateString() });
+  const list = fieldList(room, footprints, {
+    at: new Date().toLocaleDateString(),
+    marks,
+    voice,
+  });
 
-  if (list.lines.length === 0) return null;
+  // A room with every wall measured and nothing marked on it has nothing to
+  // carry. One with marks on it does, even when there is no wall left worth a
+  // tape — which is exactly the state a finished remodel walk is in.
+  if (list.lines.length === 0 && list.marks.length === 0) return null;
 
   async function copy() {
     try {
@@ -68,8 +88,13 @@ export function FieldSheet({ room, footprints }: FieldSheetProps) {
         </button>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 print:hidden">
-        {list.lines.length} wall{list.lines.length === 1 ? '' : 's'}, a tape, two minutes. Type the
-        numbers back in when you get back and the room re-solves around them.
+        {list.lines.length > 0 &&
+          `${list.lines.length} wall${list.lines.length === 1 ? '' : 's'}, a tape, two minutes. ` +
+            'Type the numbers back in when you get back and the room re-solves around them. '}
+        {list.marks.length > 0 &&
+          `Everything marked on these walls is on it too — ${list.marks.length} of them, with ` +
+            'what was said about each, and no quantities: noticing something is not the same as ' +
+            'being paid to fix it.'}
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2 print:hidden">

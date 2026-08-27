@@ -3,6 +3,8 @@ import { toleranceOf } from './measurement.ts';
 import { type Room, RoomError, isDiagonal, runLength } from './room.ts';
 import { readiness } from './issue.ts';
 import { type Footprint, DEFAULT_REACH, obstructions, punchList } from './obstruction.ts';
+import { type Mark, damageQuantity, markWord } from './damage.ts';
+import { type VoiceNote, notesOnMark, notesOnWall, whatWasSaid } from './voice.ts';
 
 /**
  * The list to carry, on paper or in a pocket.
@@ -30,6 +32,30 @@ export interface FieldListOptions {
   readonly reach?: Nanometres;
   /** Stamped on the sheet, so two lists from two visits are never confused. */
   readonly at?: string;
+  /**
+   * What is marked on the walls, so the sheet carries it back into the room.
+   *
+   * ## Why this is on the measuring list and not on a list of its own
+   *
+   * A condition note is only worth taking if somebody reads it standing in front
+   * of the wall it is about. On a claim the marks go on the claim document,
+   * which an adjuster reads at a desk; on an ordinary remodel there is no such
+   * document, and until now a remodeler could record that a sill plate was soft
+   * and then have nowhere to read it except by tapping the wall again.
+   *
+   * This is the sheet that already goes into a pocket. Putting the marks on it
+   * costs nothing and is the difference between a note and a note somebody acts
+   * on.
+   *
+   * **Nothing here is a quantity.** Each mark prints where it is and what was
+   * said about it, and never an area — a condition somebody noticed is not work
+   * anybody has bought, and a square-foot figure on a sheet like this would be
+   * read as one. On a claim the areas are on `claimReport`, which is the
+   * document that is allowed to have them.
+   */
+  readonly marks?: readonly Mark[];
+  /** What was said out loud about each wall and each mark. */
+  readonly voice?: readonly VoiceNote[];
 }
 
 export interface FieldListLine {
@@ -42,9 +68,32 @@ export interface FieldListLine {
   readonly why: string;
 }
 
+/** One thing marked on a wall, as it reads on paper. */
+export interface FieldListMark {
+  readonly markId: string;
+  readonly wallId: string;
+  /** "rot", "water damage" — the word, not a code. */
+  readonly what: string;
+  /** Where it is along the wall and how high, in words. Never an area. */
+  readonly where: string;
+  /** What somebody typed about it. */
+  readonly note: string;
+  /** And what they said out loud, one line each. */
+  readonly said: readonly string[];
+}
+
 export interface FieldList {
   readonly title: string;
   readonly lines: readonly FieldListLine[];
+  /**
+   * What is marked on the walls, in the order the plan numbers them.
+   *
+   * Separate from `lines` because they answer two different questions — `lines`
+   * is what to go and measure, this is what somebody already found — and a sheet
+   * that ran them together would put a wall nobody has measured next to a note
+   * about rot as though they were the same kind of task.
+   */
+  readonly marks: readonly FieldListMark[];
   /** The whole thing, ready to print, text, or read down a phone. */
   readonly text: string;
 }
@@ -125,5 +174,98 @@ export function fieldList(
     'A wall you measure never moves again.',
   ];
 
-  return { title, lines, text: [...header, ...body, ...footer].join('\n') };
+  const voice = options.voice ?? [];
+  const marks = markedOn(room, options.marks ?? [], voice);
+  const onTheWalls =
+    marks.length === 0
+      ? []
+      : [
+          '',
+          RULE,
+          `MARKED ON THESE WALLS — ${marks.length}`,
+          'What somebody found standing here. None of it is in the takeoff:',
+          'noticing something is not the same as being paid to fix it.',
+          RULE,
+          '',
+          ...marks.flatMap((mark) => [
+            `${mark.wallId} — ${mark.what}`,
+            `   Where:  ${mark.where}`,
+            `   Note:   ${mark.note}`,
+            ...mark.said.map((line, i) => `   ${i === 0 ? 'Said: ' : '      '}  ${line}`),
+            '',
+          ]),
+        ];
+
+  // What somebody said about a wall itself, rather than about a mark on it.
+  // Its own block: a recording about the whole wall is not an observation with
+  // a location, and filing it under a mark it was never attached to would put
+  // words in somebody's mouth about the wrong part of the room.
+  const spoken = room.walls
+    .map((wall) => ({ wallId: wall.id, said: notesOnWall(voice, wall.id).map(whatWasSaid) }))
+    .filter((wall) => wall.said.length > 0);
+  const outLoud =
+    spoken.length === 0
+      ? []
+      : [
+          '',
+          RULE,
+          'SAID ABOUT THESE WALLS',
+          'Recorded on site. Anything marked as written by the phone',
+          'has not been read by a person yet.',
+          RULE,
+          '',
+          ...spoken.flatMap((wall) => [
+            `${wall.wallId}`,
+            ...wall.said.map((line) => `   ${line}`),
+            '',
+          ]),
+        ];
+
+  return {
+    title,
+    lines,
+    marks,
+    text: [...header, ...body, ...footer, ...onTheWalls, ...outLoud].join('\n'),
+  };
+}
+
+/**
+ * Every mark, in the order the plan numbers the walls.
+ *
+ * Wall order rather than the order they were recorded in, because somebody
+ * reading this is walking the room: they want everything about the north wall
+ * while they are standing at it, not in the order they happened to notice
+ * things across two visits.
+ *
+ * A mark on a wall this room does not have is left out rather than printed. That
+ * cannot happen through the app — the reducer refuses it — and a sheet is the
+ * wrong place to discover it if it ever does.
+ */
+function markedOn(
+  room: Room,
+  marks: readonly Mark[],
+  voice: readonly VoiceNote[]
+): FieldListMark[] {
+  const order = new Map(room.walls.map((wall, at) => [wall.id, at]));
+  const onAWall = marks.filter(
+    (mark) => mark.shape.wallId !== undefined && order.has(mark.shape.wallId)
+  );
+
+  return onAWall
+    .slice()
+    .sort((a, b) => {
+      const at = (mark: Mark) => order.get(mark.shape.wallId!)!;
+      return at(a) === at(b) ? a.id.localeCompare(b.id) : at(a) - at(b);
+    })
+    .map((mark) => ({
+      markId: mark.id,
+      wallId: mark.shape.wallId!,
+      what: markWord(mark.kind),
+      // The workings, which say where along the wall and how high — and never
+      // an area. `damageQuantity` is asked rather than the geometry re-derived
+      // here, because two derivations of one thing is two chances to disagree.
+      where: damageQuantity(room, mark).workings,
+      note: mark.note,
+      said: notesOnMark(voice, mark.id).map(whatWasSaid),
+    }));
 }

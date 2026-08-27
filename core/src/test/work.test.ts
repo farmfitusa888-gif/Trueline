@@ -11,8 +11,17 @@ import {
   describeInvoice,
   invoiceOf,
   missingFromInvoice,
+  invoiceOfVerified,
   outstandingAfter,
+  whyNotBilled,
 } from '../invoice.ts';
+import {
+  CHANGE_CLIENT_INTENT,
+  ChangeError,
+  agreeToChange,
+  describeChangeDocument,
+  raiseChange,
+} from '../change.ts';
 import { quickbooksCsv, quickbooksName, readQuickbooks } from '../quickbooks.ts';
 import { ScheduleError, icsName, icsOf, inOrder, next, visitOf } from '../schedule.ts';
 
@@ -60,12 +69,12 @@ async function signedBaseline() {
 
 /* --------------------------------------------------------------- invoices */
 
-test('an invoice is built from what was signed, not from what the room measures now', async () => {
+test('an invoice bills what was signed, and never what the room measures now', async () => {
   const { baseline } = await signedBaseline();
   // The room has grown since. An invoice for that is an invoice for work
   // nobody agreed to.
   const grown = quote([{ ...SHEET[0]!, quantity: '520.0' }, SHEET[1]!], BOOK);
-  const changes = changesSince(baseline, grown);
+  const moved = changesSince(baseline, grown);
 
   const invoice = invoiceOf({
     id: 'i1',
@@ -75,28 +84,172 @@ test('an invoice is built from what was signed, not from what the room measures 
     client: { ...NOBODY, name: 'M. Alvarez' },
     jobName: 'Gilbert kitchen',
     baseline,
-    changes,
+    agreedChanges: [],
+    moved,
     alreadyBilled: 0n,
-    depositPerCent: 30,
+    share: { depositPerCent: 30 },
     issuedAt: AT,
     dueAt: '2026-09-08',
     payTo: 'Cheque to the address above',
   });
 
-  // Every line points at something signed, or at a change with a name.
+  // The extra hundred square feet is worth $875 and is on none of it.
+  assert.equal(invoice.lines.length, 1);
   assert.equal(invoice.lines[0]!.amount, AGREED);
   assert.match(invoice.lines[0]!.detail, /signed by M\. Alvarez/);
+  assert.equal(invoice.agreed, AGREED);
+  // And it is named, so he can go and get it signed.
+  assert.equal(invoice.notBilled.length, 1);
+  assert.match(whyNotBilled(invoice), /nobody has signed for/);
+  assert.match(whyNotBilled(invoice), /\$875\.00/);
+});
+
+async function signedChange(extraDays = 0) {
+  const { baseline } = await signedBaseline();
+  const grown = quote([{ ...SHEET[0]!, quantity: '520.0' }, SHEET[1]!], BOOK);
+  const document = raiseChange(baseline, changesSince(baseline, grown), {
+    id: 'c1',
+    number: 'CO-1',
+    jobName: 'Gilbert kitchen',
+    company: { ...EMPTY_COMPANY, name: 'Gilbert Remodeling' },
+    client: { ...NOBODY, name: 'M. Alvarez' },
+    raisedAt: AT,
+    because: 'The floor runs under the island, which nobody could see until it came out.',
+    extraDays,
+  });
+  const signature = await sign(document, {
+    id: 'cs1',
+    who: 'M. Alvarez',
+    role: 'client',
+    intent: CHANGE_CLIENT_INTENT,
+    consented: true,
+    mark: 'data:image/png;base64,iVBORw0KGgo=',
+    at: AT,
+    device: 'iPhone',
+  });
+  return { baseline, grown, agreed: await agreeToChange(document, [signature], AT) };
+}
+
+test('once the client signs the change order, and only then, it is on the bill', async () => {
+  const { baseline, grown, agreed } = await signedChange(3);
+  const invoice = await invoiceOfVerified({
+    id: 'i2', number: '2026-015', stage: 'final',
+    company: EMPTY_COMPANY, client: { ...NOBODY, name: 'M. Alvarez' }, jobName: 'Gilbert kitchen',
+    baseline, agreedChanges: [agreed], moved: changesSince(baseline, grown),
+    alreadyBilled: 0n, issuedAt: AT,
+  });
+
+  // 100 more square feet of floor at $8.75.
+  assert.equal(invoice.agreed, AGREED + 87500n);
+  assert.equal(invoice.amount, AGREED + 87500n);
   assert.equal(invoice.lines.length, 2);
-  assert.match(invoice.lines[1]!.what, /^Change: Floor/);
+  assert.match(invoice.lines[1]!.what, /^Change CO-1: Floor/);
+  assert.match(invoice.lines[1]!.detail, /signed by M\. Alvarez/);
+  // Nothing is left over unsigned, so there is nothing to explain.
+  assert.equal(invoice.notBilled.length, 0);
+  assert.equal(whyNotBilled(invoice), '');
+  assert.deepEqual(
+    describeChangeDocument(agreed.document).at(-1),
+    'This adds 3 days to the finish date.'
+  );
+});
+
+test('a change order signed against a different agreement cannot be billed on this one', async () => {
+  const { agreed } = await signedChange();
+  // A second job, signed a moment later, with its own fingerprint.
+  const other = await signedBaseline();
+  await assert.rejects(
+    invoiceOfVerified({
+      id: 'i3', number: '3', stage: 'final',
+      company: EMPTY_COMPANY, client: NOBODY, jobName: 'k',
+      baseline: { ...other.baseline, hash: 'a-different-agreement' },
+      agreedChanges: [agreed], alreadyBilled: 0n, issuedAt: AT,
+    }),
+    (error: unknown) => error instanceof ChangeError && /different agreement/.test((error as Error).message)
+  );
+});
+
+test('the same change order cannot be billed twice', async () => {
+  const { baseline, agreed } = await signedChange();
+  assert.throws(
+    () =>
+      invoiceOf({
+        id: 'i4', number: '4', stage: 'final',
+        company: EMPTY_COMPANY, client: NOBODY, jobName: 'k',
+        baseline, agreedChanges: [agreed, agreed], alreadyBilled: 0n, issuedAt: AT,
+      }),
+    (error: unknown) => error instanceof ChangeError && /twice/.test((error as Error).message)
+  );
+});
+
+test('a change order edited after it was signed is refused at the moment of billing', async () => {
+  const { baseline, agreed } = await signedChange();
+  const doctored = {
+    ...agreed,
+    document: { ...agreed.document, difference: agreed.document.difference * 10n },
+  };
+  await assert.rejects(
+    invoiceOfVerified({
+      id: 'i5', number: '5', stage: 'final',
+      company: EMPTY_COMPANY, client: NOBODY, jobName: 'k',
+      baseline, agreedChanges: [doctored], alreadyBilled: 0n, issuedAt: AT,
+    }),
+    (error: unknown) =>
+      error instanceof InvoiceError && /no longer matches what was signed/.test((error as Error).message)
+  );
+});
+
+test('an invoice saved before any of this existed still opens', async () => {
+  // Every invoice on a phone today was written when `notBilled` did not exist,
+  // and the Work screen calls this on every one of them as it draws the list.
+  // The first version read `.length` off it and took the whole screen down.
+  const { baseline } = await signedBaseline();
+  const invoice = invoiceOf({
+    id: 'i0', number: '2026-001', stage: 'final',
+    company: EMPTY_COMPANY, client: NOBODY, jobName: 'k',
+    baseline, agreedChanges: [], alreadyBilled: 0n, issuedAt: AT,
+  });
+  const old = { ...invoice, notBilled: undefined } as unknown as typeof invoice;
+  assert.equal(whyNotBilled(old), '');
+  assert.equal(describeInvoice(old), describeInvoice(invoice));
 });
 
 test('a deposit and the final add up to exactly the agreed figure', () => {
   // The rounding case that would otherwise leave a cent behind on the job.
   for (const agreed of [403050n, 100001n, 3n, 999999n]) {
-    const deposit = amountFor('deposit', agreed, 0n, 33.33);
+    const deposit = amountFor('deposit', agreed, 0n, { depositPerCent: 33.33 });
     const final = amountFor('final', agreed, deposit);
     assert.equal(deposit + final, agreed, `${agreed}`);
   }
+});
+
+test('a progress payment is against work done, not against the whole balance', () => {
+  // The defect: progress and final returned the same figure, so a progress
+  // invoice halfway through a job asked for everything.
+  const deposit = amountFor('deposit', AGREED, 0n, { depositPerCent: 30 });
+  const half = amountFor('progress', AGREED, deposit, { completePerCent: 50 });
+  // Half of $4,030.50 is $2,015.25, less the $1,209.15 deposit already asked for.
+  assert.equal(deposit, 120915n);
+  assert.equal(half, 201525n - deposit);
+  assert.notEqual(half, amountFor('final', AGREED, deposit));
+  // And the three of them still settle the job exactly.
+  assert.equal(deposit + half + amountFor('final', AGREED, deposit + half), AGREED);
+});
+
+test('a progress payment that is not told how much of the job is done is refused', () => {
+  assert.throws(
+    () => amountFor('progress', AGREED, 0n),
+    (error: unknown) => error instanceof InvoiceError && /how much of the job/.test((error as Error).message)
+  );
+  // A named figure is the other way to answer, and it cannot exceed the job.
+  assert.equal(amountFor('progress', AGREED, 0n, { amount: 50000n }), 50000n);
+  assert.throws(() => amountFor('progress', AGREED, 0n, { amount: AGREED + 1n }), InvoiceError);
+  assert.throws(() => amountFor('progress', AGREED, 0n, { amount: 0n }), InvoiceError);
+  // Asking against work already paid for asks for nothing.
+  assert.throws(
+    () => amountFor('progress', AGREED, AGREED / 2n, { completePerCent: 25 }),
+    InvoiceError
+  );
 });
 
 test('the same work cannot be invoiced twice', () => {
@@ -108,24 +261,24 @@ test('the same work cannot be invoiced twice', () => {
 
 test('a deposit never exceeds what is left on the job', () => {
   const already = AGREED - 1000n;
-  assert.equal(amountFor('deposit', AGREED, already, 50), 1000n);
+  assert.equal(amountFor('deposit', AGREED, already, { depositPerCent: 50 }), 1000n);
 });
 
 test('a deposit outside nought and a hundred per cent is refused', () => {
-  for (const share of [0, 100, -5, 140]) {
-    assert.throws(() => amountFor('deposit', AGREED, 0n, share), InvoiceError);
+  for (const depositPerCent of [0, 100, -5, 140]) {
+    assert.throws(() => amountFor('deposit', AGREED, 0n, { depositPerCent }), InvoiceError);
   }
 });
 
 test('nothing can be invoiced against a document that no longer matches its signature', async () => {
   const { baseline } = await signedBaseline();
-  const changes = { ...changesSince(baseline, quote(SHEET, BOOK)), tampered: true, tamperNote: 'It moved.' };
+  const moved = { ...changesSince(baseline, quote(SHEET, BOOK)), tampered: true, tamperNote: 'It moved.' };
   assert.throws(
     () =>
       invoiceOf({
         id: 'i1', number: '1', stage: 'final',
         company: EMPTY_COMPANY, client: NOBODY, jobName: 'k',
-        baseline, changes, alreadyBilled: 0n, issuedAt: AT,
+        baseline, agreedChanges: [], moved, alreadyBilled: 0n, issuedAt: AT,
       }),
     (error: unknown) => error instanceof InvoiceError && /no longer matches/.test((error as Error).message)
   );
@@ -138,7 +291,7 @@ test('an invoice with no number is refused, because two of them could not be tol
       invoiceOf({
         id: 'i1', number: '  ', stage: 'final',
         company: EMPTY_COMPANY, client: NOBODY, jobName: 'k',
-        baseline, changes: changesSince(baseline, quote(SHEET, BOOK)),
+        baseline, agreedChanges: [],
         alreadyBilled: 0n, issuedAt: AT,
       }),
     InvoiceError
@@ -150,8 +303,8 @@ test('what is left on the job is said, and what is missing is named without bloc
   const invoice = invoiceOf({
     id: 'i1', number: '2026-014', stage: 'deposit',
     company: EMPTY_COMPANY, client: NOBODY, jobName: 'k',
-    baseline, changes: changesSince(baseline, quote(SHEET, BOOK)),
-    alreadyBilled: 0n, depositPerCent: 25, issuedAt: AT,
+    baseline, agreedChanges: [],
+    alreadyBilled: 0n, share: { depositPerCent: 25 }, issuedAt: AT,
   });
   assert.equal(invoice.amount + outstandingAfter(invoice), AGREED);
   assert.match(describeInvoice(invoice), /leaving \$/);
@@ -172,7 +325,7 @@ test('the QuickBooks file reads back as the invoice that was written', async () 
     company: { ...EMPTY_COMPANY, name: 'Gilbert Remodeling' },
     client: { ...NOBODY, name: 'Alvarez, M.' },   // a comma, which is the trap
     jobName: 'Gilbert kitchen',
-    baseline, changes: changesSince(baseline, quote(SHEET, BOOK)),
+    baseline, agreedChanges: [],
     alreadyBilled: 0n, issuedAt: AT, dueAt: '2026-09-08',
     note: 'Thanks — any questions, call.',
   });
@@ -187,12 +340,11 @@ test('the QuickBooks file reads back as the invoice that was written', async () 
 });
 
 test('every line of an invoice carries the same number, which is how QuickBooks groups them', async () => {
-  const { baseline } = await signedBaseline();
-  const changes = changesSince(baseline, quote([{ ...SHEET[0]!, quantity: '520.0' }, SHEET[1]!], BOOK));
+  const { baseline, agreed } = await signedChange();
   const invoice = invoiceOf({
     id: 'i1', number: '2026-015', stage: 'final',
     company: EMPTY_COMPANY, client: { ...NOBODY, name: 'M. Alvarez' }, jobName: 'k',
-    baseline, changes, alreadyBilled: 0n, issuedAt: AT, dueAt: '2026-09-08',
+    baseline, agreedChanges: [agreed], alreadyBilled: 0n, issuedAt: AT, dueAt: '2026-09-08',
   });
   const rows = readQuickbooks(quickbooksCsv([invoice]));
   assert.equal(rows.length, 2);

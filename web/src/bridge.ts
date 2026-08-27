@@ -46,6 +46,28 @@ export interface HandOver {
    * which is the only version that does not read as a missing feature.
    */
   draftable?: boolean;
+  /**
+   * Whether this phone can record somebody talking at a wall.
+   *
+   * The microphone and a place to put the file — `VoiceRecorder.canRecord` asks
+   * both. False in a browser, which has neither a scan folder nor a way to
+   * write into one, and false on a screen with no room open.
+   */
+  recordable?: boolean;
+  /**
+   * And whether it can write down what it heard, which is a separate question.
+   *
+   * `SFSpeechRecognizer` needs a recogniser for the phone's language and an
+   * on-device model for it. A phone that has one gets a transcript; a phone that
+   * does not still records perfectly well and says plainly that there is no
+   * transcript — because the recording is the record, and the text is what makes
+   * it convenient.
+   *
+   * Two flags rather than one, because the two failures are genuinely different
+   * and collapsing them would either hide a working microphone behind a missing
+   * language model, or promise a transcript that never comes.
+   */
+  transcribes?: boolean;
   /** What has gone wrong on this phone, as `Diagnostics.asJSON` writes it. */
   reports?: string;
   /** Every corrected room on the phone, for the floor. */
@@ -170,6 +192,20 @@ export interface TruelineBridge {
    * not an error.
    */
   drafted(id: string, text: string | null): void;
+  /**
+   * How a recording is going, and how it ended.
+   *
+   * The second call the app makes in answer to something the page asked, and
+   * unlike `drafted` it arrives more than once for one question. Recording is
+   * not one act: it starts, it runs for as long as somebody talks, it stops, and
+   * only then does the phone try to write down what it heard.
+   *
+   * So the answers come as they are known — see `VoiceAnswer`. The one that
+   * matters most arrives first: **the recording is written to disk and reported
+   * before transcription is even attempted**, so a recogniser that hangs, is
+   * missing, or refuses cannot take somebody's own voice down with it.
+   */
+  heard(id: string, answer: VoiceAnswer): void;
   /** Version of this contract, so a mismatched app build can say so. */
   readonly version: 1;
 }
@@ -457,6 +493,182 @@ export function askForDraft(
   });
 }
 
+/* --------------------------------------------------------------- recording */
+
+/**
+ * Talking at a wall, and getting back both the recording and the words.
+ *
+ * ## Why this is native, and shaped like `Draftsman` rather than like the camera
+ *
+ * A damage photograph goes through an `<input type="file" capture>`, because iOS
+ * gives a web view the camera through one. It gives it nothing for the
+ * microphone that is any use here: `MediaRecorder` in a `WKWebView` would leave
+ * the audio inside the web view, in a store the operating system may reclaim,
+ * and it cannot reach `SFSpeechRecognizer` at all. Both of those are
+ * disqualifying. The recording has to land in the scan's own folder — the folder
+ * that gets AirDropped, copied out of Files and restored — and the transcript
+ * has to be free, keyless and offline, which on-device speech recognition is and
+ * nothing in a browser is.
+ *
+ * So it goes the way `Draftsman` goes: the page asks, the Swift side does it,
+ * the answer comes back through `window.trueline`.
+ *
+ * ## Why it answers more than once
+ *
+ * Drafting is one question and one answer. Recording is four moments: it starts,
+ * it runs, it stops, and afterwards the phone tries to write down what it heard.
+ * Each of those can fail on its own and each failure means something different
+ * to the person holding the phone, so each is reported when it is known rather
+ * than collapsed into one late answer.
+ *
+ * The ordering is the important part. **The file is written and reported before
+ * transcription is attempted.** A recogniser that is missing, refused or simply
+ * slow can then cost a transcript and never the recording, which is the one
+ * thing here that cannot be made again.
+ */
+
+export interface Recording {
+  /** What it is called in the scan's own `voice` folder. Chosen by the app. */
+  readonly fileName: string;
+  /** How long it runs, read off the finished file rather than off a timer. */
+  readonly milliseconds: number;
+}
+
+export interface VoiceAnswer {
+  /** The microphone is live. Nothing else is known yet. */
+  readonly started?: boolean;
+  /**
+   * Why there is no recording at all, in a sentence somebody can act on.
+   *
+   * A refused microphone is the main one, and it must leave a screen that works
+   * and says why — never a button that does nothing. So the sentence names the
+   * switch to turn back on rather than reporting a status code.
+   */
+  readonly refused?: string;
+  /** The finished recording, on disk, before anything has been transcribed. */
+  readonly kept?: Recording;
+  /** What the phone heard. */
+  readonly transcript?: string;
+  /** Or why it wrote nothing, which is not a failure of the recording. */
+  readonly noTranscript?: string;
+}
+
+/** What the app said this phone can do. Set once, when it speaks. */
+let canHear = false;
+let canWriteDown = false;
+
+const voiceListeners = new Set<() => void>();
+
+export function onVoiceable(listen: () => void): () => void {
+  voiceListeners.add(listen);
+  return () => voiceListeners.delete(listen);
+}
+
+/**
+ * Whether to offer recording at all.
+ *
+ * Two things, both required, exactly as `canDraft` needs two: an app to ask, and
+ * a phone that said yes. A browser has neither and shows nothing extra — no
+ * greyed button and no sentence about a feature it cannot have.
+ */
+export function canRecord(): boolean {
+  return canHear && handler('voice') !== undefined;
+}
+
+/**
+ * And whether a transcript is coming.
+ *
+ * Asked separately by the screen so it can say, before somebody talks for a
+ * minute, that this phone will keep the recording and not write it down. Being
+ * told afterwards is worse: it reads as a failure rather than as what the phone
+ * is.
+ */
+export function canTranscribe(): boolean {
+  return canRecord() && canWriteDown;
+}
+
+/**
+ * The one recording in flight, if any.
+ *
+ * One, not a map by id: there is one microphone. Two recordings at once is not a
+ * thing a phone can do, and modelling it as though it were would be inventing a
+ * state that cannot exist in order to look general.
+ */
+let recording: { id: string; hear: (answer: VoiceAnswer) => void; timer: number } | null = null;
+let nextRecording = 0;
+
+/** Nothing waits forever, for the same reason `askForDraft` does not. */
+const WAITING_TO_START = 8_000;
+const WAITING_FOR_WORDS = 90_000;
+
+function stopWaiting(): void {
+  if (recording) window.clearTimeout(recording.timer);
+  recording = null;
+}
+
+function giveUp(after: number, say: VoiceAnswer): number {
+  return window.setTimeout(() => {
+    const waiting = recording;
+    if (!waiting) return;
+    stopWaiting();
+    waiting.hear(say);
+  }, after);
+}
+
+/**
+ * Asks the app to start recording, and to keep saying how it is going.
+ *
+ * Returns whether there was an app to ask. The caller uses that to be absent
+ * rather than to look broken — the same rule the draft button keeps.
+ */
+export function startRecording(hear: (answer: VoiceAnswer) => void): boolean {
+  const post = handler('voice');
+  if (!post || !canRecord()) return false;
+  // A second Record tap while one is running. Refused here rather than sent,
+  // because the answer would come back on the first recording's id and the
+  // screen would show one clip twice.
+  if (recording) return false;
+
+  nextRecording += 1;
+  const id = `voice-${nextRecording}`;
+  recording = {
+    id,
+    hear,
+    timer: giveUp(WAITING_TO_START, {
+      refused:
+        'The app did not answer. Nothing has been recorded — try again, and if it keeps ' +
+        'happening, close Trueline and open it back up.',
+    }),
+  };
+  try {
+    post.postMessage({ id, action: 'start', version: BRIDGE_VERSION });
+    return true;
+  } catch {
+    stopWaiting();
+    return false;
+  }
+}
+
+/**
+ * Asks it to stop.
+ *
+ * Says nothing about what happens next: the app answers with the finished
+ * recording, and then with the words or with the reason there are none.
+ */
+export function stopRecording(): void {
+  const post = handler('voice');
+  if (!post || !recording) return;
+  try {
+    post.postMessage({ id: recording.id, action: 'stop', version: BRIDGE_VERSION });
+  } catch {
+    const waiting = recording;
+    stopWaiting();
+    waiting.hear({
+      refused: 'The app stopped answering part way through. Nothing was kept.',
+    });
+  }
+}
+
 export function handBack(fileName: string, project: string): void {
   const saved = handler('saved');
   if (!saved) return;
@@ -719,6 +931,80 @@ export function installBridge(dispatch: (action: Action) => void): void {
   };
 
   /**
+   * How the recording is going, and how it ended.
+   *
+   * Every field is checked rather than trusted, for the same reason
+   * `openReports` checks its rows: this comes from the app, which is the same
+   * side of the wall — and a screen drawn from a shape nobody verified is how a
+   * renamed field becomes a play button pointing at `undefined.m4a`.
+   *
+   * An answer whose id nobody is waiting on is dropped. That happens for real:
+   * somebody leaves the wall panel while the phone is still writing down what
+   * they said, and the answer arrives with nothing to tell.
+   */
+  const heard = (id: string, answer: VoiceAnswer) => {
+    const waiting = recording;
+    if (!waiting || waiting.id !== id) return;
+    if (typeof answer !== 'object' || answer === null) return;
+
+    const refused = typeof answer.refused === 'string' ? answer.refused : undefined;
+    const transcript =
+      typeof answer.transcript === 'string' && answer.transcript.trim() !== ''
+        ? answer.transcript
+        : undefined;
+    const noTranscript =
+      typeof answer.noTranscript === 'string' ? answer.noTranscript : undefined;
+    const kept =
+      typeof answer.kept === 'object' &&
+      answer.kept !== null &&
+      typeof answer.kept.fileName === 'string' &&
+      answer.kept.fileName !== '' &&
+      Number.isFinite(answer.kept.milliseconds)
+        ? {
+            fileName: answer.kept.fileName,
+            // Rounded here, once, at the boundary the app's own float crosses
+            // into this model -- the same rule every other quantity coming off
+            // a framework obeys.
+            milliseconds: Math.max(0, Math.round(answer.kept.milliseconds)),
+          }
+        : undefined;
+
+    // Anything that ends the conversation clears the wait.
+    if (refused !== undefined || transcript !== undefined || noTranscript !== undefined) {
+      window.clearTimeout(waiting.timer);
+      recording = null;
+      waiting.hear({
+        ...(refused !== undefined ? { refused } : {}),
+        ...(kept !== undefined ? { kept } : {}),
+        ...(transcript !== undefined ? { transcript } : {}),
+        ...(noTranscript !== undefined ? { noTranscript } : {}),
+      });
+      return;
+    }
+
+    if (kept !== undefined) {
+      // The file is on disk. Whatever the recogniser does now, this part is
+      // safe -- so the wait that remains is only for words, and it gives up
+      // with a sentence rather than leaving a spinner on the screen.
+      window.clearTimeout(waiting.timer);
+      waiting.timer = giveUp(WAITING_FOR_WORDS, {
+        noTranscript: 'the phone did not finish writing it down. The recording is kept.',
+      });
+      waiting.hear({ kept });
+      return;
+    }
+
+    if (answer.started === true) {
+      // No timer while somebody is talking. How long a person talks is not
+      // something this page gets to time out on; the app caps the length of a
+      // recording and answers when it does.
+      window.clearTimeout(waiting.timer);
+      waiting.timer = 0;
+      waiting.hear({ started: true });
+    }
+  };
+
+  /**
    * Everything the app has to say, applied in the one order that is correct.
    *
    * The order is the whole content of this function and every line of it was
@@ -746,6 +1032,13 @@ export function installBridge(dispatch: (action: Action) => void): void {
     if (typeof payload.draftable === 'boolean') {
       canWrite = payload.draftable;
       for (const listen of draftListeners) listen();
+    }
+    // Two answers, one listener: a screen asks both questions together, and
+    // telling it twice would draw it twice for no reason.
+    if (typeof payload.recordable === 'boolean' || typeof payload.transcribes === 'boolean') {
+      if (typeof payload.recordable === 'boolean') canHear = payload.recordable;
+      if (typeof payload.transcribes === 'boolean') canWriteDown = payload.transcribes;
+      for (const listen of voiceListeners) listen();
     }
     if (typeof payload.reports === 'string') {
       openReports(payload.reports);
@@ -781,6 +1074,7 @@ export function installBridge(dispatch: (action: Action) => void): void {
     putRooms,
     setSubscribed,
     drafted,
+    heard,
     take,
     version: BRIDGE_VERSION,
   };

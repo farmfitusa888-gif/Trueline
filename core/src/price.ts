@@ -52,6 +52,33 @@ export interface Rate {
   readonly source: RateSource;
   /** What it covers, in the contractor's own words, for the client to read. */
   readonly note?: string;
+  /**
+   * Where this item's quantity comes from, for an item the contractor invented.
+   *
+   * A `MeasureId` from `work.ts` — the wall's face, the baseboard run, the
+   * floor, a number he types. It is what turns a name and a price into
+   * something that can be picked on a wall and then *moves when the wall does*,
+   * which is the whole reason the room was measured at all.
+   *
+   * Left unset on every rate that was in a book before it existed, and on the
+   * framing items priced off the wall build-up rather than off a surface. A
+   * rate without one still prices a takeoff line by name exactly as it always
+   * did; it is simply not offered as something to pick on a wall.
+   *
+   * Typed as a plain string rather than as `MeasureId`, because `work.ts` reads
+   * this module and an import back the other way would be a cycle. `workItems`
+   * is the one place it is read, and it validates what it finds.
+   */
+  readonly measure?: string;
+  /**
+   * For an item measured by a number the contractor types, that number.
+   *
+   * A string, in the same shape a quantity is written on the sheet, so what he
+   * typed is what the client reads. Never a float: this is the one quantity in
+   * the app that no geometry produced, and rounding somebody's own number on
+   * the way through would be the worst possible place to do it.
+   */
+  readonly amount?: string;
 }
 
 export interface PriceBook {

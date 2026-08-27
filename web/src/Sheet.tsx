@@ -3,7 +3,8 @@ import type { Room } from '../../core/src/room.ts';
 import { readiness } from '../../core/src/issue.ts';
 import { roomToDxf } from '../../core/src/dxf/room.ts';
 import { isPresentable, pricing } from '../../core/src/company.ts';
-import { takeoff } from '../../core/src/takeoff.ts';
+import type { WorkScope } from '../../core/src/work.ts';
+import { sheetOf } from './quoteOf.ts';
 import { quote } from '../../core/src/price.ts';
 import { photosOfWall, type Photo } from '../../core/src/photo.ts';
 import { clientFile } from './clientFile.ts';
@@ -92,10 +93,16 @@ export function Sheet({
   room,
   photos,
   overrides,
+  scope,
 }: {
   readonly room: Room;
   readonly photos: readonly Photo[];
   readonly overrides: readonly Override[];
+  /**
+   * What is being done to each surface, or `null` for a room nobody has
+   * scoped — which is priced exactly as this app has always priced one.
+   */
+  readonly scope: WorkScope | null;
 }) {
   const { company, len } = useUnits();
   const [told, setTold] = useState<string | null>(null);
@@ -168,7 +175,7 @@ export function Sheet({
     setTold(null);
     try {
       const svg = document.querySelector<SVGSVGElement>('svg[aria-label^="Plan of"]');
-      const sheet = takeoff(room, new Date().toLocaleString(), { company: company.name });
+      const sheet = sheetOf(room, company, scope, new Date().toLocaleString());
       const { book } = pricing(company);
       const applied = applyOverrides(sheet.lines, overrides);
       const costed = quote(

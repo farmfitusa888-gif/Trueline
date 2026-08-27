@@ -445,8 +445,11 @@ final class ProjectStore: ObservableObject {
         if manager.fileExists(atPath: into.path) { return .alreadyHere(name: folderName) }
 
         let pictures = into.appendingPathComponent("photos", isDirectory: true)
+        let recordings = into.appendingPathComponent(
+            VoiceRecorder.folderName, isDirectory: true)
         do {
             try manager.createDirectory(at: pictures, withIntermediateDirectories: true)
+            try manager.createDirectory(at: recordings, withIntermediateDirectories: true)
         } catch {
             return .notARoom("A folder for it could not be made: \(error.localizedDescription)")
         }
@@ -457,8 +460,14 @@ final class ProjectStore: ObservableObject {
             defer { if open { file.stopAccessingSecurityScopedResource() } }
             guard let data = try? Data(contentsOf: file), !data.isEmpty else { continue }
             let name = file.lastPathComponent
-            let isPicture = ["jpg", "jpeg", "png", "heic"].contains(file.pathExtension.lowercased())
-            let where_ = isPicture ? pictures : into
+            let kind = file.pathExtension.lowercased()
+            let isPicture = ["jpg", "jpeg", "png", "heic"].contains(kind)
+            // A recording has to go back into `voice/` and not to the top of the
+            // folder, because that is the one place `WebBundle` will serve it
+            // from. A note dropped a level up is a play button that never plays
+            // -- and unlike a photograph, nobody can take it again.
+            let isRecording = ["m4a", "mp4", "caf", "wav"].contains(kind)
+            let where_ = isPicture ? pictures : isRecording ? recordings : into
             if (try? data.write(to: where_.appendingPathComponent(name), options: .atomic)) != nil {
                 took += 1
             }

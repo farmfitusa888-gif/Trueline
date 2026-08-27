@@ -1,8 +1,20 @@
-import { type Nanometres, NM_PER_FOOT, NM_PER_INCH, add, formatFeetInches } from './length.ts';
+import { type Nanometres, NM_PER_INCH, add, formatFeetInches } from './length.ts';
 import { isAdjusted, isVerified, toleranceOf } from './measurement.ts';
 import { type Room, runLength } from './room.ts';
 import { type Quantities, roomQuantities } from './zone.ts';
 import { readiness, trustLabel } from './issue.ts';
+import {
+  type Exact,
+  type WorkItem,
+  type WorkScope,
+  workSheet,
+} from './work.ts';
+import {
+  decimals,
+  linearFeet,
+  squareFeet as fromSquares,
+  squareFeetOfHalves as fromHalfSquares,
+} from './quantity.ts';
 import {
   type Spacing,
   footprint,
@@ -55,6 +67,27 @@ export interface TakeoffLine {
   readonly workings: string;
   /** `measured` once a tape has been on the walls it depends on. */
   readonly provenance: 'measured' | 'scanned';
+  /**
+   * The surfaces this quantity was added up from — walls by name, and the floor
+   * and ceiling by theirs.
+   *
+   * Set on every line of a scoped sheet and left off an unscoped one, where the
+   * answer is always "all of them" and printing it on every row would say
+   * nothing. It is what lets a contractor check a number by walking the room:
+   * "460.5 sq ft of wall face" cannot be checked, and "460.5 sq ft of wall
+   * face, from south, east and west" can.
+   */
+  readonly from?: readonly string[];
+  /**
+   * The same quantity, exact, in the unit the model keeps it in.
+   *
+   * Set on a scoped line and left off an unscoped one, where the screen already
+   * has the whole room's figures to convert from. It is what lets a metric
+   * contractor read a scoped sheet in metres without this file's foot-and-inch
+   * strings being parsed back into numbers — which is how a rounding gets done
+   * twice. See `Exact` in `work.ts`.
+   */
+  readonly exact?: Exact;
 }
 
 export interface Takeoff {
@@ -72,46 +105,48 @@ export interface Takeoff {
    * because a takeoff that quietly left them out would still add up.
    */
   readonly withoutThickness: readonly string[];
+  /**
+   * True when this sheet counts only the work somebody said was being done.
+   *
+   * False is the old behaviour and the honest default: every surface priced as
+   * if it were being replaced. A room saved before scopes existed has no scope,
+   * opens exactly as it always did, and this is how a screen knows to say so
+   * rather than letting a full-replacement sheet pass for a considered one.
+   */
+  readonly scoped: boolean;
+  /**
+   * Surfaces with no work picked on them, named. Empty on an unscoped sheet.
+   *
+   * A wall left alone produces no line anywhere, which is right — a zero line
+   * reads as work priced at nothing — and it is exactly why it has to be said
+   * here. Otherwise a decision and an oversight look identical.
+   */
+  readonly untouched: readonly string[];
+  /**
+   * Work picked on a surface that has none of it, named. Empty when unscoped.
+   *
+   * Doors ticked on a wall with no door in it: either a door the scan missed,
+   * or a tick in the wrong place. Both are worth a look and neither is a line.
+   */
+  readonly measuresNothing: readonly string[];
+  /**
+   * Work picked on a surface this room no longer has, named. Empty when
+   * unscoped.
+   *
+   * A wall deleted, renamed or turned into an open span takes everything
+   * somebody decided about it with it. The quote moves, and without this
+   * nothing would say why.
+   */
+  readonly stranded: readonly string[];
 }
 
-const SQ_FT = NM_PER_FOOT * NM_PER_FOOT;
-
-/**
- * Areas come in two units and mixing them loses a tenth of a square foot.
- *
- * Floor and ceiling are kept in *half* square nanometres — the shoelace gives
- * twice the area, and halving it early would round a room with an angled wall.
- * Wall face is a plain square-nanometre product. Halving the first before
- * converting truncated it: the garage read 411.7 sq ft here and 411.8 on the
- * screen, off by a tenth, from the same room. The division has to happen once,
- * at the end, with the tenths already in hand.
+/*
+ * The four quantity formatters that used to live here are in `quantity.ts` now,
+ * imported above under the names this file has always called them. They moved
+ * the moment a second module started producing priceable lines: two roundings
+ * of the same measurement in two files is how the garage's floor came to read
+ * 411.7 in one place and 411.8 in another.
  */
-function fromHalfSquares(halfSquareNanometres: bigint): string {
-  return decimals(halfSquareNanometres, 2n * SQ_FT, 1);
-}
-
-function fromSquares(squareNanometres: bigint): string {
-  return decimals(squareNanometres, SQ_FT, 1);
-}
-
-/** Linear feet as a decimal, for the spreadsheet column that will be multiplied. */
-function linearFeet(value: Nanometres): string {
-  return decimals(value, NM_PER_FOOT, 2);
-}
-
-/**
- * An exact integer, rounded to a decimal string — rounded, not truncated.
- *
- * The garage's floor is 411.75 sq ft. Truncating printed 411.7 here while the
- * screen, which rounds, printed 411.8: one room, two numbers, from the same
- * exact value. A tenth of a square foot is nothing; two of the app's own
- * surfaces disagreeing about a number is not.
- */
-function decimals(value: bigint, per: bigint, places: number): string {
-  const scale = 10n ** BigInt(places);
-  const scaled = (value * scale + per / 2n) / per;
-  return (Number(scaled) / Number(scale)).toFixed(places);
-}
 
 /** A CSV field, quoted only when it has to be, escaped when it does. */
 function field(text: string): string {
@@ -141,6 +176,24 @@ export interface TakeoffOptions {
    * rather than printed as an empty line.
    */
   readonly company?: string;
+  /**
+   * What is actually being done, and the items it was picked from.
+   *
+   * **Left out by everything written before this existed, and that is the whole
+   * design.** With no work given, the sheet is what it has always been: every
+   * surface priced as replaced, every line unchanged to the character. That is
+   * what makes a project saved last month open exactly the same way today. See
+   * `scoped` on the result, which is how a screen tells the two apart.
+   *
+   * Both halves are needed together. The scope holds decisions by item name;
+   * the items say where each of those names takes its quantity from, and they
+   * come from the contractor's own rate book — so this module never has to know
+   * what "Skim coat" is or which wall it belongs on.
+   */
+  readonly work?: {
+    readonly scope: WorkScope;
+    readonly items: readonly WorkItem[];
+  };
 }
 
 /**
@@ -266,57 +319,82 @@ export function takeoff(room: Room, at: string, options: TakeoffOptions = {}): T
   // so no line can be firmer than the room they came from.
   const provenance = state.blocking.length === 0 ? 'measured' : 'scanned';
 
-  const lines: TakeoffLine[] = [
-    {
-      what: 'Floor',
-      quantity: fromHalfSquares(q.floorArea),
-      unit: 'sq ft',
-      prices: 'flooring, tile, underlay',
-      workings: 'the floor outline',
-      provenance,
-    },
-    {
-      what: 'Ceiling',
-      quantity: fromHalfSquares(q.ceilingArea),
-      unit: 'sq ft',
-      prices: 'ceiling drywall, paint',
-      workings: 'follows the floor',
-      provenance,
-    },
-    {
-      what: 'Wall face',
-      quantity: fromSquares(q.wallFaceArea),
-      unit: 'sq ft',
-      prices: 'drywall, paint, primer',
-      workings: 'built walls x their height, less every door and window',
-      provenance,
-    },
-    {
-      what: 'Baseboard',
-      quantity: linearFeet(q.baseboardRun),
-      unit: 'lf',
-      prices: 'base, shoe, trim',
-      workings: 'built walls less doors and cased openings; runs under windows',
-      provenance,
-    },
-  ];
+  /**
+   * The finishes: what is being done, or everything, and never a mixture.
+   *
+   * With no scope this is the block that has been on every takeoff since the
+   * beginning — the whole floor, the whole ceiling, every wall face, all the
+   * base, every opening counted. That is the right answer for a room nobody has
+   * said anything about yet, and it is the only honest one: the alternative is
+   * an empty sheet for a job somebody has not scoped, which reads as a room
+   * that takes nothing.
+   *
+   * With a scope, each line is added up out of the surfaces it was picked on,
+   * and a surface nobody picked anything on contributes to nothing at all.
+   */
+  const scoped = options.work
+    ? workSheet(room, options.work.scope, options.work.items, provenance)
+    : null;
 
-  for (const kind of ['door', 'window', 'cased'] as const) {
-    const n = countOpenings(room, kind);
-    if (n === 0) continue;
-    lines.push({
-      what: kind === 'cased' ? 'Cased openings' : `${kind[0]!.toUpperCase()}${kind.slice(1)}s`,
-      quantity: String(n),
-      unit: 'ea',
-      prices: kind === 'window' ? 'glazing, trim' : 'slabs, jambs, casing, hardware',
-      workings: 'counted off the walls',
-      // Opening sizes have been out by more than a foot on real scans, so they
-      // are never anything but the scanner's until somebody says otherwise.
-      provenance: 'scanned',
-    });
+  const lines: TakeoffLine[] = scoped
+    ? scoped.lines.map((line) => ({ ...line }))
+    : [
+        {
+          what: 'Floor',
+          quantity: fromHalfSquares(q.floorArea),
+          unit: 'sq ft',
+          prices: 'flooring, tile, underlay',
+          workings: 'the floor outline',
+          provenance,
+        },
+        {
+          what: 'Ceiling',
+          quantity: fromHalfSquares(q.ceilingArea),
+          unit: 'sq ft',
+          prices: 'ceiling drywall, paint',
+          workings: 'follows the floor',
+          provenance,
+        },
+        {
+          what: 'Wall face',
+          quantity: fromSquares(q.wallFaceArea),
+          unit: 'sq ft',
+          prices: 'drywall, paint, primer',
+          workings: 'built walls x their height, less every door and window',
+          provenance,
+        },
+        {
+          what: 'Baseboard',
+          quantity: linearFeet(q.baseboardRun),
+          unit: 'lf',
+          prices: 'base, shoe, trim',
+          workings: 'built walls less doors and cased openings; runs under windows',
+          provenance,
+        },
+      ];
+
+  if (!scoped) {
+    for (const kind of ['door', 'window', 'cased'] as const) {
+      const n = countOpenings(room, kind);
+      if (n === 0) continue;
+      lines.push({
+        what: kind === 'cased' ? 'Cased openings' : `${kind[0]!.toUpperCase()}${kind.slice(1)}s`,
+        quantity: String(n),
+        unit: 'ea',
+        prices: kind === 'window' ? 'glazing, trim' : 'slabs, jambs, casing, hardware',
+        workings: 'counted off the walls',
+        // Opening sizes have been out by more than a foot on real scans, so they
+        // are never anything but the scanner's until somebody says otherwise.
+        provenance: 'scanned',
+      });
+    }
   }
 
+  // On a scoped sheet as well as an unscoped one, because it is not work: it is
+  // the app saying a side of this room has nothing built across it, which is
+  // the one thing a contractor must not find out from a delivery.
   if (q.openRun > 0n) {
+    const open = room.walls.filter((wall) => wall.open).map((wall) => wall.id);
     lines.push({
       what: 'Open span',
       quantity: linearFeet(q.openRun),
@@ -324,6 +402,7 @@ export function takeoff(room: Room, at: string, options: TakeoffOptions = {}): T
       prices: 'nothing — no drywall, no paint, no trim',
       workings: 'sides of the room with nothing built across them',
       provenance,
+      ...(scoped ? { from: open } : {}),
     });
   }
 
@@ -331,7 +410,11 @@ export function takeoff(room: Room, at: string, options: TakeoffOptions = {}): T
 
   const bare = withoutThickness(room);
 
-  const width = Math.max(...lines.map((l) => l.what.length));
+  // A scoped room where nothing has been picked yet has no lines at all, and
+  // `Math.max()` of nothing is -Infinity. Guarded rather than left to throw:
+  // "I have not decided what I am doing yet" is a perfectly ordinary state for
+  // a sheet to be in and it must produce a sheet that says so.
+  const width = Math.max(1, ...lines.map((l) => l.what.length));
   const rule = '-'.repeat(width + 14);
   const row = (l: TakeoffLine) =>
     `${l.what.padEnd(width)}  ${l.quantity.padStart(8)} ${l.unit.padEnd(5)}`.trimEnd();
@@ -366,11 +449,51 @@ export function takeoff(room: Room, at: string, options: TakeoffOptions = {}): T
       : `\nNo thickness given for ${bare.join(', ')} — no jamb, wrap, plate or stud above ` +
         `counts ${bare.length === 1 ? 'it' : 'them'}.\n`;
 
+  /**
+   * What this sheet counted, said on the sheet.
+   *
+   * Only on a scoped one. An unscoped takeoff is character for character what
+   * it has always been — a project saved before any of this existed has to open
+   * and read exactly as it did — and the screen is where that room is told it
+   * is being priced as a full replacement. See `scoped` on the result.
+   *
+   * When there IS a scope, three things have to be said out loud, and every one
+   * of them is a thing that would otherwise be a silent absence:
+   *
+   *   - which surfaces were left alone, because that is a decision;
+   *   - what was picked and measures nothing, because that is a mistake;
+   *   - that framing follows wall thickness rather than the scope, because the
+   *     two look like they should be the same thing and are not.
+   */
+  const scopeNote = !scoped
+    ? ''
+    : '\n' +
+      (scoped.lines.length === 0
+        ? 'Nothing has been picked in this room yet, so nothing is on this sheet. ' +
+          'Open a wall and say what is being done to it.\n'
+        : 'This sheet counts only what is being done. Anything not picked is not on it at ' +
+          'all — left out rather than priced at nothing.\n') +
+      (scoped.untouched.length === 0
+        ? ''
+        : `Nothing is being done to ${scoped.untouched.join(', ')}.\n`) +
+      (scoped.measuresNothing.length === 0
+        ? ''
+        : `Picked, and there is none of it there: ${scoped.measuresNothing.join('; ')}.\n`) +
+      (scoped.stranded.length === 0
+        ? ''
+        : `Picked on part of the room that is no longer there, so it is not counted: ` +
+          `${scoped.stranded.join('; ')}.\n`) +
+      (lines.some((l) => l.group !== undefined)
+        ? 'Openings and framing below follow the walls you have given a thickness, not what is ' +
+          'picked on a surface — a jamb belongs to the wall it goes through.\n'
+        : '');
+
   const text =
     `${room.name} — takeoff\n` +
     `${rule}\n` +
     `${body}\n` +
     `${rule}\n` +
+    scopeNote +
     `${trustLabel(state.trust)}.\n` +
     `${caveat}\n` +
     thicknessNote +
@@ -388,7 +511,17 @@ export function takeoff(room: Room, at: string, options: TakeoffOptions = {}): T
     ),
   ].join('\n');
 
-  return { room: room.name, lines, text, csv, withoutThickness: bare };
+  return {
+    room: room.name,
+    lines,
+    text,
+    csv,
+    withoutThickness: bare,
+    scoped: scoped !== null,
+    untouched: scoped?.untouched ?? [],
+    measuresNothing: scoped?.measuresNothing ?? [],
+    stranded: scoped?.stranded ?? [],
+  };
 }
 
 /**

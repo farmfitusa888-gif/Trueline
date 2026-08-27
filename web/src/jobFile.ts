@@ -7,6 +7,8 @@ import { claimReport } from '../../core/src/claim.ts';
 import { showArea, showLength } from '../../core/src/company.ts';
 import { type JobEntry, jobManifest, safeName } from '../../core/src/job-file.ts';
 import { damageScope } from '../../core/src/scope.ts';
+import type { WorkScope } from '../../core/src/work.ts';
+import { workItems } from '../../core/src/work.ts';
 import { takeoff } from '../../core/src/takeoff.ts';
 import { roomToDxf } from '../../core/src/dxf/room.ts';
 
@@ -35,11 +37,19 @@ export interface JobFileParts {
   readonly pdf?: Uint8Array;
   /** Photograph bytes by name, as they were taken. */
   readonly photos: ReadonlyMap<string, Uint8Array>;
+  /**
+   * What is being done to each surface, or `null` for a room nobody scoped.
+   *
+   * The archive is what leaves the building, so it is the last place a stale
+   * takeoff can hide. Without this the CSV in the zip would still price the
+   * whole room as a gut job while every screen priced the real one.
+   */
+  readonly scope: WorkScope | null;
   readonly at: string;
 }
 
 export async function jobFile(parts: JobFileParts): Promise<Blob> {
-  const { room, damages, claim, company, html, pdf, photos, at } = parts;
+  const { room, damages, claim, company, html, pdf, photos, scope, at } = parts;
   const zip = new JSZip();
   const contents: JobEntry[] = [];
 
@@ -82,7 +92,10 @@ export async function jobFile(parts: JobFileParts): Promise<Blob> {
     // cannot say. The rest of the archive is still worth having.
   }
 
-  const sheet = takeoff(room, at, { company: company.name });
+  const sheet = takeoff(room, at, {
+    company: company.name,
+    ...(scope ? { work: { scope, items: workItems(company.prices ?? { rates: [] }) } } : {}),
+  });
   put(
     `${safeName(room.name, 'room')} takeoff.csv`,
     'What the room takes, every row carrying its own unit and whether anybody measured it.',
