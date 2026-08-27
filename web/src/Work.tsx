@@ -10,8 +10,12 @@
  *
  * Nothing here touches money. It asks for it.
  */
-import { useMemo, useState } from 'react';
-import { type Baseline, type ChangeOrder, changesSince } from '../../core/src/baseline.ts';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  type Baseline,
+  type ChangeOrder,
+  changesSinceVerified,
+} from '../../core/src/baseline.ts';
 import { money } from '../../core/src/price.ts';
 import { type Override } from '../../core/src/override.ts';
 import { type Proposal } from '../../core/src/proposal.ts';
@@ -97,14 +101,56 @@ export function Work({
   const [note, setNote] = useState('');
   const [number, setNumber] = useState('');
   const [stage, setStage] = useState<Stage>('deposit');
-  const [deposit, setDeposit] = useState('30');
+  /**
+   * No default deposit percentage, deliberately.
+   *
+   * This was `'30'`. Several US states cap what a contractor may take up front
+   * on home improvement work -- California's is the lesser of $1,000 or ten per
+   * cent, and a breach there is a misdemeanour rather than a dispute. Shipping
+   * a number means shipping a number that is illegal somewhere, to somebody who
+   * reasonably assumes the app knows.
+   *
+   * So the field starts empty and the screen says the cap exists. The app does
+   * not name a figure for any state, because it has not verified one and a
+   * wrong figure here is worse than no figure.
+   */
+  const [deposit, setDeposit] = useState('');
   const [dueAt, setDueAt] = useState('');
   const [payTo, setPayTo] = useState('');
   const [trouble, setTrouble] = useState<string | null>(null);
   const [calendarNote, setCalendarNote] = useState<string | null>(null);
 
   const where = proposal?.client.address ?? '';
-  const changes: ChangeOrder | null = baseline ? changesSince(baseline, current) : null;
+  /**
+   * What has moved since it was signed, WITH the seal checked.
+   *
+   * This called `changesSince`, which hardcodes `tampered: false` -- it cannot
+   * check a seal because checking one is asynchronous. `invoiceOf` refuses to
+   * bill against a tampered document, and that refusal was therefore
+   * unreachable from the only screen in the app that writes invoices. The guard
+   * existed, was tested, and could never fire where it mattered.
+   *
+   * `changesSinceVerified` re-hashes the agreed document and reports drift,
+   * which is what `Agree.tsx` has always used. Same call, same shape, one await.
+   */
+  const [changes, setChanges] = useState<ChangeOrder | null>(null);
+  useEffect(() => {
+    let live = true;
+    // Both, because verifying the seal re-hashes the PROPOSAL against what the
+    // signature recorded. A baseline with no proposal beside it is a state the
+    // Agreement screen cannot produce, and billing against a document this
+    // screen cannot check is exactly what this change exists to stop.
+    if (!baseline || !proposal) {
+      setChanges(null);
+      return;
+    }
+    void changesSinceVerified(baseline, proposal, current).then((next) => {
+      if (live) setChanges(next);
+    });
+    return () => {
+      live = false;
+    };
+  }, [baseline, proposal, current]);
   const billed = useMemo(
     () => invoices.reduce((sum, invoice) => sum + invoice.amount, 0n),
     [invoices]
