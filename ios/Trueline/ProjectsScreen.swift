@@ -30,6 +30,60 @@ struct ProjectsScreen: View {
     /// stack it does not hold.
     @Binding var path: [Route]
 
+    /// What somebody is looking for. Matched against the room's name, its job
+    /// and how it was captured, so "willow", "kitchen" and "drawn" all find
+    /// something.
+    @State private var looking = ""
+    /// Whether finished work is on screen. Off by default — that is the whole
+    /// point of archiving it.
+    @State private var showingArchived = false
+    /// The room being renamed or filed, and the text being typed for it.
+    @State private var editing: ProjectStore.Entry?
+    @State private var typedName = ""
+    @State private var typedJob = ""
+    /// Said when a card could not be written, which on a phone means the disk
+    /// is full. A rename that silently did not happen is worse than one that
+    /// failed out loud.
+    @State private var trouble: String?
+
+    /// The rooms to show, after the search box and the archive switch.
+    private var showing: [ProjectStore.Entry] {
+        let wanted = looking.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return store.scans.filter { entry in
+            if entry.card.archived != showingArchived { return false }
+            guard !wanted.isEmpty else { return true }
+            return entry.title.lowercased().contains(wanted)
+                || entry.card.job.lowercased().contains(wanted)
+                || entry.kind.lowercased().contains(wanted)
+        }
+    }
+
+    /// The jobs on screen, most recently touched first, with the unfiled last.
+    ///
+    /// `store.scans` is already newest-first, so the order a job first appears
+    /// in it is the order of its newest room — which is the order somebody
+    /// wants: the house they were at this morning at the top.
+    private var grouped: [(job: String, rooms: [ProjectStore.Entry])] {
+        var order: [String] = []
+        var byJob: [String: [ProjectStore.Entry]] = [:]
+        for entry in showing {
+            let job = entry.card.job
+            if byJob[job] == nil { order.append(job) }
+            byJob[job, default: []].append(entry)
+        }
+        // The unfiled go last, whenever they turned up: they are the ones that
+        // still need a decision, and a decision belongs at the bottom of a list
+        // rather than on top of the work.
+        return order
+            .sorted { a, b in
+                if a.isEmpty != b.isEmpty { return !a.isEmpty }
+                return (order.firstIndex(of: a) ?? 0) < (order.firstIndex(of: b) ?? 0)
+            }
+            .map { (job: $0, rooms: byJob[$0] ?? []) }
+    }
+
+    private var archivedCount: Int { store.scans.filter(\.card.archived).count }
+
     var body: some View {
         List {
             // Scan and Measure used to be the two rows at the top of this list.
@@ -79,9 +133,26 @@ struct ProjectsScreen: View {
                     }
                     .padding(.vertical, 4)
                 }
+            } else if showing.isEmpty && !looking.isEmpty {
+                Section {
+                    Text("Nothing here matches \"\(looking)\".")
+                        .font(.callout)
+                        .foregroundStyle(Ink.quiet)
+                }
+            } else if showing.isEmpty && showingArchived {
+                Section {
+                    Text("Nothing has been archived yet. Finish a job and put it away here.")
+                        .font(.callout)
+                        .foregroundStyle(Ink.quiet)
+                }
             } else {
-                Section("On this phone") {
-                    ForEach(store.scans) { entry in
+                ForEach(grouped, id: \.job) { group in
+                Section(
+                    group.job.isEmpty
+                        ? (showingArchived ? "Archived" : "Not in a job yet")
+                        : group.job
+                ) {
+                    ForEach(group.rooms) { entry in
                         // A capture with nothing in it IS a link now, and
                         // that is a reversal worth writing down.
                         //
@@ -124,7 +195,13 @@ struct ProjectsScreen: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(entry.name)
+                                    // What somebody called it, not when it was
+                                    // captured. Every row on this list used to
+                                    // read "Room 2026-08-26 0927" -- including
+                                    // the rooms that had been renamed, because
+                                    // the name went into `corrected.json` and
+                                    // nothing here ever read it.
+                                    Text(entry.title)
                                     if entry.hasRoom {
                                         Text(entry.kind)
                                             .font(.caption)
@@ -159,6 +236,23 @@ struct ProjectsScreen: View {
                                     Label("What went wrong", systemImage: "questionmark.circle")
                                 }
                             }
+                            Button {
+                                editing = entry
+                                typedName = entry.title
+                                typedJob = entry.card.job
+                            } label: {
+                                Label("Rename or file it", systemImage: "pencil")
+                            }
+                            Button {
+                                if !store.archive(entry, !entry.card.archived) {
+                                    trouble = "That could not be written. The phone may be out "
+                                        + "of space — the room itself is untouched."
+                                }
+                            } label: {
+                                entry.card.archived
+                                    ? Label("Put it back on the list", systemImage: "tray.and.arrow.up")
+                                    : Label("Archive it", systemImage: "archivebox")
+                            }
                             Button(role: .destructive) {
                                 forget(entry)
                             } label: {
@@ -167,6 +261,19 @@ struct ProjectsScreen: View {
                         }
                         // And visible without a long press. A context menu is
                         // still something you have to know is there.
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                if !store.archive(entry, !entry.card.archived) {
+                                    trouble = "That could not be written. The phone may be out "
+                                        + "of space — the room itself is untouched."
+                                }
+                            } label: {
+                                entry.card.archived
+                                    ? Label("Put back", systemImage: "tray.and.arrow.up")
+                                    : Label("Archive", systemImage: "archivebox")
+                            }
+                            .tint(Ink.accent)
+                        }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
                                 forget(entry)
@@ -178,9 +285,13 @@ struct ProjectsScreen: View {
                     .onDelete { indexes in
                         // Through the same one place the menu and the swipe use,
                         // so all three cannot come apart -- and so none of them
-                        // can ever forget the copy.
-                        indexes.map { store.scans[$0] }.forEach(forget)
+                        // can ever forget the copy. Indexed into THIS group's
+                        // rooms, not into `store.scans`: the list is grouped
+                        // now, and indexing the wrong array deletes the wrong
+                        // room.
+                        indexes.map { group.rooms[$0] }.forEach(forget)
                     }
+                }
                 }
             }
 
@@ -227,11 +338,89 @@ struct ProjectsScreen: View {
         }
         .scrollContentBackground(.hidden)
         .background(Ink.ground)
+        // One box, matched against the name, the job and how it was captured.
+        // Twenty rooms in one scrolling list, newest first, was the only order
+        // there had ever been.
+        .searchable(text: $looking, prompt: "Find a room or a job")
         .navigationTitle("Trueline")
         // One tap from the first screen of the app. It used to be a text link
         // at the top of a ROOM's page, so reading how to use the app required
         // already having scanned something with it.
-        .toolbar { HandbookButton() }
+        .toolbar {
+            // Finished work, and the way back to it. Only offered once there is
+            // some: a control for an empty shelf is a control that teaches
+            // somebody the app has a shelf they do not need.
+            if archivedCount > 0 || showingArchived {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingArchived.toggle()
+                    } label: {
+                        Label(
+                            showingArchived ? "The current work" : "Archived (\(archivedCount))",
+                            systemImage: showingArchived ? "tray.full" : "archivebox"
+                        )
+                        .labelStyle(.titleAndIcon)
+                        .font(.footnote)
+                    }
+                }
+            }
+            HandbookButton()
+        }
+        // Renaming and filing, in one sheet, because they are the same thought:
+        // what is this and whose is it.
+        .sheet(item: $editing) { entry in
+            NavigationStack {
+                Form {
+                    Section("What is this room?") {
+                        TextField("Kitchen", text: $typedName)
+                    }
+                    Section {
+                        TextField("118 Willow St", text: $typedJob)
+                        // Picked rather than typed again, so the second room of
+                        // a house lands in the same job as the first instead of
+                        // in a job spelled slightly differently.
+                        ForEach(store.jobs().filter { $0 != typedJob }, id: \.self) { job in
+                            Button(job) { typedJob = job }
+                        }
+                    } header: {
+                        Text("Which job")
+                    } footer: {
+                        Text(
+                            "The property this room is part of. Leave it empty and the room sits "
+                            + "on its own. The folder on this phone keeps its own name and does "
+                            + "not move — the name here is a label, and moving a folder is how a "
+                            + "backup ends up pointing at nothing."
+                        )
+                    }
+                }
+                .navigationTitle(entry.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { editing = nil }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            let named = store.rename(entry, to: typedName)
+                            let filed = store.file(entry, under: typedJob)
+                            if !named || !filed {
+                                trouble = "That could not be written. The phone may be out of "
+                                    + "space — the room itself is untouched."
+                            }
+                            editing = nil
+                        }
+                    }
+                }
+            }
+        }
+        .alert(
+            "That could not be saved",
+            isPresented: .init(get: { trouble != nil }, set: { if !$0 { trouble = nil } })
+        ) {
+            Button("All right", role: .cancel) { trouble = nil }
+        } message: {
+            Text(trouble ?? "")
+        }
         .navigationDestination(for: Route.self) { route in
             switch route {
             case .newScan:

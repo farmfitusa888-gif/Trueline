@@ -146,7 +146,7 @@ struct DrawScreen: View {
         // The name comes out of the project itself rather than being asked for
         // twice: the grid already asked what the room is called, and a second
         // box on this side would be the same question in a different place.
-        let name = Self.name(inside: project)
+        let name = RoomCard.name(inside: project)
         let folder = store.folder(named: CaptureWriter.folderName(for: name, at: startedAt))
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -154,6 +154,11 @@ struct DrawScreen: View {
                 to: folder.appendingPathComponent(ProjectStore.correctedFile),
                 options: .atomic
             )
+            // And the card, so the Rooms list shows what this room is called
+            // straight away rather than the minute it was drawn.
+            var card = RoomCard()
+            card.name = name
+            card.write(in: folder)
         } catch {
             trouble = error.localizedDescription
             return
@@ -172,18 +177,7 @@ struct DrawScreen: View {
         )
     }
 
-    /// What the page called this room.
-    ///
-    /// `persist.ts` writes `fileName` at the top of every saved project, which
-    /// is the name typed on the grid. Read rather than guessed at, and falling
-    /// back to `Room` — the same fallback `CaptureWriter.folderName` uses — when
-    /// a build writes something this one cannot read.
-    static func name(inside project: Data) -> String {
-        guard
-            let top = try? JSONSerialization.jsonObject(with: project) as? [String: Any],
-            let name = top["fileName"] as? String,
-            !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        else { return "Room" }
-        return name
-    }
+    /// The name lands on the room's card as well, so the list shows what the
+    /// room is called rather than the moment it was drawn — see
+    /// `RoomCard.name(inside:)`, which both this and `writeCorrected` use.
 }

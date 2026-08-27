@@ -22,6 +22,19 @@ final class ProjectStore: ObservableObject {
         let hasRoom: Bool
         /// Which way it was captured, for the line under its name.
         let kind: String
+        /// What this room is called, whose job it is, and whether it is done.
+        ///
+        /// Read off `card.json` in the folder. Every scan taken before that
+        /// file existed has a blank one, which reads exactly as the list read
+        /// before: no name, no job, not archived.
+        let card: RoomCard
+        /// The name to show: what somebody called it, or the folder's own name.
+        ///
+        /// Rooms were all called `Room 2026-08-26 0927` on this list, including
+        /// the ones somebody had renamed — the name went into `corrected.json`
+        /// and nothing on the list ever read it. `writeCorrected` copies it onto
+        /// the card now, so there is one name and every screen shows it.
+        var title: String { card.name.isEmpty ? name : card.name }
         /// A small picture of the plan, once one has been drawn.
         ///
         /// A list of folders called "Room 2026-08-24 1819" tells nobody which
@@ -64,6 +77,7 @@ final class ProjectStore: ObservableObject {
                         .contentModificationDate) ?? .distantPast,
                     hasRoom: Self.holdsARoom(folder),
                     kind: Self.kind(of: folder),
+                    card: RoomCard.read(in: folder),
                     thumbnail: {
                         let picture = folder.appendingPathComponent(Self.thumbnailFile)
                         return FileManager.default.fileExists(atPath: picture.path) ? picture : nil
@@ -191,10 +205,83 @@ final class ProjectStore: ObservableObject {
     func writeCorrected(_ project: Data, into folder: URL) -> Bool {
         do {
             try project.write(to: folder.appendingPathComponent(Self.correctedFile), options: .atomic)
+            // And the name onto the card, so the list says what the room is
+            // called rather than when it was captured. Renaming a room used to
+            // change `corrected.json` and nothing else, so every row on the
+            // first screen of the app went on saying "Room 2026-08-26 0927"
+            // forever -- including the ones somebody had renamed.
+            //
+            // The job and the archive flag are NOT touched here: they are the
+            // list's own, and a save from inside a room must not undo them.
+            let named = RoomCard.name(inside: project)
+            if named != "Room" {
+                var card = RoomCard.read(in: folder)
+                if card.name != named {
+                    card.name = named
+                    card.write(in: folder)
+                    refresh()
+                }
+            }
             return true
         } catch {
             return false
         }
+    }
+
+    /* ------------------------------------------------------ managing the list */
+
+    /// Renames a room, everywhere it is shown.
+    ///
+    /// The **folder** keeps its timestamped name and does not move. That is
+    /// deliberate: the folder's name is the record name in iCloud and the path
+    /// every photograph in it already sits under, so renaming it means moving a
+    /// directory and renaming a CloudKit record together, and a failure halfway
+    /// through leaves the room in two places at once. A name is a label; a
+    /// folder is an address. Only the label changes.
+    @discardableResult
+    func rename(_ entry: Entry, to name: String) -> Bool {
+        var card = entry.card
+        card.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let written = card.write(in: entry.folder)
+        refresh()
+        return written
+    }
+
+    /// Puts a room in a job, or takes it out of one when the name is empty.
+    @discardableResult
+    func file(_ entry: Entry, under job: String) -> Bool {
+        var card = entry.card
+        card.job = job.trimmingCharacters(in: .whitespacesAndNewlines)
+        let written = card.write(in: entry.folder)
+        refresh()
+        return written
+    }
+
+    /// Finished, or back on the list.
+    ///
+    /// Nothing is deleted and nothing leaves iCloud. The only thing archiving
+    /// does is take a job off the screen somebody looks at every morning, which
+    /// is the whole complaint: a house finished in March does not stop being
+    /// work you did.
+    @discardableResult
+    func archive(_ entry: Entry, _ archived: Bool) -> Bool {
+        var card = entry.card
+        card.archived = archived
+        let written = card.write(in: entry.folder)
+        refresh()
+        return written
+    }
+
+    /// Every job name in use, most recently touched first.
+    ///
+    /// Offered when somebody is filing a room, so the second room of a house
+    /// is picked from a list rather than typed again and spelled differently.
+    func jobs() -> [String] {
+        var seen: [String] = []
+        for entry in scans where !entry.card.job.isEmpty {
+            if !seen.contains(entry.card.job) { seen.append(entry.card.job) }
+        }
+        return seen
     }
 
     /// Writes the picture of a scan's plan into its folder.
@@ -262,7 +349,7 @@ final class ProjectStore: ObservableObject {
     /// a second phone as a RoomPlan capture no importer could read, and a drawn
     /// room — which has no capture at all — would have come back as an empty
     /// `room.json`, which is exactly the shape `holdsARoom` calls a failed one.
-    func restore(name: String, capture: Data, kind: String, corrected: Data?) {
+    func restore(name: String, capture: Data, kind: String, card: Data?, corrected: Data?) {
         let folder = self.folder(named: name)
         guard !FileManager.default.fileExists(atPath: folder.path) else { return }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -275,6 +362,9 @@ final class ProjectStore: ObservableObject {
         }
         if let corrected {
             try? corrected.write(to: folder.appendingPathComponent(Self.correctedFile), options: .atomic)
+        }
+        if let card {
+            try? card.write(to: folder.appendingPathComponent(RoomCard.file), options: .atomic)
         }
         refresh()
     }

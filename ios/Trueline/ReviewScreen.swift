@@ -59,7 +59,8 @@ struct ReviewScreen: View {
                         scan: scan.title,
                         capture: scan.isTrace ? scan.traceJSON : scan.roomJSON,
                         corrected: project,
-                        kind: scan.kind
+                        kind: scan.kind,
+                        card: try? Data(contentsOf: scan.folder.appendingPathComponent(RoomCard.file))
                     )
                 }
             },

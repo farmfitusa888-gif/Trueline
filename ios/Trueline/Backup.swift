@@ -124,7 +124,11 @@ final class Backup: ObservableObject {
     /// `kind`, and `scanned` is the right answer for those: every capture the
     /// app had put in iCloud up to then really was a scan, because nothing else
     /// was being backed up.
-    func push(scan name: String, capture: Data, corrected: Data?, kind: String) async {
+    /// `card` is the room's name, its job and whether it is archived — a few
+    /// hundred bytes. Without it a second phone restores every room called
+    /// `Room 2026-08-26 0927` again, in no job, which is most of what the
+    /// Rooms list was fixed to stop being.
+    func push(scan name: String, capture: Data, corrected: Data?, kind: String, card: Data?) async {
         // A phone with no iCloud account has nowhere to put it, and saying so
         // once is enough — retrying on every keystroke would only spend the
         // battery. A *failure* is different: a lost signal comes back, and the
@@ -146,6 +150,9 @@ final class Backup: ObservableObject {
             record["name"] = name as CKRecordValue
             record["capture"] = capture as CKRecordValue
             record["kind"] = kind as CKRecordValue
+            if let card {
+                record["card"] = card as CKRecordValue
+            }
             if let corrected {
                 record["corrected"] = corrected as CKRecordValue
             }
@@ -290,6 +297,9 @@ final class Backup: ObservableObject {
         let capture: Data
         /// `scanned`, `walked` or `drawn` — which file the capture belongs in.
         let kind: String
+        /// The room's name, job and archive flag. Absent on a record written
+        /// before the Rooms list had any of those.
+        let card: Data?
         let corrected: Data?
         let savedAt: Date
     }
@@ -331,6 +341,7 @@ final class Backup: ObservableObject {
                             name: name,
                             capture: capture,
                             kind: record["kind"] as? String ?? "scanned",
+                            card: record["card"] as? Data,
                             corrected: record["corrected"] as? Data,
                             savedAt: record["savedAt"] as? Date ?? .distantPast
                         )
