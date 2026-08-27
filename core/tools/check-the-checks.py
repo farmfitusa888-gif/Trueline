@@ -771,6 +771,40 @@ def paywall(bench: Bench) -> None:
     expect('quiet again once both are back', code, out, fires=False)
 
 
+# ------------------------------------------------------------------ only once
+
+def onlyOnce(bench: Bench) -> None:
+    """Two stored properties of the same name in one type.
+
+        ProjectsScreen.swift:39:24: error: invalid redeclaration of 'looking'
+
+    `ProjectsScreen` already had `@State private var looking = ""` for the
+    search box. A second `looking` was added thirty lines above it for
+    something else, and both declarations read perfectly well on their own.
+
+    The second case matters as much as the first: `RoomCard` has a `static let
+    schema` and an instance `var schema`, which is legal Swift and deliberate.
+    An earlier version of this checker counted them together and called a
+    correct file a compile error.
+    """
+    print('check-swift-once.py — a stored property declared twice')
+
+    code, out = bench.run('check-swift-once.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    rel = 'ios/Trueline/ProjectsScreen.swift'
+    bench.write(rel, bench.read(rel).replace(
+        '@State private var askingICloud = false', '@State private var looking = false'))
+    code, out = bench.run('check-swift-once.py')
+    expect('the name put back the way the compiler refused it', code, out,
+           fires=True, saying="declares `looking` twice")
+    bench.restore(rel)
+
+    code, out = bench.run('check-swift-once.py')
+    expect('and a static beside an instance of the same name is left alone',
+           code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -791,6 +825,8 @@ def main() -> int:
         arguments(bench)
         print()
         paywall(bench)
+        print()
+        onlyOnce(bench)
 
     print()
     if failures:

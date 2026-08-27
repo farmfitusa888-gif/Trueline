@@ -371,4 +371,98 @@ final class ProjectStore: ObservableObject {
         }
         refresh()
     }
+
+    /* ------------------------------------------------------ bringing one in */
+
+    /// What happened when somebody handed the app a file or a folder.
+    enum Brought {
+        case took(name: String)
+        case alreadyHere(name: String)
+        case notARoom(String)
+    }
+
+    /// Takes a scan folder, or a bare `room.json`, and makes it a room here.
+    ///
+    /// ## Why this exists
+    ///
+    /// A scan is a folder, which is what makes it possible to AirDrop one, text
+    /// one to yourself, or copy one out of the Files app. Getting one BACK had
+    /// no path at all: the only way was to move a folder into
+    /// `On My iPhone → Trueline → Scans` by hand, and iOS will not let you open
+    /// a zip straight out of Messages, so the actual sequence was save to
+    /// Files, tap to unzip, long-press, move, and get the nesting exactly
+    /// right. Sam ended up with `room.json` loose in `Scans` and no room.
+    ///
+    /// An export with no import is half a feature.
+    ///
+    /// ## What it accepts
+    ///
+    ///   * A **folder** from a scan — `room.json` or `trace.json` or
+    ///     `corrected.json` inside it, and whatever else it carries: the card,
+    ///     the photographs, the USDZ. Copied whole.
+    ///   * A bare **`room.json`** or **`trace.json`** — a folder is made around
+    ///     it, named the way a capture on this phone would be.
+    ///
+    /// A folder already here under the same name is left completely alone and
+    /// said so, rather than merged: merging two versions of one room silently
+    /// is how somebody loses the half they wanted.
+    func bringIn(_ picked: URL) -> Brought {
+        let reachable = picked.startAccessingSecurityScopedResource()
+        defer { if reachable { picked.stopAccessingSecurityScopedResource() } }
+
+        let manager = FileManager.default
+        var isFolder: ObjCBool = false
+        guard manager.fileExists(atPath: picked.path, isDirectory: &isFolder) else {
+            return .notARoom("That file is not there any more.")
+        }
+
+        if isFolder.boolValue {
+            let holds = ["room.json", "trace.json", Self.correctedFile]
+                .contains { manager.fileExists(atPath: picked.appendingPathComponent($0).path) }
+            guard holds else {
+                return .notARoom(
+                    "There is no room.json, trace.json or corrected.json in that folder, so it "
+                    + "is not a scan. If you unzipped one, the folder you want is the one those "
+                    + "files are inside.")
+            }
+            let name = picked.lastPathComponent
+            let into = folder(named: name)
+            if manager.fileExists(atPath: into.path) {
+                return .alreadyHere(name: name)
+            }
+            do {
+                try manager.copyItem(at: picked, to: into)
+            } catch {
+                return .notARoom("That folder could not be copied in: \(error.localizedDescription)")
+            }
+            refresh()
+            return .took(name: name)
+        }
+
+        let file = picked.lastPathComponent.lowercased()
+        guard file == "room.json" || file == "trace.json" || file == Self.correctedFile else {
+            return .notARoom(
+                "\(picked.lastPathComponent) is not part of a scan. Pick the folder a scan is "
+                + "in, or the room.json inside it.")
+        }
+        guard let data = try? Data(contentsOf: picked), !data.isEmpty else {
+            return .notARoom("\(picked.lastPathComponent) is empty.")
+        }
+        // Named from the room inside it where there is one, so a room brought
+        // back does not arrive called after the minute it was brought back.
+        let inside = RoomCard.name(inside: data)
+        let name = CaptureWriter.folderName(
+            for: inside == "Room" ? picked.deletingLastPathComponent().lastPathComponent : inside,
+            at: Date())
+        let into = folder(named: name)
+        if manager.fileExists(atPath: into.path) { return .alreadyHere(name: name) }
+        do {
+            try manager.createDirectory(at: into, withIntermediateDirectories: true)
+            try data.write(to: into.appendingPathComponent(file), options: .atomic)
+        } catch {
+            return .notARoom("It could not be written: \(error.localizedDescription)")
+        }
+        refresh()
+        return .took(name: name)
+    }
 }

@@ -15,7 +15,16 @@ struct ProjectsScreen: View {
     @ObservedObject var backup: Backup
     /// True while the iCloud look-up below is in flight, so its button says so
     /// rather than looking dead on a slow connection.
-    @State private var looking = false
+    ///
+    /// Named for what it is asking. `looking` was taken -- it is the search
+    /// box's text, thirty lines further down -- and reusing it did not fail
+    /// until the compiler said so on Sam's Mac.
+    @State private var askingICloud = false
+    /// True while the Files picker is up.
+    @State private var picking = false
+    /// What the last import did, in words. Shown until it is dismissed, because
+    /// "nothing happened" is the one answer an import must never give.
+    @State private var brought: String?
     /// Whether this person has paid, so the list can offer the subscription and
     /// hand the answer to the correction screens.
     @ObservedObject var subscription: Subscription
@@ -102,6 +111,26 @@ struct ProjectsScreen: View {
             // way: start a scan, fail it, open the dead capture, and take a way
             // out. A way out is not a way in.
             Section {
+                // Bringing one back in. A scan is a folder, which is what makes
+                // it possible to AirDrop one or text one to yourself -- and
+                // until this row there was no way to get one BACK except moving
+                // a folder into On My iPhone → Trueline → Scans by hand, with
+                // the nesting exactly right. An export with no import is half a
+                // feature.
+                Button {
+                    picking = true
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Bring a room in from Files", systemImage: "square.and.arrow.down")
+                        Text(
+                            "A scan folder somebody sent you, or the room.json inside one. "
+                            + "Unzip it first if it arrived as a zip, then pick the folder."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(Ink.quiet)
+                    }
+                }
+
                 NavigationLink(value: Route.newDraw) {
                     VStack(alignment: .leading, spacing: 2) {
                         Label("Draw a room", systemImage: "square.grid.3x3")
@@ -387,11 +416,11 @@ struct ProjectsScreen: View {
                     Task { await lookForRooms() }
                 } label: {
                     Label(
-                        looking ? "Asking iCloud…" : "Look for rooms in iCloud",
+                        askingICloud ? "Asking iCloud…" : "Look for rooms in iCloud",
                         systemImage: "arrow.down.circle"
                     )
                 }
-                .disabled(looking)
+                .disabled(askingICloud)
 
                 if let said = backup.lastRestore {
                     Text(said)
@@ -484,6 +513,35 @@ struct ProjectsScreen: View {
             Button("All right", role: .cancel) { trouble = nil }
         } message: {
             Text(trouble ?? "")
+        }
+        .fileImporter(
+            isPresented: $picking,
+            // A folder is the whole scan -- the room, the card, the
+            // photographs, the USDZ. A bare JSON is the room on its own, which
+            // is what somebody has when a zip was unpacked badly.
+            allowedContentTypes: [.folder, .json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .failure(let why):
+                brought = why.localizedDescription
+            case .success(let picked):
+                guard let one = picked.first else { return }
+                switch store.bringIn(one) {
+                case .took(let name):
+                    brought = "\(name) is on this phone now."
+                case .alreadyHere(let name):
+                    brought = "There is already a room called \(name) here, so nothing was "
+                        + "changed. Rename the one you have if you want both."
+                case .notARoom(let why):
+                    brought = why
+                }
+            }
+        }
+        .alert("Bringing a room in", isPresented: .constant(brought != nil)) {
+            Button("All right", role: .cancel) { brought = nil }
+        } message: {
+            Text(brought ?? "")
         }
         .navigationDestination(for: Route.self) { route in
             switch route {
@@ -590,8 +648,8 @@ struct ProjectsScreen: View {
     /// is gone, not the moment the app happened to start.
     @MainActor
     private func lookForRooms() async {
-        looking = true
-        defer { looking = false }
+        askingICloud = true
+        defer { askingICloud = false }
         await backup.check()
         for scan in await backup.fetchMissing(have: store.names) {
             store.restore(
