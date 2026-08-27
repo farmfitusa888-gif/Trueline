@@ -153,7 +153,27 @@ export function viewer(camera: Camera): (p: Point, height: number) => Placed2D {
     const into = x * sin + y * cos;
     return {
       x: across,
-      y: into * sinTilt - height * cosTilt,
+      // `into` is NEGATED, and that minus sign is the whole of a bug that put
+      // every 3D view of every room back to front.
+      //
+      // The viewer looks along +y after the turn (see `facing`), so a larger
+      // `into` is FURTHER AWAY. Screen y grows downward. Something further away
+      // therefore belongs HIGHER on the screen — a smaller y — and the first
+      // version wrote `+into`, which drew the far side of the room below the
+      // near side. At a near-overhead camera that is a clean vertical flip of
+      // the plan, and once the camera is turned it reads as the room mirrored:
+      // Sam's hallway came off the wrong end of the drawing.
+      //
+      // The blueprint has always been right. `Plan.tsx` draws with
+      // `(maxY - y)`, so plan +y goes UP the page; this now agrees with it. The
+      // two drawings of one room disagreeing about which way round it is, is
+      // exactly the failure `floor3d.ts` reuses this function to avoid.
+      //
+      // Height keeps its own minus: taller is a smaller y, which is higher, and
+      // that part was always right. `depth` is untouched — larger is still
+      // further — and `facing()` culls from the plan normal and the turn rather
+      // than from screen coordinates, so the winding order is unaffected.
+      y: -into * sinTilt - height * cosTilt,
       depth: into * cosTilt + height * sinTilt,
     };
   };

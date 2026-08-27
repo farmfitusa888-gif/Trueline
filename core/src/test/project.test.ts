@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scanned, verified } from '../measurement.ts';
-import { type Heading, type Opening, type Room, type Wall } from '../room.ts';
+import { type Heading, type Opening, type Room, type Wall, corners } from '../room.ts';
 import { NM_PER_FOOT, parseLength } from '../length.ts';
 import { cutAt, insidePlan } from '../section.ts';
 import {
@@ -437,4 +437,77 @@ test('with no plane at all nothing about the drawing changes', () => {
   const after = project(room, DEFAULT_CAMERA, 1000, [], undefined);
   assert.deepEqual(after.facets, before.facets);
   assert.deepEqual(after.hidden, before.hidden);
+});
+
+/* --------------------------------------------------------- which way round */
+
+/**
+ * The 3D view and the blueprint must agree about which way round the room is.
+ *
+ * This is the test that was missing, and its absence cost Sam two rounds of
+ * "the image is inverted". `viewer()` wrote `+into` for screen y, and since
+ * screen y grows DOWNWARD that drew the far side of the room below the near
+ * side — a clean vertical flip of the plan at an overhead camera, and a
+ * mirror-looking room once the camera is turned. Twenty-four tests in this file
+ * passed the whole time, because every one of them asked whether the geometry
+ * was self-consistent and none asked which way up it was.
+ *
+ * The blueprint is the reference: `Plan.tsx` draws with `(maxY - y)`, so a
+ * larger plan y is HIGHER on the page. At a near-overhead camera the 3D view is
+ * the plan, so the two orderings have to be the same ordering.
+ */
+test('at an overhead camera the 3D view is the plan, the same way up', () => {
+  const overhead = project(room, { turn: 0, tilt: 88 }, 1000);
+  const floor = overhead.facets.find((f) => f.kind === 'floor');
+  assert.ok(floor, 'the floor is drawn');
+
+  const plan = corners(room);
+  assert.equal(floor.points.length, plan.length);
+
+  // Highest on the blueprint first. Larger plan y is higher.
+  const upThePage = plan
+    .map((p, i) => ({ y: Number(p.y), i }))
+    .sort((a, b) => b.y - a.y)
+    .map((p) => p.i);
+  // Highest on the screen first. SMALLER screen y is higher.
+  const upTheScreen = floor.points
+    .map((p, i) => ({ y: p.y, i }))
+    .sort((a, b) => a.y - b.y)
+    .map((p) => p.i);
+
+  assert.deepEqual(
+    upTheScreen,
+    upThePage,
+    'the 3D view is upside down relative to the blueprint'
+  );
+});
+
+test('and turning the camera never mirrors the room', () => {
+  // A reflection cannot be undone by rotation, so if the sign were wrong again
+  // this would fail at every angle rather than only overhead. The signed area
+  // of the floor on screen keeps one sign under rotation and flips under a
+  // mirror, which is exactly the difference being checked.
+  const area = (points: readonly { x: number; y: number }[]) => {
+    let sum = 0;
+    for (let i = 0; i < points.length; i += 1) {
+      const a = points[i]!;
+      const b = points[(i + 1) % points.length]!;
+      sum += a.x * b.y - b.x * a.y;
+    }
+    return sum / 2;
+  };
+
+  const plan = corners(room).map((p) => ({ x: Number(p.x), y: -Number(p.y) }));
+  const wanted = Math.sign(area(plan));
+  assert.notEqual(wanted, 0, 'the room encloses something');
+
+  for (const turn of [0, 45, 90, 135, 180, 225, 270, 315]) {
+    const floor = project(room, { turn, tilt: 70 }, 1000).facets.find((f) => f.kind === 'floor');
+    assert.ok(floor, `the floor is drawn at ${turn} degrees`);
+    assert.equal(
+      Math.sign(area(floor.points)),
+      wanted,
+      `the room is mirrored in the 3D view at ${turn} degrees`
+    );
+  }
 });

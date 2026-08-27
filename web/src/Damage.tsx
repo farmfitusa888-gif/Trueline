@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { parseLength } from '../../core/src/length.ts';
 import type { Room, Wall } from '../../core/src/room.ts';
 import { runLength } from '../../core/src/room.ts';
@@ -121,6 +121,18 @@ export function DamageOnWall({
   const [category, setCategory] = useState<WaterCategory>(1);
   const [note, setNote] = useState('');
   const [wants, setWants] = useState<string | null>(null);
+  /**
+   * The description box, so a refusal can put the cursor in the thing it is
+   * asking for.
+   *
+   * Sam pressed "Mark a spot on wall-5" and nothing happened. The button was
+   * working perfectly: `keep` refuses a mark with no description, and said so —
+   * at the TOP of the panel, several screens above the button he was pressing.
+   * From where his thumb was, a working refusal and a dead button look exactly
+   * the same. So the message now also appears beside the button that was
+   * refused, and the cursor goes into the empty box.
+   */
+  const noteBox = useRef<HTMLInputElement | null>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [high, setHigh] = useState('');
@@ -141,6 +153,10 @@ export function DamageOnWall({
   function keep(shape: Mark['shape']) {
     if (note.trim() === '') {
       setWants('Say what the damage is first — "water staining from the supply line above".');
+      // Into the box, and on screen. A refusal somebody cannot see is a button
+      // that does not work, whatever the code is doing.
+      noteBox.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      noteBox.current?.focus({ preventScroll: true });
       return;
     }
     setWants(null);
@@ -210,6 +226,7 @@ export function DamageOnWall({
       <label className="mt-3 block">
         <span className="text-sm font-medium text-slate-700">What is it?</span>
         <input
+          ref={noteBox}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder={
@@ -513,10 +530,12 @@ export function DamageOnWall({
               >
                 Mark it
               </button>
+              <Wants say={wants} />
             </div>
           )}
 
           {adding === 'whole' && (
+            <>
             <button
               type="button"
               onClick={() => keep({ kind: 'surface', surface: 'wall', wallId: wall.id })}
@@ -525,9 +544,12 @@ export function DamageOnWall({
             >
               Mark the whole of {wall.id}
             </button>
+            <Wants say={wants} />
+            </>
           )}
 
           {adding === 'pin' && (
+            <>
             <button
               type="button"
               onClick={() => keep({ kind: 'pin', at: { x: 0n, y: 0n }, wallId: wall.id })}
@@ -536,6 +558,8 @@ export function DamageOnWall({
             >
               Mark a spot on {wall.id}
             </button>
+            <Wants say={wants} />
+            </>
           )}
 
           <button

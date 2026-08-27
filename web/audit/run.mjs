@@ -59,6 +59,7 @@ const parts = [
   'a22-voice.mjs',
   'a23-scope.mjs',
   'a24-change.mjs',
+  'a31-mark.mjs',
 ];
 
 function run(part) {
