@@ -174,6 +174,17 @@ export function Tour({
   readonly onDone: () => void;
 }) {
   const [at, setAt] = useState(0);
+  /**
+   * Folded down to one line.
+   *
+   * The card is fixed to the bottom of the window, and on a phone a card with
+   * a title, three lines of text and three buttons in it is a third of the
+   * screen -- so the thing it is pointing at is behind the thing pointing at
+   * it. Folded, it is one bar: the stop, the title, and the two controls that
+   * move you. Everything is still reachable and the room is on the screen.
+   */
+  const [folded, setFolded] = useState(false);
+  const card = useRef<HTMLElement | null>(null);
   const stop = TOUR[at]!;
 
   // `onGo` is written inline by the caller, so it is a new function on every
@@ -195,7 +206,21 @@ export function Tour({
       const target = document.querySelector(stop.find);
       if (!target) return;
       target.setAttribute('data-tour-ring', '');
-      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+      // Centred in what is LEFT of the screen, not in the screen.
+      //
+      // `scrollIntoView({ block: 'center' })` centres in the viewport, and the
+      // bottom of this viewport is the card and the section bar. So a stop
+      // about a control near the foot of a panel scrolled it to the middle of
+      // the window and the card sat on top of it -- which is exactly the
+      // complaint: "the banner box on the bottom is blocking everything".
+      //
+      // So the free area is measured -- from under the section tabs to the top
+      // of the card -- and the target is put in the middle of THAT.
+      const free = window.innerHeight - (card.current?.getBoundingClientRect().height ?? 0);
+      const box = target.getBoundingClientRect();
+      const want = box.top + window.scrollY - Math.max(16, (free - box.height) / 2);
+      window.scrollTo({ top: Math.max(0, want), behavior: 'smooth' });
     }, 260);
     return () => window.clearTimeout(timer);
   }, [at, stop]);
@@ -211,18 +236,36 @@ export function Tour({
 
   return (
     <aside
+      ref={card}
       role="dialog"
       aria-label="Guided tour"
       className="fixed inset-x-0 bottom-[calc(3.25rem+env(safe-area-inset-bottom))] z-40
                  mx-auto max-w-3xl px-3"
     >
-      <div className="rounded-xl border border-slate-900 bg-slate-900 p-4 text-white shadow-lg">
-        <p className="font-mono text-[11px] uppercase tracking-widest text-slate-400">
-          Tour · {at + 1} of {TOUR.length}
-        </p>
-        <h2 className="mt-1 font-semibold">{stop.title}</h2>
-        <p className="mt-1 text-sm leading-relaxed text-slate-200">{stop.body}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="rounded-xl border border-slate-900 bg-slate-900 p-3 text-white shadow-lg">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[11px] uppercase tracking-widest text-slate-400">
+              Tour · {at + 1} of {TOUR.length}
+            </p>
+            <h2 className="mt-0.5 font-semibold">{stop.title}</h2>
+          </div>
+          {/* Out of the way, and back again. The one control that decides
+              whether this card is help or an obstruction. */}
+          <button
+            type="button"
+            onClick={() => setFolded(!folded)}
+            aria-expanded={!folded}
+            className="-m-1 min-h-11 shrink-0 rounded-md px-3 font-mono text-xs uppercase
+                       tracking-widest text-slate-300 active:bg-slate-800"
+          >
+            {folded ? 'Show' : 'Hide'}
+          </button>
+        </div>
+        {!folded && (
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-200">{stop.body}</p>
+        )}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => (last ? onDone() : setAt(at + 1))}

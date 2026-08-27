@@ -729,6 +729,48 @@ def arguments(bench: Bench) -> None:
     expect('quiet again once it is back', code, out, fires=False)
 
 
+# -------------------------------------------------------------------- paywall
+
+def paywall(bench: Bench) -> None:
+    """The tester unlock, and the one thing that must never happen to it.
+
+    Every paid screen is behind `subscribed`. `Subscription.testing` turns that
+    on so the two people testing the app can reach the takeoff before anything
+    is on sale -- and it is compiled out of Release by `#if DEBUG`. Lose the
+    guard and the App Store build gives the product away, with no symptom except
+    that nobody ever pays.
+    """
+    print('check-paywall.py — the tester unlock, and its guard')
+
+    code, out = bench.run('check-paywall.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    rel = 'ios/Trueline/Subscription.swift'
+    was = bench.read(rel)
+
+    bench.write(rel, was.replace(
+        '        #if DEBUG\n        return true\n        #else\n        return false\n        #endif',
+        '        return true'))
+    code, out = bench.run('check-paywall.py')
+    expect('the #if DEBUG taken off the unlock', code, out,
+           fires=True, saying='no `#if DEBUG`')
+    bench.restore(rel)
+
+    # And the other way in: somebody simply turning it on somewhere else.
+    other = 'ios/Trueline/PaywallView.swift'
+    before = bench.read(other)
+    bench.write(other, before.replace(
+        'struct PaywallView: View {',
+        'struct PaywallView: View {\n    func cheat() { subscription.subscribed = true }'))
+    code, out = bench.run('check-paywall.py')
+    expect('anything else that sets subscribed = true', code, out,
+           fires=True, saying='outright')
+    bench.restore(other)
+
+    code, out = bench.run('check-paywall.py')
+    expect('quiet again once both are back', code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -747,6 +789,8 @@ def main() -> int:
         awaiting(bench)
         print()
         arguments(bench)
+        print()
+        paywall(bench)
 
     print()
     if failures:

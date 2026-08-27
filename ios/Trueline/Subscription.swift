@@ -101,8 +101,41 @@ final class Subscription: ObservableObject {
                 found = true
             }
         }
-        subscribed = found
+        subscribed = found || Self.testing
         known = true
+    }
+
+    /// Everything unlocked, for the two people testing this before it is on
+    /// sale.
+    ///
+    /// ## Why this exists
+    ///
+    /// The takeoff, the price, the proposal, the claim and the exports are all
+    /// behind the subscription. Nothing is on sale yet, so on a real phone
+    /// there is nothing StoreKit can sell and nothing it can restore -- and
+    /// every one of those screens correctly showed the paywall. From the
+    /// outside that reads as *"takeoff still doesn't work"*, which is what it
+    /// was reported as.
+    ///
+    /// A StoreKit configuration file only applies to a run launched FROM Xcode
+    /// with that scheme. `bash build.sh` installs a build and launches it on
+    /// its own, so the configuration is not in play and the store is empty.
+    ///
+    /// ## Why it cannot ship
+    ///
+    /// `#if DEBUG` is compiled out entirely of a Release build -- the branch
+    /// does not exist in the binary that would go to the App Store, and there
+    /// is no flag, no setting and no gesture that turns it on there. A TestFlight
+    /// or App Store build is Release. This is true for a debug build on a
+    /// developer's own phone and nowhere else.
+    ///
+    /// `check-swift-testing.py` fails the build if this ever loses its `#if`.
+    static var testing: Bool {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
     }
 
     /// Loads what is on sale.
