@@ -13,6 +13,9 @@ import UIKit
 struct ProjectsScreen: View {
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
+    /// True while the iCloud look-up below is in flight, so its button says so
+    /// rather than looking dead on a slow connection.
+    @State private var looking = false
     /// Whether this person has paid, so the list can offer the subscription and
     /// hand the answer to the correction screens.
     @ObservedObject var subscription: Subscription
@@ -372,6 +375,29 @@ struct ProjectsScreen: View {
                 )
                 .font(.footnote)
                 .foregroundStyle(Ink.quiet)
+
+                // Bring rooms back, on purpose, and say what happened.
+                //
+                // This has always run at launch. It ran silently, so a room
+                // deleted by accident and not restored looked identical to
+                // three different problems: no copy in iCloud, a query iCloud
+                // refused, and a restore that worked and found nothing missing.
+                // A recovery path nobody can watch is one nobody can trust.
+                Button {
+                    Task { await lookForRooms() }
+                } label: {
+                    Label(
+                        looking ? "Asking iCloud…" : "Look for rooms in iCloud",
+                        systemImage: "arrow.down.circle"
+                    )
+                }
+                .disabled(looking)
+
+                if let said = backup.lastRestore {
+                    Text(said)
+                        .font(.footnote)
+                        .foregroundStyle(Ink.quiet)
+                }
             }
         }
         .scrollContentBackground(.hidden)
@@ -557,6 +583,29 @@ struct ProjectsScreen: View {
     /// One route in, one route out — so back from the review is back to this
     /// list, and there is no live camera screen left underneath waiting to push
     /// the review on again.
+    /// Ask iCloud for anything this phone does not have, and write it down.
+    ///
+    /// The same call the app makes at launch, on a button, so it can be run
+    /// when it is actually needed — which is the moment somebody notices a room
+    /// is gone, not the moment the app happened to start.
+    @MainActor
+    private func lookForRooms() async {
+        looking = true
+        defer { looking = false }
+        await backup.check()
+        for scan in await backup.fetchMissing(have: store.names) {
+            store.restore(
+                name: scan.name, capture: scan.capture, kind: scan.kind,
+                card: scan.card, corrected: scan.corrected
+            )
+            let folder = store.folder(named: scan.name)
+            for photo in await backup.fetchDamagePhotos(scan: scan.name) {
+                store.writeDamagePhoto(photo.jpeg, named: photo.name, into: folder)
+            }
+        }
+        store.refresh()
+    }
+
     private func show(_ scan: SavedScan) {
         store.refresh()
         path = [.review(scan)]

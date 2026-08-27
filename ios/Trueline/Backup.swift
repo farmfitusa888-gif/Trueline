@@ -309,7 +309,22 @@ final class Backup: ObservableObject {
     /// This is the second half of the point. A backup nobody can get back is a
     /// receipt, not a backup — and it is also how the same person's second
     /// device gets the job they scanned on the first one.
+    /// What the last restore actually did, in words, or nothing.
+    ///
+    /// ## Why this is published rather than left to the log
+    ///
+    /// Restoring ran once, at launch, inside a `.task`, and said nothing
+    /// whatever happened. A room was deleted by accident, the app was
+    /// relaunched to get it back, nothing came back, and there was no way from
+    /// the outside -- or from the code, afterwards -- to tell whether iCloud
+    /// had no copy, whether the query was refused, or whether it worked and
+    /// found nothing missing. Three different problems with one appearance.
+    ///
+    /// A recovery path that cannot say what it did is not a recovery path.
+    @Published private(set) var lastRestore: String?
+
     func fetchMissing(have: Set<String>) async -> [Restored] {
+        lastRestore = nil
         do {
             // No sort descriptor. Sorting server-side would need `savedAt`
             // marked Sortable in the CloudKit console on top of the one index
@@ -349,9 +364,16 @@ final class Backup: ObservableObject {
                 }
                 cursor = page.queryCursor
             } while cursor != nil
-            return out.sorted { $0.savedAt > $1.savedAt }
+            let sorted = out.sorted { $0.savedAt > $1.savedAt }
+            lastRestore = sorted.isEmpty
+                ? "iCloud had nothing this phone was missing."
+                : "Brought back \(sorted.count) room\(sorted.count == 1 ? "" : "s") from iCloud: "
+                  + sorted.map(\.name).joined(separator: ", ")
+            return sorted
         } catch {
-            state = .failed(Self.explain(error))
+            let why = Self.explain(error)
+            state = .failed(why)
+            lastRestore = "Could not ask iCloud for your rooms. " + why
             return []
         }
     }
