@@ -23,10 +23,28 @@
  * The channels-not-hex form is what makes `bg-raise/95` keep working on the
  * fixed bars. See the note at the top of `src/tokens.css`.
  */
+/**
+ * The tone's name, as `tokens.css` actually declares it.
+ *
+ * `core/tools/gen-design.mjs` writes `refuseSoft` out kebab-cased, and this
+ * file was interpolating the TypeScript name straight in — so ten tones emitted
+ * a camelCase token declared nowhere. CSS does not treat
+ * an unresolvable `var()` as absent: it invalidates the whole declaration, so
+ * `background-color` fell back to transparent with no error anywhere. Fifteen
+ * utilities painted nothing at all -- `bg-red-50`, `bg-amber-50`,
+ * `bg-emerald-50`, `bg-sky-50`, `bg-violet-50`, every soft and edge tint, and
+ * the pressed state of three buttons.
+ *
+ * It is the same defect that put a black square on the claim document, one
+ * layer up: a colour one indirection from being defined, with nothing checking
+ * that the indirection lands. `core/tools/check-tokens.py` now checks it.
+ */
+const cssName = (name) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+
 const token = (name) => ({ opacityValue }) =>
   opacityValue === undefined
-    ? `rgb(var(--c-${name}))`
-    : `rgb(var(--c-${name}) / ${opacityValue})`;
+    ? `rgb(var(--c-${cssName(name)}))`
+    : `rgb(var(--c-${cssName(name)}) / ${opacityValue})`;
 
 /** A whole Tailwind ramp pointed at one token, so every step of it resolves. */
 const flat = (name, steps) =>

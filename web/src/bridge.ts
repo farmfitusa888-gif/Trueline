@@ -714,14 +714,43 @@ export function stopRecording(): void {
   }
 }
 
-export function handBack(fileName: string, project: string): void {
+/**
+ * Hands the corrected room to the app, to be written into the scan's own folder
+ * and into iCloud.
+ *
+ * ## Why this returns something now
+ *
+ * It used to swallow the failure. The catch said the copy in `localStorage`
+ * still existed, which is true and is not the point: a web view's store is
+ * cleared by the system whenever it feels like it, and the copy in the scan's
+ * folder is the one that survives. So a room could be corrected, look saved,
+ * and exist nowhere but a cache — and the app said nothing at all.
+ *
+ * That is the last silent catch on the path between a correction and the
+ * phone's disk, and it is the one remaining mechanism that explains a room
+ * whose new name never appeared in the list. Sam: **"Stop and say it plainly."**
+ *
+ * Three outcomes, and only one of them is a failure:
+ *
+ *   - **No app.** A browser, or the development server. There is nothing to
+ *     hand it to, nothing was promised, and `null` says so.
+ *   - **Taken.** `null`.
+ *   - **Refused.** The app is here and would not take it. A sentence, which the
+ *     screen puts in front of the person in red and does not take down until a
+ *     save actually goes through.
+ *
+ * It does not retry. A retry that succeeds quietly on the third go teaches
+ * somebody that the red line means nothing, and the thing it is protecting is
+ * the only durable copy of a room.
+ */
+export function handBack(fileName: string, project: string): string | null {
   const saved = handler('saved');
-  if (!saved) return;
+  if (!saved) return null;
   try {
     saved.postMessage({ fileName, project, version: BRIDGE_VERSION });
-  } catch {
-    // A web view that will not take the message is one more reason the copy in
-    // localStorage still exists. Nothing here is the only copy.
+    return null;
+  } catch (error) {
+    return error instanceof Error && error.message ? error.message : 'the app gave no reason';
   }
 }
 

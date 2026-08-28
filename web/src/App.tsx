@@ -9,7 +9,7 @@ import { extent } from '../../core/src/health.ts';
 import { DEFAULT_REACH, obstructions, punchList } from '../../core/src/obstruction.ts';
 import { missingFromClaim } from '../../core/src/claim.ts';
 import { missingFromProposal } from '../../core/src/proposal.ts';
-import { EMPTY, mayKeep, persist, reduce } from './state.ts';
+import { type SaveTrouble, EMPTY, mayKeep, persist, reduce } from './state.ts';
 import { installBridge } from './bridge.ts';
 import { Plan, legendFor } from './Plan.tsx';
 import { Corrections } from './Corrections.tsx';
@@ -212,7 +212,7 @@ export function openedAt(): 'room' | 'floor' | 'business' | 'draw' | 'demo' | 't
 export function App() {
   const { len, area: showArea, borrow } = useUnits();
   const [state, dispatch] = useReducer(reduce, EMPTY);
-  const [saveTrouble, setSaveTrouble] = useState<string | null>(null);
+  const [saveTrouble, setSaveTrouble] = useState<SaveTrouble | null>(null);
   /** Why a new room was not written down, or nothing. Never about an old one. */
   const [roomLimit, setRoomLimit] = useState<string | null>(null);
   // Plan or room. The same model, the same selection, the same tape box under
@@ -590,9 +590,31 @@ export function App() {
 
       {roomLimit && <RoomLimit because={roomLimit} />}
 
+      {/*
+          Sticky, and red when the phone is the copy that is missing.
+
+          Amber at the top of a long screen is a colour somebody scrolls past.
+          The two failures are not the same size: a browser store that refused
+          means closing the tab loses the room, which is bad; the app refusing
+          means the durable copy -- the one in the scan's folder and in iCloud,
+          the one that survives this web view being cleared -- does not exist at
+          all, which is how a room gets lost for good. So it follows the screen
+          down and it is the app's refusal colour, and it cannot be dismissed:
+          it goes when a save actually goes through and not before.
+
+          The colour is taken from `where`, never from reading the sentence.
+          A message somebody rewords is a message that quietly changes colour.
+      */}
       {saveTrouble && (
-        <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          {saveTrouble}
+        <div
+          role="alert"
+          className={`sticky top-2 z-40 mb-4 rounded-lg border p-4 text-sm shadow-sm ${
+            saveTrouble.where === 'phone'
+              ? 'border-red-300 bg-red-50 text-red-900'
+              : 'border-amber-300 bg-amber-50 text-amber-900'
+          }`}
+        >
+          {saveTrouble.say}
         </div>
       )}
 

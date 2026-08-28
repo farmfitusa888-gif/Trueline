@@ -1896,14 +1896,32 @@ export function mayKeep(loaded: Loaded): Keeping {
   return mayKeepRoomHere(keptRoomNames(), loaded.fileName);
 }
 
-export function persist(loaded: Loaded, at: string): string | null {
+/**
+ * Why a room is not where it should be, and which copy is missing.
+ *
+ * Two different failures with two different consequences, told apart by what
+ * they are rather than by reading their words. `'phone'` means the browser has
+ * it but the app would not take it, so the durable copy — the one in the scan's
+ * folder and in iCloud — does not exist. `'browser'` means the web view's own
+ * store refused, so closing the tab loses it.
+ */
+export interface SaveTrouble {
+  readonly where: 'phone' | 'browser';
+  readonly say: string;
+}
+
+export function persist(loaded: Loaded, at: string): SaveTrouble | null {
   try {
     // One room is kept without a subscription, decided here because this is the
     // only path to storage. It stops a NEW room being written and nothing else:
     // re-saving a room already on this device always goes through, and nothing
     // already written is ever removed or hidden by this.
     const may = mayKeep(loaded);
-    if (!may.keep) return may.because;
+    // The room limit, as the safety net rather than the message: `App.tsx` asks
+    // `mayKeep` first and says it in its own words. Nothing was written
+    // anywhere, so it is reported as the weaker copy being absent, which is
+    // true and is the one this screen colours amber rather than red.
+    if (!may.keep) return { where: 'browser', say: may.because };
 
     const project = saveProject({
       savedAt: at,
@@ -1939,14 +1957,30 @@ export function persist(loaded: Loaded, at: string): string | null {
     // this web view being cleared. Doing it after `localStorage` would mean a
     // full browser store — the one failure this whole function exists to report
     // — also silently skipped the durable copy.
-    handBack(loaded.fileName, project);
+    const refused = handBack(loaded.fileName, project);
 
+    // The browser copy is written whatever the app said. It is the weaker of the
+    // two and it is not nothing: if the app comes back, the next save hands the
+    // whole room over again and the red line goes.
     window.localStorage.setItem(keyFor(loaded.fileName), project);
+
+    if (refused !== null) {
+      return {
+        where: 'phone',
+        say:
+          `This is not saved on your phone yet. The app would not take it — ${refused}. ` +
+          `It is in this screen only, and a screen's memory is cleared by the phone whenever ` +
+          `it needs the room. Close the app and open it again, then change something small ` +
+          `here so it saves. This line stays until one goes through.`,
+      };
+    }
     return null;
   } catch (error) {
-    return (
-      `This room could not be saved in the browser, so it will be gone if you close the tab: ` +
-      `${message(error)}`
-    );
+    return {
+      where: 'browser',
+      say:
+        `This room could not be saved in the browser, so it will be gone if you close the tab: ` +
+        `${message(error)}`,
+    };
   }
 }

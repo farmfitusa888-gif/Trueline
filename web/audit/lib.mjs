@@ -125,7 +125,8 @@ export async function open() {
   problems = [];
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
-  await page.goto(URL, { waitUntil: 'networkidle' });
+  await page.goto(URL, { waitUntil: 'load', timeout: 60000 });
+  await page.waitForSelector('body', { timeout: 60000 });
   return { browser, ctx, page };
 }
 
@@ -163,7 +164,7 @@ export async function sentTo(page, name) {
  * Leave `subscribed` out of the payload to get the state the bug produced — the
  * app never says. Nothing should ever be blank in it.
  */
-export async function openAsApp(payload, { scheme = 'light' } = {}) {
+export async function openAsApp(payload, { scheme = 'light', refuses = [] } = {}) {
   await refuseAStaleBundle();
   const browser = await openChromium();
   const ctx = await browser.newContext({
@@ -175,7 +176,7 @@ export async function openAsApp(payload, { scheme = 'light' } = {}) {
   problems = [];
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
-  await page.addInitScript((parked) => {
+  await page.addInitScript(({ parked, refuses }) => {
     // The handlers `insideApp()` looks for. Present before a line of the
     // bundle runs, which is how it is on the phone.
     //
@@ -190,13 +191,24 @@ export async function openAsApp(payload, { scheme = 'light' } = {}) {
       window.__sent[name] = [];
       window.webkit.messageHandlers[name] = {
         postMessage(body) {
+          // A handler named in `refuses` is an app that is HERE and will not
+          // take the message -- which is a different thing from no app at all,
+          // and the only one of the two that is a failure. It is the state a
+          // room was lost in, and until it could be reproduced there was no
+          // way to check that the screen says so.
+          if (refuses.includes(name)) throw new Error('the web view refused it');
           window.__sent[name].push(body);
         },
       };
     }
     if (parked) window.truelinePayload = parked;
-  }, payload);
-  await page.goto(URL, { waitUntil: 'networkidle' });
+  }, { parked: payload, refuses });
+  // `load`, not `networkidle`. Idle is a clock, not a signal: on a machine
+  // doing anything else it never settles, and the part then dies at `goto`
+  // saying nothing about the app at all. The wait that matters is the app's own
+  // first screen, which is the next line.
+  await page.goto(URL, { waitUntil: 'load', timeout: 60000 });
+  await page.waitForSelector('body', { timeout: 60000 });
   await page.waitForTimeout(600);
   return { browser, ctx, page };
 }

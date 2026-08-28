@@ -20,7 +20,7 @@
  * what the pre-push hook runs. A generated file that has gone stale is worse
  * than no generated file, because it looks maintained.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -201,6 +201,65 @@ const files = [
   [join(root, 'ios', 'Trueline', 'Design.swift'), swift],
 ];
 
+/**
+ * Every `--c-` name anything reaches for, against the ones `tokens.css`
+ * declares.
+ *
+ * The generated files matching their source was never the whole question. A
+ * third file — `web/tailwind.config.js` — names these tokens too, and it was
+ * naming ten of them wrong: it interpolated the TypeScript's `refuseSoft`
+ * straight in as `--c-refuseSoft`, where the generator writes
+ * `--c-refuse-soft`. CSS does not treat an unresolvable `var()` as absent. It
+ * invalidates the whole declaration, so `background-color` fell back to
+ * transparent — silently, with no error in any console — and fifteen utilities
+ * painted nothing at all: `bg-red-50`, `bg-amber-50`, `bg-emerald-50`,
+ * `bg-sky-50`, `bg-violet-50`, five border tints, and three pressed states.
+ * A red refusal banner was a transparent rectangle.
+ *
+ * It is the same defect that put a black square on the claim document. So the
+ * check is the same shape as that fix: every token anybody names has to be a
+ * token that is declared.
+ */
+function tokensNobodyDeclares(declaredIn) {
+  const declared = new Set(
+    [...declaredIn.matchAll(/^\s*(--c-[a-z0-9-]+)\s*:/gim)].map((m) => m[1].toLowerCase())
+  );
+  const missing = [];
+  for (const where of ['web/tailwind.config.js', 'web/src/index.css']) {
+    let text = '';
+    try { text = readFileSync(join(root, where), 'utf8'); } catch { continue; }
+    for (const m of text.matchAll(/--c-[A-Za-z0-9-]+/g)) {
+      // A template hole rather than a name: `--c-${name}` is built at run time
+      // and cannot be judged here. The `cssName` it is built through is what
+      // this check exists to hold honest, and the built CSS below is where that
+      // is caught for real.
+      if (m[0].includes('$')) continue;
+      if (!declared.has(m[0].toLowerCase())) missing.push(`${where}: ${m[0]}`);
+    }
+  }
+  // And the built stylesheet, which is the only place the two meet. A config
+  // that reads correctly and a generator that reads correctly can still produce
+  // a rule that resolves to nothing.
+  for (const sheet of globCss(join(root, 'web', 'dist', 'assets'))) {
+    for (const m of sheet.text.matchAll(/var\((--c-[A-Za-z0-9-]+)\)/g)) {
+      if (!declared.has(m[1].toLowerCase())) missing.push(`${sheet.name}: ${m[1]}`);
+    }
+  }
+  return [...new Set(missing)];
+}
+
+function globCss(dir) {
+  try {
+    return readdirSync(dir)
+      .filter((name) => name.endsWith('.css'))
+      .map((name) => ({ name, text: readFileSync(join(dir, name), 'utf8') }));
+  } catch {
+    // No build here yet. `npm run verify` builds before this runs; a bare
+    // `check-tokens` on a clean tree checks the two source files and says so.
+    return [];
+  }
+}
+
 if (process.argv.includes('--check')) {
   let bad = false;
   for (const [path, want] of files) {
@@ -211,11 +270,20 @@ if (process.argv.includes('--check')) {
       bad = true;
     }
   }
+  const missing = tokensNobodyDeclares(css);
+  if (missing.length > 0) {
+    console.error('These colour tokens are named but never declared, so they paint nothing:');
+    for (const one of missing) console.error(`  ${one}`);
+    console.error('A var() that resolves to nothing does not fall back -- it voids the whole');
+    console.error('declaration, so the colour becomes transparent or black with no error.');
+    bad = true;
+  }
   if (bad) {
     console.error('Regenerate:  node --experimental-strip-types core/tools/gen-design.mjs');
     process.exit(1);
   }
   console.log('tokens.css and Design.swift match the TypeScript they are generated from');
+  console.log('and every --c- token named anywhere is one that tokens.css declares');
 } else {
   for (const [path, want] of files) {
     writeFileSync(path, want);
