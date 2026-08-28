@@ -304,3 +304,56 @@ not a compile. What changed: `Subscription.swift` (the seed),
 - `a52-browser` **124/124**, up from 88 when the wiring started and from a part
   that could not run at all before it.
 - `check-controls` clean at 279 names with an empty excuse file.
+
+## 2026-08-28 — the garage, and the four things that were mine and not done
+
+### The garage
+
+Sam scanned his garage and got a 15-by-11 rectangle. The folder came back with
+the report and settled it in ten minutes: a real capture (five walls, two doors,
+two windows, sixty photographs) with a **hand-drawn room from two days earlier**
+sitting beside it as `corrected.json`. A corrected room outranks a capture, so
+the drawing won. Full record in `DECISIONS.md`.
+
+The capture was never damaged. Through the importer it is 21' 4 1/4" by
+19' 3 11/16", six walls, the garage door found as a 9' 9 1/8" opening, nothing
+dropped. `core/src/test/fixtures/garage-roomplan.json` keeps it, and
+`core/src/test/garage.test.ts` and `web/audit/a56-garage.mjs` prove it.
+
+### The four
+
+1. **`VoiceNote.wallId` is `surface` now**, as a migration and not a rename.
+   `surfaceOf()` reads either; `onSurface()` writes the new key and drops the
+   old. Every job file already on a phone keeps working, for ever. 5 tests.
+2. **The doorways on the floor plan are controls.** They were `<g onClick>`
+   with no role, no name and no keyboard path, and they are the only way to
+   join two rooms. Named after the opening and the room, `aria-pressed` for the
+   choice that stays made between the two taps, Enter and Space both work.
+   Driven in `a47`, 121/121.
+3. **`a12-everything` has a measured budget.** Its cost is the number of
+   controls in the app and that only goes up. It now checks the wall clock
+   against `BUDGET_SECONDS` and prints the real figure, so growth shows as a
+   red check with a number rather than as a runner timeout that reports
+   nothing.
+4. **The dialog-backdrop blind spot is closed.** `check-controls.py` gained
+   `shadowedHandlers`: a control inside a holder that has its own `onClick` and
+   that does not `stopPropagation` has a handler nothing can watch failing —
+   measured, a no-op left the whole suite green. It found exactly the two the
+   note predicted, both fixed, and it is in `check-the-checks.py`.
+
+Two real holes in the tooling fell out of that last one, both found by
+`check-the-checks.py` going green on a file broken on purpose:
+
+- The subtree walk used `TAG`, a naive scan to the next `>`, on a div whose own
+  `onClick={() => …}` contains one. It uses `openTagEnd` now.
+- **`openTagEnd` did not skip `//` comments inside a handler.** A comment
+  reading `the button's handler` opened a quote that never closed and the whole
+  tag was lost. Fixing it took the harvest from **277 controls to 281** — four
+  the tool had never seen at all. All four are driven.
+
+### What is still not done, and honestly
+
+- **No Swift here has been compiled.** There is no Mac in this environment.
+  `check-swift` and `check-swift-names` parse it, which is a parse.
+- The 30 tape readings, the simulator click-through, and one real App Store
+  Connect export are still Sam's to do; nothing here can stand in for them.

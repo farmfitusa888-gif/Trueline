@@ -4,12 +4,14 @@ import { parseLength } from '../length.ts';
 import { scanned } from '../measurement.ts';
 import type { Heading, Room, Wall } from '../room.ts';
 import {
-  type VoiceNote,
-  VoiceError,
   notesOnMark,
   notesOnWall,
+  onSurface,
   spokenLength,
+  surfaceOf,
   validateVoiceNote,
+  VoiceError,
+  type VoiceNote,
   whatWasSaid,
 } from '../voice.ts';
 
@@ -152,4 +154,56 @@ test('and with no reason given it still says there is something to listen to', (
   const said = whatWasSaid(note());
   assert.match(said, /no transcript/);
   assert.match(said, /0:14/);
+});
+
+/* ------------------------------------- wallId became surface, and both read */
+
+/**
+ * The rename that had to be a migration.
+ *
+ * `wallId` stopped being true the day a ceiling could be talked at, and the
+ * check in `validateVoiceNote` has always accepted a surface as readily as a
+ * wall — so the name described one of the two things the field held. Every job
+ * file already on a phone carries the old key and none of them can be reached
+ * to be rewritten, so both read and only the new one is written.
+ */
+
+test('a recording saved before the rename still says which surface it is about', () => {
+  const old = { ...note(), wallId: 'north' } as VoiceNote;
+  delete (old as { surface?: string }).surface;
+  assert.equal(surfaceOf(old), 'north');
+  assert.doesNotThrow(() => validateVoiceNote(room, old));
+});
+
+test('and one saved after it says so under the new key', () => {
+  assert.equal(surfaceOf({ surface: 'ceiling' }), 'ceiling');
+  assert.doesNotThrow(() => validateVoiceNote(room, note({ surface: 'ceiling', wallId: undefined })));
+});
+
+test('the new key wins when a file somehow carries both, and the old one is dropped on a move', () => {
+  assert.equal(surfaceOf({ surface: 'ceiling', wallId: 'north' }), 'ceiling');
+  const moved = onSurface({ ...note(), wallId: 'north' } as VoiceNote, 'south');
+  assert.equal(moved.surface, 'south');
+  assert.equal('wallId' in moved, false);
+  assert.equal(surfaceOf(moved), 'south');
+});
+
+test('a recording that says neither is refused rather than filed against nothing', () => {
+  for (const nowhere of [{}, { surface: '' }, { wallId: '' }, { surface: undefined }]) {
+    assert.throws(() => surfaceOf(nowhere), VoiceError);
+  }
+});
+
+test('notes on a wall are found whichever key they were written under', () => {
+  const heard = [
+    { ...note({ id: 'old' }), wallId: 'north', surface: undefined },
+    note({ id: 'new', surface: 'north', wallId: undefined }),
+    note({ id: 'elsewhere', surface: 'south', wallId: undefined }),
+  ] as VoiceNote[];
+  // The set, not the order: `notesOnWall` sorts by when it was said and these
+  // two were said at the same moment, so an order here would be asserting
+  // something this test is not about.
+  const onNorth = notesOnWall(heard, 'north').map((one) => one.id);
+  assert.deepEqual([...onNorth].sort(), ['new', 'old']);
+  assert.equal(onNorth.length, 2);
 });

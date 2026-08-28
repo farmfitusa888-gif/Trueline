@@ -364,14 +364,53 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
           {openings.map((opening) => {
             const chosen =
               picked?.roomId === opening.roomId && picked?.openingId === opening.openingId;
+            // The room this one is in, by the name on the screen rather than by
+            // its id — the name is what somebody is looking at.
+            const inRoom =
+              drawn.find((one) => one.roomId === opening.roomId)?.name ?? opening.roomId;
+            const says =
+              `${opening.kind === 'cased' ? 'Cased opening' : opening.kind === 'window' ? 'Window' : 'Door'}` +
+              ` ${opening.openingId} in ${inRoom}, ${len(opening.width)} wide` +
+              (opening.joined ? ', already joined' : ', not joined yet');
             return (
               <g
                 key={`${opening.roomId}-${opening.openingId}`}
+                /* A doorway is the ONLY way to join two rooms on this floor, and
+                   it was a `<g onClick>`: no role, no name, no keyboard. To a
+                   screen reader the whole join was not there, and to anybody
+                   working from a keyboard the floor was a picture.
+
+                   A real control, then: named after the room it is in and the
+                   opening it is, because "doorway" nine times over is the same
+                   as no name at all. `aria-pressed` because tapping one is a
+                   choice that stays made until the second one is tapped — the
+                   screen shows that with a bigger dot and nothing said it. */
+                role="button"
+                tabIndex={0}
+                aria-label={says}
+                aria-pressed={chosen}
                 onClick={() => tap(opening)}
-                className="cursor-pointer"
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  // Space scrolls the page otherwise, which on this screen
+                  // moves the floor out from under the thing just chosen.
+                  event.preventDefault();
+                  tap(opening);
+                }}
+                className="cursor-pointer focus:outline-none [&:focus-visible>circle:first-child]:stroke-2"
               >
-                {/* A fat invisible target, so a finger can hit a doorway. */}
-                <circle cx={px(opening.at.x)} cy={py(opening.at.y)} r={26} fill="transparent" />
+                {/* A fat invisible target, so a finger can hit a doorway — and
+                    the ring a keyboard needs to see where it is. `transparent`
+                    fill with a stroke that only appears on focus-visible, so a
+                    thumb sees nothing and a keyboard sees the target. */}
+                <circle
+                  cx={px(opening.at.x)}
+                  cy={py(opening.at.y)}
+                  r={26}
+                  fill="transparent"
+                  stroke="rgb(var(--c-focus))"
+                  strokeWidth={0}
+                />
                 <circle
                   cx={px(opening.at.x)}
                   cy={py(opening.at.y)}

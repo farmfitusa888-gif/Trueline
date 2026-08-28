@@ -49,6 +49,28 @@ const DEEPEST = 4;
 /** A backstop against a crawl that never converges. Reported if it is hit. */
 const MOST = 500;
 
+/**
+ * How long the whole walk may take, in seconds.
+ *
+ * This part opens a fresh context per control and presses it, so its cost is
+ * the number of controls in the app — and that number only ever goes up. Nine
+ * disclosure headers were added in one afternoon, then eighteen more controls,
+ * then the doorways on the floor. Every one of them is a good thing and every
+ * one of them makes this longer.
+ *
+ * What it must never do is die on a clock and report nothing, which is what a
+ * runner's timeout produces: a part that walked four hundred controls and said
+ * nothing about any of them. So the budget is here, it is checked, and it is
+ * printed with the real figure beside it. When it goes red it is not a fault in
+ * the app — it is this part saying the walk has outgrown the budget, and
+ * somebody deciding whether to raise the number or split the walk.
+ *
+ * 600 against a measured 300-and-something is deliberate slack: this runs
+ * alongside fifty-four other parts on a box that is doing other things.
+ */
+const BUDGET_SECONDS = 600;
+const startedAt = Date.now();
+
 const CONTROLS = 'button,a[href],input,select,textarea,[role="button"],summary';
 
 /* --------------------------------------------------------------- the app */
@@ -312,7 +334,17 @@ check('every button does something you can see',
 check('the crawl finished rather than hitting its own limit',
   !capped, `stopped at ${MOST} controls, so some were never pressed`);
 
-console.log(`\n  ${clicks} controls pressed, ${reached.size} screens reached.`);
+const walked = (Date.now() - startedAt) / 1000;
+check('the walk finished inside the time it is given, so it never dies on a clock',
+  walked <= BUDGET_SECONDS,
+  `${walked.toFixed(1)}s for ${clicks} controls, and the budget is ${BUDGET_SECONDS}s. ` +
+    'This is not a fault in the app: the walk has outgrown its budget. Raise the number ' +
+    'or split the walk.');
+
+console.log(
+  `\n  ${clicks} controls pressed, ${reached.size} screens reached, ` +
+  `${walked.toFixed(1)}s of ${BUDGET_SECONDS}s.`
+);
 console.log(`  ${[...reached].sort().join('\n  ')}`);
 
 check('no console or page errors across the whole click-through', errors.length === 0,

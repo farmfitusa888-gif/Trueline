@@ -588,7 +588,16 @@ function Tag({ name }: { readonly name: string }) {
               button on its full-size view all along; this had none. */}
           <button
             type="button"
-            onClick={() => setBig(false)}
+            onClick={(event) => {
+              // The backdrop closes on a tap too, and without this the button's
+              // own handler could be dead and nothing would ever know: the
+              // click bubbles up and the picture closes either way. Measured —
+              // replacing this handler with a no-op left the whole audit green.
+              // Stopping here makes pressing the button the thing that acted,
+              // which is also what the person pressing it meant.
+              event.stopPropagation();
+              setBig(false);
+            }}
             aria-label="Close the price tag photograph"
             className="mt-3 min-h-12 shrink-0 rounded-md border border-white/60 px-4
                        font-semibold text-white active:bg-white/20"

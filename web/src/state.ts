@@ -37,7 +37,13 @@ import {
 } from '../../core/src/capture.ts';
 import type { Photo } from '../../core/src/photo.ts';
 import type { Damage, Reading } from '../../core/src/damage.ts';
-import { type VoiceNote, spokenLength, validateVoiceNote } from '../../core/src/voice.ts';
+import {
+  type VoiceNote,
+  onSurface,
+  spokenLength,
+  surfaceOf,
+  validateVoiceNote,
+} from '../../core/src/voice.ts';
 import { type PinImport, type PinManifest, importPins } from '../../core/src/pins.ts';
 import { type Tag, CONDITION, readConditions, tagAt } from '../../core/src/tag.ts';
 import { type Boundary, splitByBoundary } from '../../core/src/zone.ts';
@@ -1182,7 +1188,7 @@ export function reduce(state: State, action: Action): State {
         // exists is somebody's own voice, silently off every screen -- the same
         // failure as a mark, one file bigger.
         const voice = loaded.voice.map((note) =>
-          note.wallId === action.wallId ? { ...note, wallId: to } : note
+          surfaceOf(note) === action.wallId ? onSurface(note, to) : note
         );
         const next = edited(state, loaded, room, `That wall is called "${to}" now.`);
         return next.loaded
@@ -1330,7 +1336,7 @@ export function reduce(state: State, action: Action): State {
         // said out loud in the same sentence: a note about a wall that is not
         // in the room any more can never be found again, and losing somebody's
         // own voice silently is worse than losing a quantity.
-        const heardStill = loaded.voice.filter((note) => note.wallId !== action.wallId);
+        const heardStill = loaded.voice.filter((note) => surfaceOf(note) !== action.wallId);
         const unheard = loaded.voice.length - heardStill.length;
         const next = edited(
           state,
@@ -1669,7 +1675,7 @@ export function reduce(state: State, action: Action): State {
               ? action.note.transcript?.by === 'person'
                 ? 'That is what you said now, in your words.'
                 : 'Wrote down what was said.'
-              : `Recorded ${spokenLength(action.note.milliseconds)} about ${action.note.wallId}.`,
+              : `Recorded ${spokenLength(action.note.milliseconds)} about ${surfaceOf(action.note)}.`,
           },
         };
       } catch (error) {

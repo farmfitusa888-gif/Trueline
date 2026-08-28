@@ -747,7 +747,6 @@ check('it does not offer to clear joins when there are no joins to clear',
   `${await page.getByRole('button', { name: 'Start the joins again' }).count()} found`);
 check('and it says so, rather than leaving the absence to be noticed',
   /no joins to clear/.test(said), said.slice(0, 600));
-
 // What it says instead has to be something a person can act on.
 check('it names the two captures that carry one id',
   /garage/.test(said) && /kitchen/.test(said), said.slice(0, 800));
@@ -756,6 +755,85 @@ check('and says what to do about it',
 check('and does not suggest anything was lost, because nothing was',
   /Nothing is wrong with either room and nothing here has been lost/.test(said),
   said.slice(0, 800));
+
+
+/* ---------------------------------------- the doorways, which had no names */
+
+/*
+ * Joining two rooms is the whole purpose of the Floor screen, and it was two
+ * taps on `<g onClick>` elements holding nothing but `<circle>`s: no role, no
+ * name, no `tabindex`. To a screen reader the join was not on the page at all,
+ * and to anybody working from a keyboard the floor was a picture. This part
+ * used to find them by working out which room label each dot was nearest to,
+ * and said so in its own closing note.
+ *
+ * `check-controls.py` could not report it: a control with no name is not a
+ * name that can go undriven. So the check is here.
+ */
+// The twin capture loaded above is still on the device and still stops the
+// floor being laid out, which is what it was loaded to prove. Take it off
+// again: a floor that refuses draws no doorways, and this block is about the
+// doorways.
+await page.goto(URL, { waitUntil: 'networkidle' });
+await page.waitForTimeout(400);
+await page.evaluate(() => {
+  for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+    const key = window.localStorage.key(i);
+    if (key && key.startsWith('trueline.room.v1:') && /kitchen/i.test(key)) {
+      window.localStorage.removeItem(key);
+    }
+  }
+});
+await page.goto(`${URL}#floor`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(900);
+said = await page.locator('body').innerText();
+check('with the twin capture off the device, the floor lays out again',
+  !/could not be laid out/.test(said), said.slice(0, 400));
+
+const joinDots = page.getByRole('button', { name: /^(Door|Window|Cased opening) / });
+const dotCount = await joinDots.count();
+check('every doorway on the floor is a control with a name, not a bare circle',
+  dotCount > 0, `${dotCount} named doorways on a floor laid out from rooms with openings`);
+
+const dotNames = [];
+for (const one of await joinDots.all()) dotNames.push(await one.getAttribute('aria-label'));
+check('and the name says which opening, in which room, and how wide',
+  dotNames.every((n) => /\bin\b/.test(n ?? '') && /wide/.test(n ?? '')),
+  dotNames.join(' | '));
+check('and whether it is joined already, which is the thing being decided',
+  dotNames.every((n) => /joined/.test(n ?? '')), dotNames.join(' | '));
+check('no two of them answer to the same name, or a tap could not say which',
+  new Set(dotNames).size === dotNames.length, dotNames.join(' | '));
+
+// A keyboard has to be able to get to one and press it. This is the whole
+// point: the join is not reachable any other way.
+const firstDot = joinDots.first();
+check('a doorway can be reached from a keyboard',
+  (await firstDot.getAttribute('tabindex')) === '0',
+  String(await firstDot.getAttribute('tabindex')));
+check('and it says out loud whether it is the one currently chosen',
+  (await firstDot.getAttribute('aria-pressed')) === 'false',
+  String(await firstDot.getAttribute('aria-pressed')));
+
+await firstDot.focus();
+await page.keyboard.press('Enter');
+await page.waitForTimeout(400);
+check('pressing Enter on it chooses it, the same as a tap would',
+  (await joinDots.first().getAttribute('aria-pressed')) === 'true',
+  String(await joinDots.first().getAttribute('aria-pressed')));
+said = await page.locator('body').innerText();
+check('and the screen says what to do next, rather than only drawing a bigger dot',
+  /Now tap the same (door|window|cased)/.test(said), said.slice(0, 600));
+
+await joinDots.first().focus();
+await page.keyboard.press(' ');
+await page.waitForTimeout(400);
+check('and Space unchooses it, so a keyboard can change its mind',
+  (await joinDots.first().getAttribute('aria-pressed')) === 'false',
+  String(await joinDots.first().getAttribute('aria-pressed')));
+check('and Space did not scroll the floor out from under it',
+  (await page.evaluate(() => Math.round(window.scrollY))) === 0,
+  String(await page.evaluate(() => Math.round(window.scrollY))));
 
 check('the drawing and room screens: no console or page errors',
   noise().length === 0, noise().join(' | '));
@@ -800,7 +878,7 @@ await second.page.waitForTimeout(600);
 // bug twice before: three boxes called "e.g." and a toggle that said "Your
 // business" while showing the word "Close".
 //
-// The proposal's is now `Write it again`, named for what it destroys.
+// The proposal's is now `Write it again`, dotNames for what it destroys.
 const again = second.page.getByRole('button', { name: 'Start again', exact: true });
 const rewrite = second.page.getByRole('button', { name: 'Write it again', exact: true });
 
@@ -1019,14 +1097,18 @@ process.exit(bad > 0 ? 1 : 0);
      `min-h-11`, which is 44. This one carries none.
 
    And one thing no checker in this repository can see, found while driving
-   `Start the joins again`: **the doorways on the floor plan have no accessible
-   name and no role at all.** Joining two rooms is two taps on `<g onClick>`
-   elements containing nothing but `<circle>`s — no `role`, no `aria-label`, no
-   `tabindex`. `check-controls.py` cannot report it, because a control with no
-   name is not a name that can go undriven; this part had to find them by
-   working out which room label each dot was nearest to. Every other tappable
-   thing drawn in this app — a wall, a facet, a mark — is a `role="button"`
-   with a name.
+   `Start the joins again` and **fixed on 2026-08-28**: the joinDots on the
+   floor plan had no accessible name and no role at all. Joining two rooms was
+   two taps on `<g onClick>` elements containing nothing but `<circle>`s — no
+   `role`, no `aria-label`, no `tabindex`. `check-controls.py` could not report
+   it, because a control with no name is not a name that can go undriven, and
+   this part used to find them by working out which room label each dot was
+   nearest to.
+
+   They are `role="button"` now, dotNames after the opening and the room it is in,
+   reachable from a keyboard, and carrying `aria-pressed` for the choice that
+   stays made between the two taps. The block above drives all of it, including
+   Enter and Space, because the checker still cannot.
 
    What is NOT proven here, and cannot be without a device: that the print
    dialog on a real phone honours the class the body is wearing (the dialog

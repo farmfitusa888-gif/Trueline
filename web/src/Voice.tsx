@@ -382,7 +382,9 @@ export function VoiceNotes({
       // never the recording.
       const note: VoiceNote = {
         id: answer.kept.fileName,
-        wallId,
+        // `surface` and not `wallId`: a ceiling is not a wall, and this field
+        // has held both since the ceiling could be talked at. See `surfaceOf`.
+        surface: wallId,
         ...(markId !== undefined ? { markId } : {}),
         fileName: answer.kept.fileName,
         recordedAt: new Date().toISOString(),

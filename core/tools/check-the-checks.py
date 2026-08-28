@@ -1045,6 +1045,30 @@ def controls(bench: Bench) -> None:
     bench.restore(rel)
 
 
+    # 4. A control whose own handler nothing can watch failing.
+    #
+    #    The blind spot this checker had for as long as it existed: a button
+    #    inside a backdrop that closes on a tap is pressed by the audit, counted
+    #    as driven, and its handler could be a no-op. That was measured -- a
+    #    no-op left the whole suite green -- and written down in
+    #    `a54-marks.mjs` as a thing no checker could see. It can be seen now.
+    rel = 'web/src/DamagePhotos.tsx'
+    was = bench.read(rel)
+    bench.write(rel, was.replace(
+        """            onClick={(event) => {""",
+        """            onClick={() => {""", 1).replace(
+        """              event.stopPropagation();
+              setBig(false);""",
+        """              setBig(false);""", 1))
+    code, out = bench.run('check-controls.py')
+    expect('a control inside a backdrop that does not stop the click', code, out,
+           fires=True, saying='makes invisible')
+    bench.restore(rel)
+
+    code, out = bench.run('check-controls.py')
+    expect('and quiet again once the click stops at the control', code, out, fires=False)
+
+
 # ------------------------------------------------------------------ collapse
 
 def collapse(bench: Bench) -> None:

@@ -56,6 +56,44 @@ import { surfaceKey, surfacesOf } from './work.ts';
 export class VoiceError extends RoomError {}
 
 /**
+ * Which surface a recording is about, whichever key it was written under.
+ *
+ * The one reader of both. `surface` is what is written now; `wallId` is what
+ * every file saved before 2026-08-28 carries and what a second phone restoring
+ * from iCloud will hand back for as long as those files exist.
+ *
+ * Refuses rather than guesses when a note carries neither. A recording filed
+ * against nothing is not a recording about a wall that happens to be unnamed —
+ * it is a note nobody can ever find again, and returning `''` for it would
+ * quietly file it against a wall called `''`.
+ */
+export function surfaceOf(note: { readonly surface?: string; readonly wallId?: string }): string {
+  const on = note.surface ?? note.wallId;
+  if (on === undefined || on === '') {
+    throw new VoiceError(
+      'This recording does not say which wall or surface it is about, so there is nowhere to ' +
+        'put it. It is still on the phone; nothing has been deleted.'
+    );
+  }
+  return on;
+}
+
+/**
+ * The same recording, about a different surface.
+ *
+ * Drops `wallId` rather than leaving it beside the new `surface`. Two keys
+ * disagreeing about which wall a recording belongs to is exactly the state
+ * `surfaceOf` would have to arbitrate for ever, and the arbitration would be
+ * invisible: `surface` wins, and the stale key sits in the file looking like an
+ * answer.
+ */
+export function onSurface(note: VoiceNote, surface: string): VoiceNote {
+  const { wallId, ...rest } = note;
+  void wallId;
+  return { ...rest, surface };
+}
+
+/**
  * The words, and who is responsible for them.
  *
  * `phone` means the recogniser wrote it and nobody has read it. `person` means
@@ -72,8 +110,38 @@ export interface Transcript {
 
 export interface VoiceNote {
   readonly id: string;
-  /** The wall it is about. Every note is about a wall — that is how it is found. */
-  readonly wallId: string;
+  /**
+   * The surface it is about: a wall, or the ceiling, or the floor.
+   *
+   * ## Why this is not called `wallId`
+   *
+   * It was, and it stopped being true the day a ceiling could be talked at.
+   * `noteBelongs` below has always accepted a surface as readily as a wall —
+   * the check is `surfaces.has(note.wallId) || room.walls.some(...)` — so the
+   * name was describing one of the two things the field actually held. A
+   * contractor recording "this ceiling is stained the whole way along" was
+   * filing it under something called a wall id.
+   *
+   * A field name is not cosmetic here. It is what the next person reads before
+   * writing the code that decides which recordings a deleted wall takes with
+   * it, and a name that lies about half its values is how that gets written
+   * wrong.
+   *
+   * **This is a migration, not a rename.** Every job file already on a phone
+   * carries `wallId` and none of them can be reached to be rewritten, so
+   * `surfaceOf` reads either and everything written from now on carries
+   * `surface`. The old key stays readable for as long as there are files with
+   * it in them, which is for ever. See `readMarkup` in `price.ts`, which is the
+   * same shape for the same reason.
+   */
+  readonly surface?: string;
+  /**
+   * What it was called before there was a ceiling to talk at.
+   *
+   * Kept readable, never written. `surfaceOf` is the only thing that should
+   * touch it.
+   */
+  readonly wallId?: string;
   /**
    * The mark it was recorded on, when it was recorded on one.
    *
@@ -125,8 +193,9 @@ export function validateVoiceNote(room: Room, note: VoiceNote): void {
   // the key, which is the same one that surface's scope, its phone readings and
   // its marks are filed under, so one ceiling has one name everywhere.
   const surfaces = new Set(surfacesOf(room).map(surfaceKey));
-  if (!surfaces.has(note.wallId) && !room.walls.some((wall) => wall.id === note.wallId)) {
-    throw new VoiceError(`"${room.name}" has no wall or surface called "${note.wallId}".`);
+  const on = surfaceOf(note);
+  if (!surfaces.has(on) && !room.walls.some((wall) => wall.id === on)) {
+    throw new VoiceError(`"${room.name}" has no wall or surface called "${on}".`);
   }
   if (note.fileName.trim() === '') {
     throw new VoiceError('That recording has no file name, so nothing could ever play it back.');
@@ -156,7 +225,7 @@ export function notesOnWall(
   wallId: string
 ): readonly VoiceNote[] {
   return notes
-    .filter((note) => note.wallId === wallId && note.markId === undefined)
+    .filter((note) => surfaceOf(note) === wallId && note.markId === undefined)
     .sort(byWhenSaid);
 }
 

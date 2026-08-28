@@ -157,6 +157,24 @@ def openTagEnd(text: str, at: int) -> int:
                 continue
             if ch == quote:
                 quote = ''
+        elif ch == '/' and text[i:i + 2] == '//' and depth > 0:
+            # A line comment inside a handler. `stripComments` takes out the
+            # `{/* ... */}` kind and leaves this one, because this one lives
+            # INSIDE an expression the tag needs kept.
+            #
+            # It has to be skipped whole, and the reason is an apostrophe: a
+            # comment reading `without this the button's handler could be dead`
+            # opened a quote here that never closed, the scan ran past the end
+            # of the tag, and `attribute(tag, 'onClick')` came back None. The
+            # control was then invisible. Found by `check-the-checks.py` when a
+            # deliberately broken file went green.
+            #
+            # `depth > 0` because a `//` outside braces is not a comment in JSX
+            # -- it is text on the page.
+            newline = text.find('\n', i)
+            if newline == -1:
+                return -1
+            i = newline
         elif ch in '"\'`':
             quote = ch
         elif ch == '{':
@@ -718,6 +736,111 @@ def excused() -> dict[str, str]:
 
 # --------------------------------------------------------------------- main
 
+# ------------------------------- a handler a parent's onClick makes invisible
+
+# The elements a person does not press: they hold things, they are not controls.
+HOLDER = re.compile(r'<(div|section|li|ul|form|article|aside|header|footer|main|nav)\b')
+PRESSABLE = re.compile(r'<(button|a)\b')
+
+
+def shadowedHandlers(sources: dict[Path, str]) -> list[str]:
+    """A control whose own handler no audit can ever watch failing.
+
+    ## The blind spot
+
+    `web/src/DamagePhotos.tsx` draws a full-screen photograph in a
+    `<div onClick={() => setBig(false)}>`, and puts a **Close** button inside
+    it whose handler does the same thing. Click the button and the picture
+    closes — whether or not the button's own handler runs, because the click
+    bubbles to the div. Replace that handler with a no-op, rebuild, run the
+    whole audit: every check stays green. It was tried.
+
+    So the button is driven, `check-controls.py` counts it as driven, and the
+    one fact worth knowing about it — that pressing it does what it says — is
+    not established by anything. Every reachability check in this repository is
+    blind to it by construction.
+
+    ## What this asks for
+
+    Not that a holder may never have an `onClick`. A backdrop that closes on a
+    tap is a real and good thing. It asks that a control **inside** one stops
+    the click going any further, with `stopPropagation`, so that the control's
+    own handler is what ran. That is one line, it makes the control's behaviour
+    provable, and it is what a person pressing the button means anyway: they
+    pressed the button, not the sheet behind it.
+    """
+    bad = []
+    for path, source in sorted(sources.items()):
+        text = stripComments(source)
+        rel = str(path.relative_to(ROOT))
+        for holder in HOLDER.finditer(text):
+            end = openTagEnd(text, holder.start())
+            if end == -1:
+                continue
+            tag = text[holder.start():end + 1]
+            # Presence by regex and not by `attribute`, which reads the value
+            # with a brace counter of its own and comes back empty on a handler
+            # carrying a line comment with an apostrophe in it. This check needs
+            # two facts about the tag and both are in the tag's own text.
+            if not re.search(r'\bonClick\s*=', tag):
+                continue
+            # The holder's subtree, by tag depth from its own opening tag.
+            #
+            # `openTagEnd` and not `TAG`, and that is the whole of it: `TAG` is
+            # a naive scan to the next `>`, and this very div carries
+            # `onClick={() => setBig(false)}`. The `>` in the arrow ended the
+            # tag, the depth count desynchronised, and this check found nothing
+            # at all on the two files it was written for. `check-the-checks.py`
+            # caught it. It is the same trap `openTagEnd`'s own docstring
+            # records, arriving in a second place.
+            name = holder.group(1)
+            depth = 1
+            close = len(text)
+            i = end + 1
+            while i < len(text):
+                nextClose = text.find(f'</{name}', i)
+                if nextClose == -1:
+                    break
+                nextOpen = text.find(f'<{name}', i)
+                # `<divider` is not a `<div`. Anything word-ish after the name
+                # makes it a different element.
+                while nextOpen != -1 and re.match(r'\w', text[nextOpen + 1 + len(name):] or ' '):
+                    nextOpen = text.find(f'<{name}', nextOpen + 1)
+                if nextOpen != -1 and nextOpen < nextClose:
+                    opened = openTagEnd(text, nextOpen)
+                    if opened == -1:
+                        break
+                    if text[opened - 1] != '/':
+                        depth += 1
+                    i = opened + 1
+                    continue
+                depth -= 1
+                if depth == 0:
+                    close = nextClose
+                    break
+                i = nextClose + len(name) + 2
+            inside = text[end + 1:close]
+            for control in PRESSABLE.finditer(inside):
+                at = openTagEnd(inside, control.start())
+                if at == -1:
+                    continue
+                own = inside[control.start():at + 1]
+                if not re.search(r'\bonClick\s*=', own) or 'stopPropagation' in own:
+                    continue
+                # The CONTROL's line, not the holder's: the fix goes on the
+                # control. `inside` starts at `end + 1`, so its offsets are
+                # counted from there rather than from the top of the file.
+                line = text[:end + 1 + control.start()].count('\n') + 1
+                bad.append(
+                    f'{rel}:{line}  a <{control.group(1)}> inside a <{name}> that has its own\n'
+                    f'      onClick, and the control does not stop the click going further. The\n'
+                    f'      parent fires whether or not the control\'s handler ran, so a dead\n'
+                    f'      handler here is invisible to every audit that presses it -- measured:\n'
+                    f'      replacing one with a no-op left the whole suite green.\n'
+                    f'      Add `event.stopPropagation()` so pressing the control is what acts.')
+    return bad
+
+
 def main() -> int:
     if not SRC.is_dir() or not AUDIT.is_dir():
         print('web/src or web/audit is missing, so no control can be compared')
@@ -823,6 +946,13 @@ def main() -> int:
         print('    wrapper, and the hint stays on the screen where it belongs.')
         print()
 
+    shadowed = shadowedHandlers(sources)
+    if shadowed:
+        print('Controls whose own handler nothing can watch failing:')
+        print()
+        for one in shadowed:
+            print(f'  {one}\n')
+
     if thin:
         print(f'Excused in {ON_PURPOSE.name} with no real reason:')
         for one in thin:
@@ -839,12 +969,13 @@ def main() -> int:
           f'{opaque} whose name is built at runtime and cannot be checked statically, '
           f'{audit.unknowable} audit locators naming a variable.')
 
-    if undriven or thin or stale or louder:
+    if undriven or thin or stale or louder or shadowed:
         print(f'{len(undriven)} control name(s) nothing drives, in '
               f'{len({r for p in undriven.values() for r, _, _ in p})} file(s), '
               f'{len(thin)} excused without a reason, '
               f'{len(stale)} stale excuse(s), '
-              f'{len(louder)} whose name a browser reads longer than the source.')
+              f'{len(louder)} whose name a browser reads longer than the source, '
+              f'{len(shadowed)} whose handler a parent\'s onClick makes invisible.')
         return 1
 
     print(f'Every one of them is driven by a part of the audit, or is one of '

@@ -2563,3 +2563,65 @@ caught it: the escape hatch searched the whole file for a `let name =
 folder.lastPathComponent`, found one seventy lines away in a different method,
 and excused the very call it was written for. It is scoped to the enclosing
 method now.
+
+## The four that were mine and not done
+
+**2026-08-28.** Sam: *"Mine, known and not done: DO ALL."*
+
+### `VoiceNote.wallId` became `surface`
+
+A migration, not a rename. The field has held a ceiling as readily as a wall
+since the day a ceiling could be talked at — `validateVoiceNote` checks
+`surfaces.has(...) || walls.some(...)` — so the name described one of the two
+things it held. A contractor recording *"this ceiling is stained the whole way
+along"* was filing it under something called a wall id.
+
+Every job file on a phone carries `wallId` and none can be reached to be
+rewritten, so `surfaceOf()` reads either and `onSurface()` writes only the new
+one, dropping the old rather than leaving two keys that could disagree. Same
+shape as `readMarkup` in `price.ts`, for the same reason. A note carrying
+neither is refused rather than filed against `''`.
+
+### The doorways on the floor plan
+
+`<g onClick>` with nothing in them but `<circle>`s: no role, no name, no
+`tabindex`. To a screen reader the join was not on the page; to a keyboard the
+floor was a picture. And joining two rooms is the only thing that screen is for.
+
+`check-controls.py` could not report it — a control with no name is not a name
+that can go undriven — so `a47` drives it instead: named, keyboard-reachable,
+`aria-pressed` for the choice that stays made between the two taps, Enter and
+Space both proved.
+
+### `a12-everything`'s walk
+
+Its cost is the number of controls in the app, and that only goes up. What it
+must never do is die on a runner's clock having walked four hundred controls and
+said nothing about any of them. It has a stated budget now, checks the wall
+clock against it, and prints the real figure — so growth is a red check with a
+number rather than a silent timeout.
+
+### The dialog-backdrop blind spot
+
+A **Close** button inside a backdrop that closes on a tap is pressed by the
+audit, counted as driven, and could have a no-op handler: the click bubbles to
+the parent and the picture closes either way. That was measured — a no-op left
+the whole suite green — and written down in `a54-marks.mjs` as a thing no
+checker could see.
+
+`shadowedHandlers` in `check-controls.py` sees it now. It asks for one thing:
+a control inside a holder with its own `onClick` must `stopPropagation`, so
+that pressing the control is what acted. It found exactly the two the note
+predicted, `DamagePhotos.tsx` and `Vendor.tsx`, and both are fixed.
+
+**Two holes in the tooling fell out of writing it**, both caught by
+`check-the-checks.py` going green on a file broken on purpose:
+
+1. The subtree walk used `TAG`, a naive scan to the next `>`, on a `<div>` whose
+   own `onClick={() => setBig(false)}` contains one. `openTagEnd` now.
+2. **`openTagEnd` did not skip `//` comments inside a handler.** A comment
+   reading *"the button's handler"* opened a quote that never closed, the scan
+   ran past the end of the tag, and the control became invisible. It is the same
+   trap that function's own docstring already records, arriving in a second
+   place. Fixing it took the harvest from **277 controls to 281** — four the
+   tool had never seen at all, and all four already driven.
