@@ -444,7 +444,22 @@ export function KeepACopy({ fileName }: { readonly fileName: string }) {
                   'than what is on this screen.'}`}
       </p>
 
-      <p className="mt-2 leading-relaxed">{sayPersistence(answer)}</p>
+      {/* What the browser answered about keeping the storage is the second most
+          important sentence here and it is only urgent while something is at
+          risk. Shown outright when this is nagging; folded away when it is not,
+          because every line above the room is a line the room is pushed down
+          by — three of `a41`'s controls went below the fold of an 800-tall
+          window the first time this panel was drawn in full at all times. */}
+      {nagging ? (
+        <p className="mt-2 leading-relaxed">{sayPersistence(answer)}</p>
+      ) : (
+        <details className="mt-2">
+          <summary className="min-h-11 cursor-pointer text-sm text-slate-600">
+            What this browser said about keeping it
+          </summary>
+          <p className="mt-1 leading-relaxed">{sayPersistence(answer)}</p>
+        </details>
+      )}
 
       <p className="mt-3 flex flex-wrap gap-2">
         <button
@@ -458,7 +473,7 @@ export function KeepACopy({ fileName }: { readonly fileName: string }) {
               : 'bg-slate-900 text-white active:bg-slate-700')
           }
         >
-          Save the job file
+          Write the job to a file
         </button>
         <button
           type="button"
@@ -539,9 +554,14 @@ export function KeepACopy({ fileName }: { readonly fileName: string }) {
         control that does not work. Measured: the audit could not press "Forget
         the code" at all. */}
     {!unlockedByCode() && (
-      <section className="mb-4 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4">
-        <UnlockCode />
-      </section>
+      <details className="mb-4 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4">
+        <summary className="min-h-11 cursor-pointer text-sm font-medium text-slate-700">
+          Already paying for Trueline? Unlock this browser
+        </summary>
+        <div className="mt-2">
+          <UnlockCode />
+        </div>
+      </details>
     )}
     </>
   );

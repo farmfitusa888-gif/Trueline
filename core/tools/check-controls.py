@@ -404,6 +404,80 @@ def labelledComponents(sources: dict[Path, str]) -> dict[str, list[str]]:
     return {k: sorted(v) for k, v in found.items()}
 
 
+def readAloudAsMore(sources: dict[Path, str]) -> list[tuple[str, str, str]]:
+    """Components whose box a browser will call something longer than the source says.
+
+    A `<label>` that WRAPS its box names that box with **all** of its own text,
+    not just the bit that looks like a label. So
+
+        <label>
+          {label}
+          {hint && <span>{hint}</span>}
+          <input ... />
+        </label>
+
+    draws a box a screen reader announces as *"Licence number Some states
+    require this on anything given to a homeowner."* -- and the licence field
+    really did, along with the business address, the insurance line, the date of
+    loss, and a ceiling tickbox carrying sixty words. It is also why
+    `getByLabel('Licence number', { exact: true })` found nothing at all.
+
+    This checker was the optimistic one: it read `>{label}<` and recorded the
+    short name, so the name it reported and the name the browser computed were
+    two different strings and it said nothing about the gap. It is exactly the
+    failure it exists to catch, one level in: a control whose real name nobody
+    is checking.
+
+    The fix everywhere was `aria-label={label}` on the box itself, which wins
+    over the wrapping label. So the rule is: a wrapping `<label>` carrying more
+    than the prop, and no `aria-label` on the box, is reported. A label element
+    holding nothing but the prop is correct and is left alone.
+    """
+    out: list[tuple[str, str, str]] = []
+    for path, text in sources.items():
+        for at in re.finditer(r'\bfunction\s+([A-Z]\w*)\s*(?=\()', text):
+            name = at.group(1)
+            shape = functionBody(text, at.end())
+            if shape is None:
+                continue
+            props, body = shape
+            if not any(f'<{box}' in body for box in BOXES):
+                continue
+            for prop in ('label', 'name'):
+                if not re.search(rf'\b{prop}\b', props):
+                    continue
+                if f'aria-label={{{prop}}}' in body:
+                    continue  # named outright; the wrapper cannot win
+                if not re.search(rf'>\s*\{{{prop}\}}\s*<', body):
+                    continue
+                # Does a <label> wrap a box, and does it carry anything else?
+                for label in re.finditer(r'<label\b', body):
+                    end = openTagEnd(body, label.start())
+                    if end is None:
+                        continue
+                    shut = body.find('</label>', end)
+                    if shut == -1:
+                        continue
+                    inside = body[end + 1:shut]
+                    if not any(f'<{box}' in inside for box in BOXES):
+                        continue
+                    if not re.search(rf'\{{{prop}\}}', inside):
+                        continue
+                    # Everything in there that is not the prop and not a box.
+                    rest = re.sub(rf'\{{{prop}\}}', '', inside)
+                    rest = re.sub(r'<[^>]*>', ' ', rest)
+                    words = re.sub(r'\s+', ' ', rest).strip()
+                    if len(words) >= 8:
+                        out.append((
+                            f'{path}: {name}',
+                            prop,
+                            f'a <label> wraps the box and carries {len(words)} more '
+                            f'characters, so the browser reads all of it',
+                        ))
+                    break
+    return out
+
+
 def drawn(sources: dict[Path, str]) -> list[tuple[str, int, str, Name]]:
     """Every control the app draws, as (file, line, what it is, its name)."""
     wrappers = labelledComponents(sources)
@@ -734,6 +808,21 @@ def main() -> int:
         print(f'    part in web/audit, or say why it stays out in {ON_PURPOSE.name}.')
         print()
 
+    louder = readAloudAsMore(sources)
+    if louder:
+        print('Controls a browser will call something longer than the source says:')
+        print()
+        for where, prop, why in louder:
+            print(f'  {where} — `{prop}`')
+            print(f'      {why}')
+        print()
+        print('    A <label> that WRAPS its box names that box with all of its own text.')
+        print('    So a field whose source reads `{label}` is announced with the hint')
+        print('    beside it as well, and `getByLabel(..., { exact: true })` finds')
+        print('    nothing. Put `aria-label={label}` on the box: it wins over the')
+        print('    wrapper, and the hint stays on the screen where it belongs.')
+        print()
+
     if thin:
         print(f'Excused in {ON_PURPOSE.name} with no real reason:')
         for one in thin:
@@ -750,11 +839,12 @@ def main() -> int:
           f'{opaque} whose name is built at runtime and cannot be checked statically, '
           f'{audit.unknowable} audit locators naming a variable.')
 
-    if undriven or thin or stale:
+    if undriven or thin or stale or louder:
         print(f'{len(undriven)} control name(s) nothing drives, in '
               f'{len({r for p in undriven.values() for r, _, _ in p})} file(s), '
               f'{len(thin)} excused without a reason, '
-              f'{len(stale)} stale excuse(s).')
+              f'{len(stale)} stale excuse(s), '
+              f'{len(louder)} whose name a browser reads longer than the source.')
         return 1
 
     print(f'Every one of them is driven by a part of the audit, or is one of '

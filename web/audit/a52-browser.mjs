@@ -58,14 +58,18 @@ reportEvenIfItDies('A52 — the browser version, with no phone under it');
 /**
  * Presses a control, or says it was not there, and never throws.
  *
+ * Takes the locator rather than a name, so that every control this part drives
+ * is written out at the call site as `getByRole('button', { name: '...' })` —
+ * which is what `core/tools/check-controls.py` reads. A helper that took the
+ * name as a string hid three controls from it and added three findings.
+ *
  * A49 states the rule this follows: a part that throws reports **nothing**, so
  * the one mutation a file exists to catch kills the run instead of turning it
  * red. Measured here — taking the job-file branch out of the picker left this
  * part with no room on screen, and it died on the first click of part 7 having
  * printed not one line about the eight checks that had already failed.
  */
-async function press(page, name) {
-  const control = page.getByRole('button', { name });
+async function press(control) {
   if ((await control.count()) === 0) return false;
   try {
     await control.first().click({ timeout: 5000 });
@@ -226,6 +230,21 @@ const panelText = async (page) => {
   return (await panel.count()) === 0 ? '' : panel.innerText();
 };
 
+/**
+ * Opens the fold the persistence answer sits behind while nothing is at risk.
+ *
+ * It is folded on purpose: every line above the room is a line the room is
+ * pushed down by, and with nothing in the room to lose there is nothing urgent
+ * to say. It is drawn outright the moment the panel is nagging. This is a
+ * person tapping the summary, which is the only way anybody reads it.
+ */
+async function openTheAnswer(page) {
+  const fold = page.locator('[data-keep="job"] details', { hasText: 'said about keeping it' });
+  if ((await fold.count()) === 0) return;
+  await fold.first().locator('summary').click();
+  await page.waitForTimeout(200);
+}
+
 let jobFileOnDisk = null;
 
 {
@@ -246,6 +265,8 @@ let jobFileOnDisk = null;
   const refusedHere = await persistedIn(page);
   check('the browser was asked to keep the storage and answered no',
     refusedHere === false, String(refusedHere));
+  await openTheAnswer(page);
+  panel = await panelText(page);
   check('and the screen reports that answer rather than a hopeful one',
     /said no/.test(panel) && !/agreed to keep/.test(panel), panel.slice(0, 600));
   check('and says what the answer means for this room',
@@ -295,7 +316,7 @@ let jobFileOnDisk = null;
   /* ------------------------------------------------- writing the file quiets it */
 
   const saving = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Save the job file' }).click();
+  await page.getByRole('button', { name: 'Write the job to a file' }).click();
   const download = await saving;
   jobFileOnDisk = join(tmpdir(), 'a52-' + download.suggestedFilename());
   await download.saveAs(jobFileOnDisk);
@@ -386,7 +407,8 @@ for (const [answer, name] of [[true, 'a browser that agrees'], [false, 'a browse
   check(`${name}: the app actually asks, rather than assuming`,
     asked.length > 0, JSON.stringify(asked));
 
-  const panel = await page.locator('[data-keep="job"]').first().innerText();
+  await openTheAnswer(page);
+  const panel = await panelText(page);
   if (answer) {
     check(`${name}: the screen reports the yes it was given`,
       /agreed to keep/.test(panel) && !/said no/.test(panel), panel.slice(0, 600));
@@ -492,7 +514,7 @@ let theLink = null;
   await page.setInputFiles('input[type=file][accept="application/json,.json"]', jobFileOnDisk);
   await page.waitForTimeout(1000);
 
-  const asked = await press(page, 'Make a link to this room');
+  const asked = await press(page.getByRole('button', { name: 'Make a link to this room' }));
   await page.waitForTimeout(600);
   check('a room opened from a job file offers to be put in a link', asked,
     'there was no "Make a link to this room" to press, so no room was open');
@@ -520,13 +542,13 @@ let theLink = null;
     theLink.length < 8000, `${theLink.length} characters`);
   console.log(`link for a corrected garage: ${theLink.length} characters`);
 
-  await press(page, 'Copy the link');
+  await press(page.getByRole('button', { name: 'Copy the link' }));
   await page.waitForTimeout(400);
   const afterCopy = await panelText(page);
   check('copying says what happened either way, rather than nothing',
     /on the clipboard|copy it by hand/.test(afterCopy), afterCopy.slice(0, 900));
 
-  await press(page, 'Done with the link');
+  await press(page.getByRole('button', { name: 'Done with the link' }));
   await page.waitForTimeout(300);
   check('and the link can be put away again',
     !/has a customer’s room inside it/.test(await panelText(page)));
@@ -548,7 +570,7 @@ let theLink = null;
     const { browser, page } = await open();
     await page.setInputFiles('input[type=file][accept="application/json,.json"]', file);
     await page.waitForTimeout(1200);
-    await press(page, 'Make a link to this room');
+    await press(page.getByRole('button', { name: 'Make a link to this room' }));
     await page.waitForTimeout(700);
     const said = await panelText(page);
     const errors = noise().slice();
@@ -790,6 +812,13 @@ async function openFree() {
 
   /* --------------------------------------------------- what the box says it is */
 
+  // On the room screen the box is folded away, because every line above the room
+  // is a line the room is pushed down by. Opened here the way a person opens it.
+  const folded = page.locator('details', { hasText: 'Already paying for Trueline' });
+  if ((await folded.count()) > 0) {
+    await folded.first().locator('summary').click();
+    await page.waitForTimeout(300);
+  }
   const codeBox = page.locator('[data-unlock="off"]').first();
   check('a browser with no code is offered somewhere to paste one',
     (await codeBox.count()) === 1);

@@ -892,12 +892,13 @@ def controls(bench: Bench) -> None:
 
     Three mutations, and the first two are the undoing of a real audit line.
 
-    The quiet state here is not silence, which is why `notSaying` exists.
-    `check-controls.py` stands at seventy-nine findings on the repository as it
-    is — the real backlog, not a defect in the tool — so an exit code cannot
-    tell an eightieth from the seventy-nine. Each mutation is watched by name
-    instead: the checker must be silent about that control, then name it, then
-    be silent again.
+    The quiet state used to be noise: `check-controls.py` stood at seventy-nine
+    findings, so an exit code could not tell an eightieth from the seventy-nine
+    and every mutation had to be watched by name instead. **The backlog is
+    gone** — every control in `web/src` is driven by a part of the audit and
+    the excuse file is empty — so silence means silence again and an exit code
+    answers each one. The `notSaying` machinery stays in `expect` for the next
+    checker that needs it.
     """
     print('check-controls.py — a control nothing in the audit drives')
 
@@ -920,7 +921,7 @@ def controls(bench: Bench) -> None:
 
     code, out = bench.run('check-controls.py')
     expect('the rename box is driven by name as the repository stands',
-           code, out, fires=True, notSaying=named)
+           code, out, fires=False)
 
     #    The stand-in has to match NOTHING: `check-controls.py` reads a regex
     #    locator as well as a literal one, so a looser pattern over the same
@@ -939,7 +940,7 @@ def controls(bench: Bench) -> None:
 
     code, out = bench.run('check-controls.py')
     expect('and quiet about it again once the name is back', code, out,
-           fires=True, notSaying=named)
+           fires=False)
 
     # 2. Whole parts deleted. The mark button is the one Sam reported as dead,
     #    and the control's name is built as `Mark a spot on ${wall.id}`, so what
@@ -954,7 +955,7 @@ def controls(bench: Bench) -> None:
 
     code, out = bench.run('check-controls.py')
     expect('the mark controls are driven as the repository stands',
-           code, out, fires=True, notSaying=mark)
+           code, out, fires=False)
 
     for part in parts:
         (bench.where / part).unlink()
@@ -966,7 +967,32 @@ def controls(bench: Bench) -> None:
 
     code, out = bench.run('check-controls.py')
     expect('and quiet about them again once the parts are back', code, out,
-           fires=True, notSaying=mark)
+           fires=False)
+
+    # 2b. A control the browser calls something else entirely.
+    #
+    #     A `<label>` that WRAPS its box names that box with all of its own
+    #     text. `PriceList.tsx`'s column picker announced as
+    #     "The price— pick a column —" plus every column header in the select,
+    #     and `getByLabel('The price', { exact: true })` found nothing. This
+    #     checker was the optimistic one: it read the short name out of the
+    #     source and said nothing about the gap, which is its own failure mode
+    #     one level in. `aria-label` on the box is what wins over the wrapper.
+    louder = '`label`'
+    rel = 'web/src/PriceList.tsx'
+
+    code, out = bench.run('check-controls.py')
+    expect('no control is announced as more than the source says it is',
+           code, out, fires=False)
+
+    bench.write(rel, bench.read(rel).replace('        aria-label={label}\n', '', 1))
+    code, out = bench.run('check-controls.py')
+    expect('the column picker left to be named by the label wrapped round it',
+           code, out, fires=True, saying=louder)
+    bench.restore(rel)
+
+    code, out = bench.run('check-controls.py')
+    expect('and quiet once the box is named outright again', code, out, fires=False)
 
     # 3. An excuse with no argument behind it. `controls-on-purpose.json` is
     #    the pressure valve on this check and therefore the way to make it

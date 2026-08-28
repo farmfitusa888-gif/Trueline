@@ -64,7 +64,15 @@ function Column({
   return (
     <label className="block">
       <span className="text-sm font-medium text-slate-700">{label}</span>
+      {/* Named outright, because the <label> around it wraps the box and a
+          wrapping label names its box with ALL of its own text -- the "— pick a
+          column —" placeholder and every column header inside the select
+          included. This one announced as "The price— pick a column —", and
+          `getByLabel('The price', { exact: true })` found nothing at all.
+          `aria-label` on the box wins over the wrapper, and the visible label
+          stays exactly where it is. */}
       <select
+        aria-label={label}
         value={value === undefined ? '' : String(value)}
         onChange={(event) =>
           onChange(event.target.value === '' ? undefined : Number(event.target.value))
