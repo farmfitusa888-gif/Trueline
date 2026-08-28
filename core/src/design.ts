@@ -66,8 +66,19 @@ export const NEUTRAL = {
   ink: { light: '#14181B', dark: '#E4E7E9' },
   /** Secondary text: a caption, a unit, a label. */
   quiet: { light: '#4B545B', dark: '#A9B3BA' },
-  /** Tertiary: present, but not what is being read right now. */
-  faint: { light: '#6B747B', dark: '#79838B' },
+  /**
+   * Tertiary: present, but not what is being read right now.
+   *
+   * Held at WCAG AA against the ground it is painted on, in BOTH themes, and
+   * that is what set these two values rather than taste. It was #6B747B and
+   * #79838B, which measure 4.43:1 and 4.20:1 — under the 4.5:1 body-text bar,
+   * on 127 pieces of text across the app. On a phone in a driveway in full sun
+   * that is not a technicality. `a50-readable.mjs` measures every word on every
+   * screen against the colour actually behind it and fails under the bar, so
+   * moving either of these without checking is a failing audit rather than a
+   * quiet regression. These measure 4.63:1 and 4.62:1.
+   */
+  faint: { light: '#687178', dark: '#808A92' },
   /** A hairline between rows or around a control. */
   rule: { light: '#DFE3E6', dark: '#2B3238' },
   /** A quieter hairline, inside a group. */

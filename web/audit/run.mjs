@@ -75,6 +75,7 @@ const parts = [
   'a37-scanphotos.mjs',
   'a38-sent.mjs',
   'a49-notsaved.mjs',
+  'a50-readable.mjs',
 ];
 
 /**
