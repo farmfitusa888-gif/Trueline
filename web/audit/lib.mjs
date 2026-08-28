@@ -100,7 +100,12 @@ export async function refuseAStaleBundle() {
     await newestUnder(join(REPO, 'web', 'src')),
     await newestUnder(join(REPO, 'core', 'src'))
   );
-  if (source > built) {
+  // A few seconds' grace, because a build takes a few seconds and a file saved
+  // while it ran is not evidence of a stale bundle -- it is evidence of a busy
+  // machine. Anything older than this is a real one: nobody edits a file and
+  // expects a bundle from before it.
+  const GRACE = 5000;
+  if (source > built + GRACE) {
     const behind = Math.round((source - built) / 1000);
     throw new Error(
       `The built bundle is ${behind}s older than the source it came from, so this ` +

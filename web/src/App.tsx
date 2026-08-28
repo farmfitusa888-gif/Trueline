@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { area, isDiagonal, runLength } from '../../core/src/room.ts';
 import { isAdjusted } from '../../core/src/measurement.ts';
 import { EditWall, RenameRoom } from './Edit.tsx';
@@ -213,6 +213,28 @@ export function App() {
   const { len, area: showArea, borrow } = useUnits();
   const [state, dispatch] = useReducer(reduce, EMPTY);
   const [saveTrouble, setSaveTrouble] = useState<SaveTrouble | null>(null);
+  // The refusal banner, so a refusal can be brought to where somebody is
+  // looking rather than waiting to be found.
+  const refusal = useRef<HTMLDivElement>(null);
+
+  /**
+   * Bring a refusal to where the person is, rather than waiting to be found.
+   *
+   * `block: 'nearest'` and not `'center'`: the banner is sticky, so it is
+   * already on the screen in most cases, and scrolling the whole page under
+   * somebody who can see the answer is its own small rudeness. `nearest` moves
+   * only when it has to.
+   *
+   * The focus is not decoration either. It is what makes a screen reader say
+   * the refusal at the moment it happens, and it is why the banner carries
+   * `tabIndex={-1}` -- a div cannot take focus without it. `preventScroll`
+   * because the line above has already decided how far to move.
+   */
+  useEffect(() => {
+    if (!state.error) return;
+    refusal.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    refusal.current?.focus({ preventScroll: true });
+  }, [state.error]);
   /** Why a new room was not written down, or nothing. Never about an old one. */
   const [roomLimit, setRoomLimit] = useState<string | null>(null);
   // Plan or room. The same model, the same selection, the same tape box under
@@ -618,8 +640,33 @@ export function App() {
         </div>
       )}
 
+      {/*
+          Sticky, and scrolled to, because it was drawn where nobody was looking.
+
+          `state.error` is every refusal the model makes, and it is drawn above
+          the whole room while the buttons that produce it sit most of a screen
+          down inside a correction panel. Measured at 430x800: a 12 ft wall
+          refused under a 9 ft ceiling put the banner **2,213 px above** the
+          button that was pressed, and taking a fourth side out of a four-walled
+          room put it **2,527 px above**. Nothing moved and nothing scrolled, so
+          pressing the button looked exactly like pressing a dead one.
+
+          That is the bug Sam already reported once, at eight times the
+          distance. The mark button he called dead was 280 px out.
+
+          Two things fix it and both are here: it follows the screen down, the
+          way the save banner does, and the effect below scrolls it into view
+          and puts the focus on it the moment a refusal appears -- so a screen
+          reader says it too, rather than a sighted person alone eventually
+          finding it.
+      */}
       {state.error && (
-        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+        <div
+          ref={refusal}
+          tabIndex={-1}
+          role="alert"
+          className="sticky top-2 z-40 mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900 shadow-sm"
+        >
           <p className="whitespace-pre-line">{state.error}</p>
           <button
             type="button"

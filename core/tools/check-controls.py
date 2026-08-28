@@ -128,6 +128,23 @@ def openTagEnd(text: str, at: int) -> int:
     Braces are counted and quotes are skipped, because a tag's attributes hold
     whole expressions — `onClick={() => setKind(which)}` has a `>` in it and a
     naive search for the next one lands in the middle of an arrow function.
+
+    A backslash escapes the next character, and skipping that used to be
+    missing. `Edit.tsx` has
+
+        setMoveWants('Type where this wall really is first — 12\' 4".')
+
+    inside an `onClick`, and the `\'` closed the string early. The scan then
+    desynchronised and the tag never ended where it should. Measured across
+    `web/src/**.tsx` before this line existed: **six controls were never
+    harvested at all** and **three were harvested under another control's
+    name** — the `Move it` button was recorded as `How high this wall stands`,
+    which is the aria-label of an input forty lines below it.
+
+    That is the worst thing this tool can do. A checker that quietly reports a
+    control under the wrong name is not a checker that missed something; it is
+    one that says the wrong thing confidently, and the count going down looks
+    like progress.
     """
     depth = 0
     quote = ''
@@ -135,6 +152,9 @@ def openTagEnd(text: str, at: int) -> int:
     while i < len(text):
         ch = text[i]
         if quote:
+            if ch == '\\':
+                i += 2
+                continue
             if ch == quote:
                 quote = ''
         elif ch in '"\'`':

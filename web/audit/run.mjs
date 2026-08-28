@@ -86,6 +86,7 @@ const parts = [
   'a48-withdraw.mjs',
   'a49-notsaved.mjs',
   'a50-readable.mjs',
+  'a53-drawings.mjs',
 ];
 
 /**
