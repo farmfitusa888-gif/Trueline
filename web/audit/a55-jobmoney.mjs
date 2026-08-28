@@ -754,16 +754,25 @@ const leftInTheBoxes = {
 };
 await press(work.getByRole('button', { name: 'Write the change order' }));
 await page.waitForTimeout(600);
+// Nothing may be raised at all, and that is the fixed behaviour rather than a
+// missing case: with the boxes emptied by the tear-up, pressing Write with
+// nothing retyped is refused for want of a number and a reason. So the read is
+// guarded — a locator that finds nothing throws, and a part that throws here
+// would report none of the fifty-odd checks above it.
 const inherited = /Change order (\S+) — waiting to be signed/.exec(await work.innerText())?.[1];
-const inheritedReason = /Why: ([^\n]+)/.exec(
-  await work.locator('div', { hasText: 'waiting to be signed' }).last().innerText()
-)?.[1];
+const waiting = work.locator('div', { hasText: 'waiting to be signed' });
+const inheritedReason = (await waiting.count()) === 0
+  ? undefined
+  : /Why: ([^\n]+)/.exec(await waiting.last().innerText())?.[1];
 
 check('tearing one up empties the boxes, so the next one is not the torn-up one again',
   leftInTheBoxes.number === '' && leftInTheBoxes.reason === ''
   && leftInTheBoxes.days === '0'
   && inherited !== 'CO-2',
-  `after the tear-up the boxes still held number "${leftInTheBoxes.number}", ` +
+  inherited === undefined
+    ? 'nothing was raised at all, which is right: with the boxes empty there is no '
+      + 'number and no reason to raise one with'
+    : `after the tear-up the boxes still held number "${leftInTheBoxes.number}", ` +
     `reason "${leftInTheBoxes.reason}", days "${leftInTheBoxes.days}", and the next ` +
     `change order raised with nothing retyped called itself "${inherited}" with the ` +
     `reason "${inheritedReason}". Work.tsx clears all three on Agree and none of ` +

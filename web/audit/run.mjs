@@ -88,6 +88,9 @@ const parts = [
   'a50-readable.mjs',
   'a51-owner.mjs',
   'a53-drawings.mjs',
+  'a52-browser.mjs',
+  'a54-marks.mjs',
+  'a55-jobmoney.mjs',
 ];
 
 /**

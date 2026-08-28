@@ -219,7 +219,20 @@ function Said({
         <button
           type="button"
           onClick={() => onForget(note.id)}
-          aria-label={`Take off the recording from ${note.recordedAt.slice(0, 10)}`}
+          // The day AND the time, because a contractor records four notes on
+          // one walk and the day alone names all four of them the same thing.
+          // Measured: two recordings on one wall gave two buttons whose whole
+          // accessible name was `Take off the recording from 2026-08-28`.
+          // Anybody listening to the screen rather than looking at it is
+          // offered the same sentence for every recording on the wall.
+          //
+          // To the SECOND, not the minute: two notes a minute apart is a
+          // normal walk and the minute alone still named both the same. Two
+          // in one second is not something a person can do.
+          aria-label={
+            `Take off the recording from ${note.recordedAt.slice(0, 10)}` +
+            ` at ${note.recordedAt.slice(11, 19)}`
+          }
           className="min-h-11 shrink-0 text-xs text-slate-500 underline underline-offset-4"
         >
           Take it off

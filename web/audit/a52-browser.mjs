@@ -257,8 +257,8 @@ let jobFileOnDisk = null;
   let panel = await panelText(page);
   check('on a scan nobody has touched, the panel is quiet about losing work',
     /nothing here to lose/i.test(panel), panel.slice(0, 400));
-  check('and it is not an alert, because there is nothing to be alarmed about',
-    (await page.locator('[data-keep="job"][role="alert"]').count()) === 0);
+  check('and there is no alarm, because there is nothing to be alarmed about',
+    (await page.locator('[data-keep="alarm"]').count()) === 0);
 
   /* ------------------------------- the persistence answer, and whether it is true */
 
@@ -280,28 +280,42 @@ let jobFileOnDisk = null;
   await page.waitForTimeout(900);
 
   panel = await panelText(page);
-  check('once a wall is measured, the panel says the room is in no file',
-    /not in a file anywhere/i.test(panel), panel.slice(0, 400));
+  check('once a wall is measured, the room says it is in no file',
+    /not in a file anywhere/i.test(
+      panel + (await page.locator('[data-keep="alarm"]').first().innerText().catch(() => ''))),
+    panel.slice(0, 400));
   check('and names the work rather than talking about storage',
     /1 wall you measured yourself/.test(panel), panel.slice(0, 400));
   check('and says this room has never been written to a file',
     /never been written to one/.test(panel), panel.slice(0, 500));
 
-  const alert = page.locator('[data-keep="job"][role="alert"]').first();
-  const isAlert = (await alert.count()) === 1;
+  const alert = page.locator('[data-keep="alarm"]').first();
+  const isAlert = (await alert.count()) === 1
+    && (await alert.getAttribute('role')) === 'alert';
   check('it is an alert, so it is announced rather than only drawn', isAlert, String(isAlert));
 
+  // From the top of the room, which is where somebody arriving at it is. Taping
+  // a wall scrolls the page down to the box being typed in.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(250);
   const box = isAlert ? await alert.boundingBox() : null;
   const window = page.viewportSize();
-  check('the whole of it is on the screen at a phone height',
+  check('the whole of it is on the screen the moment the room opens',
     box !== null && box.y >= 0 && box.y + box.height <= window.height,
     box === null ? 'there is no banner to see' : JSON.stringify({ box, window }));
 
+  // And it gets OUT OF THE WAY. This is the opposite of what `a49` asks of the
+  // banner about the phone, on purpose and for a measured reason: that one is
+  // rare, this one is on for nearly every browser visitor who has done
+  // anything, and made sticky it sat on top of the controls underneath and
+  // broke six checks in `a24-change` — the change order could not be signed.
+  // A warning that is almost always there and follows the screen down is not a
+  // warning, it is an obstacle in front of the work.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(400);
   const after = isAlert ? await alert.boundingBox() : null;
-  check('and it follows the screen down, like the one about the phone',
-    after !== null && after.y >= 0 && after.y + after.height <= window.height,
+  check('and scrolled away from, it is not left sitting on top of the work',
+    after !== null && after.y + after.height <= 0,
     after === null ? 'there is no banner to see' : JSON.stringify({ after, window }));
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(200);
@@ -320,14 +334,16 @@ let jobFileOnDisk = null;
   const download = await saving;
   jobFileOnDisk = join(tmpdir(), 'a52-' + download.suggestedFilename());
   await download.saveAs(jobFileOnDisk);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(900);
 
   check('the file is named after the room, not after the app',
     /garage/.test(download.suggestedFilename()), download.suggestedFilename());
 
+  // The panel is in its other place now — quiet, and under the room rather than
+  // over it. Same component, same words; `panelText` finds it either way.
   panel = await panelText(page);
   check('writing the file stops the nagging',
-    (await page.locator('[data-keep="job"][role="alert"]').count()) === 0, panel.slice(0, 400));
+    (await page.locator('[data-keep="alarm"]').count()) === 0, panel.slice(0, 400));
   check('and the panel says where the work now is, in both places',
     /is in the job file you wrote/.test(panel) && /and in this browser/.test(panel),
     panel.slice(0, 500));
@@ -340,7 +356,7 @@ let jobFileOnDisk = null;
   await page.waitForTimeout(900);
   panel = await panelText(page);
   check('a second measurement brings the line straight back',
-    (await page.locator('[data-keep="job"][role="alert"]').count()) === 1, panel.slice(0, 400));
+    (await page.locator('[data-keep="alarm"]').count()) === 1, panel.slice(0, 400));
   check('and it says the file it has is older than the screen',
     /older than what is on this screen/.test(panel), panel.slice(0, 600));
 
@@ -453,7 +469,7 @@ for (const [answer, name] of [[true, 'a browser that agrees'], [false, 'a browse
   const panel = await panelText(page);
   check('and the browser it arrived in does not nag about work already in a file',
     /nothing here to lose|is in the job file/.test(panel) ||
-      (await page.locator('[data-keep="job"][role="alert"]').count()) === 1,
+      (await page.locator('[data-keep="alarm"]').count()) === 1,
     panel.slice(0, 400));
 
   check('opening a job file: no console or page errors', noise().length === 0, noise().join(' | '));
@@ -859,6 +875,12 @@ async function openFree() {
   const alert = page.locator('[data-unlock="off"] [role="alert"]');
   check('the refusal is where the person is looking, and announced',
     (await alert.count()) === 1, `${await alert.count()} alerts`);
+  // Measured from where a person pressing the button is actually looking: the
+  // button scrolled to, pressed, and the refusal appearing under it. Measuring
+  // from the top of a page nobody is at would prove nothing either way.
+  await page.getByRole('button', { name: 'Unlock this browser' })
+    .scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
   const box = (await alert.count()) === 1 ? await alert.first().boundingBox() : null;
   check('and it is on the screen at a phone height',
     box !== null && box.y >= 0 && box.y + box.height <= page.viewportSize().height,

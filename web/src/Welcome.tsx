@@ -15,6 +15,7 @@ import {
   lastFileCopy,
   markOf,
   noteFileCopy,
+  onFileCopied,
   roomFromLink,
   roomLink,
   saveJobFile,
@@ -247,6 +248,20 @@ export function UnlockCode() {
                      text-sm text-slate-900"
         />
       </label>
+      {/* Above the button and not below it. This box sits at the foot of a long
+          page, and a refusal drawn under the button landed five pixels below the
+          fold of an 800-tall window — measured. Above it, the message appears
+          exactly where the eye already is: between the code somebody typed and
+          the button they just pressed. */}
+      {said && (
+        <p
+          role="alert"
+          className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm
+                     leading-relaxed text-amber-900"
+        >
+          {said}
+        </p>
+      )}
       <p className="mt-3">
         <button
           type="button"
@@ -257,15 +272,6 @@ export function UnlockCode() {
           Unlock this browser
         </button>
       </p>
-      {said && (
-        <p
-          role="alert"
-          className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm
-                     leading-relaxed text-amber-900"
-        >
-          {said}
-        </p>
-      )}
     </div>
   );
 }
@@ -314,7 +320,27 @@ function sayPersistence(answer: Persistence | null): string {
  * it names what that is, so the warning is about their work rather than about
  * storage.
  */
-export function KeepACopy({ fileName }: { readonly fileName: string }) {
+export function KeepACopy({
+  fileName,
+  at,
+}: {
+  readonly fileName: string;
+  /**
+   * Which of its two places this one is.
+   *
+   * `'top'` draws nothing at all unless there is work in no file, and then
+   * draws the red line that follows the screen down. `'bottom'` draws the quiet
+   * version, under the room, and nothing while the top one is speaking.
+   *
+   * Two places rather than one because the two states are not the same size and
+   * do not belong in the same place. Drawn in full above the room at all times
+   * this panel pushed everything down by **238 pixels** — measured, against the
+   * same page without it — and three of the field sheet's controls went below
+   * the fold of an 800-tall window. A warning that is not urgent has not earned
+   * the top of somebody's screen; one that is has earned all of it.
+   */
+  readonly at: 'top' | 'bottom';
+}) {
   const [answer, setAnswer] = useState<Persistence | null>(null);
   const [job, setJob] = useState<{ readonly text: string; readonly mark: string } | null>(null);
   const [said, setSaid] = useState<string | null>(null);
@@ -367,6 +393,12 @@ export function KeepACopy({ fileName }: { readonly fileName: string }) {
     return () => clearInterval(tick);
   }, []);
 
+  // And whenever a file is written anywhere on the screen. This component is on
+  // the page twice and the button is only in one of them; without this the
+  // other one never hears, and after a save there was no panel on the screen at
+  // all — the loud one had gone and the quiet one had not arrived.
+  useEffect(() => onFileCopied(() => setNow(new Date())), []);
+
   const work = job ? workIn(job.text) : { count: 0, says: '' };
   const copy = lastFileCopy(fileName);
   const inAFile = job !== null && copy !== null && copy.mark === job.mark;
@@ -409,26 +441,78 @@ export function KeepACopy({ fileName }: { readonly fileName: string }) {
   // the whole page's: "nothing here calls browser storage safe" is a claim about
   // what this component says, and the app around it legitimately uses the word
   // "saved" about other things.
+  // Nothing at the top unless there is work in no file.
+  if (at === 'top' && !nagging) return null;
+
+  /**
+   * The alarm: one line, and the button that answers it.
+   *
+   * ## Why it is one line
+   *
+   * Everything that is not urgent — where the work is, what the browser said
+   * about keeping it, the link, the code — is in the panel under the room,
+   * which is where somebody goes when they want to *do* something rather than
+   * be told something. The top is the alarm and the one button that answers it.
+   *
+   * ## And why it is NOT sticky, unlike the one about the phone
+   *
+   * `SaveTrouble` in `App.tsx` follows the screen down, and a49 argues for that
+   * in as many words: a banner at the top of a page somebody scrolls is a
+   * banner somebody scrolls past. That argument is right about **that** banner,
+   * and it does not carry to this one, for a reason that was measured rather
+   * than reasoned about.
+   *
+   * `SaveTrouble` is rare — it means the phone refused a room, which almost
+   * never happens. This one is on for very nearly every browser visitor who has
+   * done anything at all, because in a browser there IS no durable copy until
+   * somebody makes one. A sticky banner that is almost always there is not a
+   * warning, it is an obstacle: made sticky, it sat on top of the controls
+   * underneath it and broke **six checks in `a24-change`** — the change order
+   * could not be signed, so the money that follows from it was wrong on four
+   * more screens. Those are the same controls a contractor's thumb is reaching
+   * for.
+   *
+   * So it is a red line at the head of the room, whole and on the screen the
+   * moment the room opens, and it gets out of the way of the work. The panel
+   * under the room says the same thing at length, and the two are the only two
+   * ends of a screen anybody scrolls to.
+   */
+  if (at === 'top') {
+    return (
+      <section
+        role="alert"
+        data-sheet="no"
+        data-keep="alarm"
+        className="mb-4 flex flex-wrap items-center justify-between gap-2
+                   rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900
+                   shadow-sm"
+      >
+        <span className="font-semibold">
+          Not in a file anywhere — this room is in this browser only.
+        </span>
+        <button
+          type="button"
+          onClick={save}
+          disabled={job === null}
+          className="inline-flex min-h-11 items-center rounded-md bg-red-800 px-4 font-semibold
+                     text-white active:bg-red-900"
+        >
+          Write the job to a file
+        </button>
+      </section>
+    );
+  }
+
   return (
     <>
     <section
       data-sheet="no"
       data-keep="job"
-      {...(nagging ? { role: 'alert' as const } : {})}
-      className={
-        nagging
-          ? 'sticky top-2 z-40 mb-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm ' +
-            'text-red-900 shadow-sm'
-          : 'mb-4 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700'
-      }
+      className="mb-4 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700"
     >
-      {nagging ? (
-        <p className="font-semibold">
-          This room is not in a file anywhere. It is in this browser only.
-        </p>
-      ) : (
-        <p className="font-semibold text-slate-900">Where this room actually is</p>
-      )}
+      <p className="font-semibold text-slate-900">
+        {nagging ? 'This room is not in a file anywhere' : 'Where this room actually is'}
+      </p>
 
       <p className="mt-2 leading-relaxed">
         {work.count === 0
@@ -450,31 +534,29 @@ export function KeepACopy({ fileName }: { readonly fileName: string }) {
           because every line above the room is a line the room is pushed down
           by — three of `a41`'s controls went below the fold of an 800-tall
           window the first time this panel was drawn in full at all times. */}
-      {nagging ? (
-        <p className="mt-2 leading-relaxed">{sayPersistence(answer)}</p>
-      ) : (
-        <details className="mt-2">
-          <summary className="min-h-11 cursor-pointer text-sm text-slate-600">
-            What this browser said about keeping it
-          </summary>
-          <p className="mt-1 leading-relaxed">{sayPersistence(answer)}</p>
-        </details>
-      )}
+      <details className="mt-2" {...(nagging ? { open: true } : {})}>
+        <summary className="min-h-11 cursor-pointer text-sm text-slate-600">
+          What this browser said about keeping it
+        </summary>
+        <p className="mt-1 leading-relaxed">{sayPersistence(answer)}</p>
+      </details>
 
       <p className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={save}
-          disabled={job === null}
-          className={
-            'inline-flex min-h-11 items-center rounded-md px-4 font-semibold ' +
-            (nagging
-              ? 'bg-red-800 text-white active:bg-red-900'
-              : 'bg-slate-900 text-white active:bg-slate-700')
-          }
-        >
-          Write the job to a file
-        </button>
+        {/* Only when the alarm above is not already offering one. Two controls
+            with the same accessible name on one screen are two controls a
+            screen reader user cannot tell apart — the rule the wordmark and
+            "Open another" were separated for. */}
+        {!nagging && (
+          <button
+            type="button"
+            onClick={save}
+            disabled={job === null}
+            className="inline-flex min-h-11 items-center rounded-md bg-slate-900 px-4
+                       font-semibold text-white active:bg-slate-700"
+          >
+            Write the job to a file
+          </button>
+        )}
         <button
           type="button"
           onClick={makeLink}

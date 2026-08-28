@@ -723,7 +723,22 @@ export function Work({
                   <button
                     type="button"
                     onClick={() => {
+                      // Everything `Agree to this change` clears, because a
+                      // change order torn up must not come back as the next
+                      // one's number and the next one's reason. Measured: tear
+                      // up CO-2 and press Write the change order with nothing
+                      // retyped, and the new document calls itself CO-2 and
+                      // carries the reason from the one just torn up. Two
+                      // change orders under one number is not untidiness; it is
+                      // two documents a client can sign that refer to each
+                      // other's work.
                       onRaisedChange(null);
+                      setCoNumber('');
+                      setCoBecause('');
+                      setCoDays('0');
+                      setCoWho('');
+                      setCoMark('');
+                      setCoConsent(false);
                       setCoTrouble(null);
                     }}
                     className="min-h-11 w-full rounded-md border border-slate-300 px-4 text-sm

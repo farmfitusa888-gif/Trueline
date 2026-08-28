@@ -451,6 +451,29 @@ export function lastFileCopy(fileName: string): FileCopy | null {
   }
 }
 
+/**
+ * Whoever is showing where the work is when a file gets written.
+ *
+ * ## The bug this is the answer to
+ *
+ * `KeepACopy` is on the screen twice — loud above the room while there is work
+ * in no file, quiet below it once there is not — and only one of the two draws
+ * at a time. Writing the file happens in whichever one the button was pressed
+ * in, and React re-renders **that** one: the other goes on believing what it
+ * believed a moment ago, so the loud one vanished and the quiet one never
+ * appeared. Measured: no panel on the screen at all after saving.
+ *
+ * It is the same shape as `onUnlockChanged` above and for the same reason. A
+ * fact kept in `localStorage` and read during render is a fact nothing is
+ * subscribed to.
+ */
+const copyListeners = new Set<() => void>();
+
+export function onFileCopied(listen: () => void): () => void {
+  copyListeners.add(listen);
+  return () => copyListeners.delete(listen);
+}
+
 export function noteFileCopy(fileName: string, project: string, at: string): void {
   try {
     window.localStorage.setItem(
@@ -462,6 +485,7 @@ export function noteFileCopy(fileName: string, project: string, at: string): voi
     // hazard it looks like: if that store goes, the room goes with it and there
     // is nothing left for this to be a record of.
   }
+  for (const listen of copyListeners) listen();
 }
 
 /**
