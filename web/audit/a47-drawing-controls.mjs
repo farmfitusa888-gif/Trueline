@@ -733,15 +733,29 @@ await page.waitForTimeout(400);
 await page.goto(`${URL}#floor`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
 said = await page.locator('body').innerText();
+said = await page.locator('body').innerText();
 check('two captures sharing a floor identifier also stop the floor being laid out',
   /could not be laid out/.test(said) && /share the id/.test(said), said.slice(0, 400));
 
-const stuck = await page.locator('body').innerText();
-await page.getByRole('button', { name: 'Start the joins again' }).click();
-await page.waitForTimeout(900);
-check('and the one way out the screen offers changes something when it is pressed',
-  (await page.locator('body').innerText()) !== stuck,
-  'the only control on the screen did nothing at all when it was pressed');
+// The screen used to offer `Start the joins again` here too, and pressing it
+// wrote an empty list of joins over an empty list of joins: the page came back
+// identical character for character. The only control on the screen did nothing
+// at all, which is worse than no control -- it teaches somebody that pressing
+// things here does nothing.
+check('it does not offer to clear joins when there are no joins to clear',
+  (await page.getByRole('button', { name: 'Start the joins again' }).count()) === 0,
+  `${await page.getByRole('button', { name: 'Start the joins again' }).count()} found`);
+check('and it says so, rather than leaving the absence to be noticed',
+  /no joins to clear/.test(said), said.slice(0, 600));
+
+// What it says instead has to be something a person can act on.
+check('it names the two captures that carry one id',
+  /garage/.test(said) && /kitchen/.test(said), said.slice(0, 800));
+check('and says what to do about it',
+  /Scan one of them again, or take it off this floor/.test(said), said.slice(0, 800));
+check('and does not suggest anything was lost, because nothing was',
+  /Nothing is wrong with either room and nothing here has been lost/.test(said),
+  said.slice(0, 800));
 
 check('the drawing and room screens: no console or page errors',
   noise().length === 0, noise().join(' | '));

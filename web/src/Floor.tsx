@@ -135,17 +135,67 @@ export function Floor({ onOpenRoom }: { readonly onOpenRoom: (fileName: string) 
   }
 
   if (!plan.it) {
+    /*
+      The one way out has to be a way out, and it was not.
+
+      This panel offered `Start the joins again` whatever the trouble was, and
+      that button writes an empty list of joins. When the trouble IS the joins,
+      that is the fix. When it is two captures carrying the same floor id --
+      which RoomPlan hands out per scan, so two scans of two different rooms can
+      both be `roomplan:floor-1` -- there are no joins to clear, the button
+      writes an empty list over an empty list, and the screen is identical
+      character for character afterwards. The only control on the screen did
+      nothing at all, and it was the only thing offered.
+
+      So it is offered when it can help, and when it cannot the screen says
+      which rooms clash and what to do about it instead. A control that cannot
+      succeed is worse than no control: it teaches somebody that pressing
+      things here does nothing.
+    */
+    const sameId = new Map<string, string[]>();
+    for (const one of rooms) {
+      sameId.set(one.room.id, [...(sameId.get(one.room.id) ?? []), one.fileName]);
+    }
+    const clashing = [...sameId.values()].filter((named) => named.length > 1);
+
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <h2 className="font-semibold">This floor could not be laid out</h2>
         <p className="mt-1">{plan.trouble}</p>
-        <button
-          type="button"
-          onClick={() => commit([])}
-          className="mt-3 min-h-11 rounded-md border border-amber-300 px-4 font-medium"
-        >
-          Start the joins again
-        </button>
+
+        {clashing.length > 0 && (
+          <div className="mt-3 rounded-md border border-amber-300 bg-white/60 p-3">
+            <p className="font-semibold">Two captures are the same room as far as the app can tell.</p>
+            <p className="mt-1 leading-relaxed">
+              The scanner gives every capture an id, and it gives the same one twice if two
+              captures came out of one session. These carry an id each other already has:
+            </p>
+            <ul className="mt-2 list-disc pl-5">
+              {clashing.map((named) => (
+                <li key={named.join('|')}>{named.join(' and ')}</li>
+              ))}
+            </ul>
+            <p className="mt-2 leading-relaxed">
+              Nothing is wrong with either room and nothing here has been lost. Scan one of them
+              again, or take it off this floor, and the rest of the floor lays out as it should.
+            </p>
+          </div>
+        )}
+
+        {joins.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => commit([])}
+            className="mt-3 min-h-11 rounded-md border border-amber-300 px-4 font-medium"
+          >
+            Start the joins again
+          </button>
+        ) : (
+          <p className="mt-3 text-xs">
+            There are no joins to clear — nothing on this floor has been joined to anything yet,
+            so starting them again would change nothing.
+          </p>
+        )}
       </div>
     );
   }
