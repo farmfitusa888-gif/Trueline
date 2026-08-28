@@ -355,6 +355,109 @@ def photographMovedQuietly(rel: str, raw: str, text: str) -> list[str]:
     return bad
 
 
+# ------------------------------------- 5. a scan filed under a name of its own
+
+# `SavedScan(... title: <something>)`, and what that something is.
+FILED_AS = re.compile(
+    r'SavedScan\s*\((?P<args>[^)]*)\)',
+    re.S,
+)
+TITLE_ARG = re.compile(r'\btitle\s*:\s*([^,\n]+)')
+
+
+def filedUnderTheTypedName(rel: str, raw: str, text: str) -> list[str]:
+    """A scan filed under the name somebody typed rather than the folder's.
+
+    ## The report this is the answer to
+
+    > "I JUST SCANNED MY ENTIRE GARAGE AND WHEN IT FINISHED THERE WAS JUST A
+    >  GENERIC SQUARE BLUEPRINT AND 3D."
+
+    `SavedScan.title` crosses the bridge as `fileName`, and `fileName` is the
+    key the web half files a room under -- in that browser's storage and in the
+    Rooms list. The folder carries a date; the typed name does not. So every
+    scan a contractor called "Garage" shared one key and one room, and the
+    second walk overwrote the first.
+
+    Worse, the same folder reached from the Rooms list comes over as
+    `folder.lastPathComponent` -- `ProjectStore.load` and `keepMarks` both do
+    that -- so one scan had two names depending on which screen you came from,
+    and corrections made one way were invisible the other way.
+
+    The rule is narrow and mechanical: whatever builds a `SavedScan` takes its
+    title from the folder. Nothing here says which folder, or what it is called.
+    """
+    bad = []
+    for match in FILED_AS.finditer(text):
+        title = TITLE_ARG.search(match.group('args'))
+        if title is None:
+            continue
+        said = title.group(1).strip()
+        if 'lastPathComponent' in said:
+            continue
+        # A bare identifier is allowed only when the line that made it, IN THIS
+        # SAME METHOD, read the folder. `keepMarks` does exactly that one line
+        # above its own `SavedScan`.
+        #
+        # Scoped to the method and not to the file, and that is the whole of it:
+        # searching the file excused `save()` on the strength of a `let name =
+        # folder.lastPathComponent` seventy lines earlier in a different
+        # function, and the check then passed on the very defect it was written
+        # for. `check-the-checks.py` caught that, which is what it is for.
+        if re.fullmatch(r'\w+(?:\.\w+)?', said):
+            start = max(
+                (m.end() for m in re.finditer(r'\n    (?:\w+ )*func\b', text[:match.start()])),
+                default=0,
+            )
+            made = [
+                m for m in re.finditer(
+                    r'\b(?:let|var)\s+' + re.escape(said.split('.')[0]) + r'\s*=\s*([^\n]+)',
+                    text[start:match.start()],
+                )
+            ]
+            if made and 'lastPathComponent' in made[-1].group(1):
+                continue
+            if said == 'entry.name':
+                # `ProjectStore.Entry.name` IS `folder.lastPathComponent`, set
+                # in `refresh()` two dozen lines up and nowhere else.
+                continue
+        bad.append(
+            f'{rel}:{lineOf(raw, match.start())}  a scan is filed as `{said}`, not as its folder.\n'
+            f'      `title` crosses the bridge as `fileName`, and `fileName` is the key the\n'
+            f'      web half files the room under. The folder carries a date and the typed\n'
+            f'      name does not, so two scans of the same room share one key and the\n'
+            f'      second overwrites the first. Use the folder\'s lastPathComponent.')
+    return bad
+
+
+# --------------------------- 6. a capture written into a folder already in use
+
+MADE_FOLDER = re.compile(r'store\.folder\s*\(\s*named:\s*CaptureWriter\.folderName')
+
+
+def capturesIntoAResidentFolder(rel: str, raw: str, text: str) -> list[str]:
+    """A new capture given a folder without asking whether one is already there.
+
+    `createDirectory(withIntermediateDirectories: true)` succeeds on a folder
+    that already exists, so a second scan of the same name in the same second
+    writes its `room.json` into the first one's folder and inherits its
+    `corrected.json`. A corrected room outranks a capture all the way to the web
+    view, so the walk somebody has just finished is never shown at all -- they
+    get the older room back, corrections and all.
+
+    `store.freeFolder(named:)` counts up until it finds one nobody is in.
+    """
+    bad = []
+    for match in MADE_FOLDER.finditer(text):
+        bad.append(
+            f'{rel}:{lineOf(raw, match.start())}  a capture is given a folder that may\n'
+            f'      already hold one. `createDirectory` succeeds on a folder that is there,\n'
+            f'      so the arriving scan inherits the resident one\'s corrected.json -- and\n'
+            f'      a corrected room outranks a capture, so the new walk is never shown.\n'
+            f'      Use `store.freeFolder(named:)`.')
+    return bad
+
+
 def main() -> int:
     bad: list[str] = []
     seen = 0
@@ -371,6 +474,8 @@ def main() -> int:
             bad += callbackStoresWithoutChecking(rel, raw, text)
         if path.name in SCANNER:
             bad += photographMovedQuietly(rel, raw, text)
+        bad += filedUnderTheTypedName(rel, raw, text)
+        bad += capturesIntoAResidentFolder(rel, raw, text)
 
     if bad:
         print('The scanner can lose a scan this way:\n')
@@ -382,8 +487,9 @@ def main() -> int:
         return 1
 
     print(f'{seen} Swift files: the camera can be rebuilt, reset() puts every published')
-    print('value back, no capture callback stores a room without asking whose it is, and')
-    print('no photograph is carried across with a swallowed error')
+    print('value back, no capture callback stores a room without asking whose it is,')
+    print('no photograph is carried across with a swallowed error, every scan is filed')
+    print('under its own folder, and no capture is written into a folder already in use')
     return 0
 
 

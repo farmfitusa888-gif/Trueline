@@ -147,7 +147,11 @@ struct DrawScreen: View {
         // twice: the grid already asked what the room is called, and a second
         // box on this side would be the same question in a different place.
         let name = RoomCard.name(inside: project)
-        let folder = store.folder(named: CaptureWriter.folderName(for: name, at: startedAt))
+        // Never on top of a folder that is already there. A drawn room IS its
+        // `corrected.json`, so writing into a resident folder does not merely
+        // inherit somebody else's corrections — it overwrites them, and the
+        // room that was in that folder is gone. See `CaptureWriter.freeFolder`.
+        let folder = store.freeFolder(named: CaptureWriter.folderName(for: name, at: startedAt))
         // Declared out here because it is written inside the `do` and read
         // after it, when the room goes to iCloud.
         var cardJSON: Data?

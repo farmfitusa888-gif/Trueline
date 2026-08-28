@@ -60,6 +60,15 @@ final class ProjectStore: ObservableObject {
         root.appendingPathComponent(name, isDirectory: true)
     }
 
+    /// A folder for a new capture that is not already somebody else's.
+    ///
+    /// `root` is private, and rightly so, so the rule lives in `CaptureWriter`
+    /// where it can be read beside the writer it protects and this hands it the
+    /// one thing it cannot reach. See `CaptureWriter.freeFolder`.
+    func freeFolder(named name: String) -> URL {
+        CaptureWriter.freeFolder(under: root, named: name)
+    }
+
     func refresh() {
         let contents = (try? FileManager.default.contentsOfDirectory(
             at: root,

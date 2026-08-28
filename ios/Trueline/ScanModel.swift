@@ -337,7 +337,11 @@ final class ScanModel: ObservableObject {
     }
 
     private func save() {
-        let folder = store.folder(named: CaptureWriter.folderName(for: name, at: startedAt))
+        // Never on top of a folder that is already there. See `freeFolder`: an
+        // arriving scan that lands in a resident folder inherits its
+        // `corrected.json`, which outranks a capture on the way to the web
+        // view -- so the walk somebody had just finished was never shown.
+        let folder = store.freeFolder(named: CaptureWriter.folderName(for: name, at: startedAt))
         do {
             let written = try CaptureWriter.write(
                 room: session.capturedRoom,
@@ -366,7 +370,24 @@ final class ScanModel: ObservableObject {
             store.refresh()
             finished = SavedScan(
                 folder: written.folder,
-                title: name,
+                // The FOLDER's name, not the one typed into the box.
+                //
+                // `title` is what crosses the bridge as `fileName`, and
+                // `fileName` is the key the web half files the room under --
+                // in this browser's storage and in the Rooms list. The typed
+                // name has no date on it, so every scan a contractor called
+                // "Garage" shared one key and one room: the second walk
+                // overwrote the first, and re-opening either one gave whichever
+                // was written last.
+                //
+                // Worse, the same folder opened from the Rooms list came over
+                // as `folder.lastPathComponent` -- `ProjectStore.load` and
+                // `keepMarks` both do that -- so one scan had two different
+                // names depending on which screen you reached it from, and
+                // corrections made one way were invisible the other way.
+                //
+                // One name, from the folder, everywhere.
+                title: written.folder.lastPathComponent,
                 roomJSON: written.roomJSON,
                 photosJSON: written.photosJSON,
                 pinsJSON: written.pinsJSON

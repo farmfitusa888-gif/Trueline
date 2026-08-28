@@ -190,9 +190,50 @@ enum CaptureWriter {
     /// A folder name somebody can find again: what it is, and when.
     static func folderName(for name: String, at date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HHmm"
+        // Seconds, not minutes. Two scans a contractor walks back to back can
+        // land in the same minute -- a garage and the bay beside it, or one
+        // walk abandoned and immediately re-walked -- and the folder name was
+        // the only thing keeping them apart. `createDirectory` with
+        // `withIntermediateDirectories: true` succeeds on a folder that is
+        // already there, so the second scan wrote its `room.json` on top of the
+        // first and INHERITED its `corrected.json`, which outranks a capture
+        // everywhere. The screen then showed the older room, corrections and
+        // all, for a walk somebody had just finished.
+        formatter.dateFormat = "yyyy-MM-dd HHmmss"
+        // Fixed, so a phone set to a 24-hour clock and a phone set to a 12-hour
+        // one name their folders the same way. `HH` follows the locale
+        // otherwise, and a folder called "Garage 2026-08-28 0224 PM" sorts and
+        // reads differently from one called "Garage 2026-08-28 1424".
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let safe = cleaned.isEmpty ? "Room" : cleaned.replacingOccurrences(of: "/", with: "-")
         return "\(safe) \(formatter.string(from: date))"
+    }
+
+    /// A folder for a scan that is not already somebody else's.
+    ///
+    /// Seconds make a collision unlikely and do not make it impossible: a
+    /// device restored from a backup, a clock that went backwards, two walks
+    /// that genuinely start in the same second. What a collision costs is not a
+    /// tidiness problem -- the arriving scan inherits the resident folder's
+    /// `corrected.json`, and a corrected room outranks a capture on the way to
+    /// the web view, so the new walk is never shown at all.
+    ///
+    /// So this refuses to hand back a folder that already holds a capture, and
+    /// counts up until it finds one that does not.
+    static func freeFolder(under root: URL, named wanted: String) -> URL {
+        var name = wanted
+        var next = 2
+        while FileManager.default.fileExists(
+            atPath: root.appendingPathComponent(name, isDirectory: true).path
+        ) {
+            name = "\(wanted) (\(next))"
+            next += 1
+            // A hundred folders of the same name in the same second is not a
+            // real state; it is a filesystem that is lying about `fileExists`.
+            // Stop rather than spin, and let the write fail with a reason.
+            if next > 100 { break }
+        }
+        return root.appendingPathComponent(name, isDirectory: true)
     }
 }

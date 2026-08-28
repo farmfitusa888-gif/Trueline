@@ -29,7 +29,12 @@ import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Section
 import { Tour, TOUR } from './Tour.tsx';
 import { KeepACopy, RoomFromLink, Welcome } from './Welcome.tsx';
 import { isJobFile } from './roomLink.ts';
-import { handBackThumbnail, insideApp } from './bridge.ts';
+import {
+  correctionsWereStrays,
+  handBackThumbnail,
+  insideApp,
+  onStrayCorrection,
+} from './bridge.ts';
 import { Openings } from './Openings.tsx';
 import { Ceiling, CeilingPanel } from './Ceiling.tsx';
 import { CEILING, surfaceKey } from '../../core/src/work.ts';
@@ -230,6 +235,11 @@ export function App() {
   const { len, area: showArea, borrow } = useUnits();
   const [state, dispatch] = useReducer(reduce, EMPTY);
   const [saveTrouble, setSaveTrouble] = useState<SaveTrouble | null>(null);
+  // Whether the room on screen is a capture drawn in place of a correction that
+  // turned out to be another room's. Read from the bridge rather than the
+  // reducer: it is a fact about what the app handed over, not about the room.
+  const [stray, setStray] = useState(correctionsWereStrays);
+  useEffect(() => onStrayCorrection(() => setStray(correctionsWereStrays())), []);
   // The refusal banner, so a refusal can be brought to where somebody is
   // looking rather than waiting to be found.
   const refusal = useRef<HTMLDivElement>(null);
@@ -674,6 +684,34 @@ export function App() {
           }`}
         >
           {saveTrouble.say}
+        </div>
+      )}
+
+      {/*
+          The corrections in this room's folder were another room's.
+
+          Said out loud rather than fixed silently. `isCorrectionOf` decided the
+          saved file could not be a correction of the capture beside it — a
+          room drawn on a grid cannot be a correction of a scan — so what is on
+          the screen is the capture, and this says why the tape readings
+          somebody remembers making are not on it.
+
+          Nothing was deleted to get here. The file is still in the folder, and
+          one screen's judgement that it does not belong is not grounds for
+          throwing away work.
+      */}
+      {stray && loaded && (
+        <div
+          role="alert"
+          data-stray="yes"
+          className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm
+                     leading-relaxed text-amber-900"
+        >
+          <strong>This is the scan, not the corrections that were filed with it.</strong> The
+          corrected room in this scan&rsquo;s folder is a different room — it was drawn or
+          walked, and this was scanned, so it cannot be a correction of it. It got there when
+          two rooms shared a name. Nothing has been deleted: the other room is still on this
+          phone under its own entry. What you are looking at is what the scanner measured.
         </div>
       )}
 

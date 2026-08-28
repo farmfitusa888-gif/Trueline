@@ -671,12 +671,27 @@ struct CorrectView: UIViewRepresentable {
             // outranks a scanned one: the same room with progressively more of
             // somebody's work in it, and opening an earlier one would throw the
             // later work away.
+            //
+            // The CAPTURE GOES ACROSS TOO, always, and that is the change that
+            // fixed Sam's garage. This used to be an `else if` chain, so a
+            // folder holding a `corrected.json` sent that and nothing else --
+            // and when the corrected file was a correction of some OTHER room,
+            // which is a state a `fileName` collision could produce, the
+            // capture beside it could not even be looked at. The web half now
+            // has both and decides: `isCorrectionOf` in `import-roomplan.ts`
+            // asks whether the saved room carries this capture's own
+            // identifier, and draws the capture when it does not.
+            //
+            // The ranking is unchanged and still lives on the far side. What
+            // changed is that the far side can see what it is ranking.
             payload["fileName"] = quoted(parent.title)
             if let saved = String(data: parent.correctedJSON, encoding: .utf8), !saved.isEmpty {
                 payload["saved"] = quoted(saved)
-            } else if let trace = String(data: parent.traceJSON, encoding: .utf8), !trace.isEmpty {
+            }
+            if let trace = String(data: parent.traceJSON, encoding: .utf8), !trace.isEmpty {
                 payload["trace"] = "JSON.parse(\(quoted(trace)))"
-            } else if let room = String(data: parent.roomJSON, encoding: .utf8), !room.isEmpty {
+            }
+            if let room = String(data: parent.roomJSON, encoding: .utf8), !room.isEmpty {
                 payload["room"] = "JSON.parse(\(quoted(room)))"
                 if let photos = String(data: parent.photosJSON, encoding: .utf8), !photos.isEmpty {
                     payload["photos"] = "JSON.parse(\(quoted(photos)))"

@@ -2476,3 +2476,90 @@ twenty-two checks after it never ran. Including both checks about that button.
 `click({ force: true })` now, and 37/37. That is the second part this session
 found to be silently under-reporting: `a22-voice` was reading two checks off
 `indexOf(...) === -1`, which is `slice(-1)`, the last character of the sheet.
+
+## The garage that came back as a square
+
+**2026-08-28.** Sam scanned his garage, and the app showed him a plain 15-by-11
+rectangle. He sent the folder.
+
+It held **a real capture** — five walls, two doors, two windows, sixty
+photographs, `room.json` 65 KB — and, beside it, a `corrected.json` of
+**2.5 KB**: a four-walled room 15 by 11, `id: "drawn:1787736652238"`,
+`fileName: "Room"`, every wall carrying a tape reading dated **2026-08-26**.
+A room he had drawn on a grid two days earlier and called "Draft".
+
+A corrected room outranks a capture on the way to the screen, so the drawing won
+every time. Nothing about the scanner was broken. Put through the importer, that
+capture gives:
+
+```
+wall-1    west      21' 4 1/4"   scanned
+wall-2    north      5' 5 5/16"  scanned  (1 opening)
+opening-1 north      9' 9 1/8"   scanned      ← the garage door
+wall-3    north      4' 1 1/4"   scanned  (1 opening)
+wall-4    east      21' 4 1/4"   scanned  (2 openings)
+wall-5    south     19' 3 11/16" scanned
+```
+
+Six walls, four openings, nothing dropped. The garage was never lost.
+
+### How the drawing got into the garage's folder
+
+`SavedScan.title` crosses the bridge as `fileName`, and `fileName` is the key the
+web half files a room under — in that browser's storage and in the Rooms list.
+
+- `ScanModel.save()` filed a scan under **the name typed into the box**: `"Room"`.
+- `ProjectStore.load()` and `keepMarks()` file the same folder under
+  **`folder.lastPathComponent`**: `"Room 2026-08-28 1213"`.
+
+So one scan had two names depending on which screen reached it, and every scan
+left at the default name shared the single key `trueline.room.v1:Room`. The
+drawing was under that key. The garage opened, the web half restored that key,
+and `onSave` wrote the drawing into the garage's folder as `corrected.json`.
+
+### Three fixes, at three depths
+
+**1. One name, from the folder.** `save()` in `ScanModel` and `finish()` in
+`ARMeasureModel` now take `title` from `written.folder.lastPathComponent`, which
+is what every other reader of that folder already used.
+
+**2. A folder is never written into twice.** `CaptureWriter.folderName` carries
+seconds rather than minutes (and a fixed `en_US_POSIX` locale, so a 12-hour
+phone and a 24-hour phone name folders the same way), and
+`store.freeFolder(named:)` counts up until it finds one nobody is in.
+`createDirectory(withIntermediateDirectories: true)` succeeds on a folder that
+already exists, so without this a second walk in the same second landed in the
+first one's folder and inherited its corrections. `DrawScreen` had it too, and
+there it was worse: a drawn room **is** its `corrected.json`, so writing into a
+resident folder overwrote a room rather than merely shadowing it.
+
+**3. A guard for the folders already in that state.** `isCorrectionOf` in
+`core/src/import-roomplan.ts`: a correction of a capture carries that capture's
+own identifier, `roomplan:<the floor's identifier>`. A room that was drawn says
+`drawn:` and one that was walked says `ar:`, and neither can be a correction of
+anything RoomPlan produced. It is exact rather than a guess, and where there is
+no capture to compare against it claims nothing.
+
+`CorrectView` now sends the capture **as well as** the correction — it was an
+`else if` chain, so the far side could not even look at what it was ranking —
+and `bridge.ts` decides. When the saved room is a stray, the capture is drawn
+and **the screen says so**. Nothing is deleted: one screen's judgement that a
+file does not belong is not grounds for throwing away somebody's work.
+
+### What was measured
+
+- `core/src/test/garage.test.ts` — 8 tests over **the real capture**, kept as
+  `core/src/test/fixtures/garage-roomplan.json` (geometry only; the sixty
+  photographs are Sam's and a regression test does not need them).
+- `web/audit/a56-garage.mjs` — 15 checks driving that capture and **the real
+  `corrected.json`** through the real bridge. Watched failing: with the guard
+  disabled, five go red, including *"the drawing does not win"*.
+- `check-scan.py` gained two checks, and found the same two defects in
+  `ARMeasureModel.swift` and `DrawScreen.swift` that nothing had looked at.
+  Both are in `check-the-checks.py`, watched failing and going quiet.
+
+**One of those two checks was written wrong first**, and `check-the-checks.py`
+caught it: the escape hatch searched the whole file for a `let name =
+folder.lastPathComponent`, found one seventy lines away in a different method,
+and excused the very call it was written for. It is scoped to the enclosing
+method now.

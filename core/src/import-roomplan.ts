@@ -719,3 +719,60 @@ function describe(parts: {
 }
 
 export type { Heading };
+
+/* ===================================================================== */
+/*  Whether a saved room belongs to the capture it is sitting beside     */
+/* ===================================================================== */
+
+/**
+ * The id `importRoomPlan` would give this capture, or nothing.
+ *
+ * Read off the scan rather than remembered, so it cannot drift from the line
+ * that sets it. A scan with no floor in it has no id and no room either.
+ */
+export function capturedRoomId(scan: unknown): string | null {
+  if (typeof scan !== 'object' || scan === null) return null;
+  const floors = (scan as { floors?: unknown }).floors;
+  if (!Array.isArray(floors) || floors.length === 0) return null;
+  const first = floors[0] as { identifier?: unknown };
+  return typeof first?.identifier === 'string' && first.identifier !== ''
+    ? `roomplan:${first.identifier}`
+    : null;
+}
+
+/**
+ * Whether a saved room is a correction OF this capture, or a different room.
+ *
+ * ## The report this is the answer to
+ *
+ * > "I JUST SCANNED MY ENTIRE GARAGE AND WHEN IT FINISHED THERE WAS JUST A
+ * >  GENERIC SQUARE BLUEPRINT AND 3D."
+ *
+ * Sam's garage folder, opened: a real capture — six walls, 21' 4" by 19' 4",
+ * with the garage door found as a 9' 9" opening and sixty photographs beside it
+ * — and, in the same folder, a `corrected.json` holding a **four-walled 15 by
+ * 11 room he had drawn by hand two days earlier**, id `drawn:1787736652238`.
+ *
+ * A corrected room outranks a capture everywhere, and rightly: it is the same
+ * room with somebody's work in it. It is not the same room here. It got in
+ * because a scan was filed under the name typed into the box rather than under
+ * its own folder, so every room called "Room" shared one key, and the drawing
+ * was written into the garage's folder over the top.
+ *
+ * The naming is fixed at the source. This is the guard that means a folder
+ * already in that state on somebody's phone shows the garage rather than the
+ * drawing — and it is exact rather than a guess. A correction of a capture
+ * keeps the capture's own id: `roomplan:<the floor's identifier>`. A room that
+ * was drawn on a grid says `drawn:`, one walked with the phone says `ar:`, and
+ * neither of those can be a correction of anything RoomPlan produced.
+ *
+ * Where there is no capture to compare against, this says nothing: a folder
+ * holding only a drawing is a drawing, and it opens exactly as it always did.
+ */
+export function isCorrectionOf(room: { readonly id: string }, scan: unknown): boolean {
+  const captured = capturedRoomId(scan);
+  // No capture beside it, or a capture too broken to name: nothing to
+  // contradict, so nothing is claimed. The saved room stands.
+  if (captured === null) return true;
+  return room.id === captured;
+}

@@ -1249,8 +1249,48 @@ def scanLifecycle(bench: Bench) -> None:
            fires=True, saying='a photograph is moved with `try?`')
     bench.restore(rel)
 
+    # 5. "A GENERIC SQUARE BLUEPRINT AND 3D", 2026-08-28: the garage that came
+    #    back as somebody else's room. `title` crosses the bridge as `fileName`
+    #    and `fileName` is the key the web half files the room under, so a scan
+    #    filed under the typed name shares a key with every other scan of that
+    #    name -- and the same folder reached from the Rooms list comes over
+    #    under a different name again.
+    rel = 'ios/Trueline/ScanModel.swift'
+    bench.write(rel, bench.read(rel).replace(
+        '                title: written.folder.lastPathComponent,',
+        '                title: name,'))
     code, out = bench.run('check-scan.py')
-    expect('and quiet again on all four once they are fixed', code, out, fires=False)
+    expect('a scan filed under the name somebody typed rather than its folder',
+           code, out, fires=True, saying='not as its folder')
+    bench.restore(rel)
+
+    # 6. The other half of the same report: a capture written into a folder
+    #    that already holds one, which inherits its corrected.json -- and a
+    #    corrected room outranks a capture all the way to the screen.
+    bench.write(rel, bench.read(rel).replace(
+        'let folder = store.freeFolder(named: CaptureWriter.folderName',
+        'let folder = store.folder(named: CaptureWriter.folderName'))
+    code, out = bench.run('check-scan.py')
+    expect('a capture given a folder that may already hold one', code, out,
+           fires=True, saying='already hold one')
+    bench.restore(rel)
+
+    # And the same two in the walk and the drawing, which had them too and
+    # which nothing had looked at until this check was written.
+    for other, line in [
+        ('ios/Trueline/ARMeasureModel.swift', 'a walk'),
+        ('ios/Trueline/DrawScreen.swift', 'a drawing'),
+    ]:
+        bench.write(other, bench.read(other).replace(
+            'let folder = store.freeFolder(named: CaptureWriter.folderName',
+            'let folder = store.folder(named: CaptureWriter.folderName'))
+        code, out = bench.run('check-scan.py')
+        expect(f'{line} written into a folder that may already hold one', code, out,
+               fires=True, saying='already hold one')
+        bench.restore(other)
+
+    code, out = bench.run('check-scan.py')
+    expect('and quiet again on all six once they are fixed', code, out, fires=False)
 
 
 def main() -> int:

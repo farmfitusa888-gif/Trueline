@@ -91,6 +91,7 @@ const parts = [
   'a52-browser.mjs',
   'a54-marks.mjs',
   'a55-jobmoney.mjs',
+  'a56-garage.mjs',
 ];
 
 /**

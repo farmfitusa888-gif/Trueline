@@ -152,7 +152,12 @@ final class ARMeasureModel: ObservableObject {
     /// where it is tested. None of that arithmetic is repeated here.
     func finish() {
         session.stop()
-        let folder = store.folder(named: CaptureWriter.folderName(for: name, at: startedAt))
+        // Never on top of a folder that is already there. See
+        // `CaptureWriter.freeFolder`: an arriving walk that lands in a resident
+        // folder inherits its `corrected.json`, which outranks a capture on the
+        // way to the web view — so the walk somebody just finished is never
+        // shown and an older room comes back in its place.
+        let folder = store.freeFolder(named: CaptureWriter.folderName(for: name, at: startedAt))
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
@@ -190,7 +195,12 @@ final class ARMeasureModel: ObservableObject {
             store.refresh()
             finished = SavedScan(
                 folder: folder,
-                title: name,
+                // The folder's name, not the one typed into the box. `title`
+                // crosses the bridge as `fileName` and `fileName` is the key
+                // the web half files the room under, so two walks a contractor
+                // called the same thing shared one key and the second
+                // overwrote the first. See `ScanModel.save`.
+                title: folder.lastPathComponent,
                 roomJSON: Data(),
                 photosJSON: Data(),
                 traceJSON: data

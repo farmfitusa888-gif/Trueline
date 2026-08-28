@@ -1,6 +1,7 @@
 import type { Action } from './state.ts';
 import { setEntitlement } from './entitlementStore.ts';
 import { loadProject } from '../../core/src/persist.ts';
+import { isCorrectionOf } from '../../core/src/import-roomplan.ts';
 import { STORAGE_PREFIX } from './state.ts';
 
 /**
@@ -477,6 +478,30 @@ export function tapBack(): boolean {
     // for. The wall is still selected and the screen still says so.
     return false;
   }
+}
+
+/* --------------------------------- a correction that was not of this room */
+
+/**
+ * Whether the room on screen came up because its saved corrections were not
+ * its own.
+ *
+ * Set once, when the app speaks, and read by the screen so it can say so. A
+ * capture drawn in place of a correction with nothing said about it is the
+ * same silence this whole guard exists to end.
+ */
+let strayed = false;
+
+const strayListeners = new Set<() => void>();
+
+export function onStrayCorrection(listen: () => void): () => void {
+  strayListeners.add(listen);
+  return () => strayListeners.delete(listen);
+}
+
+/** Whether the corrections in this room's folder belonged to another room. */
+export function correctionsWereStrays(): boolean {
+  return strayed;
 }
 
 /* -------------------------------------------------- the code for a browser */
@@ -993,6 +1018,39 @@ export function installBridge(dispatch: (action: Action) => void): void {
     dispatch({ type: 'openSaved', project });
   };
 
+  /**
+   * Whether the saved room in this payload is a correction of the capture in it.
+   *
+   * Answers `true` whenever it cannot tell — no capture beside it, a project
+   * that will not parse, a capture with no floor in it. A guard that guessed
+   * would throw away real work, and real work is the thing it exists to
+   * protect. See `isCorrectionOf` in `core/src/import-roomplan.ts`.
+   */
+  const theSavedRoomBelongsHere = (payload: HandOver): boolean => {
+    if (payload.room === undefined || payload.room === null) return true;
+    if (typeof payload.saved !== 'string' || payload.saved === '') return true;
+    try {
+      return isCorrectionOf(loadProject(payload.saved).room, payload.room);
+    } catch {
+      // A corrected file that will not parse is a different failure, and
+      // `openSaved` already says so properly through the reducer.
+      return true;
+    }
+  };
+
+  /**
+   * The capture, and a sentence saying its corrections were somebody else's.
+   *
+   * The stray file is not deleted and not repaired — it is one screen's guess
+   * that it does not belong, and a guess does not get to delete a room. It is
+   * left on disk, and what changes is which of the two is drawn.
+   */
+  const openStrayCorrection = (payload: HandOver) => {
+    open(payload.room, payload.photos, payload.fileName, payload.pins);
+    strayed = true;
+    for (const listen of strayListeners) listen();
+  };
+
   // The profile is not part of the room, so it does not go through the reducer.
   // The provider that owns it subscribes here instead.
   const openCompany = (company: string) => {
@@ -1168,6 +1226,23 @@ export function installBridge(dispatch: (action: Action) => void): void {
     }
 
     if (typeof payload.saved === 'string' && payload.saved !== '') {
+      // A corrected room outranks a capture -- unless it is a correction of
+      // some OTHER room, which is a thing that has actually happened on a
+      // contractor's phone and looked exactly like a broken scanner.
+      //
+      // Sam's garage folder held a real capture, six walls and a garage door,
+      // and beside it a `corrected.json` holding a four-walled 15-by-11 room he
+      // had drawn on a grid two days before. The drawing won, every time, and
+      // the garage was never on the screen. `isCorrectionOf` is exact about it:
+      // a correction of a capture carries that capture's own identifier, and a
+      // room that was drawn or walked cannot be one. See `import-roomplan.ts`.
+      //
+      // Where there is no capture to compare against, nothing is claimed and
+      // this behaves exactly as it always did.
+      if (!theSavedRoomBelongsHere(payload)) {
+        openStrayCorrection(payload);
+        return;
+      }
       openSaved(payload.saved);
       return;
     }
