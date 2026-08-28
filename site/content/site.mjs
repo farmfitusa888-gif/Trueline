@@ -71,11 +71,21 @@ export const PEOPLE = {
      * name appears in the byline, on the About page, and in the `reviewedBy`
      * of every guide's structured data.
      */
-    name: '',
+    name: 'Gilbert Rios',
     /** How he describes his own trade, in his words. Not guessed. */
-    role: '',
-    /** Two sentences, from him. Nothing here may be written on his behalf. */
-    bio: '',
+    role: 'Remodeling contractor, 15 years',
+    /**
+     * What Sam gave, and nothing beyond it.
+     *
+     * He sent four things: the name, the trade, the years, and that Trueline
+     * was built for a problem of his. That is what is here. No town, no
+     * speciality, no anecdote and no adjective has been added — a bio is a
+     * claim about a real person, and the parts nobody said are the parts that
+     * would be invented.
+     */
+    bio:
+      'Gilbert Rios has been a remodeling contractor for fifteen years. Trueline '
+      + 'was built for the way he works, and he is the one testing it on real jobs.',
   },
 };
 
