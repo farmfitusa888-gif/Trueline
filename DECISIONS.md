@@ -2684,3 +2684,79 @@ because it was untracked, and the rest came back by hand.
 
 The test belonged in the throwaway clone, which already existed two lines above.
 A `reset --hard` in a tree with uncommitted work is not a cleanup.
+
+---
+
+## One word that works from any folder
+
+Sam ran this from his home folder:
+
+    npm run catch-up && bash build.sh
+
+    npm error enoent Could not read package.json: ENOENT: no such file or
+    directory, open '/Users/sunnyacres/package.json'
+
+Nothing was broken. `npm` looks for `package.json` in the folder you are
+standing in, and the repo was one folder away.
+
+The cause is not that he was in the wrong folder. The cause is that every
+command in this project began with `cd ~/trueline &&`, which makes the `cd` the
+load-bearing half of the line and the half most easily lost when a line is
+copied out of a message. A command that only works from one folder will keep
+doing this, and telling somebody to be more careful is not a fix.
+
+So `install-command.sh` writes a zsh function into `~/.trueline.zsh` and sources
+it from `~/.zshrc`. The path to the repo is baked into the function at install
+time, and every command it runs, it runs from there:
+
+    trueline          build it and put it on the phone
+    trueline sim      the simulator -- no cable, no signing team, no device
+    trueline open     open the project in Xcode
+    trueline site     build the website and reveal the folder to drag
+    trueline check    every test and check, without building
+    trueline here     move this Terminal into the repo
+
+The path is baked in rather than searched for at run time. A search can find the
+wrong copy of the repo, and being wrong quietly is worse than being broken
+loudly — so if the repo moves, the function says exactly that and names the
+script to re-run.
+
+`trueline site` also runs `open -R` on `site/dist` rather than `open`. `open`
+puts you *inside* the folder, where there is nothing to drag onto Cloudflare
+Pages; `-R` reveals it selected in its parent, which is the thing you drag. That
+was a real complaint, and the fix belongs in the command rather than in a
+sentence telling him to go back up one level.
+
+### The bug in the fix, and the checker that now exists for it
+
+The first version of `install-command.sh` quoted the path like this:
+
+    printf '%s\n' "  local root=${root@Q}"
+
+`${var@Q}` is bash 4.4. **macOS ships bash 3.2.57**, frozen at the last release
+under GPLv2, and there it is a syntax error — found when the file is *parsed*,
+so the whole script dies before its first line of output. The one command whose
+job is to make the build reachable would have produced nothing at all on the
+only machine it was ever going to run on.
+
+It was caught by reading. The next one would not have been, so
+`core/tools/check-bash32.py` reads every `.sh` in the tree for the thirteen
+constructs bash 3.2 does not have: the `@` transformations, `declare -A`,
+`${v,,}` and `${v^^}`, `mapfile`, `&>>`, `|&`, `coproc`, `;;&`, `wait -n`,
+`test -v`, `printf %(fmt)T`, negative array indices and `globstar`. Comments are
+stripped first, so a script may name one in prose to explain why it does not use
+it — which `install-command.sh` does.
+
+Two details in it are the point rather than the detail:
+
+- It lists files with `git ls-files --cached --others --exclude-standard`, not
+  plain `git ls-files`. On its first run the plain form scanned six files and
+  not the seventh — the untracked one with the bug in it. A shell script is
+  runnable the moment it is written, not the moment it is committed.
+- `check-the-checks.py` now puts `${root@Q}` back into `install-command.sh` and
+  a `declare -A` into `build.sh` and fails if the checker stays quiet, then
+  writes both names into a comment and fails if it does not.
+
+This is the same shape as `check-portable.py`, for the same reason: the
+container this is written in is not the machine it runs on, and anything only
+true of the container is a bug waiting for a plane ticket.

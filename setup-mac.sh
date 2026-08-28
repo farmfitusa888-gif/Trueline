@@ -22,9 +22,14 @@
 # Once you have picked your signing team in Xcode the once, you do not need
 # this script again for the ordinary loop:
 #
-#   cd ~/trueline && bash build.sh
+#   trueline
 #
-# builds and puts the app on the phone in one command, without opening Xcode.
+# builds and puts the app on the phone in one command, without opening Xcode,
+# and works from any folder. Install that word once with:
+#
+#   bash ~/trueline/install-command.sh
+#
+# From inside the repo, `bash build.sh` is the same thing.
 
 set -uo pipefail
 

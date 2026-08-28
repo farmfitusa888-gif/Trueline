@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Builds Trueline and puts it on the phone. One command, no Xcode window.
 #
+#   trueline
+#
+# That word works from any folder, once `bash ~/trueline/install-command.sh` has
+# been run the one time. From inside the repo this file is also just:
+#
 #   cd ~/trueline && bash build.sh
 #
 # What it does, in order: pulls, checks the things that have gone wrong before,

@@ -68,6 +68,11 @@ class Bench:
         # scan, a supplier price list, a photograph — and copying them would
         # turn every run of this harness into a several-second file copy for no
         # gain. A checker that reads a `.jpg` does not exist.
+        # The shell scripts at the top of the repository. `check-bash32.py`
+        # reads every `.sh` in the tree, and the one whose bug it exists for is
+        # one of these rather than one under `core/tools`.
+        for path in sorted(ROOT.glob('*.sh')):
+            shutil.copy2(path, where / path.name)
         for folder, suffixes in (('web/src', ('.tsx', '.ts')),
                                  ('web/audit', ('.mjs',))):
             for path in sorted((ROOT / folder).rglob('*')):
@@ -1332,6 +1337,50 @@ def scanLifecycle(bench: Bench) -> None:
     expect('and quiet again on all six once they are fixed', code, out, fires=False)
 
 
+def bashThirtyTwo(bench: Bench) -> None:
+    print('check-bash32.py — the bash that macOS does not have')
+
+    code, out = bench.run('check-bash32.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    # 1. The line `install-command.sh` was actually written with, on 2026-08-28.
+    #    bash 5 runs it. The 3.2 macOS ships dies parsing the file, so the
+    #    script that exists to make the build reachable would have produced no
+    #    output at all on the only machine it was ever going to run on.
+    rel = 'install-command.sh'
+    was = bench.read(rel)
+    broken = was.replace('"  local root=$quoted_root"', '"  local root=${root@Q}"')
+    assert broken != was, 'the line check-bash32 was written for is not there any more'
+    bench.write(rel, broken)
+    code, out = bench.run('check-bash32.py')
+    expect('${root@Q} back in install-command.sh', code, out,
+           fires=True, saying='install-command.sh')
+    bench.restore(rel)
+
+    # 2. A different construct, in a different file, so the checker is not
+    #    trusted on the strength of one pattern out of thirteen.
+    rel = 'build.sh'
+    was = bench.read(rel)
+    bench.write(rel, was.replace('pull=yes', 'declare -A seen\npull=yes', 1))
+    code, out = bench.run('check-bash32.py')
+    expect('an associative array in build.sh', code, out,
+           fires=True, saying='associative array')
+    bench.restore(rel)
+
+    # 3. Naming one in prose must stay quiet -- `install-command.sh` explains in
+    #    a comment why it does not use `${root@Q}`, and a checker that cannot
+    #    tell an explanation from a use makes the explanation unwritable.
+    rel = 'build.sh'
+    was = bench.read(rel)
+    bench.write(rel, '# ${v@Q} and declare -A are bash 4, so they are not used.\n' + was)
+    code, out = bench.run('check-bash32.py')
+    expect('the same things named in a comment', code, out, fires=False)
+    bench.restore(rel)
+
+    code, out = bench.run('check-bash32.py')
+    expect('quiet again once the files are put back', code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -1362,6 +1411,8 @@ def main() -> int:
         onlyOnce(bench)
         print()
         scanLifecycle(bench)
+        print()
+        bashThirtyTwo(bench)
 
     print()
     if failures:

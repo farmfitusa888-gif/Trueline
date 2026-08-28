@@ -7,19 +7,42 @@ measurement that re-solves the whole model around it.
 
 ## Put it on the phone
 
-One command, every time. It pulls, puts the built bundle back if a build left it
-modified, installs what is missing, rebuilds the web screens, checks the things that
-have gone wrong before, finds the phone, compiles, installs and launches. It stops at
-the first thing that is actually wrong and says what to do about it.
+Once, from anywhere, to install the command:
+
+```bash
+bash ~/trueline/install-command.sh
+```
+
+After that, one word, from any folder:
+
+```bash
+trueline
+```
+
+It pulls, puts the built bundle back if a build left it modified, installs what is
+missing, rebuilds the web screens, checks the things that have gone wrong before,
+finds the phone, compiles, installs and launches. It stops at the first thing that is
+actually wrong and says what to do about it.
+
+| | |
+|---|---|
+| `trueline` | build it and put it on the phone |
+| `trueline sim` | the simulator — no cable, no signing team, no device |
+| `trueline open` | open the project in Xcode |
+| `trueline site` | build the website and show you the folder to drag |
+| `trueline check` | every test and check, without building |
+| `trueline here` | move this Terminal into the repo |
+
+The word carries the path to the repo inside it, so the folder you are standing in
+stops mattering. That is the whole reason it exists: every command here used to begin
+`cd ~/trueline &&`, which makes the `cd` the load-bearing part and the part most
+easily lost when a line is copied. Without it, `npm` reads the folder you are in,
+finds no `package.json`, and stops.
+
+The long way still works, from inside the repo:
 
 ```bash
 cd ~/trueline && npm run phone
-```
-
-No cable, no signing team, no device — the simulator instead, which runs every screen
-but the ones that need a sensor:
-
-```bash
 cd ~/trueline && npm run sim
 ```
 

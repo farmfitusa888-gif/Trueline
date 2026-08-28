@@ -148,7 +148,8 @@ to hit, in the order they happen.
 
 | It says | What it means | What to do |
 |---|---|---|
-| `bash: build.sh: No such file or directory` | You are not in the repo folder. | `cd ~/trueline` first. |
+| `bash: build.sh: No such file or directory` | You are not in the repo folder. | `bash ~/trueline/install-command.sh` once, then `trueline` from anywhere. |
+| `npm error enoent Could not read package.json` | Same thing. `npm` reads the folder you are standing in, and there is no `package.json` in your home folder. | The same fix — the installed `trueline` command carries the path inside it. |
 | `Xcode's command line tools are not on the path` | Step 1 is not finished. | Open Xcode once, then **Xcode → Settings → Locations → Command Line Tools** and pick the version in the dropdown. |
 | `No iPhone found` | Cable, lock screen, or Trust. | Unlock the phone, unplug and replug, tap **Trust**. A simulator will not do. |
 | `No signing team` | Step 3 has not happened, or did not stick. | Run `bash setup-mac.sh` — it reads the team off your own certificate and writes it down. If it says no certificate exists, redo step 3. |
@@ -172,7 +173,23 @@ doing. The full 22 are in `docs/on-the-phone.md` when you want them.
 
 ## After the first time
 
-The whole loop, forever:
+Install the one-word command, once, from anywhere:
+
+```bash
+bash ~/trueline/install-command.sh
+```
+
+Then the whole loop, forever, from any folder:
+
+```bash
+trueline
+```
+
+`trueline sim` for the simulator, `trueline open` for Xcode, `trueline check` for
+every test and check without building, `trueline here` to move this Terminal into
+the repo. `trueline help` lists them.
+
+The long way still works from inside the repo:
 
 ```bash
 cd ~/trueline && bash build.sh
