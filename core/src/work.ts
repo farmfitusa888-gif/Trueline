@@ -1,9 +1,17 @@
-import { type Nanometres, NM_PER_MM } from './length.ts';
+import { type Nanometres, NM_PER_FOOT, NM_PER_MM } from './length.ts';
 import type { PriceBook, PriceUnit, Rate } from './price.ts';
 import { type Room, RoomError, area } from './room.ts';
 import { type WallQuantities, byWall, wholeRoom } from './zone.ts';
 import { type Measurement, isVerified, scanned } from './measurement.ts';
-import { linearFeet, squareFeet, squareFeetOfHalves, typedAmount } from './quantity.ts';
+import {
+  SQ_FT,
+  exactFromHundredths,
+  linearFeet,
+  readHundredths,
+  squareFeet,
+  squareFeetOfHalves,
+  typedAmount,
+} from './quantity.ts';
 
 /**
  * What is actually being done, surface by surface — and the reason this had to
@@ -244,6 +252,51 @@ export function measureFits(measure: Measure, kind: SurfaceKind): boolean {
   return measure.surfaces.includes(kind);
 }
 
+/* ------------------------------------------------------ how much of it */
+
+/**
+ * How much of a measured surface is being done, in the contractor's own words.
+ *
+ * > "I LOVE THE OPTION TO SELECT WHAT IS BEING DONE ON THE WALL, BUT SHOULD
+ * >  ALSO BE ABLE TO PUT IN HOW MUCH OF THAT WALL NEEDS REPLACING (GET TO
+ * >  CHOOSE THE EACHES)"
+ *
+ * A tick said "all of it" and nothing else could be said. Most of a remodel is
+ * not all of it: thirty square feet of a wall that measures eighty-four, one
+ * door of the two in a run, six feet of a base that runs eleven. A sheet that
+ * can only say all-or-nothing is a sheet somebody corrects in a spreadsheet,
+ * which is the same failure the scope itself was built to end.
+ *
+ * ## It is his figure and it says so, everywhere
+ *
+ * This is the one quantity on a scoped sheet that no geometry produced, so it
+ * is held to exactly the rule `override.ts` holds a typed-over quantity to, and
+ * for the same reason:
+ *
+ *   1. **The measured figure is never lost.** The room goes on measuring what
+ *      it measures; a part is recorded beside it and never over it. Both are on
+ *      the line — see `LinePart` — and both are on the screen he typed it on.
+ *   2. **A part cannot pass for a measurement.** A line carrying one is never
+ *      `measured`, whatever tape has been on the walls behind it, exactly as
+ *      `provenanceOf` refuses to call an overridden line measured.
+ *
+ * ## Why hundredths and not the string a rate keeps
+ *
+ * `Rate.amount` is a string because it is printed and never added to anything.
+ * A part *is* added — to quantities the geometry produced, in those
+ * quantities' own exact units — so it is kept as the exact integer that
+ * addition happens in, and every reader of a saved file gets the same number
+ * without parsing anything. Hundredths of the unit the item is charged in:
+ * `3000n` is thirty square feet, `100n` is one door.
+ */
+export interface Part {
+  /** Hundredths of the item's own unit. Never a float, and never a length. */
+  readonly hundredths: bigint;
+  /** Who said so. A figure nobody signed is a number that changed by itself. */
+  readonly by: string;
+  readonly at: string;
+}
+
 /* ----------------------------------------------------------- work items */
 
 /**
@@ -267,6 +320,21 @@ export interface WorkItem {
   readonly own?: true;
   /** For a `typed` measure, the number, per surface it is picked on. */
   readonly amount?: string;
+  /**
+   * How much of this surface is being done, when he has said.
+   *
+   * **Not a property of the item, and this is the one place that is worth
+   * saying out loud.** How much of the north wall gets boarded has nothing to
+   * do with how much of the south wall does, so a part belongs to a `Pick` and
+   * that is where `pick` files it. It rides on the item because naming an item
+   * on a surface is the whole of the act — "this, here, this much" is one
+   * decision, not two — and because the screen that makes it has an item in its
+   * hand and a surface beside it.
+   *
+   * Left off means the whole of what the surface measures, which is what every
+   * tick has always meant and what every scope saved before this existed says.
+   */
+  readonly part?: Part;
 }
 
 /**
@@ -387,6 +455,15 @@ export function rateFor(item: WorkItem, cents: bigint, by: string, at: string): 
 export interface Pick {
   readonly item: string;
   readonly unit: PriceUnit;
+  /**
+   * How much of this surface, when it is not all of it.
+   *
+   * Absent is the whole of what the surface measures — which is what a tick has
+   * always meant, and what makes every scope written before parts existed open
+   * to exactly the sheet it always produced. Absent is never zero here either:
+   * nothing being done produces no pick at all.
+   */
+  readonly part?: Part;
 }
 
 /**
@@ -411,15 +488,54 @@ export function isPicked(scope: WorkScope, surface: Surface, item: WorkItem): bo
   return picksOn(scope, surface).some((p) => p.item === item.item && p.unit === item.unit);
 }
 
-/** The scope with one item turned on for one surface. Adding twice adds once. */
+/**
+ * The scope with one item turned on for one surface.
+ *
+ * Adding twice adds once, and adding it again with a different figure on it
+ * changes the figure. Those are the same rule rather than two: the pick is the
+ * decision "this item, on this surface, this much", so a second call saying the
+ * same thing is a no-op and a second call saying a different amount is somebody
+ * changing his mind — which has to land, or the box he typed into springs back.
+ */
 export function pick(scope: WorkScope, surface: Surface, item: WorkItem, by: string, at: string): WorkScope {
-  if (isPicked(scope, surface, item)) return scope;
   const k = surfaceKey(surface);
-  return {
-    picked: { ...scope.picked, [k]: [...(scope.picked[k] ?? []), { item: item.item, unit: item.unit }] },
-    setBy: by,
-    setAt: at,
+  const here = scope.picked[k] ?? [];
+  const next: Pick = {
+    item: item.item,
+    unit: item.unit,
+    ...(item.part === undefined ? {} : { part: item.part }),
   };
+  const where = here.findIndex((p) => p.item === item.item && p.unit === item.unit);
+  if (where >= 0) {
+    if (samePart(here[where]!.part, next.part)) return scope;
+    const replaced = [...here];
+    replaced[where] = next;
+    return { picked: { ...scope.picked, [k]: replaced }, setBy: by, setAt: at };
+  }
+  return { picked: { ...scope.picked, [k]: [...here, next] }, setBy: by, setAt: at };
+}
+
+/** Whether two parts say the same thing, absence included. */
+function samePart(a: Part | undefined, b: Part | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return a.hundredths === b.hundredths;
+}
+
+/**
+ * How much of this surface is being done, when somebody has said.
+ *
+ * `undefined` is the whole of what it measures, and the two must never be
+ * collapsed into a number: "all of it" moves when the wall is re-measured and
+ * a figure he typed does not, which is the entire difference between them.
+ */
+export function partOn(scope: WorkScope, surface: Surface, item: WorkItem): Part | undefined {
+  return picksOn(scope, surface).find((p) => p.item === item.item && p.unit === item.unit)?.part;
+}
+
+/** The same item, carrying a figure — or carrying none, which is all of it. */
+export function withPart(item: WorkItem, part: Part | null): WorkItem {
+  const { part: _was, ...rest } = item;
+  return part === null ? rest : { ...rest, part };
 }
 
 /** The scope with one item turned off for one surface. */
@@ -496,6 +612,36 @@ export interface WorkLine {
   readonly from: readonly string[];
   /** The same number, exact, for a screen that shows metric. See `Exact`. */
   readonly exact: Exact;
+  /**
+   * The surfaces on this line whose share is a figure he typed, not one the
+   * room measured — with what the room measures there, kept beside it.
+   *
+   * Empty on every line the geometry produced on its own, which is every line
+   * on every sheet written before parts existed. When it is not empty, the
+   * quantity above is partly somebody's word, `provenance` says so by never
+   * being `measured`, and `workings` says it in a sentence for the sheet that
+   * gets printed. Three places, because a number that is partly a person's
+   * opinion has to survive being copied into a spreadsheet.
+   */
+  readonly parts: readonly LinePart[];
+}
+
+/**
+ * One surface's share of a line, as a figure somebody typed.
+ *
+ * Both numbers, always. A note reading "30 sq ft on wall-5" leaves a client to
+ * work out for himself that the drawing says eighty-four, and finding that out
+ * on his own is what makes it feel like something was hidden — the same
+ * argument `describeOverride` makes about the same shape of number.
+ */
+export interface LinePart {
+  readonly surface: string;
+  /** What he said, printed in the line's own unit. */
+  readonly typed: string;
+  /** What the room measures there. Never replaced, never overwritten. */
+  readonly measured: string;
+  readonly by: string;
+  readonly at: string;
 }
 
 /**
@@ -555,10 +701,13 @@ export interface WorkSheet {
    */
   readonly measuresNothing: readonly string[];
   /**
-   * Work picked on a surface the room no longer has, named.
+   * Work somebody picked that the room can no longer carry, named.
    *
-   * A wall gets deleted, renamed, or turned into an open span, and everything
-   * somebody decided about it stops applying. The quote changes and nothing
+   * Two ways in, and they are the same failure at two sizes. A wall gets
+   * deleted, renamed, or turned into an open span, and everything somebody
+   * decided about it stops applying. Or a wall is re-measured smaller than the
+   * figure somebody typed against it — see `Part` — and that much of it is no
+   * longer there to be done. The quote changes and nothing
    * says why — which is exactly the failure `applyOverrides` reports as
    * `stranded`, in exactly the same words, for exactly the same reason: a
    * number that quietly moved is worse than a number that is wrong, because
@@ -567,13 +716,47 @@ export interface WorkSheet {
   readonly stranded: readonly string[];
 }
 
-/** How a quantity is being accumulated. One item, one kind, always. */
+/**
+ * How a quantity is being accumulated. One item, one kind, always.
+ *
+ * A count is hundredths of an each rather than a plain integer, which looks
+ * like fussiness and is not. A part — see `Part` — is hundredths of whatever
+ * unit the item is charged in, and "one door of the two" has to be added to a
+ * count in the same unit the rest of the count is held in or the two cannot be
+ * added at all. Whole counts print exactly as they always did: `typedAmount`
+ * gives `2` for `200n`, not `2.00`.
+ */
 type Tally =
   | { kind: 'squares'; value: bigint }
   | { kind: 'halfSquares'; value: bigint }
   | { kind: 'run'; value: Nanometres }
-  | { kind: 'count'; value: number }
+  | { kind: 'count'; value: bigint }
   | { kind: 'typed'; value: bigint };
+
+/**
+ * How many of a tally's own exact units make one of the unit it prints.
+ *
+ * The bridge a typed part crosses. Everything else in this module works in the
+ * unit the geometry produced — square nanometres, the doubled unit a floor is
+ * kept in, nanometres of run — and a number somebody typed arrives in
+ * hundredths of square feet, linear feet or eaches. Converting once, here,
+ * exactly, is what keeps the sum a single rounding at the end rather than one
+ * on the way in and another on the way out.
+ */
+function perUnit(kind: Tally['kind']): bigint {
+  switch (kind) {
+    case 'squares':
+      return SQ_FT;
+    case 'halfSquares':
+      return 2n * SQ_FT;
+    case 'run':
+      return NM_PER_FOOT;
+    // Already hundredths of an each. One printed unit is a hundred of them.
+    case 'count':
+    case 'typed':
+      return 100n;
+  }
+}
 
 /**
  * What an item starts at before any surface has been added to it.
@@ -597,23 +780,23 @@ function emptyTally(measure: MeasureId): Tally {
     case 'typed':
       return { kind: 'typed', value: 0n };
     default:
-      return { kind: 'count', value: 0 };
+      return { kind: 'count', value: 0n };
   }
 }
 
 /** One surface's share, added on. The kinds cannot be crossed by construction. */
-function plus(tally: Tally, share: bigint | number): Tally {
+function plus(tally: Tally, share: bigint): Tally {
   switch (tally.kind) {
-    case 'count':
-      return { kind: 'count', value: tally.value + Number(share) };
     case 'squares':
-      return { kind: 'squares', value: tally.value + BigInt(share) };
+      return { kind: 'squares', value: tally.value + share };
     case 'halfSquares':
-      return { kind: 'halfSquares', value: tally.value + BigInt(share) };
+      return { kind: 'halfSquares', value: tally.value + share };
     case 'run':
-      return { kind: 'run', value: tally.value + BigInt(share) };
+      return { kind: 'run', value: tally.value + share };
+    case 'count':
+      return { kind: 'count', value: tally.value + share };
     case 'typed':
-      return { kind: 'typed', value: tally.value + BigInt(share) };
+      return { kind: 'typed', value: tally.value + share };
   }
 }
 
@@ -626,27 +809,41 @@ function show(tally: Tally): string {
     case 'run':
       return linearFeet(tally.value);
     case 'count':
-      return String(tally.value);
     case 'typed':
       return typedAmount(tally.value);
   }
 }
 
 function isZero(tally: Tally): boolean {
-  return tally.kind === 'count' ? tally.value === 0 : tally.value === 0n;
+  return tally.value === 0n;
 }
 
-/** What one surface contributes to one item, exactly, in that item's own unit. */
+/**
+ * What one surface contributes to one item, exactly, in that item's own unit.
+ *
+ * Counts come back in hundredths of an each — see `Tally` — so that a door and
+ * a part of a door are the same kind of number and can be added to each other.
+ */
 function contribution(
   item: WorkItem,
   surface: Surface,
   room: Room,
   walls: ReadonlyMap<string, WallQuantities>
-): bigint | number {
+): bigint {
   if (item.measure === 'typed') {
-    const text = (item.amount ?? '').trim();
-    const [whole, fraction = ''] = text.split('.');
-    return BigInt(whole || '0') * 100n + BigInt(fraction.padEnd(2, '0') || '0');
+    const typed = readHundredths(item.amount ?? '');
+    // `validateItem` refuses an unreadable amount before an item can reach a
+    // rate book, so this is the second wall and not the first. It stays a
+    // refusal rather than a nought: a typed item whose number cannot be read is
+    // a line nobody could defend, and priced at zero it would read as work
+    // somebody agreed to do for nothing.
+    if (typed === null) {
+      throw new WorkError(
+        `"${item.item}" is measured by a number you type and its number reads "${item.amount}", ` +
+          `which is not one. Whole numbers, or a decimal to two places.`
+      );
+    }
+    return typed;
   }
   if (surface.kind === 'floor' || surface.kind === 'ceiling') {
     // Both follow the room's outline, which is what `area()` returns and what
@@ -666,16 +863,94 @@ function contribution(
     case 'baseboard':
       return q.baseboardRun;
     case 'doors':
-      return q.doors;
+      return BigInt(q.doors) * 100n;
     case 'windows':
-      return q.windows;
+      return BigInt(q.windows) * 100n;
     case 'cased':
-      return q.cased;
+      return BigInt(q.cased) * 100n;
     case 'openings':
-      return q.doors + q.windows + q.cased;
+      return BigInt(q.doors + q.windows + q.cased) * 100n;
     default:
       return 0n;
   }
+}
+
+/**
+ * A figure somebody typed against one item on one surface, read or refused.
+ *
+ * The refusals are the point of it. A part is the one quantity on a scoped
+ * sheet that no geometry produced, so every way of getting it wrong has to be
+ * answered in a sentence beside the box rather than clamped, rounded or
+ * ignored — a number silently reduced to fit is a number the contractor thinks
+ * he set and the client is never charged for.
+ *
+ * Four answers, and each is somebody standing at a wall:
+ *
+ *   - **Not a number.** Whole numbers, or a decimal to two places, which is the
+ *     shape the sheet prints and `quote()` parses back.
+ *   - **More than is there.** Twelve feet of base on a run that measures ten is
+ *     not a part of anything. It is refused with both figures in the sentence,
+ *     because the useful half of the answer is what the wall actually has.
+ *   - **None of it.** Zero is not "a small part": it is the work not happening,
+ *     and the way to say that here has always been to untick the line.
+ *   - **None of it there.** A part of doors on a wall with no door in it. The
+ *     panel offers no box in that state, so this is the second wall rather than
+ *     the first, and it is a refusal rather than a nought for the same reason
+ *     everything else in this module is.
+ *
+ * `null` comes back for a figure that is exactly what the surface measures.
+ * That is not a part and must not be recorded as one — it is `applyOverrides`
+ * refusing to mark a line whose override says exactly what the room says, for
+ * the same reason: a sheet covered in notes about numbers nobody changed is a
+ * sheet nobody reads the notes on. The caller ticks it as the whole of it.
+ */
+export function readPart(
+  room: Room,
+  surface: Surface,
+  item: WorkItem,
+  text: string,
+  by: string,
+  at: string
+): Part | null {
+  const hundredths = readHundredths(text);
+  if (hundredths === null) {
+    throw new WorkError(
+      `"${text.trim()}" is not an amount of ${item.item.toLowerCase()}. Whole numbers, or a ` +
+        `decimal to two places — the same shape the sheet prints, so the figure you type is the ` +
+        `figure the client adds up.`
+    );
+  }
+  if (hundredths === 0n) {
+    throw new WorkError(
+      `None of the ${item.item.toLowerCase()} on ${surfaceName(surface)}, then. Take the tick ` +
+        `off instead — work that is not happening comes off the sheet, and a line at nothing ` +
+        `reads as work priced at no cost.`
+    );
+  }
+  const whole = exactOn(room, surface, item);
+  const kind = emptyTally(item.measure).kind;
+  const wanted = exactFromHundredths(hundredths, perUnit(kind));
+  if (whole === 0n) {
+    throw new WorkError(
+      `${surfaceName(surface)} has no ${item.item.toLowerCase()} on it, so there is no part of ` +
+        `it to do.`
+    );
+  }
+  if (wanted > whole) {
+    throw new WorkError(
+      `${surfaceName(surface)} has ${show(plus(emptyTally(item.measure), whole))} ${item.unit} of ` +
+        `${item.item.toLowerCase()} on it, and you have said ${typedAmount(hundredths)} ` +
+        `${item.unit}. A part cannot be bigger than the thing it is part of — say what is really ` +
+        `there, or leave it ticked for the whole of it.`
+    );
+  }
+  return wanted === whole ? null : { hundredths, by, at };
+}
+
+/** What one surface has of one item, exactly, in that item's own unit. */
+function exactOn(room: Room, surface: Surface, item: WorkItem): bigint {
+  const walls = new Map(byWall(wholeRoom(room), room).map((q) => [q.wallId, q]));
+  return contribution(item, surface, room, walls);
 }
 
 /**
@@ -711,7 +986,7 @@ export function workSheet(
 
   const totals = new Map<
     string,
-    { item: WorkItem; tally: Tally; from: string[]; measured: boolean }
+    { item: WorkItem; tally: Tally; from: string[]; measured: boolean; parts: LinePart[] }
   >();
   const untouched: string[] = [];
   const measuresNothing: string[] = [];
@@ -750,12 +1025,50 @@ export function workSheet(
         measuresNothing.push(`${p.item} on ${surfaceName(surface)} — no such item any more`);
         continue;
       }
-      const share = contribution(item, surface, room, walls);
+      const measures = contribution(item, surface, room, walls);
       const k = key(item.item, item.unit);
       const running =
-        totals.get(k) ?? { item, tally: emptyTally(item.measure), from: [], measured: true };
-      running.tally = plus(running.tally, share);
+        totals.get(k) ??
+        { item, tally: emptyTally(item.measure), from: [], measured: true, parts: [] };
+      const empty = emptyTally(item.measure);
+      const part = p.part;
+      const wanted =
+        part === undefined ? null : exactFromHundredths(part.hundredths, perUnit(empty.kind));
+      // A part bigger than what the surface now has. It cannot happen at the
+      // panel — `readPart` refuses it there — so the only way here is the room
+      // changing underneath a decision somebody already made: a wall
+      // re-measured shorter, a door taken off, an opening widened.
+      //
+      // Named rather than thrown, and named rather than quietly cut down to
+      // fit. Throwing would take the whole sheet down over one stale figure on
+      // one wall; clamping would move money and say nothing.
+      //
+      // It goes through `stranded` and not through `measuresNothing`, because
+      // the sheet's two sentences mean two different things and only one of
+      // them is true here. There IS some of it there — sixty-four square feet
+      // of it — so "picked, and there is none of it there" would be the sheet
+      // contradicting its own line. What is gone is the hundred square feet he
+      // picked, which is exactly what stranded says: something he decided about
+      // is no longer there, and this is why the quote moved.
+      if (part !== undefined && wanted !== null && wanted > measures) {
+        stranded.push(
+          `${item.item} on ${surfaceName(surface)} — you said ` +
+            `${typedAmount(part.hundredths)} ${item.unit} and it measures ` +
+            `${show(plus(empty, measures))} ${item.unit} now`
+        );
+        continue;
+      }
+      running.tally = plus(running.tally, wanted ?? measures);
       running.from.push(surfaceName(surface));
+      if (part !== undefined && wanted !== null) {
+        running.parts.push({
+          surface: surfaceName(surface),
+          typed: show(plus(empty, wanted)),
+          measured: show(plus(empty, measures)),
+          by: part.by,
+          at: part.at,
+        });
+      }
       if (!wallsBehind(surface, room).every((id) => verified.get(id) === true)) {
         running.measured = false;
       }
@@ -777,15 +1090,29 @@ export function workSheet(
       continue;
     }
     const measure = measureById(item.measure);
+    const yours = running.parts
+      .map((part) => `${part.surface} ${part.typed} of ${part.measured} ${item.unit}`)
+      .join('; ');
     lines.push({
       what: item.item,
       quantity: show(running.tally),
       unit: item.unit,
       prices: item.prices,
-      workings: `${measure.workings} — ${running.from.join(', ')}`,
-      provenance: roomProvenance === 'measured' && running.measured ? 'measured' : 'scanned',
+      workings:
+        `${measure.workings} — ${running.from.join(', ')}` +
+        (yours === '' ? '' : `. Your own figure, not a measurement: ${yours}`),
+      // Never `measured` once any of it was typed, however much tape has been
+      // on the walls behind it. It is the rule `provenanceOf` keeps for an
+      // overridden line, kept here for the same reason: the moment a figure
+      // somebody typed can pass for one the room produced, every promise this
+      // app makes about where a number came from is worth nothing.
+      provenance:
+        roomProvenance === 'measured' && running.measured && running.parts.length === 0
+          ? 'measured'
+          : 'scanned',
       from: running.from,
       exact: exactOf(running.tally),
+      parts: running.parts,
     });
   }
 
@@ -807,8 +1134,7 @@ export function workSheet(
  * in `measuresNothing` where it is named.
  */
 export function amountOn(room: Room, surface: Surface, item: WorkItem): string {
-  const walls = new Map(byWall(wholeRoom(room), room).map((q) => [q.wallId, q]));
-  const tally = plus(emptyTally(item.measure), contribution(item, surface, room, walls));
+  const tally = plus(emptyTally(item.measure), exactOn(room, surface, item));
   return isZero(tally) ? '' : show(tally);
 }
 

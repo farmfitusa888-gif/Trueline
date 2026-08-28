@@ -1252,8 +1252,11 @@ export function App() {
 
             {/* Room for the tour card, which is fixed to the bottom of the
                 window. Without it the last stop's ring lands underneath the
-                card that is telling you to look at it. */}
-            {touring && <div aria-hidden="true" className="h-56 print:hidden" />}
+                card that is telling you to look at it. 12 rem is the folded
+                card, the open card and the section bar with room to spare --
+                `CARD_BUDGET.open` in Tour.tsx is a fifth of the window, and
+                a21-tour measures the card against it on every run. */}
+            {touring && <div aria-hidden="true" className="h-48 print:hidden" />}
           </div>
         )
       )}

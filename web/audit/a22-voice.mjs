@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { check, noise, openAsApp, pick, report, section, sentTo, SP } from './lib.mjs';
+import { openChromium } from '../../core/tools/browser.mjs';
+import { check, noise, openAsApp, pick, report, section, sentTo, SP, URL } from './lib.mjs';
 
 /**
  * Talking at a wall, and marking one on a job nobody is claiming for.
@@ -40,6 +41,27 @@ async function openAWall(page) {
   await section(page, 'Plan');
   await pick(page, /^Wall wall-1,/);
   await page.waitForTimeout(200);
+}
+
+/**
+ * Fill a box and make sure it took.
+ *
+ * These inputs are controlled by React, and a `fill` landing in the same frame
+ * as the re-render that opened the form is occasionally swallowed: the value
+ * goes in, the component re-renders from state that has not caught up, and the
+ * box comes back empty or holding what it held before. It failed here once in
+ * about four runs and produced a mark five feet wide where nine was typed,
+ * which reads as a bug in the app and is not one. Filling and then reading the
+ * box back is the whole fix.
+ */
+async function type(page, label, value) {
+  const field = page.getByLabel(label);
+  for (let go = 0; go < 3; go += 1) {
+    await field.fill(value);
+    await page.waitForTimeout(120);
+    if ((await field.inputValue()) === value) return;
+  }
+  throw new Error(`"${label}" would not take "${value}"`);
 }
 
 /** The last thing the page asked the app to do about a recording. */
@@ -250,9 +272,14 @@ check('and no cause-of-loss word is on the screen',
 
 await page.getByRole('button', { name: 'Rot', exact: true }).click();
 await page.getByPlaceholder('sill plate is soft under the window').fill('sill plate is soft here');
-await page.getByLabel('From along the wall').fill('4');
-await page.getByLabel('To along the wall').fill('13');
-await page.getByLabel('How high the damage reaches').fill(`2'`);
+// The three boxes were "from", "to" and "up to" when this was written, and are
+// now where it starts, how wide it is and how high it goes -- the same mark
+// described the way somebody holds a tape rather than the way a rectangle is
+// stored. 4 and 13 became 4 and 9, which is the same nine feet of wall: the
+// check below still reads "9' along wall-1".
+await type(page, 'How far from the corner it starts', '4');
+await type(page, 'How wide it is', '9');
+await type(page, 'How high up the wall it goes', `2'`);
 await page.getByRole('button', { name: 'Mark it' }).click();
 await page.waitForTimeout(400);
 
@@ -328,9 +355,9 @@ check('and the words offered are causes of loss',
 await page.getByRole('button', { name: 'Water', exact: true }).click();
 await page.getByPlaceholder('water line along the bottom of the wall')
   .fill('supply line let go overnight');
-await page.getByLabel('From along the wall').fill('0');
-await page.getByLabel('To along the wall').fill('9');
-await page.getByLabel('How high the damage reaches').fill(`2'`);
+await type(page, 'How far from the corner it starts', '0');
+await type(page, 'How wide it is', '9');
+await type(page, 'How high up the wall it goes', `2'`);
 await page.getByRole('button', { name: 'Mark it' }).click();
 await page.waitForTimeout(400);
 marks = await page.locator('[data-marks]').innerText();
@@ -352,6 +379,232 @@ check('and neither is the word that made it a condition',
 // so the filter is doing its job rather than simply emptying the screen.
 check('while the loss on the same wall prices as tear-out',
   /water damage/.test(claim) && /Remove wall board/.test(claim), claim.slice(0, 1400));
+
+
+/* ========================================================================
+   7. The transcript, at the length somebody actually talks for, on a phone.
+
+   ## The complaint
+
+       "THE TRANSCRIBING IS IN A TEXT BOX AND YOU HAVE TO SCROLL AND CANT SEE
+        EVERYTHING."
+
+   with a recording that came back as *"There was just a lot of mold and mildew
+   and garbage on the wall so I got rid of it and now we're gonna replace it
+   with another drywall piece and"* -- cut off mid-sentence in a three-line box.
+
+   That transcript is the artefact he opens six weeks later to remember what he
+   said, and it was being served three lines at a time behind a scrollbar
+   halfway down a scrolling page. Everything above in this part checks that the
+   words are RIGHT. This checks that they can be READ.
+
+   ## Why this opens its own browser
+
+   Same reason as `a21-tour`: the shared harness opens 430 x 1600, and 1600 is
+   not a phone. In a window that tall the page barely scrolls, so no check about
+   whether a box is hiding the end of a sentence can fail in it. This opens
+   430 x 800 and leaves `lib.mjs` alone.
+
+   The sentence used is his, in full, from the recording in the complaint --
+   including the words that are the whole reason this box stays editable rather
+   than becoming a paragraph: jamb, kerf, R-13.
+   ======================================================================== */
+
+{
+  const HIS = 'There was just a lot of mold and mildew and garbage on the wall so I got rid '
+    + 'of it and now we’re gonna replace it with another drywall piece and I had to cut the '
+    + 'jamb back about a quarter inch to get it to sit flat, so the trim is off by a kerf on '
+    + 'the left side, and behind all of it there is R-13 that got soaked through and that is '
+    + 'coming out too before anything goes back on.';
+
+  const browser = await openChromium();
+  const ctx2 = await browser.newContext({ viewport: { width: 430, height: 800 } });
+  const phone = await ctx2.newPage();
+  const shouted = [];
+  phone.on('console', (m) => { if (m.type() === 'error') shouted.push('console: ' + m.text()); });
+  phone.on('pageerror', (e) => shouted.push('pageerror: ' + e.message));
+  await phone.addInitScript((parked) => {
+    window.__sent = {};
+    window.webkit = { messageHandlers: {} };
+    for (const name of ['saved', 'thumbnail', 'company', 'photo', 'calendar', 'trouble',
+      'mark', 'draft', 'voice', 'haptic']) {
+      window.__sent[name] = [];
+      window.webkit.messageHandlers[name] = {
+        postMessage(body) { window.__sent[name].push(body); },
+      };
+    }
+    window.truelinePayload = parked;
+  }, room({ recordable: true, transcribes: true }));
+  await phone.goto(URL, { waitUntil: 'networkidle' });
+  await phone.waitForTimeout(700);
+
+  await section(phone, 'Plan');
+  await pick(phone, /^Wall wall-1,/);
+  await phone.waitForTimeout(300);
+
+  await phone.getByRole('button', { name: 'Record a note' }).click();
+  await phone.waitForTimeout(300);
+  const which = (await sentTo(phone, 'voice')).at(-1)?.id;
+  await phone.evaluate((it) => window.trueline.heard(it, { started: true }), which);
+  await phone.getByRole('button', { name: /^Stop/ }).click();
+  await phone.waitForTimeout(200);
+  await phone.evaluate(
+    (it) => window.trueline.heard(it, {
+      kept: { fileName: 'voice-1756300009-77778888.m4a', milliseconds: 74_000 },
+    }),
+    which
+  );
+  await phone.waitForTimeout(300);
+  await phone.evaluate(
+    ([it, said]) => window.trueline.heard(it, { transcript: said }), [which, HIS]);
+  await phone.waitForTimeout(500);
+
+  /**
+   * The box, measured rather than described.
+   *
+   * `hidden` is the whole complaint as one number: how many pixels of what
+   * somebody said are inside the element and not on the screen. On a `rows={2}`
+   * textarea holding a minute of talking it is around a hundred and ten.
+   */
+  const box = () => phone.evaluate(() => {
+    const el = document.querySelector('textarea[aria-label="What was said, as text"]');
+    if (!el) return null;
+    const style = getComputedStyle(el);
+    const fixed = [];
+    for (let up = el.parentElement; up && up !== document.body; up = up.parentElement) {
+      const how = getComputedStyle(up).position;
+      if (how === 'fixed' || how === 'sticky') fixed.push(`${up.tagName}:${how}`);
+    }
+    return {
+      height: Math.round(el.getBoundingClientRect().height),
+      hidden: el.scrollHeight - el.clientHeight,
+      inside: el.scrollTop,
+      overflow: style.overflowY,
+      resize: style.resize,
+      room: Number.parseFloat(style.scrollMarginBottom),
+      line: Number.parseFloat(style.lineHeight),
+      words: el.value.length,
+      fixed,
+      page: document.documentElement.scrollHeight > window.innerHeight,
+    };
+  });
+
+  const one = await box();
+  check('the transcript is in a box on the screen at all', one !== null);
+  check('and it arrives marked as the phone’s, before anybody has read it',
+    /Written by this phone/.test(await phone.locator('[data-panel="plan"]').innerText()));
+  check('and not one pixel of what he said is hidden inside it',
+    one.hidden === 0, `${one.hidden}px of the transcript is inside the box and not on screen`);
+  check('and the box is as tall as the words rather than three lines tall',
+    one.height >= one.line * 5, `${one.height}px, one line is ${one.line}px`);
+  check('the whole of it is there to read',
+    one.words === HIS.length, `${one.words} of ${HIS.length} characters`);
+  check('there is no scrollbar in it to find',
+    one.overflow === 'hidden', one.overflow);
+  check('and no drag handle that could only make it wrong',
+    one.resize === 'none', one.resize);
+
+  // The other half of "you have to scroll": what somebody scrolls should be the
+  // page, the way they scroll everything else on this screen.
+  await phone.evaluate(() => {
+    const el = document.querySelector('textarea[aria-label="What was said, as text"]');
+    el.scrollTop = 400;
+  });
+  const still = await box();
+  check('and nothing scrolls inside it when you try', still.inside === 0, String(still.inside));
+  check('the page is what scrolls instead', still.page);
+
+  // The keyboard. It covers the bottom of the window, and a browser asked to
+  // put a focused field "in view" will happily put it against the top of the
+  // keys. Two things keep the line being corrected above them: room asked for
+  // underneath the box, and the box being in the ordinary flow of the page
+  // rather than pinned to an edge the keyboard is about to cover.
+  check('there is room asked for under the box, for the on-screen keyboard',
+    still.room >= 64, `scroll-margin-bottom is ${still.room}px`);
+  check('and nothing between it and the page is pinned to an edge',
+    still.fixed.length === 0, still.fixed.join(', '));
+
+  await phone.getByLabel('What was said, as text').first().click();
+  await phone.waitForTimeout(200);
+  check('it is still a box somebody can type in — the phone gets jamb and R-13 wrong',
+    await phone.evaluate(() =>
+      document.activeElement?.getAttribute('aria-label') === 'What was said, as text'));
+
+  /* ---- A long one. Ten minutes of a walk-round is not an edge case. ---- */
+
+  const LONG = `${HIS} `.repeat(6).trim();
+  await phone.getByLabel('What was said, as text').first().fill(LONG);
+  await phone.waitForTimeout(400);
+  const big = await box();
+  check('a very long recording is shown in full as well',
+    big.hidden === 0 && big.words === LONG.length,
+    `${big.hidden}px hidden, ${big.words} of ${LONG.length} characters`);
+  check('and the box grew with it rather than putting the scrollbar back',
+    big.height > one.height * 3, `${big.height}px against ${one.height}px`);
+
+  // Growing the box must not move the page under somebody's thumb. Measuring
+  // the words means clearing the height for one frame, which shortens the
+  // document; a browser scrolled near the bottom clamps its scroll position to
+  // the shorter document and does not put it back. So: sit at the bottom, make
+  // the box re-measure without touching the caret, and the page must not move.
+  await phone.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await phone.waitForTimeout(400);
+  const wasAt = await phone.evaluate(() => Math.round(window.scrollY));
+  await phone.evaluate(() => {
+    const el = document.querySelector('textarea[aria-label="What was said, as text"]');
+    const put = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+    put.call(el, `${el.value} on.`);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await phone.waitForTimeout(400);
+  const nowAt = await phone.evaluate(() => Math.round(window.scrollY));
+  check('and re-measuring it does not walk the page up the screen',
+    Math.abs(nowAt - wasAt) <= 4, `page moved from ${wasAt} to ${nowAt}`);
+
+  /* ---- Back down, and back again after leaving the screen. ---- */
+
+  await phone.getByLabel('What was said, as text').first().fill('mould on wall three');
+  await phone.waitForTimeout(400);
+  const small = await box();
+  check('cutting it back down shrinks the box again',
+    small.height < one.height && small.hidden === 0, `${small.height}px, ${small.hidden}px hidden`);
+
+  // A textarea measured while its panel is `hidden` has a scrollHeight of zero,
+  // and a box fitted to zero stays flat: the words have not changed, so nothing
+  // would ever measure it again. This is that round trip.
+  await section(phone, 'Takeoff');
+  await phone.waitForTimeout(300);
+  await section(phone, 'Plan');
+  await phone.waitForTimeout(500);
+  await phone.getByLabel('What was said, as text').first().fill(HIS);
+  await phone.waitForTimeout(400);
+  const again = await box();
+  check('and it is still the right height after leaving this screen and coming back',
+    again.hidden === 0 && again.height >= one.line * 5,
+    `${again.height}px, ${again.hidden}px hidden`);
+
+  // Correcting it is still what the box is for. This is the rule part 2 checks,
+  // on the screen size where the box has just changed shape -- a box that grew
+  // beautifully and stopped saving what was typed in it would be a worse bug
+  // than the one being fixed.
+  await phone.getByLabel('What was said, as text').first()
+    .fill(HIS.replace('R-13', 'R-13 batt'));
+  await phone.getByLabel('What was said, as text').first().blur();
+  await phone.waitForTimeout(500);
+  const wall = await phone.locator('[data-panel="plan"]').innerText();
+  check('typing in the taller box still makes the words theirs',
+    !/Written by this phone/.test(wall), wall.slice(0, 500));
+  check('and the recording is untouched by any of it',
+    (await phone.locator('audio[src=\"voice/voice-1756300009-77778888.m4a\"]').count()) === 1);
+  const written = (await sentTo(phone, 'saved')).at(-1)?.project ?? '';
+  check('and every word of the corrected transcript is in what the app was given to keep',
+    written.includes('R-13 batt') && written.includes('mold and mildew'),
+    written.slice(0, 200));
+
+  check('the transcript on a phone: no console or page errors', shouted.length === 0,
+    shouted.join(' | '));
+  await browser.close();
+}
 
 check('marks: no console or page errors', noise().length === 0, noise().join(' | '));
 await ctx.close();

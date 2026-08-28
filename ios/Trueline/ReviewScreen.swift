@@ -105,7 +105,28 @@ struct ReviewScreen: View {
             // Ending the web view where the tab bar starts makes the page's own
             // bottom the tab bar's top, and the two sit flush with no arithmetic
             // shared between Swift and CSS.
-            .navigationTitle(scan.title)
+
+            // The room's NAME, not its folder's.
+            //
+            // This said `scan.title`, which is `entry.name`, which is the
+            // folder's own name -- a timestamp like "Room 2026-08-26 0927". So
+            // a room somebody had named UPSTAIRS had a bar across the top of it
+            // reading "Room 2026-…", truncated, identifying nothing, while the
+            // screen underneath said UPSTAIRS. That is the same screen
+            // disagreeing with itself, and the last time this app let a name
+            // disagree Sam deleted a scan with 53 photographs in it believing
+            // it was a duplicate of the room next to it.
+            //
+            // Read through the store rather than off `scan`, and that is the
+            // point: `store.scans` is `@Published`, `writeCorrected` refreshes
+            // it the moment a rename lands, and this bar follows. A copy taken
+            // when the screen was built would go stale the first time somebody
+            // renamed the room they were looking at.
+            //
+            // `scan.title` is still the folder name everywhere it is an
+            // ADDRESS -- the iCloud record below, and the key handed to the
+            // correction screens above. Those must never move.
+            .navigationTitle(store.name(of: scan.folder))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

@@ -108,7 +108,12 @@ export function Price({
         </p>
       ) : (
         <>
-          <dl className="mt-2 divide-y divide-slate-100">
+          {/* The tour rings THIS, not the whole section: the stop is about a line
+              being a rate times a quantity, and the section around it carries a
+              heading, the rate book and two footnotes that the stop is not
+              about. a21-tour fails a ring taller than the part of the screen
+              its own card is not covering. */}
+          <dl data-tour="priced-lines" className="mt-2 divide-y divide-slate-100">
             {priced.lines.map((line) => {
               const key = `${line.item}|${line.unit}`;
               const source: OverriddenLine | undefined = byItem.get(key);

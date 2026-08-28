@@ -58,13 +58,24 @@ class Bench:
         shutil.copytree(ROOT / 'core' / 'tools', where / 'core' / 'tools',
                         ignore=shutil.ignore_patterns('__pycache__'))
         shutil.copytree(ROOT / 'ios', where / 'ios')
-        # The two web files `check-bridge.py` compares against the app. Copied
-        # one by one rather than the whole of `web/`, which carries node_modules
-        # and a build directory and would make every run of this harness a
-        # several-second file copy.
-        for rel in ('web/src/bridge.ts', 'web/audit/lib.mjs'):
-            (where / rel).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(ROOT / rel, where / rel)
+        # The web sources the checkers read. `check-bridge.py` needs two named
+        # files; `check-controls.py` needs every screen in `web/src` and every
+        # part of the audit, because its whole question is which of the one is
+        # named by the other.
+        #
+        # Source files only, and still not the whole of `web/`: that folder
+        # carries node_modules, a build directory and the audit's fixtures — a
+        # scan, a supplier price list, a photograph — and copying them would
+        # turn every run of this harness into a several-second file copy for no
+        # gain. A checker that reads a `.jpg` does not exist.
+        for folder, suffixes in (('web/src', ('.tsx', '.ts')),
+                                 ('web/audit', ('.mjs',))):
+            for path in sorted((ROOT / folder).rglob('*')):
+                if path.suffix not in suffixes:
+                    continue
+                rel = path.relative_to(ROOT)
+                (where / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, where / rel)
 
     def read(self, rel: str) -> str:
         return (self.where / rel).read_text(encoding='utf-8')
@@ -86,8 +97,17 @@ class Bench:
 failures: list[str] = []
 
 
-def expect(what: str, code: int, output: str, *, fires: bool, saying: str = '') -> None:
-    """A checker must have complained, and must have said the right thing."""
+def expect(what: str, code: int, output: str, *, fires: bool,
+           saying: str = '', notSaying: str = '') -> None:
+    """A checker must have complained, and must have said the right thing.
+
+    `notSaying` is for the checkers whose quiet state is not silence. Most of
+    these tools are green on the repository as it stands, so "did it exit 0"
+    answers everything. `check-controls.py` is not: it stands at seventy-nine
+    findings today, and a mutation that adds an eightieth would be invisible to
+    an exit code. So the mutation is watched by name — the checker must say
+    this control before the break and must stop saying it after.
+    """
     wrong = []
     if fires and code == 0:
         wrong.append('it passed, and the file was broken on purpose')
@@ -95,6 +115,8 @@ def expect(what: str, code: int, output: str, *, fires: bool, saying: str = '') 
         wrong.append(f'it complained about a file that is correct:\n{output.strip()}')
     if fires and saying and saying not in output:
         wrong.append(f'it complained, but never said {saying!r}. It said:\n{output.strip()}')
+    if notSaying and notSaying in output:
+        wrong.append(f'it said {notSaying!r}, and nothing was broken to make it')
     if wrong:
         failures.append(f'{what}: {wrong[0]}')
         print(f'  {RED}✗{OFF} {what}')
@@ -855,6 +877,104 @@ def paywall(bench: Bench) -> None:
     expect('quiet again once both are back', code, out, fires=False)
 
 
+# ------------------------------------------------------------------ controls
+
+def controls(bench: Bench) -> None:
+    """A control the app draws that no part of the audit has ever named.
+
+    This is the shape all four of the reachability bugs were in before somebody
+    found them by hand. `PaywallView` compiled, was in the target and passed
+    nine Swift checkers, and nothing presented it. "Photograph it" was inside a
+    collapsed row that gave no sign it opened. The mark button was refusing
+    280px above the thumb pressing it. Every time, the control was finished and
+    no script had ever asked for it by name, so nothing had ever had the chance
+    to notice.
+
+    Three mutations, and the first two are the undoing of a real audit line.
+
+    The quiet state here is not silence, which is why `notSaying` exists.
+    `check-controls.py` stands at seventy-nine findings on the repository as it
+    is — the real backlog, not a defect in the tool — so an exit code cannot
+    tell an eightieth from the seventy-nine. Each mutation is watched by name
+    instead: the checker must be silent about that control, then name it, then
+    be silent again.
+    """
+    print('check-controls.py — a control nothing in the audit drives')
+
+    # 1. Driven, but never by name. `a6-persist.mjs` renames a wall through
+    #    `getByRole('textbox', { name: 'What to call this wall' })`, and it is
+    #    the only part in the repository that says those words. Reach for the
+    #    same box positionally instead and the audit still passes, still types
+    #    into it, still proves the rename survives a reload — and no longer
+    #    proves anybody could find the box. That is the paywall's exact state:
+    #    working, tested, and unreachable as far as any evidence goes.
+    named = '`What to call this wall`'
+    rel = 'web/audit/a6-persist.mjs'
+
+    code, out = bench.run('check-controls.py')
+    expect('the rename box is driven by name as the repository stands',
+           code, out, fires=True, notSaying=named)
+
+    bench.write(rel, bench.read(rel).replace(
+        "getByRole('textbox', { name: 'What to call this wall' })",
+        "getByRole('textbox').first()"))
+    code, out = bench.run('check-controls.py')
+    expect('the one part that named it reaching for it positionally instead',
+           code, out, fires=True, saying=named)
+    bench.restore(rel)
+
+    code, out = bench.run('check-controls.py')
+    expect('and quiet about it again once the name is back', code, out,
+           fires=True, notSaying=named)
+
+    # 2. A whole part deleted. `a31-mark.mjs` is the only script that drives
+    #    the control that puts a mark on a wall, and the mark button is the one
+    #    Sam reported as dead. Losing the part loses the only evidence anybody
+    #    can reach it.
+    mark = '`Mark a spot on`'
+    part = 'web/audit/a31-mark.mjs'
+
+    code, out = bench.run('check-controls.py')
+    expect('the mark controls are driven as the repository stands',
+           code, out, fires=True, notSaying=mark)
+
+    (bench.where / part).unlink()
+    code, out = bench.run('check-controls.py')
+    expect('the only part that drives the mark controls, deleted', code, out,
+           fires=True, saying=mark)
+    bench.restore(part)
+
+    code, out = bench.run('check-controls.py')
+    expect('and quiet about them again once the part is back', code, out,
+           fires=True, notSaying=mark)
+
+    # 3. An excuse with no argument behind it. `controls-on-purpose.json` is
+    #    the pressure valve on this check and therefore the way to make it
+    #    meaningless. Four words is not a reason.
+    rel = 'core/tools/controls-on-purpose.json'
+    was = bench.read(rel)
+    bench.write(rel, was.rstrip().rstrip('}').rstrip()
+                + ',\n  "Never mind": "we might need it"\n}\n')
+    code, out = bench.run('check-controls.py')
+    expect('a control excused with four words instead of a reason', code, out,
+           fires=True, saying='too thin to be one')
+    bench.restore(rel)
+
+    # 4. A real reason, on a control the audit drives after all. The entry is
+    #    then a lie by omission -- it says nobody should reach this, while
+    #    a11-work.mjs presses it -- and the file has to say so or it silently
+    #    grows entries that mean nothing.
+    bench.write(rel, was.rstrip().rstrip('}').rstrip()
+                + ',\n  "Put it in the calendar": "A long and entirely '
+                  'respectable sentence, written by somebody willing to sign '
+                  'it, about a control that is in fact driven by a11-work.mjs."'
+                  '\n}\n')
+    code, out = bench.run('check-controls.py')
+    expect('an excuse for a control the audit drives anyway', code, out,
+           fires=True, saying='the excuse is spent')
+    bench.restore(rel)
+
+
 # ------------------------------------------------------------------ only once
 
 def onlyOnce(bench: Bench) -> None:
@@ -970,6 +1090,8 @@ def main() -> int:
         doors(bench)
         print()
         bridge(bench)
+        print()
+        controls(bench)
         print()
         pbxproj(bench)
         print()

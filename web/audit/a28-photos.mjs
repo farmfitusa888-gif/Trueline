@@ -78,9 +78,9 @@ await page.getByRole('button', { name: 'Water', exact: true }).click();
 await page
   .getByPlaceholder('water line along the bottom of the wall')
   .fill('supply line behind the washer');
-await page.getByLabel('From along the wall').fill('0');
-await page.getByLabel('To along the wall').fill('6');
-await page.getByLabel('How high the damage reaches').fill('18"');
+await page.getByLabel('How far from the corner it starts').fill('0');
+await page.getByLabel('How wide it is').fill('6');
+await page.getByLabel('How high up the wall it goes').fill('18"');
 await page.getByRole('button', { name: 'Mark it' }).click();
 await page.waitForTimeout(400);
 await page.getByRole('button', { name: /Open$/ }).first().click();

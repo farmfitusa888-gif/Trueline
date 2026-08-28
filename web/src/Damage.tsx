@@ -59,6 +59,35 @@ import { useUnits } from './units.tsx';
  *
  * Everything else — the shape, the note, the photograph, the recording — is the
  * same code, because it is the same thing.
+ *
+ * ## How a patch is asked for, and why it changed
+ *
+ * > "'FROM' 'TO' 'UPTO' MAKES NO SENSE MAKE IT EASY AND UNDERSTANDABLE."
+ *
+ * It asked for three numbers in boxes labelled `from`, `to` and `up to`, under
+ * a line about "the corner the plan numbers this wall from". Every one of those
+ * is the model's vocabulary rather than the trade's. `from` and `to` are
+ * coordinates along a wall; nobody standing at a wall says a coordinate. And
+ * the corner sentence named no corner anybody could find.
+ *
+ * **The middle box was the one that actually cost something.** With a tape
+ * hooked in a corner, the start of a patch is read straight off the tape — but
+ * "to" is the far end *as a coordinate*, so a four-foot patch starting three
+ * feet in has to be typed as `7`. That is a sum, done in the head, usually at
+ * the top of a ladder, and it is a sum nothing afterwards can catch: `7` is a
+ * perfectly valid coordinate and the mark simply comes out the wrong size.
+ *
+ * So it asks for what a person measures and says out loud — where it starts,
+ * **how wide it is**, how high it goes — and does the addition here. Three
+ * boxes stayed three boxes because position is genuinely needed: the elevation
+ * draws the patch where it is and the plan puts a marker on it, so a width with
+ * no position would stack every mark in the corner. What changed is that all
+ * three are now tape readings of the thing itself rather than two coordinates
+ * and a height.
+ *
+ * **Nothing about the record moved.** A patch is still `fromAlong`, `toAlong`
+ * and a height off the floor, in exact nanometres, and `validateDamage` checks
+ * exactly what it always did. This is the words and the shape of the asking.
  */
 
 const LABEL: Record<MarkKind, string> = {
@@ -133,8 +162,8 @@ export function DamageOnWall({
    * refused, and the cursor goes into the empty box.
    */
   const noteBox = useRef<HTMLInputElement | null>(null);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [startsAt, setStartsAt] = useState('');
+  const [wide, setWide] = useState('');
   const [high, setHigh] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [typed, setTyped] = useState<string | null>(null);
@@ -149,6 +178,35 @@ export function DamageOnWall({
   });
 
   const feet = (text: string) => parseLength(text, { defaultUnit: 'ft' });
+
+  /**
+   * How tall this wall stands, for the prompt above the boxes.
+   *
+   * A pony wall carries its own height and everything else takes the room's,
+   * which is the same pair `validateDamage` checks a patch against. It is in
+   * the prompt because "how high up the wall it goes" is a question with a
+   * ceiling on it, and being told the ceiling afterwards — by a refusal — is
+   * being told it too late.
+   */
+  const standsAt = (wall.height ?? room.ceilingHeight).value;
+
+  /**
+   * The wall this one shares its starting corner with.
+   *
+   * "From the corner the plan numbers this wall from" is true and is unusable:
+   * it names no corner a person standing in the room can find. A room's walls
+   * are walked in order and each starts where the one before it ended — see
+   * `corners` — so the corner a patch is measured from is the corner this wall
+   * makes with the wall before it, and that is a corner somebody can put a
+   * thumb on. Renaming a wall replaces its id, so once he has called one "the
+   * window wall" the sentence says so too.
+   */
+  const cornerWith = (() => {
+    const index = room.walls.findIndex((w) => w.id === wall.id);
+    if (index < 0 || room.walls.length < 2) return null;
+    const before = room.walls[(index - 1 + room.walls.length) % room.walls.length];
+    return before && before.id !== wall.id ? before.id : null;
+  })();
 
   function keep(shape: Mark['shape']) {
     if (note.trim() === '') {
@@ -174,8 +232,8 @@ export function DamageOnWall({
     setAdding(null);
     setWants(null);
     setNote('');
-    setFrom('');
-    setTo('');
+    setStartsAt('');
+    setWide('');
     setHigh('');
   }
 
@@ -255,7 +313,7 @@ export function DamageOnWall({
         <p className="mt-1 text-sm text-slate-600">
           Rot, a crack, a wall out of plumb, something you cannot get at. It goes on the sheet
           you carry and on nothing you price — the wall is already measured, so all it needs is
-          where along it and how high.
+          where it starts, how wide it is and how high it goes.
         </p>
       )}
 
@@ -507,37 +565,60 @@ export function DamageOnWall({
           {adding === 'patch' && (
             <div className="mt-3 space-y-2">
               <p className="text-sm text-slate-700">
-                Where along {wall.id}, and how high? It runs {len(runLength(wall))}.
+                How big is it, and where on {wall.id}? {wall.id} runs {len(runLength(wall))} and
+                stands {len(standsAt)} high.
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                <input
-                  value={from}
-                  onChange={(event) => setFrom(event.target.value)}
-                  placeholder="from"
-                  aria-label="From along the wall"
-                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
-                             focus:border-sky-500 focus:outline-none"
-                />
-                <input
-                  value={to}
-                  onChange={(event) => setTo(event.target.value)}
-                  placeholder="to"
-                  aria-label="To along the wall"
-                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
-                             focus:border-sky-500 focus:outline-none"
-                />
-                <input
-                  value={high}
-                  onChange={(event) => setHigh(event.target.value)}
-                  placeholder="up to"
-                  aria-label="How high the damage reaches"
-                  className="min-h-12 rounded-md border border-slate-300 px-2 py-2 font-mono tabular-nums
-                             focus:border-sky-500 focus:outline-none"
-                />
+              {/* Three rows rather than three columns. At 430 px a row of three
+                  boxes leaves room for a word above each and nothing more,
+                  which is how they came to be labelled "from", "to" and
+                  "up to" in the first place. */}
+              <div className="space-y-2">
+                <label className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-slate-700">How far from the corner it starts</span>
+                  <input
+                    value={startsAt}
+                    onChange={(event) => setStartsAt(event.target.value)}
+                    inputMode="text"
+                    placeholder={`e.g. 3'`}
+                    aria-label={`How far from the corner it starts, along ${wall.id}`}
+                    className="min-h-12 w-28 shrink-0 rounded-md border border-slate-300 px-2 py-2
+                               text-right font-mono tabular-nums
+                               focus:border-sky-500 focus:outline-none"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-slate-700">How wide it is</span>
+                  <input
+                    value={wide}
+                    onChange={(event) => setWide(event.target.value)}
+                    inputMode="text"
+                    placeholder={`e.g. 4'`}
+                    aria-label={`How wide it is, along ${wall.id}`}
+                    className="min-h-12 w-28 shrink-0 rounded-md border border-slate-300 px-2 py-2
+                               text-right font-mono tabular-nums
+                               focus:border-sky-500 focus:outline-none"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-slate-700">How high up the wall it goes</span>
+                  <input
+                    value={high}
+                    onChange={(event) => setHigh(event.target.value)}
+                    inputMode="text"
+                    placeholder={`e.g. 2'`}
+                    aria-label={`How high up the wall it goes, on ${wall.id}`}
+                    className="min-h-12 w-28 shrink-0 rounded-md border border-slate-300 px-2 py-2
+                               text-right font-mono tabular-nums
+                               focus:border-sky-500 focus:outline-none"
+                  />
+                </label>
               </div>
               <p className="text-xs text-slate-500">
-                From the corner the plan numbers this wall from. Height is off the floor — water
-                starts at nothing, a roof leak does not.
+                {cornerWith
+                  ? `Hook your tape in the corner where ${wall.id} meets ${cornerWith}, and ` +
+                    `measure along ${wall.id} from there.`
+                  : `Measure along ${wall.id} from the corner the plan numbers it from.`}{' '}
+                Height is off the floor — water starts at nothing, a roof leak does not.
               </p>
               {typed && <p className="text-sm text-red-700">{typed}</p>}
               <button
@@ -547,11 +628,19 @@ export function DamageOnWall({
                   // typed in. Only a shape that actually parsed reaches the
                   // model, which then checks it against the room.
                   try {
+                    // The two ends, worked out from the two things somebody
+                    // standing at the wall actually has in his hand: where the
+                    // patch starts and how big it is. The record is unchanged —
+                    // a patch is still two positions along the wall and a
+                    // height off the floor — and the addition happens here, in
+                    // exact nanometres, rather than in his head at the top of a
+                    // ladder.
+                    const at = feet(startsAt);
                     const shape = {
                       kind: 'patch' as const,
                       wallId: wall.id,
-                      fromAlong: feet(from),
-                      toAlong: feet(to),
+                      fromAlong: at,
+                      toAlong: at + feet(wide),
                       fromHeight: 0n,
                       toHeight: feet(high),
                     };

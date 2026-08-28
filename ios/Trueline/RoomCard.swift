@@ -56,6 +56,14 @@ struct RoomCard: Codable, Hashable {
     var schema: String = RoomCard.schema
     /// What to call this room. Empty means "no name given" and the folder's own
     /// name is used, which is what every room looked like before this existed.
+    ///
+    /// **A copy, never a second opinion.** The room's name lives in `room.name`
+    /// inside `corrected.json`, where the correction screens put it and where
+    /// every document this app prints reads it from. This field exists so the
+    /// Rooms list can show a name without parsing a 12 kB room per row, and it
+    /// is written by exactly one function -- `ProjectStore.writeCorrected` --
+    /// out of `name(inside:)` below. Nothing else may write it. A second writer
+    /// is a second name, and a second name is the 53 photographs above.
     var name: String = ""
     /// The property this room belongs to — "118 Willow St".
     ///
@@ -99,7 +107,12 @@ struct RoomCard: Codable, Hashable {
         // the room screen said the new name, the Rooms list went on saying
         // "Room 2026-08-26 0927" forever, and the two looked like two
         // different rooms. Sam deleted one of them believing it was a
-        // duplicate. It was his scan.
+        // duplicate. It was his scan, and there were **53 photographs** in it
+        // of walls that have since been closed up. That is what a name
+        // disagreeing with itself costs in this app, and it is why there is
+        // exactly one function in the whole project that writes a room's name
+        // onto a card -- `ProjectStore.writeCorrected` -- and why it gets that
+        // name from here rather than from anywhere a person could type one.
         //
         // Trimmed and checked for emptiness both ways, because a room named
         // with a space is a room with no name.

@@ -28,11 +28,15 @@ import {
   pick,
   rateFor,
   readSurface,
+  partOn,
+  picksOn,
+  readPart,
   readSurfaceMeasure,
   surfaceKey,
   surfaceName,
   surfacesOf,
   validateItem,
+  withPart,
   workItems,
   workSheet,
 } from '../work.ts';
@@ -97,6 +101,19 @@ function scopeOf(pairs: readonly (readonly [Surface, WorkItem])[]): WorkScope {
 
 const sheetFor = (room: Room, scope: WorkScope, items: readonly WorkItem[] = ITEMS) =>
   takeoff(room, T0, { work: { scope, items } });
+
+/**
+ * The work sheet itself, before the takeoff copies it into its own line shape.
+ *
+ * `takeoff` widens a `WorkLine` into a `TakeoffLine`, which is the shape the
+ * text and the CSV are written from and which carries no `parts` — a printed
+ * sheet says whose figure a quantity is in the `workings` sentence, because
+ * that is the half of it a person reads. Anything asserting on the structure
+ * asks `workSheet` for it rather than reaching for a field the takeoff's own
+ * type does not have.
+ */
+const workFor = (room: Room, scope: WorkScope, items: readonly WorkItem[] = ITEMS) =>
+  workSheet(room, scope, items, 'scanned');
 
 /* ============================================================ counting */
 
@@ -796,4 +813,326 @@ test('the ceiling is a surface of every room, and it is the same one every time'
   assert.deepEqual(readSurface('ceiling'), CEILING);
   assert.ok(surfacesOf(box).some((s) => surfaceKey(s) === surfaceKey(CEILING)));
   assert.equal(surfaceName(CEILING), 'the ceiling');
+});
+
+/* ============================================== how much of a surface */
+
+/**
+ * Saying how much of a wall is being done, rather than all of it or none.
+ *
+ * > "I LOVE THE OPTION TO SELECT WHAT IS BEING DONE ON THE WALL, BUT SHOULD
+ * >  ALSO BE ABLE TO PUT IN HOW MUCH OF THAT WALL NEEDS REPLACING (GET TO
+ * >  CHOOSE THE EACHES)"
+ *
+ * Every figure below is worked out by hand off the room at the top of this
+ * file, and never asked of the thing being tested. The room is 20 ft by 10 ft
+ * and 8 ft to the ceiling, so a long wall is 160 sq ft of face and 20 lf of
+ * base, and a short one is 80 sq ft and 10 lf.
+ *
+ * The failure these exist for is a sheet that adds up perfectly and is for the
+ * wrong amount of work — the one a test that asks the sheet for its own numbers
+ * cannot see.
+ */
+
+/** The scope, with a figure typed against one item on one surface. */
+function partOf(
+  scope: WorkScope,
+  surface: Surface,
+  item: WorkItem,
+  text: string,
+  room: Room = box
+): WorkScope {
+  return pick(scope, surface, withPart(item, readPart(room, surface, item, text, BY, T0)), BY, T0);
+}
+
+const RATES: PriceBook = {
+  rates: [
+    { item: 'Wall face', unit: 'sq ft', cents: 375n, source: { kind: 'typed', by: BY, at: T0 } },
+    { item: 'Baseboard', unit: 'lf', cents: 600n, source: { kind: 'typed', by: BY, at: T0 } },
+    { item: 'Doors', unit: 'ea', cents: 24000n, source: { kind: 'typed', by: BY, at: T0 } },
+  ],
+};
+
+test('a part of a wall is priced as the part, and the rest of the sheet does not move', () => {
+  // South and north boarded — 160 sq ft each, 320 together — and 20 lf of base
+  // put back on the north wall. Then only 30 sq ft of the south wall is being
+  // boarded rather than all 160, so the face line is 30 + 160 = 190.
+  const all = scopeOf([
+    [wallOf('south'), wallFace],
+    [wallOf('north'), wallFace],
+    [wallOf('north'), baseboard],
+  ]);
+  const some = partOf(all, wallOf('south'), wallFace, '30');
+
+  const before = sheetFor(box, all);
+  const after = sheetFor(box, some);
+
+  assert.equal(before.lines.find((l) => l.what === 'Wall face')!.quantity, '320.0');
+  assert.equal(after.lines.find((l) => l.what === 'Wall face')!.quantity, '190.0');
+
+  // 320 sq ft at $3.75 is $1,200.00; 190 at $3.75 is $712.50. 20 lf of base at
+  // $6.00 is $120.00 on both, because nobody said anything about the base.
+  const money = (sheet: typeof before, what: string) =>
+    quote(sheet.lines.map((l) => ({ ...l })), RATES).lines.find((l) => l.item === what)!.total;
+
+  assert.equal(money(before, 'Wall face'), 120000n);
+  assert.equal(money(after, 'Wall face'), 71250n);
+  assert.equal(money(before, 'Baseboard'), 12000n, '20 lf at $6.00');
+  assert.equal(
+    money(after, 'Baseboard'),
+    12000n,
+    'the untouched line is the same to the cent'
+  );
+
+  // And the money came down by exactly the 130 sq ft that came off: 130 at
+  // $3.75 is $487.50.
+  assert.equal(money(before, 'Wall face') - money(after, 'Wall face'), 48750n);
+});
+
+test('the measured figure is kept beside the typed one, on the line and in the workings', () => {
+  const scope = partOf(scopeOf([[wallOf('south'), wallFace]]), wallOf('south'), wallFace, '30');
+  const line = workFor(box, scope).lines.find((l) => l.what === 'Wall face')!;
+
+  assert.equal(line.quantity, '30.0');
+  assert.equal(line.parts.length, 1);
+  assert.equal(line.parts[0]!.surface, 'south');
+  assert.equal(line.parts[0]!.typed, '30.0');
+  assert.equal(line.parts[0]!.measured, '160.0', 'what the room measures is never replaced');
+  assert.equal(line.parts[0]!.by, BY);
+  assert.match(line.workings, /Your own figure, not a measurement: south 30\.0 of 160\.0 sq ft/);
+});
+
+test('a line carrying a figure somebody typed is never measured, whatever tape is on it', () => {
+  // One wall each way taped, which is what makes a room read as measured.
+  let measured = verifyWall(box, 'south', parseLength(`20'`), BY, T0, 'tape').room;
+  measured = verifyWall(measured, 'east', parseLength(`10'`), BY, T0, 'tape').room;
+
+  const whole = scopeOf([[wallOf('south'), wallFace]]);
+  assert.equal(
+    sheetFor(measured, whole).lines.find((l) => l.what === 'Wall face')!.provenance,
+    'measured'
+  );
+
+  const part = partOf(whole, wallOf('south'), wallFace, '30', measured);
+  const line = sheetFor(measured, part).lines.find((l) => l.what === 'Wall face')!;
+  assert.equal(line.provenance, 'scanned', 'a figure he typed cannot pass for one a tape gave');
+  assert.equal(
+    quote(sheetFor(measured, part).lines.map((l) => ({ ...l })), RATES).measured,
+    false,
+    'and the quote it is on cannot call itself measured either'
+  );
+});
+
+test('the eaches can be chosen: one door of the two in a wall', () => {
+  const twoDoors: Room = {
+    ...box,
+    walls: box.walls.map((wall) =>
+      wall.id === 'south'
+        ? {
+            ...wall,
+            openings: [
+              opening('d1', 'door', `3'`, `6'8"`, `2'`),
+              opening('d2', 'door', `3'`, `6'8"`, `12'`),
+            ],
+          }
+        : wall
+    ),
+  };
+
+  const both = scopeOf([[wallOf('south'), doorsItem]]);
+  assert.equal(sheetFor(twoDoors, both).lines.find((l) => l.what === 'Doors')!.quantity, '2');
+
+  const one = partOf(both, wallOf('south'), doorsItem, '1', twoDoors);
+  const line = workFor(twoDoors, one).lines.find((l) => l.what === 'Doors')!;
+  assert.equal(line.quantity, '1', 'one of them, and it prints as a count and not as 1.00');
+  assert.equal(line.parts[0]!.measured, '2');
+
+  // $240.00 a door: two is $480.00 and one is $240.00.
+  const money = (scope: WorkScope) =>
+    quote(sheetFor(twoDoors, scope).lines.map((l) => ({ ...l })), RATES).lines
+      .find((l) => l.item === 'Doors')!.total;
+  assert.equal(money(both), 48000n);
+  assert.equal(money(one), 24000n);
+});
+
+test('a part bigger than the thing it is part of is refused, with both figures in the sentence', () => {
+  // The south wall carries 20 lf of base. Twelve is a part of it; twenty-five
+  // is not a part of anything.
+  assert.ok(readPart(box, wallOf('south'), baseboard, '12', BY, T0));
+  assert.throws(
+    () => readPart(box, wallOf('south'), baseboard, '25', BY, T0),
+    (error: unknown) =>
+      error instanceof WorkError &&
+      /south has 20\.00 lf of baseboard on it, and you have said 25 lf/.test(String(error)) &&
+      /cannot be bigger than the thing it is part of/.test(String(error))
+  );
+});
+
+test('a part is refused rather than clamped, so nothing quietly becomes the whole', () => {
+  // The failure this is against: a silent clamp. Somebody types 25 on a 20 ft
+  // run, the app prices 20, and he believes he priced 25 until the invoice.
+  let refused = false;
+  try {
+    readPart(box, wallOf('south'), baseboard, '25', BY, T0);
+  } catch {
+    refused = true;
+  }
+  assert.equal(refused, true);
+
+  // Nothing was recorded, so the sheet is still the whole run.
+  const scope = scopeOf([[wallOf('south'), baseboard]]);
+  assert.equal(sheetFor(box, scope).lines.find((l) => l.what === 'Baseboard')!.quantity, '20.00');
+});
+
+test('a part that is not a number, or is none of it, is refused in words', () => {
+  assert.throws(
+    () => readPart(box, wallOf('south'), wallFace, 'half', BY, T0),
+    (error: unknown) => error instanceof WorkError && /is not an amount of wall face/.test(String(error))
+  );
+  assert.throws(
+    () => readPart(box, wallOf('south'), wallFace, '30.555', BY, T0),
+    (error: unknown) => error instanceof WorkError && /decimal to two places/.test(String(error))
+  );
+  assert.throws(
+    () => readPart(box, wallOf('south'), wallFace, '0', BY, T0),
+    (error: unknown) =>
+      error instanceof WorkError && /Take the tick off instead/.test(String(error))
+  );
+  assert.throws(
+    () => readPart(box, wallOf('south'), doorsItem, '1', BY, T0),
+    (error: unknown) =>
+      error instanceof WorkError &&
+      /south has no doors on it, so there is no part of it to do/.test(String(error))
+  );
+});
+
+test('a figure that is exactly what the surface measures is not a part at all', () => {
+  // The same rule `applyOverrides` keeps: a number that says exactly what the
+  // room says is not somebody changing anything, and marking it as his figure
+  // would put a note on a sheet about a number nobody moved.
+  assert.equal(readPart(box, wallOf('south'), wallFace, '160', BY, T0), null);
+
+  const scope = partOf(scopeOf([[wallOf('south'), wallFace]]), wallOf('south'), wallFace, '160');
+  assert.equal(partOn(scope, wallOf('south'), wallFace), undefined);
+  const line = workFor(box, scope).lines.find((l) => l.what === 'Wall face')!;
+  assert.equal(line.quantity, '160.0');
+  assert.equal(line.parts.length, 0);
+  assert.equal(line.provenance, 'scanned', 'unchanged: nobody has taped this room');
+  assert.doesNotMatch(line.workings, /Your own figure/);
+});
+
+test('picking twice adds once, and picking again with a different figure changes it', () => {
+  const once = scopeOf([[wallOf('south'), wallFace]]);
+  assert.equal(pick(once, wallOf('south'), wallFace, BY, T0), once, 'the same scope, untouched');
+
+  const thirty = partOf(once, wallOf('south'), wallFace, '30');
+  assert.equal(picksOnCount(thirty), 1, 'still one pick, not two');
+  assert.equal(partOn(thirty, wallOf('south'), wallFace)!.hundredths, 3000n);
+
+  const again = partOf(thirty, wallOf('south'), wallFace, '30');
+  assert.equal(again, thirty, 'saying the same figure twice is not a change');
+
+  const forty = partOf(thirty, wallOf('south'), wallFace, '40.5');
+  assert.equal(picksOnCount(forty), 1);
+  assert.equal(partOn(forty, wallOf('south'), wallFace)!.hundredths, 4050n);
+  assert.equal(sheetFor(box, forty).lines.find((l) => l.what === 'Wall face')!.quantity, '40.5');
+
+  // And taking the figure off puts it back to the whole of it.
+  const whole = pick(forty, wallOf('south'), withPart(wallFace, null), BY, T0);
+  assert.equal(partOn(whole, wallOf('south'), wallFace), undefined);
+  assert.equal(sheetFor(box, whole).lines.find((l) => l.what === 'Wall face')!.quantity, '160.0');
+});
+
+function picksOnCount(scope: WorkScope): number {
+  return picksOn(scope, wallOf('south')).length;
+}
+
+test('an untouched line is priced as the whole, exactly as it was before parts existed', () => {
+  // Nothing about a room nobody has typed a figure into may change. The proof
+  // is character for character, both sheets, both shapes.
+  const scope = everything(box, ITEMS, BY, T0);
+  const sheet = sheetFor(box, scope);
+  assert.equal(sheet.text, takeoff(box, T0, { work: { scope, items: ITEMS } }).text);
+  assert.ok(
+    workFor(box, scope).lines.every((l) => l.parts.length === 0),
+    'no line claims a typed figure'
+  );
+  assert.equal(sheet.lines.find((l) => l.what === 'Wall face')!.quantity, '480.0');
+  assert.equal(sheet.lines.find((l) => l.what === 'Baseboard')!.quantity, '60.00');
+});
+
+test('a figure typed against one wall leaves every other wall on that line measured to the inch', () => {
+  // Two walls on one line: 160 sq ft measured on the north, 30 typed on the
+  // south. The sum has to be the exact 160 plus the exact 30 — not the printed
+  // 160.0 rounded and added, which is how a tenth goes missing.
+  const scope = partOf(
+    scopeOf([
+      [wallOf('south'), wallFace],
+      [wallOf('north'), wallFace],
+    ]),
+    wallOf('south'),
+    wallFace,
+    '30.25'
+  );
+  const line = workFor(box, scope).lines.find((l) => l.what === 'Wall face')!;
+  assert.equal(line.quantity, '190.3', '160 + 30.25, rounded once at the end');
+  assert.equal(line.exact.kind, 'area');
+  if (line.exact.kind === 'area') {
+    const sqFt = NM_PER_FOOT * NM_PER_FOOT;
+    assert.equal(line.exact.halfSquares, 2n * (160n * sqFt) + 2n * ((3025n * sqFt) / 100n));
+  }
+});
+
+test('a figure that no longer fits the room is named, not thrown and not clamped', () => {
+  // A part is refused at the panel, so the only way one can outgrow its wall is
+  // the room changing under a decision somebody already made.
+  const scope = partOf(
+    scopeOf([
+      [wallOf('south'), wallFace],
+      [wallOf('north'), wallFace],
+    ]),
+    wallOf('south'),
+    wallFace,
+    '100'
+  );
+
+  // The south wall is re-measured at 8 ft: 64 sq ft of face, and the 100 he
+  // typed is no longer a part of it.
+  const shrunk = verifyWall(box, 'south', parseLength(`8'`), BY, T0, 'tape').room;
+  const sheet = workFor(shrunk, scope);
+
+  const line = sheet.lines.find((l) => l.what === 'Wall face')!;
+  assert.deepEqual([...line.from], ['north'], 'the wall it stopped applying to drops off');
+  assert.equal(line.parts.length, 0);
+  // Through `stranded` and not `measuresNothing`: there IS wall face on south,
+  // just not the hundred square feet of it he picked. The sheet says which
+  // figure stopped applying rather than letting the quote move in silence.
+  assert.equal(sheet.measuresNothing.length, 0);
+  assert.equal(sheet.stranded.length, 1);
+  assert.match(
+    sheet.stranded[0]!,
+    /^Wall face on south — you said 100 sq ft and it measures 64\.0 sq ft now$/
+  );
+  assert.match(
+    takeoff(shrunk, T0, { work: { scope, items: ITEMS } }).text,
+    /Picked on part of the room that is no longer there[^]*?you said 100 sq ft/
+  );
+});
+
+test('a typed figure survives being saved and read back, exactly', () => {
+  const scope = partOf(scopeOf([[wallOf('south'), wallFace]]), wallOf('south'), wallFace, '30.25');
+  const saved = saveProject({
+    savedAt: T0,
+    fileName: 'Back bedroom',
+    room: box,
+    extras: { report: { sourceVersion: '1' }, scope },
+  });
+
+  // On the way out it is an exact integer of hundredths, tagged, never a float.
+  assert.match(saved, /"hundredths":\{"\$nm":"3025"\}/);
+
+  const back = (loadProject(saved).extras as { scope: WorkScope }).scope;
+  assert.equal(partOn(back, wallOf('south'), wallFace)!.hundredths, 3025n);
+  assert.equal(partOn(back, wallOf('south'), wallFace)!.by, BY);
+  assert.equal(sheetFor(box, back).lines.find((l) => l.what === 'Wall face')!.quantity, '30.3');
 });

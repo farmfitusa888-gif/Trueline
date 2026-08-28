@@ -216,6 +216,15 @@ final class ProjectStore: ObservableObject {
             // "Room" is what `name(inside:)` hands back when there is no name
             // anywhere, and writing that onto a card would replace a real name
             // with a placeholder.
+            //
+            // This is the ONLY place in the app that writes a room's name onto
+            // a card. There used to be a second -- `rename(_:to:)`, from the
+            // Rooms list -- and the two could not agree: the correction screens
+            // save the moment a room is opened, before anybody has touched
+            // anything, so the name typed on the list was quietly overwritten
+            // by the room's own the very next time somebody opened it. A name
+            // that lives in two places is a name that will disagree, and in
+            // this app that has already cost a scan with 53 photographs in it.
             let named = RoomCard.name(inside: project)
             if named != "Room" {
                 var card = RoomCard.read(in: folder)
@@ -233,21 +242,41 @@ final class ProjectStore: ObservableObject {
 
     /* ------------------------------------------------------ managing the list */
 
-    /// Renames a room, everywhere it is shown.
+    /// What the room in this folder is called.
     ///
-    /// The **folder** keeps its timestamped name and does not move. That is
-    /// deliberate: the folder's name is the record name in iCloud and the path
-    /// every photograph in it already sits under, so renaming it means moving a
-    /// directory and renaming a CloudKit record together, and a failure halfway
-    /// through leaves the room in two places at once. A name is a label; a
-    /// folder is an address. Only the label changes.
-    @discardableResult
-    func rename(_ entry: Entry, to name: String) -> Bool {
-        var card = entry.card
-        card.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let written = card.write(in: entry.folder)
-        refresh()
-        return written
+    /// ## Why this is a reader and there is no writer beside it
+    ///
+    /// There used to be `rename(_:to:)` here, which wrote a name of its own
+    /// onto the card from the Rooms list. It could not work, and the way it
+    /// failed is the most expensive bug this project has had.
+    ///
+    /// A room's name lives in `room.name` inside `corrected.json`. The
+    /// correction screens own it, they put it on every drawing, proposal and
+    /// claim document, and they hand the whole saved room back on the `saved`
+    /// channel **every time a room is opened** -- before anybody has edited
+    /// anything. `writeCorrected` copies that name onto the card. So a name
+    /// typed on the list survived exactly until the next time somebody opened
+    /// the room, and then the list silently went back to saying
+    /// "Room 2026-08-26 0927" while the room's own screen said UPSTAIRS.
+    ///
+    /// That is the disagreement that made Sam delete a scan with 53
+    /// photographs in it, believing it was a duplicate. So there is one name,
+    /// it is the room's, it is changed on the room's own screen, and this
+    /// screen-facing lookup is how every list and every title bar reads it.
+    ///
+    /// The **folder** keeps its timestamped name and never moves. It is the
+    /// record name in iCloud and the path every photograph already sits under:
+    /// renaming it means moving a directory and renaming a CloudKit record
+    /// together, and a failure halfway through leaves the room in two places at
+    /// once. A name is a label; a folder is an address.
+    ///
+    /// Falls back to the card on disk for a folder this list has not refreshed
+    /// yet -- a room opened straight after a capture -- and to the folder's own
+    /// name when nothing has named it, which is exactly what the list shows.
+    func name(of folder: URL) -> String {
+        if let entry = scans.first(where: { $0.folder == folder }) { return entry.title }
+        let card = RoomCard.read(in: folder)
+        return card.name.isEmpty ? folder.lastPathComponent : card.name
     }
 
     /// Puts a room in a job, or takes it out of one when the name is empty.

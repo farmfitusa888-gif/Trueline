@@ -18,6 +18,7 @@
     "audit": "npm run build --workspace=@trueline/web && node web/audit/run.mjs",
     "check-guide": "python3 docs/build/check-guide.py docs/handbook.html",
     "what-is-left": "python3 core/tools/check-reachable.py",
+    "what-is-untouched": "python3 core/tools/check-controls.py",
     "verify": "npm test && npm run typecheck && npm run build && npm run check-guide && npm run what-is-left && npm run check-tokens && npm run check-art && npm run check-portable && npm run check-swift && npm run check-the-checks && npm run site",
     "ship-web": "npm run build && rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/",
     "site": "node site/build.mjs && node site/tools/check.mjs",

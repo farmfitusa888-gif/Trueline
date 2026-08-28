@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   type VoiceAnswer,
   canRecord,
@@ -99,6 +99,93 @@ function Elapsed({ since }: { readonly since: number }) {
 }
 
 /**
+ * A box that is exactly as tall as the words in it.
+ *
+ * ## The complaint this closes
+ *
+ *     "THE TRANSCRIBING IS IN A TEXT BOX AND YOU HAVE TO SCROLL AND CANT SEE
+ *      EVERYTHING."
+ *
+ * The transcript was a `rows={2}` textarea. A minute of talking is around a
+ * hundred and eighty words, which is nine or ten lines at phone width, so what
+ * somebody saw was *"…and now we're gonna replace it with another drywall piece
+ * and"* and a scrollbar. That is the one artefact he will open six weeks later
+ * to remember what he said, and it was being served three lines at a time
+ * inside a box the page scrolls past.
+ *
+ * It cannot simply become a `<p>`: the phone's recogniser gets *jamb*, *soffit*,
+ * *kerf* and *R-13* wrong, and correcting them is the only reason the text is
+ * worth printing. So it stays a textarea and the textarea stops having a size
+ * of its own — it is set, every time the words change, to exactly the height of
+ * the words. Nothing is ever hidden and nothing scrolls inside it. What scrolls
+ * is the page, which is where somebody's thumb already is.
+ *
+ * There is deliberately **no maximum**. A ten-minute recording is a tall box,
+ * and a tall box you scroll the page through is how every other piece of text
+ * on this screen is read; a maximum would put the scrollbar back and reintroduce
+ * exactly the bug, only for the recordings where losing the end matters most.
+ *
+ * ## The three things that break a growing textarea
+ *
+ * 1. **Borders.** `scrollHeight` is content plus padding and no border, and
+ *    `box-sizing: border-box` means the height set has to include them. Two
+ *    pixels short clips the descenders on the last line.
+ * 2. **The page jumping on every keystroke.** Zeroing the height for a frame is
+ *    what lets the box SHRINK when text is deleted, and it also shortens the
+ *    document for that frame. A browser scrolled near the bottom clamps its
+ *    scroll position to the shorter document and does not put it back, so the
+ *    page — and the caret with it — walks up the screen as somebody types. The
+ *    scroll position is read before and written back after.
+ * 3. **Being measured while the panel is hidden.** The wall panel is `hidden`
+ *    whenever another section is on, and a hidden element has a `scrollHeight`
+ *    of zero. Fitting then would collapse the box to nothing and leave it that
+ *    way, because the words have not changed and no effect would run again. So
+ *    a zero measurement is refused, and the width is watched instead: it goes
+ *    from nothing to the panel's width the moment the section comes back, and
+ *    it also changes when the phone is turned on its side.
+ */
+function useGrowsToFit(text: string) {
+  const box = useRef<HTMLTextAreaElement | null>(null);
+
+  const fit = useCallback(() => {
+    const el = box.current;
+    if (!el) return;
+    const doc = document.documentElement;
+    const was = doc.scrollTop;
+    el.style.height = 'auto';
+    // Border, in the units the height is being set in. Read while the height
+    // is `auto`, because `clientHeight` is the height that was just cleared.
+    const edges = el.offsetHeight - el.clientHeight;
+    const wanted = el.scrollHeight;
+    // Hidden: nothing to measure, and measuring anyway would leave the box
+    // flat forever. Left as it was until the width says it is on screen.
+    if (wanted === 0) return;
+    el.style.height = `${wanted + edges}px`;
+    if (doc.scrollTop !== was) doc.scrollTop = was;
+  }, []);
+
+  useLayoutEffect(fit, [fit, text]);
+
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    // Width only. Observing height would be observing the thing this sets,
+    // and the two would chase each other for as long as the panel is open.
+    let wide = -1;
+    const watch = new ResizeObserver((entries) => {
+      const now = entries[0]?.contentRect.width ?? -1;
+      if (now === wide) return;
+      wide = now;
+      fit();
+    });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [fit]);
+
+  return box;
+}
+
+/**
  * One recording: play it, read it, fix it.
  */
 function Said({
@@ -113,6 +200,7 @@ function Said({
   const [text, setText] = useState(note.transcript?.text ?? '');
   const [missing, setMissing] = useState(false);
   const machine = note.transcript?.by === 'phone';
+  const box = useGrowsToFit(text);
 
   // A note that gained a transcript after it was drawn — the words arrive a
   // second or two after the recording does. Without this the box would still be
@@ -160,8 +248,11 @@ function Said({
       <label className="mt-2 block">
         <span className="text-xs font-medium text-slate-700">What was said</span>
         <textarea
+          ref={box}
           value={text}
-          rows={2}
+          /* One line to start from. The height is set from the words on the
+             very first paint, so this is only ever what an empty box is. */
+          rows={1}
           onChange={(event) => setText(event.target.value)}
           onBlur={() => {
             const said = text.trim();
@@ -186,7 +277,18 @@ function Said({
               : ''
           }
           aria-label="What was said, as text"
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+          /* `overflow-hidden` is the promise: there is no scrollbar in here to
+             find, because the height is always the height of the words.
+             `resize-none` for the same reason — a drag handle that can only
+             make the box wrong.
+
+             `scroll-mb-32` is the on-screen keyboard. Tapping in here makes the
+             browser scroll this box into view, and "into view" to a browser
+             means the bottom edge of the window, which is behind the keyboard.
+             Eight rem of scroll margin under it is what puts the line being
+             corrected above the keys instead of under them. */
+          className="mt-1 w-full resize-none overflow-hidden scroll-mb-32 rounded-md
+                     border border-slate-300 px-3 py-2 text-sm leading-relaxed
                      focus:border-sky-500 focus:outline-none"
         />
       </label>

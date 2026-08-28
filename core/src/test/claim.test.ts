@@ -248,3 +248,96 @@ test('the document reads in whatever the contractor reads in', () => {
   );
   assert.equal(report.room.find((l) => l.label === 'Ceiling height')!.value, '2743 mm');
 });
+
+/* ------------------------------------------------------------ and the money */
+
+const BOOK = {
+  rates: [
+    { item: 'Remove wall board', unit: 'sq ft' as const, cents: 250n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Remove baseboard', unit: 'lf' as const, cents: 120n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Hang wall board', unit: 'sq ft' as const, cents: 420n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Tape and finish', unit: 'sq ft' as const, cents: 230n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Replace baseboard', unit: 'lf' as const, cents: 675n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Prime and paint the wall', unit: 'sq ft' as const, cents: 145n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    // Priced deliberately, and priced high, so the test below has teeth. A book
+    // with no floor rate in it would put a floor line in `unpriced` rather than
+    // in the money, and "no floor appears" would pass for the wrong reason.
+    { item: 'Remove floor finish', unit: 'sq ft' as const, cents: 175n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Replace floor finish', unit: 'sq ft' as const, cents: 850n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Remove ceiling finish', unit: 'sq ft' as const, cents: 180n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Replace ceiling finish', unit: 'sq ft' as const, cents: 560n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+  ],
+};
+
+test('the marked damage is priced on the report, mark by mark', () => {
+  // > "IT DOESNT AUTOMATICALLY PRICE OUT THE DAMAGE BUT INSTEAD IF YOU GO TO
+  // >  THE PRICING IS SHOW YOU THE ENTIRE ROOM AND THE FLOOR AND CEILING WHICH
+  // >  ARE NOT CHECK FOR BEING NEEDED"
+  //
+  // 9' x 2' on the north wall of an unopened 20 x 10 room with a 9 ft ceiling:
+  //   remove board 18.0 x $2.50 = $45.00, remove base 9.00 x $1.20 = $10.80,
+  //   hang board 18.0 x $4.20 = $75.60, tape 18.0 x $2.30 = $41.40,
+  //   replace base 9.00 x $6.75 = $60.75, paint 180.0 x $1.45 = $261.00.
+  //   $494.55.
+  const report = claimReport(room, [waterline], full, '26 Aug 2026', undefined, BOOK);
+  assert.ok(report.money);
+  assert.equal(report.money!.priced, true);
+  assert.deepEqual(
+    report.money!.totals,
+    [
+      { label: 'The damage, priced', value: '$494.55' },
+      { label: 'Total', value: '$494.55' },
+    ]
+  );
+  // Beside the mark, because "what is the loss worth" and "what is THIS wall
+  // worth" are different questions and only the second one gets argued about.
+  assert.equal(report.damages[0]!.cost, '$494.55');
+
+  // Every line carries the quantity and the rate it was multiplied by, so the
+  // arithmetic can be checked without asking anybody for a breakdown.
+  const board = report.money!.lines.find((l) => l.item === 'Remove wall board')!;
+  assert.equal(board.quantity, '18.0 sq ft');
+  assert.equal(board.rate, '$2.50 / sq ft');
+  assert.equal(board.amount, '$45.00');
+  assert.equal(board.stage, 'tear out');
+  assert.equal(board.damageId, 'd-1');
+});
+
+test('nothing on the money comes off a surface nobody marked', () => {
+  // This is the whole complaint. The remodel takeoff prices the room, floor and
+  // ceiling included; the claim prices the marks. One damaged wall must not
+  // produce a floor.
+  const report = claimReport(room, [waterline], full, '26 Aug 2026', undefined, BOOK);
+  const items = report.money!.lines.map((l) => l.item);
+  assert.ok(!items.some((i) => /floor|ceiling/i.test(i)), items.join(', '));
+  // And the only wall it paints is the one that was marked: 180 sq ft, which is
+  // the north wall, and not the room's 540 sq ft of wall face.
+  assert.equal(
+    report.money!.lines.find((l) => l.item === 'Prime and paint the wall')!.quantity,
+    '180.0 sq ft'
+  );
+});
+
+test('with no rate book the report is exactly what it always was', () => {
+  // Every caller that has no book — a test, a tool, a renderer that only wants
+  // the measurements — gets the report it got before any of this existed.
+  const report = claimReport(room, [waterline], full, '26 Aug 2026');
+  assert.equal(report.money!.priced, false);
+  assert.equal(report.damages[0]!.cost, '');
+  assert.ok(report.money!.unpriced.includes('Remove wall board'));
+});
+
+test('a claim with nothing but a pin on it has no money at all', () => {
+  // A pin is a marker rather than a measurement, so it makes no work — and a
+  // mark with no work must not carry a confident $0.00.
+  const pin: Damage = {
+    ...waterline,
+    id: 'd-pin',
+    photos: [],
+    readings: [],
+    shape: { kind: 'pin', wallId: 'north', at: { x: parseLength(`3'`), y: 0n }, height: parseLength(`4'`) },
+  };
+  const report = claimReport(room, [pin], full, '26 Aug 2026', undefined, BOOK);
+  assert.equal(report.money, null);
+  assert.equal(report.damages[0]!.cost, '');
+});

@@ -72,3 +72,59 @@ export function typedAmount(hundredths: bigint): string {
   if (rest === 0) return whole.toString();
   return `${whole}.${rest.toString().padStart(2, '0')}`.replace(/0$/, '');
 }
+
+/**
+ * A number somebody typed, into the hundredths the model adds up in.
+ *
+ * The inverse of `typedAmount`, and it lives beside it for the reason
+ * everything else in this file moved here: this arithmetic existed inline in
+ * `work.ts` — `BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'))` — and the
+ * moment a second thing needed to read a typed quantity there would have been
+ * two parsers for one format. Two readers of one format is two readers that
+ * will eventually disagree, and the one they would disagree about is a number
+ * on a client's quote.
+ *
+ * `null` rather than a thrown error, because only the caller knows what was
+ * being typed and therefore what sentence to say about it. A blank box on the
+ * rate screen and a blank box on a wall panel need two different answers, and
+ * neither of them is this file's to write.
+ */
+export function readHundredths(text: string): bigint | null {
+  const trimmed = text.trim();
+  // Whole numbers, or a decimal to two places: the same shape the sheet prints
+  // and the same shape `quote()` will parse back out of it.
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;
+  const [whole, fraction = ''] = trimmed.split('.');
+  return BigInt(whole!) * 100n + BigInt(fraction.padEnd(2, '0'));
+}
+
+/**
+ * Hundredths of a printed unit, as the exact integer that many of it is.
+ *
+ * The other direction from `decimals`, and the reason it has to exist: a
+ * quantity somebody typed has to be added to quantities the geometry produced,
+ * and the addition must happen in the geometry's own exact unit rather than in
+ * printed tenths. Adding in tenths would round a wall face on the way in and
+ * then round the sum again on the way out — two roundings of one measurement,
+ * which is the exact failure this file was made to end.
+ *
+ * `per` is how many exact units make one printed unit: `SQ_FT` for a wall
+ * face, `2 * SQ_FT` for the doubled unit a floor is kept in, `NM_PER_FOOT` for
+ * a run, `100` for a count already held in hundredths.
+ *
+ * Every one of those is a multiple of a hundred, so the division is exact and
+ * nothing is ever lost here. The check is not decoration: it is what turns a
+ * unit somebody adds later that is *not* a multiple of a hundred into a loud
+ * failure rather than into a quantity quietly short by a fraction.
+ */
+export function exactFromHundredths(hundredths: bigint, per: bigint): bigint {
+  const product = hundredths * per;
+  if (product % 100n !== 0n) {
+    throw new RangeError(
+      `${hundredths} hundredths of a unit worth ${per} is not a whole number of them. A typed ` +
+        `quantity that cannot be held exactly is a quantity that would be short by a fraction on ` +
+        `every sheet it reached.`
+    );
+  }
+  return product / 100n;
+}

@@ -375,9 +375,9 @@ let jobPath = '';
     await page.getByPlaceholder('water line along the bottom of the wall')
       .fill('supply line behind the washer');
     await beat(page, 600);
-    await page.getByLabel('From along the wall').fill('0');
-    await page.getByLabel('To along the wall').fill('9');
-    await page.getByLabel('How high the damage reaches').fill('18"');
+    await page.getByLabel('How far from the corner it starts').fill('0');
+    await page.getByLabel('How wide it is').fill('9');
+    await page.getByLabel('How high up the wall it goes').fill('18"');
     await beat(page, 700);
     await page.getByRole('button', { name: 'Mark it' }).click();
     await say(page, 'And it works out the quantities',

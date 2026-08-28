@@ -81,9 +81,10 @@ const one = (over: Partial<Parameters<typeof claimFile>[0]> = {}) =>
 
 /* ------------------------------------------------------- what it must not do */
 
-test('no money appears on the document, ever', () => {
-  // The scope and its cost are a separate sheet sent after the scope is agreed.
-  // An adjuster who reads a number first negotiates against it.
+test('a contractor who has set no rates sends the document he always sent', () => {
+  // The money on this document is the restoration scope, and until there are
+  // rates to price it with there is none. A claim that leaves the building
+  // announcing that nothing has been priced is not a document anybody sends.
   const html = one();
   assert.doesNotMatch(html, /\$/);
   assert.match(html, /No prices appear on this document/);
@@ -230,4 +231,198 @@ test('the drawing that was handed in is the drawing on the document', () => {
     ],
   });
   assert.match(html, /<svg viewBox="0 0 10 10"><line stroke="#dc2626"\/><\/svg>/);
+});
+
+/* ------------------------------------------- the drawing has to survive the trip */
+
+/**
+ * The plan the app actually serialises, cut down to what matters here.
+ *
+ * Not invented for the test: `Plan.tsx` paints every fill and stroke as
+ * `rgb(var(--c-...))`, and `planSvg` clones that element straight out of the
+ * page. This is that element's own spelling.
+ */
+const REAL_PLAN =
+  '<svg viewBox="0 0 980 978" xmlns="http://www.w3.org/2000/svg" width="980" height="978">' +
+  '<rect x="0" y="0" width="980" height="978" fill="rgb(var(--c-raise))"/>' +
+  '<line x1="10" y1="10" x2="900" y2="10" stroke="rgb(var(--c-ink))" stroke-width="6"/>' +
+  '<line x1="10" y1="40" x2="400" y2="40" stroke="rgb(var(--c-refuse))" stroke-width="14"/>' +
+  '<text x="20" y="90" fill="rgb(var(--c-derived))">20&#39; 0&quot;</text>' +
+  '</svg>';
+
+test('the drawing arrives as a drawing and not as a black rectangle', () => {
+  // ## The bug this is the answer to
+  //
+  // > "The claim document has a black square where the drawing should be."
+  //
+  // The plan's colours are custom properties declared on the app's own :root.
+  // Serialised out of that document and pasted into this one, `var(--c-raise)`
+  // resolves to nothing — and CSS does not ignore that, it invalidates the
+  // whole declaration, so `fill` falls back to its initial value, which is
+  // black. The full-bleed background rectangle paints black over everything and
+  // every stroke on top of it disappears. Measured on the real claim file
+  // before the fix: 99.7% of the drawing was rgb(0, 0, 0).
+  const html = claimFile({
+    rooms: [{ room, damages: [waterline], plan: REAL_PLAN, photos: shots }],
+    claim: full,
+    company: EMPTY_COMPANY,
+    at: '26 Aug 2026',
+  });
+
+  // Not one `var()` may leave the app inside a drawing. This is the check that
+  // fails when the drawing goes blank.
+  assert.doesNotMatch(html, /var\(--/, 'a colour left as a variable resolves to black out here');
+
+  // And the resolved values are the paper palette from `design.ts`, which is
+  // the same place `web/src/tokens.css` is generated from. `--c-raise` is
+  // #FFFFFF and `--c-ink` is #14181B.
+  assert.match(html, /fill="rgb\(255 255 255\)"/);
+  assert.match(html, /stroke="rgb\(20 24 27\)"/);
+  // The damage is still drawn in the refusal red, #A31212.
+  assert.match(html, /stroke="rgb\(163 18 18\)"/);
+});
+
+test('a var() that is not a colour is left exactly as it was', () => {
+  // The selected wall's pulse hands its two widths to the stylesheet as custom
+  // properties on the element itself, which travel with it. Only `--c-` names
+  // come from a stylesheet this document does not have, and only those go
+  // black — so only those are resolved. A function that rewrote every var()
+  // would be one that knew about things that are not its business.
+  const html = claimFile({
+    rooms: [
+      {
+        room,
+        damages: [],
+        plan:
+          '<svg viewBox="0 0 10 10" style="--picked-halo:14">' +
+          '<line stroke-width="var(--picked-halo)" stroke="rgb(var(--c-ink))"/></svg>',
+        photos: new Map(),
+      },
+    ],
+    claim: full,
+    company: EMPTY_COMPANY,
+    at: '26 Aug 2026',
+  });
+  assert.match(html, /stroke-width="var\(--picked-halo\)"/);
+  assert.match(html, /stroke="rgb\(20 24 27\)"/);
+});
+
+test('a colour the shared palette does not have is refused, not left to go black', () => {
+  // The only way this can happen is a drawing painting with a token nobody
+  // generated. Left in, it is the black rectangle again — on the one document
+  // that goes to somebody who pays.
+  assert.throws(
+    () =>
+      claimFile({
+        rooms: [
+          {
+            room,
+            damages: [],
+            plan: '<svg viewBox="0 0 10 10"><rect fill="rgb(var(--c-invented))"/></svg>',
+            photos: new Map(),
+          },
+        ],
+        claim: full,
+        company: EMPTY_COMPANY,
+        at: '26 Aug 2026',
+      }),
+    /--c-invented/
+  );
+});
+
+/* ------------------------------------------------------------- and the money */
+
+/** What a contractor who has set his restoration rates looks like. */
+const withRates = {
+  ...EMPTY_COMPANY,
+  prices: {
+    rates: [
+      { item: 'Remove wall board', unit: 'sq ft' as const, cents: 250n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+      { item: 'Remove baseboard', unit: 'lf' as const, cents: 120n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+      { item: 'Hang wall board', unit: 'sq ft' as const, cents: 420n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+      { item: 'Tape and finish', unit: 'sq ft' as const, cents: 230n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+      { item: 'Replace baseboard', unit: 'lf' as const, cents: 675n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+      { item: 'Prime and paint the wall', unit: 'sq ft' as const, cents: 145n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    ],
+  },
+};
+
+test('the damage is priced on the document, and it is the damage and not the room', () => {
+  // ## Why this is on a document that carried no money for months
+  //
+  // > "IT DOESNT AUTOMATICALLY PRICE OUT THE DAMAGE BUT INSTEAD IF YOU GO TO
+  // >  THE PRICING IS SHOW YOU THE ENTIRE ROOM AND THE FLOOR AND CEILING WHICH
+  // >  ARE NOT CHECK FOR BEING NEEDED"
+  //
+  // Worked out by hand. The mark is 9' x 2' on the north wall of a 20 x 10 room
+  // with a 9 ft ceiling and no openings anywhere in it:
+  //
+  //   remove board    18.0 sq ft x $2.50 =  $45.00
+  //   remove base      9.00 lf   x $1.20 =  $10.80
+  //   hang board      18.0 sq ft x $4.20 =  $75.60
+  //   tape            18.0 sq ft x $2.30 =  $41.40
+  //   replace base     9.00 lf   x $6.75 =  $60.75
+  //   paint           the whole north face, 20' x 9' = 180.0 sq ft x $1.45 = $261.00
+  //                                                                          -------
+  //                                                                          $494.55
+  const html = claimFile({
+    rooms: [{ room, damages: [waterline], plan: '', photos: shots }],
+    claim: full,
+    company: withRates,
+    at: '26 Aug 2026',
+  });
+
+  assert.match(html, /What it takes to put right/);
+  assert.match(html, /Remove wall board<span>18\.0 sq ft at \$2\.50 \/ sq ft<\/span><\/th><td>\$45\.00/);
+  assert.match(html, /Prime and paint the wall<span>180\.0 sq ft at \$1\.45 \/ sq ft<\/span><\/th><td>\$261\.00/);
+  assert.match(html, /The damage, priced<\/th><td>\$494\.55/);
+  assert.match(html, /Total<\/th><td>\$494\.55/);
+  // And on the job's own totals, which is the figure an adjuster is looking for.
+  assert.match(html, /What it takes to put right<\/th><td>\$494\.55/);
+
+  // The room's remodel takeoff is a different sheet for a different payer, and
+  // none of it may appear here. Nothing said the floor or the ceiling needed
+  // doing, so neither is on the document as work.
+  assert.doesNotMatch(html, /Replace floor finish/);
+  assert.doesNotMatch(html, /Replace ceiling finish/);
+  assert.match(html, /not a remodel of these rooms/);
+  assert.doesNotMatch(html, /No prices appear on this document/);
+});
+
+test('two rooms are one figure, added as money and never as printed strings', () => {
+  const other: Room = { ...room, id: 'r2', name: 'utility' };
+  const second: Damage = { ...waterline, id: 'd-2', photos: [] };
+  const html = claimFile({
+    rooms: [
+      { room, damages: [waterline], plan: '', photos: shots },
+      { room: other, damages: [second], plan: '', photos: new Map() },
+    ],
+    claim: full,
+    company: withRates,
+    at: '26 Aug 2026',
+  });
+  // The same mark in two identical rooms: $494.55 twice is $989.10.
+  assert.match(html, /What it takes to put right<\/th><td>\$989\.10/);
+});
+
+test('an item with no rate is named on the document rather than counted as nothing', () => {
+  const short = {
+    ...EMPTY_COMPANY,
+    prices: {
+      rates: [
+        { item: 'Hang wall board', unit: 'sq ft' as const, cents: 420n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+      ],
+    },
+  };
+  const html = claimFile({
+    rooms: [{ room, damages: [waterline], plan: '', photos: shots }],
+    claim: full,
+    company: short,
+    at: '26 Aug 2026',
+  });
+  // 18.0 sq ft at $4.20 is $75.60, and that is all of it.
+  assert.match(html, /Total<\/th><td>\$75\.60/);
+  assert.match(html, /Not in the figure above:/);
+  assert.match(html, /Remove wall board/);
+  assert.match(html, /which have no rate set/);
 });

@@ -1,6 +1,7 @@
 import { type Nanometres, NM_PER_FOOT } from './length.ts';
 import { type Room, RoomError } from './room.ts';
 import { readiness, trustLabel } from './issue.ts';
+import { type Cents, type PriceBook, type PricedLine, quote } from './price.ts';
 import {
   type Damage,
   type DamageQuantity,
@@ -403,4 +404,106 @@ export function damageScope(room: Room, damages: readonly Damage[], at: string):
   ].join('\n');
 
   return { room: room.name, lines, text, csv, note, noWork };
+}
+
+/* ---------------------------------------------------------------- the money */
+
+/**
+ * What one mark comes to, in cents.
+ *
+ * Per mark and not only per sheet, because that is the question somebody
+ * standing in front of a wall is actually asking: *what is this one worth?* A
+ * single figure at the bottom of a scope answers "what is the loss worth" and
+ * leaves every argument about one wall unanswerable.
+ */
+export interface MarkMoney {
+  /** Which mark this is the cost of, so money can always be traced to an observation. */
+  readonly damageId: string;
+  readonly lines: readonly PricedLine[];
+  readonly subtotal: Cents;
+}
+
+export interface ScopeMoney {
+  readonly perMark: readonly MarkMoney[];
+  /** Every priced line on the sheet, in the order the work happens in. */
+  readonly lines: readonly PricedLine[];
+  readonly subtotal: Cents;
+  /** Zero unless the contractor set a mark-up on his book. */
+  readonly margin: Cents;
+  readonly total: Cents;
+  /**
+   * Items with no rate against them, named once each.
+   *
+   * Never zero-priced and never silently dropped. A restoration sheet that adds
+   * up perfectly and is short by a tear-out is the worst thing this could hand
+   * an adjuster, because it is the version nobody queries.
+   */
+  readonly unpriced: readonly string[];
+  /** True when at least one line got a rate, so a renderer knows there is a figure at all. */
+  readonly priced: boolean;
+  /** True when every quantity behind the money has had a tape on it. */
+  readonly measured: boolean;
+}
+
+/**
+ * The damage scope, priced at the contractor's own rates.
+ *
+ * ## Why this exists
+ *
+ * > "IT DOESNT AUTOMATICALLY PRICE OUT THE DAMAGE BUT INSTEAD IF YOU GO TO THE
+ * >  PRICING IS SHOW YOU THE ENTIRE ROOM AND THE FLOOR AND CEILING WHICH ARE
+ * >  NOT CHECK FOR BEING NEEDED"
+ *
+ * The two sheets stay two sheets — a remodel takeoff and a restoration scope go
+ * to two different payers and collapsing them is how a carrier gets billed for
+ * a kitchen. What was missing is that the restoration half never became money
+ * anywhere a claim could carry it, so the only figure in the app was the
+ * takeoff's, which prices a whole room nobody asked to have done.
+ *
+ * ## Why it goes through `quote` twice rather than multiplying here
+ *
+ * Once for the sheet and once per mark, through the same function the remodel
+ * takeoff is priced by. Re-multiplying a quantity here to attribute it to a
+ * mark would be a second derivation of one number, and the one that would be
+ * wrong is whichever nobody is looking at. Every total is a per-line sum of
+ * integer cents, so the marks add back to the subtotal exactly — there is no
+ * rounding between the two passes to disagree about.
+ */
+export function scopeMoney(scope: Scope, book: PriceBook): ScopeMoney {
+  const whole = quote(scope.lines, book);
+
+  // First appearance decides the order, so the money reads down the page in the
+  // same order as the marks it came off.
+  const order: string[] = [];
+  const byMark = new Map<string, ScopeLine[]>();
+  for (const line of scope.lines) {
+    const got = byMark.get(line.damageId);
+    if (got) {
+      got.push(line);
+    } else {
+      order.push(line.damageId);
+      byMark.set(line.damageId, [line]);
+    }
+  }
+
+  const perMark = order.map((damageId) => {
+    const part = quote(byMark.get(damageId)!, book);
+    return { damageId, lines: part.lines, subtotal: part.subtotal };
+  });
+
+  // Named once each. `quote` reports an unpriced item per line, and an adjuster
+  // reading "Remove wall board, Remove wall board, Remove wall board" learns
+  // nothing the first one did not tell him.
+  const unpriced = [...new Set(whole.unpriced)];
+
+  return {
+    perMark,
+    lines: whole.lines,
+    subtotal: whole.subtotal,
+    margin: whole.margin,
+    total: whole.total,
+    unpriced,
+    priced: whole.lines.length > 0,
+    measured: whole.measured,
+  };
 }

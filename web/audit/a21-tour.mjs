@@ -1,4 +1,7 @@
-import { check, noise, open, report, URL } from './lib.mjs';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { openChromium } from '../../core/tools/browser.mjs';
+import { check, noise, open, report, SP, URL } from './lib.mjs';
 
 /**
  * The worked example, and the guided tour over the top of it.
@@ -177,8 +180,13 @@ for (let at = 1; at <= total; at += 1) {
 
 check('every stop has its own title', everyTitleDifferent.size === total,
   `${everyTitleDifferent.size} distinct of ${total}`);
-check('and most of them ring the thing they are about',
-  rangSomething >= Math.ceil(total * 0.7),
+// Raised from "most of them" (14 of 20) to all of them. It could be met before
+// by pointing four stops at a whole panel -- a selector that always matches and
+// draws a ring 2,800 pixels tall round everything at once, which is worse than
+// no ring. Every stop now names the smallest element that is actually its
+// subject, so anything that fails to match is a stop pointing at nothing.
+check('and every one of them rings the thing it is about',
+  rangSomething === total,
   `${rangSomething}/${total} rang. Missed: ${missed.join(' | ')}`);
 
 /* ========================================================================
@@ -254,6 +262,255 @@ check('and leaves the room on the screen',
   check('and leaving it gives your own profile straight back', back === REAL,
     String(back).slice(0, 200));
   await mine.close();
+}
+
+
+/* ========================================================================
+   7. On a phone that exists, the card is a budget rather than a paragraph.
+
+   ## Why this section opens its own browser
+
+   The shared harness in `lib.mjs` opens 430 x 1600. That is 430 wide, which is
+   a phone, and 1600 tall, which is no phone ever made -- it is a page-height
+   window chosen so that every panel is fully laid out and nothing a check wants
+   to read is below the fold. It is the right window for "does this screen say
+   the right thing" and it is the wrong window for the only question this
+   section asks, which is "can somebody SEE it". At 1600 a card that covers the
+   bottom third of a real phone covers a seventh, every ring fits, and no
+   measurement here can fail. So this opens 430 x 800 -- an iPhone 14 Pro,
+   near enough -- and leaves `lib.mjs` alone, because eighteen other parts
+   depend on the harness being what it is.
+
+   ## What is being measured, and why these two numbers
+
+   This is the complaint, in full:
+
+       "NEED TO FIX THE TOUR, CANT SEE ANYTHING PROPERLY"
+
+   with a screenshot of the card over the bottom half of the screen and the
+   drawing it was describing behind it. There are exactly two things a person
+   needs to be true at a stop, and both are numbers rather than opinions:
+
+     1. **How much of the screen the card has taken.** Measured as the height of
+        the card over the height of the window.
+     2. **How much of the thing it is pointing at is on screen.** Measured as
+        the visible height of the ringed element over its own height.
+
+   The budget for the first is declared in `Tour.tsx` next to the card it
+   governs, and read out of that file here so the two cannot drift apart. It is
+   also checked against the numbers this section was written to -- otherwise
+   raising the constant would "fix" a failure without a pixel moving.
+   ======================================================================== */
+
+{
+  const CARD = readFileSync(join(dirname(SP), 'src', 'Tour.tsx'), 'utf8');
+  const budgetOf = (name) => {
+    const found = new RegExp(`${name}:\\s*([\\d.]+)`).exec(
+      /CARD_BUDGET\s*=\s*\{([^}]*)\}/.exec(CARD)?.[1] ?? ''
+    );
+    return found ? Number(found[1]) : NaN;
+  };
+  const BUDGET = {
+    open: budgetOf('open'), folded: budgetOf('folded'), reading: budgetOf('reading'),
+  };
+
+  // The budget the card declares is itself held to the numbers this section was
+  // written against. Without this, a stop that grew past the budget could be
+  // made green by editing one digit in the other file.
+  check('the tour declares a card budget', Number.isFinite(BUDGET.open)
+    && Number.isFinite(BUDGET.folded) && Number.isFinite(BUDGET.reading),
+    JSON.stringify(BUDGET));
+  check('and it is no looser than a fifth of the screen with the body showing',
+    BUDGET.open <= 0.2, String(BUDGET.open));
+  check('an eighth folded', BUDGET.folded <= 0.125, String(BUDGET.folded));
+  check('and under half even while somebody is reading the long version',
+    BUDGET.reading <= 0.45, String(BUDGET.reading));
+
+  const PHONE = { width: 430, height: 800 };
+  const browser2 = await openChromium();
+  const ctx2 = await browser2.newContext({ viewport: PHONE, acceptDownloads: true });
+  const phone = await ctx2.newPage();
+  const shouted = [];
+  phone.on('console', (m) => { if (m.type() === 'error') shouted.push('console: ' + m.text()); });
+  phone.on('pageerror', (e) => shouted.push('pageerror: ' + e.message));
+  await phone.goto(`${URL}#tour`, { waitUntil: 'networkidle' });
+  const bar = phone.getByRole('dialog', { name: 'Guided tour' });
+  await bar.waitFor({ timeout: 15000 });
+  await phone.waitForTimeout(600);
+
+  /**
+   * Waits for the smooth scroll to actually stop.
+   *
+   * A fixed timeout here would be a check that passes on a fast machine and
+   * fails on a loaded one, and the failure would look like a layout bug.
+   */
+  async function settled() {
+    let last = -1;
+    for (let tries = 0; tries < 40; tries += 1) {
+      const now = await phone.evaluate(() => Math.round(window.scrollY));
+      if (now === last) return;
+      last = now;
+      await phone.waitForTimeout(100);
+    }
+  }
+
+  /**
+   * The two numbers, off the screen as it stands.
+   *
+   * `free` is the band the card is not on -- the top of the window down to the
+   * top of the card. It is what the tour itself scrolls into, so it is what a
+   * ring has to fit in.
+   */
+  const look = () => phone.evaluate(() => {
+    const tall = window.innerHeight;
+    const card = document.querySelector('[role="dialog"][aria-label="Guided tour"]')
+      .getBoundingClientRect();
+    const free = card.top;
+    const ringed = [...document.querySelectorAll('[data-tour-ring]')];
+    const one = ringed[0]?.getBoundingClientRect();
+    return {
+      tall,
+      card: card.height / tall,
+      // Everything from the top of the card down is gone: the card itself and
+      // the section bar underneath it. This is the number in the screenshot.
+      lost: (tall - card.top) / tall,
+      free,
+      rings: ringed.length,
+      ring: one && {
+        height: one.height,
+        top: one.top,
+        bottom: one.bottom,
+        seen: Math.max(0, Math.min(one.bottom, free) - Math.max(one.top, 0))
+          / Math.max(1, one.height),
+      },
+    };
+  });
+
+  const stops = Number(/of (\d+)/.exec(await bar.locator('p').first().textContent())?.[1] ?? 0);
+  let widest = 0;
+  let mostLost = 0;
+  let leastSeen = 1;
+  let tooBig = [];
+  let cutOff = [];
+  let longest = 0;
+
+  for (let at = 1; at <= stops; at += 1) {
+    await phone.waitForTimeout(420);
+    await settled();
+    const now = await look();
+    const title = await bar.locator('h2').innerText();
+
+    widest = Math.max(widest, now.card);
+    mostLost = Math.max(mostLost, now.lost);
+
+    check(`stop ${at} rings exactly one thing on a phone`, now.rings === 1,
+      `${title}: ${now.rings}`);
+
+    if (now.ring) {
+      leastSeen = Math.min(leastSeen, now.ring.seen);
+      // A ring taller than the free band cannot be shown whole however the page
+      // is scrolled, which is what ringing a whole panel did: 2,800 pixels of
+      // outline with both edges off the screen.
+      if (now.ring.height > now.free) {
+        tooBig.push(`${at}. ${title}: ${Math.round(now.ring.height)}px in ${Math.round(now.free)}px`);
+      }
+      // The other half of the complaint, in his words: "the highlighted region
+      // runs off the top".
+      if (now.ring.top < -1) cutOff.push(`${at}. ${title}: top ${Math.round(now.ring.top)}`);
+    }
+
+    // The card stays small because the sentence in it is short. Checked so that
+    // a paragraph cannot creep back in one stop at a time.
+    const said = (await bar.locator('p').nth(1).textContent()).trim();
+    longest = Math.max(longest, said.length);
+
+    if (at < stops) await bar.getByRole('button', { name: 'Next' }).click();
+    await phone.waitForTimeout(120);
+  }
+
+  check(`the card never takes more than a fifth of a 430x800 screen (worst ${
+    (widest * 100).toFixed(1)}%)`, widest <= BUDGET.open, `${(widest * 100).toFixed(1)}%`);
+  check(`and the card and the section bar together never take more than a third (worst ${
+    (mostLost * 100).toFixed(1)}%)`, mostLost <= 0.33, `${(mostLost * 100).toFixed(1)}%`);
+  check('every stop shows the whole of what it is pointing at',
+    leastSeen >= 0.999, `least seen ${(leastSeen * 100).toFixed(1)}%`);
+  check('nothing is ringed that is too tall to fit in the free part of the screen',
+    tooBig.length === 0, tooBig.join(' | '));
+  check('and no ring has its top edge off the top of the screen',
+    cutOff.length === 0, cutOff.join(' | '));
+  check('no stop says more than two lines before somebody asks for more',
+    longest <= 120, `longest body is ${longest} characters`);
+
+  /* ---- Folded, and reading. The two things a person can do to the card. ---- */
+
+  // Every control is checked for before it is used. An audit that throws on a
+  // missing button reports nothing at all -- including the eight measurements
+  // above it, which are the ones somebody reverting this change needs to read.
+  const there = async (name) => (await bar.getByRole('button', { name }).count()) === 1;
+
+  check('the card can be got out of the way', await there('Hide'));
+  if (await there('Hide')) {
+    await bar.getByRole('button', { name: 'Hide' }).click();
+    await phone.waitForTimeout(500);
+    await settled();
+    const shut = await look();
+    check('folded, the card is an eighth of the screen', shut.card <= BUDGET.folded,
+      `${(shut.card * 100).toFixed(1)}%`);
+    check('and folding it leaves more of the room than the open card did',
+      shut.card < widest, `${(shut.card * 100).toFixed(1)}% vs ${(widest * 100).toFixed(1)}%`);
+    check('and what the stop is about is still ringed and still whole',
+      shut.rings === 1 && (shut.ring?.seen ?? 0) >= 0.999, JSON.stringify(shut.ring));
+
+    if (await there('Show')) {
+      await bar.getByRole('button', { name: 'Show' }).click();
+      await phone.waitForTimeout(400);
+    }
+    check('and Show brings the sentence back',
+      (await bar.locator('p').nth(1).textContent()).trim().length > 40);
+  }
+
+  await bar.getByRole('button', { name: 'Back' }).click();
+  await phone.waitForTimeout(500);
+  await settled();
+  const brief = await look();
+  const short = (await bar.innerText()).length;
+
+  // Nothing was deleted to hit the budget: every sentence the card used to say
+  // is still one tap away. A card that simply lost two thirds of its prose
+  // would pass every measurement above and be a worse tour.
+  check('the long version of a stop is still there, behind More', await there('More'));
+  if (await there('More')) {
+    await bar.getByRole('button', { name: 'More' }).click();
+    await phone.waitForTimeout(600);
+    await settled();
+    const full = await look();
+    check('More says appreciably more than the card was saying',
+      (await bar.innerText()).length > short + 40,
+      `${(await bar.innerText()).length} vs ${short}`);
+    check('and even then the card is under half the screen', full.card <= BUDGET.reading,
+      `${(full.card * 100).toFixed(1)}%`);
+    check('and what the stop is about is still almost entirely on screen',
+      (full.ring?.seen ?? 0) >= 0.9, JSON.stringify(full.ring));
+
+    if (await there('Less')) {
+      await bar.getByRole('button', { name: 'Less' }).click();
+      await phone.waitForTimeout(500);
+      await settled();
+    }
+    const backDown = await look();
+    check('and Less gives the room back', backDown.card <= brief.card + 0.001,
+      `${(backDown.card * 100).toFixed(1)}% vs ${(brief.card * 100).toFixed(1)}%`);
+
+    // Reading the long version on one stop must not leave it open on the next,
+    // where it would be covering a drawing to answer a question nobody asked.
+    await bar.getByRole('button', { name: 'Next' }).click();
+    await phone.waitForTimeout(500);
+    check('and moving on closes it again', await there('More'));
+  }
+
+  check('a phone-sized screen: no console or page errors', shouted.length === 0,
+    shouted.join(' | '));
+  await browser2.close();
 }
 
 check('no console or page errors anywhere in the example or the tour',

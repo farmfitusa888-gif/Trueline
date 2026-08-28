@@ -1,7 +1,10 @@
-import type { Room } from './room.ts';
+import { type Room, RoomError } from './room.ts';
 import type { Damage } from './damage.ts';
-import { type Company, letterhead, showArea, showLength } from './company.ts';
+import { TONES } from './design.ts';
+import { type Company, letterhead, pricing, showArea, showLength } from './company.ts';
 import { type Claim, type ClaimReport, claimReport, missingFromClaim } from './claim.ts';
+import { money } from './price.ts';
+import { type ScopeMoney, damageScope, scopeMoney } from './scope.ts';
 import { damageTotals } from './damage.ts';
 
 /**
@@ -13,11 +16,21 @@ import { damageTotals } from './damage.ts';
  * document that decides what an insurer is told is one that should have tests
  * on it.
  *
- * **No money in it, on purpose.** This is what was measured and what was found;
- * the priced scope is a separate sheet the contractor sends when they choose to.
- * An adjuster who reads a number before the scope is agreed negotiates against
- * that number, and the contractor has handed away the first move for no reason.
- * The two documents exist to be sent in that order.
+ * **The money on it is the restoration scope and nothing else.** For a long time
+ * there was none, on the argument that an adjuster who reads a number before the
+ * scope is agreed negotiates against it. What that argument missed is where the
+ * number then lived: nowhere. The damage was measured to the square foot and
+ * priced on no sheet anybody could find, so the only figure in the app was the
+ * room's remodel takeoff — a whole floor and a whole ceiling nobody said needed
+ * doing. An adjuster gets a number, and it is the right one: every line comes
+ * off a mark somebody made, at a rate this contractor typed himself, and a
+ * surface nobody marked produces nothing. The remodel takeoff stays where it
+ * was and never appears here.
+ *
+ * Silent when the contractor has not set his restoration rates. A claim that
+ * leaves the building saying "none of this is priced" is not a document
+ * anybody sends, so the document is exactly what it always was until there is
+ * a real figure to put on it.
  *
  * Everything else follows the client file's rules, for the same reasons:
  *
@@ -36,12 +49,91 @@ import { damageTotals } from './damage.ts';
  * in.
  */
 
+/**
+ * A document that cannot be built honestly, refused rather than half-built.
+ *
+ * There is exactly one thing that raises it and it is not a person's typing: a
+ * colour the shared palette does not define. That is a programming mistake, and
+ * a loud one here is a black rectangle nobody notices there.
+ */
+export class ClaimFileError extends RoomError {}
+
 function safe(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/* ------------------------------------------------- the drawing’s own colours */
+
+/**
+ * Every palette token, as the channels the app’s stylesheet holds them in.
+ *
+ * Built from `design.ts`, which is the one place the palette lives and the same
+ * place `web/src/tokens.css` is generated from. A second table of hexes typed
+ * out here would be a palette maintained twice, which is the exact failure that
+ * file exists to prevent.
+ *
+ * The **light** values, always. Anything that leaves the app as a document is
+ * paper, and a claim printed out of the dark palette is a sheet of black ink
+ * arriving at an adjuster.
+ */
+const PAPER: ReadonlyMap<string, string> = new Map(
+  Object.entries(TONES).map(([name, tone]) => {
+    const hex = /^#([0-9a-f]{6})$/i.exec(tone.light);
+    if (!hex) throw new ClaimFileError(`${name} is not a six-digit hex colour.`);
+    const n = parseInt(hex[1]!, 16);
+    return [
+      `--c-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`,
+      `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`,
+    ];
+  })
+);
+
+/**
+ * The plan’s colours, resolved, because a `var()` cannot leave the document
+ * that defines it.
+ *
+ * ## The bug this is the answer to
+ *
+ * > "The claim document has a black square where the drawing should be."
+ *
+ * The plan paints with `fill="rgb(var(--c-raise))"` and `stroke="rgb(var(--c-ink))"`,
+ * and those custom properties are declared once, on the app’s own `:root`. The
+ * drawing is serialised **out** of that document and pasted into this one,
+ * where nothing declares them. CSS then does the worst possible thing: a
+ * `var()` that resolves to nothing is not ignored, it makes the whole
+ * declaration invalid at computed-value time, so `fill` and `stroke` fall back
+ * to their initial values — solid black and no stroke. The full-bleed
+ * background rectangle paints black across the viewBox and every line on top of
+ * it disappears. Measured on the audit’s own claim file: 99.7% of the drawing
+ * was `rgb(0, 0, 0)`.
+ *
+ * A colour that is one indirection away from being defined is a colour that has
+ * to be resolved before the drawing is allowed to travel. That is what this
+ * does, and it is why `claimFile` is the last thing the SVG passes through.
+ *
+ * Colour tokens only, and that is deliberate. `--c-` names are the shared
+ * palette and every one of them has to resolve or the drawing goes black; a
+ * `var()` holding a stroke width comes from an inline style on the element
+ * itself and travels perfectly well. Resolving those too would be this function
+ * knowing about things that are not its business.
+ *
+ * An unknown colour token is refused rather than left in. Leaving it would put
+ * the black square back, on the one document that goes to somebody who pays.
+ */
+function resolvePalette(svg: string): string {
+  return svg.replace(/var\((--c-[a-z0-9-]+)\)/gi, (whole, name: string) => {
+    const channels = PAPER.get(name.toLowerCase());
+    if (channels) return channels;
+    throw new ClaimFileError(
+      `The drawing paints with ${name}, which is not a colour in the shared palette. Left as ` +
+        `it is, ${whole} resolves to nothing outside the app and the drawing prints as a black ` +
+        `rectangle.`
+    );
+  });
 }
 
 /** One room's part of the claim: its own drawing, its damage, its evidence. */
@@ -104,19 +196,109 @@ function damageBlock(report: ClaimReport, photos: ReadonlyMap<string, string>): 
     .join('');
 }
 
+/**
+ * The whole loss as one figure, across every room going on the document.
+ *
+ * Exported because the screen that sends the file has to be able to say what
+ * will be on it before it builds it — and saying so from a second calculation
+ * would be a screen that promises one number and attaches another.
+ *
+ * Priced by quoting the union of the rooms' scope lines through the same
+ * function each room's own money goes through, never by adding the printed
+ * strings back up. Adding printed money is arithmetic done on a rounding
+ * instead of on the money.
+ */
+export function lossMoney(
+  rooms: readonly { readonly room: Room; readonly damages: readonly Damage[] }[],
+  company: Company,
+  at: string
+): ScopeMoney {
+  return scopeMoney(
+    {
+      room: rooms.map((r) => r.room.name).join(' · '),
+      lines: rooms.flatMap((r) => damageScope(r.room, r.damages, at).lines),
+      text: '',
+      csv: '',
+      note: '',
+      noWork: [],
+    },
+    pricing(company).book
+  );
+}
+
+/**
+ * The marked damage, priced, under the room it was marked in.
+ *
+ * Grouped by the stage the work happens in — tear out, protect, rebuild —
+ * because that is the order a scope is read in and the order it is scheduled
+ * in. Every row carries the quantity and the rate beside the money, so an
+ * adjuster can check the multiplication without asking anybody for a breakdown.
+ *
+ * Silent when nothing has a rate against it. A claim that leaves the building
+ * announcing that the contractor has not set his prices is not a document
+ * anybody sends.
+ */
+function moneyBlock(report: ClaimReport): string {
+  const priced = report.money;
+  if (!priced || !priced.priced) return '';
+
+  const stages = ['tear out', 'protect', 'rebuild'] as const;
+  const rows = stages
+    .map((stage) => {
+      const inStage = priced.lines.filter((l) => l.stage === stage);
+      if (inStage.length === 0) return '';
+      return (
+        `<tr><th colspan="2" class="stage">${safe(stage)}</th></tr>` +
+        inStage
+          .map(
+            (l) =>
+              `<tr><th>${safe(l.item)}<span>${safe(l.quantity)} at ${safe(l.rate)}</span></th>` +
+              `<td>${safe(l.amount)}</td></tr>`
+          )
+          .join('')
+      );
+    })
+    .join('');
+
+  const totals = priced.totals
+    .map((line) => `<tr class="sum"><th>${safe(line.label)}</th><td>${safe(line.value)}</td></tr>`)
+    .join('');
+
+  return `<div class="money">
+      <h3>What it takes to put right</h3>
+      <table>${rows}${totals}</table>
+      <p class="how">${safe(priced.note)}</p>
+      ${
+        priced.unpriced.length > 0
+          ? `<p class="how"><strong>Not in the figure above:</strong> ${safe(
+              priced.unpriced.join(', ')
+            )}. There is no rate set for those, and they are left out rather than counted as ` +
+            `nothing.</p>`
+          : ''
+      }
+    </div>`;
+}
+
 export function claimFile(parts: ClaimFileParts): string {
   const { rooms, claim, company, at } = parts;
   const units = company.units;
   const head = letterhead(company);
   const missing = missingFromClaim(claim);
 
+  const book = pricing(company).book;
   const reports = rooms.map((r) => ({
     part: r,
-    report: claimReport(r.room, r.damages, claim, at, {
-      len: (v) => showLength(v, units),
-      area: (a) => showArea(a, units),
-    }),
+    report: claimReport(
+      r.room,
+      r.damages,
+      claim,
+      at,
+      { len: (v) => showLength(v, units), area: (a) => showArea(a, units) },
+      book
+    ),
   }));
+
+  const wholeLoss = lossMoney(rooms, company, at);
 
   // The claim's own facts are the same on every room, so they are stated once
   // at the top rather than repeated under each drawing.
@@ -158,6 +340,22 @@ export function claimFile(parts: ClaimFileParts): string {
           },
         ]
       : []),
+    // The one number an adjuster is looking for, on a document that used to
+    // carry none. Only when something is actually priced: a claim announcing
+    // that the contractor has not set his rates is not a document anybody
+    // sends, and a total of nothing beside real damage is worse than no total.
+    ...(wholeLoss.priced
+      ? [
+          {
+            label: 'What it takes to put right',
+            value:
+              money(wholeLoss.total) +
+              (wholeLoss.unpriced.length > 0
+                ? ` — not counting ${wholeLoss.unpriced.join(', ')}, which have no rate set`
+                : ''),
+          },
+        ]
+      : []),
   ];
 
   const unchecked = reports.some((r) => r.report.caveat.startsWith('THESE ARE'));
@@ -169,8 +367,9 @@ export function claimFile(parts: ClaimFileParts): string {
     <p class="size">${safe(
       report.room.map((line) => `${line.label} ${line.value}`).join(' · ')
     )}</p>
-    ${part.plan ? `<div class="plan">${part.plan}</div>` : ''}
+    ${part.plan ? `<div class="plan">${resolvePalette(part.plan)}</div>` : ''}
     ${damageBlock(report, part.photos)}
+    ${moneyBlock(report)}
   </section>`
     )
     .join('');
@@ -214,6 +413,13 @@ export function claimFile(parts: ClaimFileParts): string {
   .how { color: #64748b; font-size: 14px; margin: 0 0 6px; }
   .none { color: #64748b; font-size: 14px; }
   .readings { max-width: 320px; margin: 0 0 12px; }
+  .money { border-top: 1px solid #e2e8f0; margin: 16px 0 0; padding: 14px 0 0; }
+  .money h3 { margin: 0 0 8px; }
+  .money th span { display: block; font-size: 13px; color: #64748b; font-variant-numeric: tabular-nums; }
+  .money .stage { text-transform: uppercase; letter-spacing: .04em; font-size: 12px;
+                  color: #64748b; padding-top: 14px; }
+  .money .sum th, .money .sum td { font-weight: 700; }
+  .money .sum:first-of-type th, .money .sum:first-of-type td { border-top: 2px solid #cbd5e1; }
   .readings th, .readings td { padding: 5px 0; font-size: 14px; }
   figure { margin: 12px 0 0; }
   figure img { width: 100%; border-radius: 8px; display: block; }
@@ -282,7 +488,11 @@ export function claimFile(parts: ClaimFileParts): string {
     <p style="margin-bottom:0">${
       everyDamage.length === 0
         ? 'No damage is marked on this document.'
-        : 'No prices appear on this document. The scope and its cost are a separate sheet.'
+        : wholeLoss.priced
+          ? 'The money on this document is the restoration scope only &mdash; what it takes to ' +
+            'put the marked damage right, at this contractor&rsquo;s own rates. It is not a ' +
+            'remodel of these rooms, and nothing on it comes off a surface nobody marked.'
+          : 'No prices appear on this document. The scope and its cost are a separate sheet.'
     }</p>
   </section>
 

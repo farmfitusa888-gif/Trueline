@@ -5,6 +5,7 @@ import { type Quantities, roomQuantities } from './zone.ts';
 import { readiness, trustLabel } from './issue.ts';
 import {
   type Exact,
+  type LinePart,
   type WorkItem,
   type WorkScope,
   workSheet,
@@ -88,6 +89,18 @@ export interface TakeoffLine {
    * twice. See `Exact` in `work.ts`.
    */
   readonly exact?: Exact;
+
+  /**
+   * Surfaces on this line whose share is a figure the contractor typed, with
+   * what the room measures there beside it.
+   *
+   * Empty on every unscoped sheet and on every scoped line the geometry
+   * produced on its own. It is carried so a document can show the two figures
+   * apart — his thirty square feet, and the eighty-four the room measures —
+   * rather than only as the sentence inside `workings`. A line that has one is
+   * never `measured`, whatever tape is on the walls behind it.
+   */
+  readonly parts?: readonly LinePart[];
 }
 
 export interface Takeoff {

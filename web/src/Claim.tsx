@@ -9,6 +9,8 @@ import {
   missingFromClaim,
   overlappingDamage,
 } from '../../core/src/claim.ts';
+import type { ClaimMoney as ClaimReportMoney } from '../../core/src/claim.ts';
+import { pricing } from '../../core/src/company.ts';
 import { useUnits } from './units.tsx';
 import { ReportPhotos } from './ReportPhotos.tsx';
 import { canMarkAgain, markAgain } from './bridge.ts';
@@ -116,6 +118,109 @@ function MarkMore() {
   );
 }
 
+/**
+ * The damage, priced, on the claim.
+ *
+ * ## Why this is here and not on the Price screen
+ *
+ * > "IT DOESNT AUTOMATICALLY PRICE OUT THE DAMAGE BUT INSTEAD IF YOU GO TO THE
+ * >  PRICING IS SHOW YOU THE ENTIRE ROOM AND THE FLOOR AND CEILING WHICH ARE
+ * >  NOT CHECK FOR BEING NEEDED"
+ *
+ * Sam marked mould on one wall, saw "15.0 sq ft" beside it, went looking for
+ * what that was worth, and found the room's remodel takeoff — a floor and a
+ * ceiling he had never said needed doing. He was not wrong about either screen.
+ * The takeoff prices the room because that is what a takeoff is for, and the
+ * damage was measured exactly. What did not exist anywhere was the number in
+ * between: **the marks he made, at his rates, adding up.**
+ *
+ * It belongs on the claim and nowhere else. A remodel takeoff and a restoration
+ * scope go to two different payers out of two different pots of money, and a
+ * single screen holding both is a screen somebody bills the wrong party off.
+ * Folding this into the Price screen would have been the easy fix and the wrong
+ * one.
+ *
+ * Every figure is a rate this contractor typed multiplied by a quantity the
+ * room measured. Nothing here is a market average and nothing is guessed, and
+ * an item with no rate against it is named rather than counted as nothing — a
+ * sheet that adds up perfectly and is short by a tear-out is the version nobody
+ * queries.
+ */
+function Money({ money }: { readonly money: ClaimReportMoney | null }) {
+  if (!money) return null;
+
+  if (!money.priced) {
+    return (
+      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="font-semibold">None of this damage is priced yet.</p>
+        <p className="mt-1">
+          The work it takes is worked out below, to the square foot, and there is no rate against
+          any of it: {money.unpriced.join(', ')}. Tap <strong>Your rates</strong> on the sheet
+          underneath and every figure on this claim fills in.
+        </p>
+      </div>
+    );
+  }
+
+  const stages = ['tear out', 'protect', 'rebuild'] as const;
+
+  return (
+    <div className="mt-4 rounded-lg border border-slate-200 p-3">
+      <h4 className="font-semibold text-slate-900">What it takes to put right</h4>
+      {stages.map((stage) => {
+        const inStage = money.lines.filter((line) => line.stage === stage);
+        if (inStage.length === 0) return null;
+        return (
+          <div key={stage} className="mt-2">
+            <h5 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {stage}
+            </h5>
+            <dl className="mt-1 divide-y divide-slate-100">
+              {inStage.map((line, n) => (
+                <div
+                  key={`${line.damageId}-${line.item}-${n}`}
+                  className="flex items-baseline justify-between gap-3 py-2"
+                >
+                  <dt className="text-sm text-slate-800">
+                    {line.item}
+                    <span className="block font-mono text-xs tabular-nums text-slate-500">
+                      {line.quantity} at {line.rate}
+                    </span>
+                  </dt>
+                  <dd className="shrink-0 font-mono text-sm font-semibold tabular-nums text-slate-900">
+                    {line.amount}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        );
+      })}
+
+      <dl className="mt-3 divide-y divide-slate-200 border-t-2 border-slate-300">
+        {money.totals.map((line) => (
+          <div key={line.label} className="flex items-baseline justify-between gap-3 py-2">
+            <dt className="font-semibold text-slate-900">{line.label}</dt>
+            <dd className="shrink-0 font-mono text-lg font-semibold tabular-nums text-slate-900">
+              {line.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {money.unpriced.length > 0 && (
+        <p className="mt-2 text-sm text-amber-800">
+          No rate yet for {money.unpriced.join(', ')}. Those are{' '}
+          <strong>not in the total</strong> — a sheet that adds up perfectly and is short by a
+          tear-out is the worst thing this could hand you.
+        </p>
+      )}
+
+      <p className="mt-2 text-xs leading-relaxed text-slate-600">{money.note}</p>
+    </div>
+  );
+}
+
 export function Claim({
   room,
   damages,
@@ -127,20 +232,30 @@ export function Claim({
   readonly claim: ClaimRecord;
   readonly onChange: (next: ClaimRecord) => void;
 }) {
-  const { area, len } = useUnits();
+  const { area, len, company } = useUnits();
   const [showing, setShowing] = useState<'details' | 'report'>('details');
   /** Whether the loss description was drafted by the phone and not yet read. */
   const [drafted, setDrafted] = useState(false);
 
+  // The contractor's own book, so the marks on this claim carry money. The
+  // same book the restoration sheet below prices off and the same one the
+  // claim document prints from — one book, three places, no chance of three
+  // different figures for one loss.
+  const book = useMemo(() => pricing(company).book, [company]);
+
   const report = useMemo(
     () =>
       claim.on
-        ? claimReport(room, damages, claim, new Date().toLocaleDateString(), {
-            len,
-            area: (a) => area(a),
-          })
+        ? claimReport(
+            room,
+            damages,
+            claim,
+            new Date().toLocaleDateString(),
+            { len, area: (a) => area(a) },
+            book
+          )
         : null,
-    [room, damages, claim, len, area]
+    [room, damages, claim, len, area, book]
   );
   const overlaps = useMemo(() => overlappingDamage(damages), [damages]);
   const missing = missingFromClaim(claim);
@@ -398,6 +513,18 @@ export function Claim({
                         {damage.summary}
                       </p>
                     )}
+                    {/* What this one mark comes to. Beside the mark, because
+                        "what is the loss worth" and "what is THIS wall worth"
+                        are two different questions and only the second one can
+                        be argued about with an adjuster. */}
+                    {damage.cost && (
+                      <p className="mt-1 text-sm text-slate-700">
+                        Putting this right:{' '}
+                        <strong className="font-mono tabular-nums text-slate-900">
+                          {damage.cost}
+                        </strong>
+                      </p>
+                    )}
                     <p className="mt-1 text-sm text-slate-600">{damage.note}</p>
                     <p className="mt-1 text-xs text-slate-500">{damage.workings}</p>
                     {damage.dryingNote && (
@@ -421,6 +548,8 @@ export function Claim({
                 ))}
               </ul>
             )}
+
+            <Money money={report.money} />
 
             <dl className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
               {report.totals.map((line) => (

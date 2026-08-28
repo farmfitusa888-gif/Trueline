@@ -19,9 +19,10 @@ import { type Company, letterhead } from './company.ts';
  * different result on every platform, and cannot be tested. This is arithmetic
  * on a page: it produces the same bytes on a phone, on a laptop and in a test.
  *
- * What is deliberately absent is the same thing that is absent from the HTML:
- * **no prices.** The scope and its cost is a separate sheet, sent after the
- * scope is agreed.
+ * What it carries is the same thing the HTML carries, including the money: the
+ * restoration scope, priced at the contractor's own rates, and never the room's
+ * remodel takeoff. The two are different sheets going to different payers, and
+ * this one only ever prices what somebody marked.
  */
 
 /** US Letter, in points, because that is what a carrier prints on. */
@@ -185,6 +186,10 @@ export function drawClaim(pen: Pen, parts: ClaimPdfParts): number {
     room(40);
     say(damage.headline, 11, { bold: true, gap: 3 });
     if (damage.summary) say(damage.summary, 11, { bold: true, gap: 4 });
+    // What this one mark comes to, beside the mark. A single figure at the
+    // bottom of a scope answers what the loss is worth and leaves every
+    // argument about one wall unanswerable.
+    if (damage.cost) say(`Putting this right: ${damage.cost}`, 10, { bold: true, gap: 4 });
     if (damage.note) say(damage.note, 10, { gap: 3 });
     say(damage.workings, 9, { grey: true, gap: 3 });
     if (damage.dryingNote) say(damage.dryingNote, 9, { grey: true, gap: 3 });
@@ -223,6 +228,38 @@ export function drawClaim(pen: Pen, parts: ClaimPdfParts): number {
     y -= 6;
   }
 
+  /* ----------------------------------------------------------- the money */
+
+  // Under the damage and above the totals, because it is the answer to what is
+  // directly above it. Grouped by the stage the work happens in, with the
+  // quantity and the rate beside every figure so the multiplication can be
+  // checked without anybody asking for a breakdown.
+  const priced = report.money;
+  if (priced && priced.priced) {
+    rule();
+    say('What it takes to put right', 12, { bold: true, gap: 6 });
+    for (const stage of ['tear out', 'protect', 'rebuild'] as const) {
+      const inStage = priced.lines.filter((l) => l.stage === stage);
+      if (inStage.length === 0) continue;
+      say(stage.toUpperCase(), 9, { grey: true, gap: 4 });
+      for (const line of inStage) {
+        row(`${line.item} — ${line.quantity} at ${line.rate}`, line.amount);
+      }
+    }
+    for (const line of priced.totals) row(line.label, line.value, 11);
+    y -= 6;
+    say(priced.note, 9, { grey: true, gap: 4 });
+    if (priced.unpriced.length > 0) {
+      say(
+        `Not in the figure above: ${priced.unpriced.join(', ')}. There is no rate set for those, ` +
+          `and they are left out rather than counted as nothing.`,
+        9,
+        { grey: true, gap: 8 }
+      );
+    }
+    y -= 8;
+  }
+
   /* ---------------------------------------------------------- the totals */
 
   if (report.totals.length > 0) {
@@ -242,7 +279,11 @@ export function drawClaim(pen: Pen, parts: ClaimPdfParts): number {
   say('Where these measurements came from', 11, { bold: true, gap: 4 });
   say(report.caveat, 10, { gap: 4 });
   say(
-    'No prices appear on this document. The scope and its cost is a separate sheet.',
+    priced && priced.priced
+      ? 'The money on this document is the restoration scope only — what it takes to put the ' +
+          'marked damage right, at this contractor’s own rates. It is not a remodel of this ' +
+          'room, and nothing on it comes off a surface nobody marked.'
+      : 'No prices appear on this document. The scope and its cost is a separate sheet.',
     10,
     { gap: 10 }
   );

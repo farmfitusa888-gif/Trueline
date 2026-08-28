@@ -2,6 +2,8 @@ import { type Nanometres, formatFeetInches } from './length.ts';
 import { type Room, RoomError, formatSquareFeet } from './room.ts';
 import { readiness, trustLabel } from './issue.ts';
 import { roomQuantities } from './zone.ts';
+import { type Stage, damageScope, scopeMoney } from './scope.ts';
+import { EMPTY_BOOK, type PriceBook, money, rateLabel } from './price.ts';
 import {
   type Damage,
   certainty,
@@ -119,6 +121,65 @@ export const IMPERIAL_REPORT: ReportFormat = {
   area: (halfSquareNanometres) => formatSquareFeet(halfSquareNanometres),
 };
 
+/* ------------------------------------------------------------- the money */
+
+/**
+ * One priced line of the restoration scope, ready to print.
+ *
+ * Strings, like everything else on this report, because the same figures have
+ * to come out on a screen, on a printed page and in a PDF, and three renderers
+ * each formatting cents their own way is three chances to print three different
+ * numbers for one job. The exact cents stay in `scope.ts`, where the arithmetic
+ * is done; nothing here is ever read back.
+ */
+export interface ClaimMoneyLine {
+  /** Which mark this line came off, so money can be traced to an observation. */
+  readonly damageId: string;
+  readonly stage: Stage;
+  readonly item: string;
+  /** "15.0 sq ft", exactly as the scope wrote it and the adjuster can check it. */
+  readonly quantity: string;
+  /** "$2.50 / sq ft". */
+  readonly rate: string;
+  /** "$37.50". */
+  readonly amount: string;
+}
+
+/**
+ * What it takes to put the damage right, in money.
+ *
+ * ## Why the claim carries a figure at all
+ *
+ * It did not, deliberately, and the reason was sound: an adjuster who reads a
+ * number before the scope is agreed negotiates against that number. What that
+ * missed is that the number then existed nowhere. The damage was measured to
+ * the square foot and priced on no sheet in the app, so the only figure a
+ * contractor could find was the remodel takeoff's — the whole room, its floor
+ * and its ceiling, none of which anybody said needed doing.
+ *
+ * So the figure is here, on the claim, where the marks are. It is still not the
+ * takeoff and it never becomes the takeoff: every line comes off a mark
+ * somebody made, at a rate that contractor typed himself, and a surface nobody
+ * marked produces nothing.
+ */
+export interface ClaimMoney {
+  readonly lines: readonly ClaimMoneyLine[];
+  /** Subtotal, mark-up if there is one, and the total. */
+  readonly totals: readonly ClaimLine[];
+  /** Items with no rate against them, named rather than priced at nothing. */
+  readonly unpriced: readonly string[];
+  /**
+   * False when not one line has a rate against it.
+   *
+   * The screen uses it to ask the contractor for his restoration rates. The
+   * documents use it to stay exactly as they were: a claim that leaves the
+   * building saying "none of this is priced" is not a document anybody sends.
+   */
+  readonly priced: boolean;
+  /** What this money is and, just as importantly, what it is not. */
+  readonly note: string;
+}
+
 export interface ClaimReport {
   readonly heading: string;
   /** The claim's own facts, in the order an adjuster reads them. */
@@ -136,9 +197,22 @@ export interface ClaimReport {
     readonly dryingNote: string;
     /** What it takes, in one line: "18.0 sq ft of wall face, 9' of baseboard". */
     readonly summary: string;
+    /**
+     * What putting this one mark right comes to, at the contractor's rates.
+     *
+     * Empty when nothing on this mark has a rate against it, so a renderer
+     * prints nothing rather than a confident `$0.00` for work that is simply
+     * not priced yet.
+     */
+    readonly cost: string;
   }[];
   /** The totals, and every caveat that has to travel with them. */
   readonly totals: readonly ClaimLine[];
+  /**
+   * The damage, priced. `null` when the marks take no priceable work at all —
+   * a claim that is nothing but pins, or a room with nothing marked on it.
+   */
+  readonly money: ClaimMoney | null;
   /** What is missing, said on the document rather than left to be discovered. */
   readonly missing: readonly string[];
   /**
@@ -163,11 +237,31 @@ export function claimReport(
   damages: readonly Damage[],
   claim: Claim,
   at: string,
-  format: ReportFormat = IMPERIAL_REPORT
+  format: ReportFormat = IMPERIAL_REPORT,
+  /**
+   * The contractor's own rate book, for pricing the damage.
+   *
+   * Defaulted to an empty one rather than made required, because a caller that
+   * has no book — a test, a tool, a renderer that only wants the measurements
+   * — should get the report it always got rather than be unable to ask for one.
+   * An empty book prices nothing and says which items it could not price.
+   */
+  book: PriceBook = EMPTY_BOOK
 ): ClaimReport {
   const state = readiness(room);
   const totals = damageTotals(room, damages);
   const q = roomQuantities(room);
+
+  // The same sheet `Scope` shows, priced by the same function, so the figure on
+  // the claim and the figure on the restoration sheet cannot disagree. Two
+  // pricings of one scope is two chances to print two numbers for one loss.
+  const sheet = damageScope(room, damages, at);
+  const priced = sheet.lines.length === 0 ? null : scopeMoney(sheet, book);
+  // Which half of the job a priced line belongs to. `quote` returns the money
+  // and not the stage, and an adjuster reads a scope in the order the work
+  // happens in rather than in the order a spreadsheet fell out. One mark never
+  // produces the same item twice, so the mark and the item name it exactly.
+  const stageOf = new Map(sheet.lines.map((l) => [`${l.damageId}|${l.what}`, l.stage]));
 
   const about: ClaimLine[] = [];
   const add = (label: string, value: string | undefined) => {
@@ -247,6 +341,13 @@ export function claimReport(
                     ? `Not moving: still ${curve.latest!.value} ${curve.latest!.scale}.`
                     : 'One reading so far.',
         summary: pieces.join(', '),
+        // Blank rather than "$0.00" when this mark has no rate against any of
+        // its lines. A confident zero beside real damage is the one number on
+        // this document that could cost somebody the argument.
+        cost: (() => {
+          const mine = priced?.perMark.find((m) => m.damageId === damage.id);
+          return mine && mine.lines.length > 0 ? money(mine.subtotal) : '';
+        })(),
       };
     }),
     totals: [
@@ -282,6 +383,35 @@ export function claimReport(
         : []),
       { label: 'Prepared', value: at },
     ],
+    money:
+      priced === null
+        ? null
+        : {
+            lines: priced.perMark.flatMap((mark) =>
+              mark.lines.map((line) => ({
+                damageId: mark.damageId,
+                stage: stageOf.get(`${mark.damageId}|${line.item}`) ?? 'tear out',
+                item: line.item,
+                quantity: `${line.quantity} ${line.unit}`,
+                rate: rateLabel(line),
+                amount: money(line.total),
+              }))
+            ),
+            totals: [
+              { label: 'The damage, priced', value: money(priced.subtotal) },
+              ...(priced.margin !== 0n
+                ? [{ label: 'Mark-up', value: money(priced.margin) }]
+                : []),
+              { label: 'Total', value: money(priced.total) },
+            ],
+            unpriced: priced.unpriced,
+            priced: priced.priced,
+            note:
+              'This is what it takes to put the marked damage right, at this contractor’s own ' +
+              'rates. It is NOT a remodel of the room: nothing on it comes off a surface ' +
+              'nobody marked, and the floor and ceiling appear only where damage was marked on ' +
+              'them. Every quantity above is the one beside the mark it came from.',
+          },
     missing: missingFromClaim(claim),
     caveat:
       state.blocking.length > 0

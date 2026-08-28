@@ -4,7 +4,7 @@ import { parseLength } from '../length.ts';
 import { scanned, verified, verify } from '../measurement.ts';
 import type { Heading, Opening, Room, Wall } from '../room.ts';
 import type { Damage } from '../damage.ts';
-import { SCOPE_ITEMS, damageScope } from '../scope.ts';
+import { SCOPE_ITEMS, damageScope, scopeMoney } from '../scope.ts';
 import { quote } from '../price.ts';
 
 /**
@@ -309,4 +309,117 @@ test('the catalogue holds nothing the module cannot produce', () => {
   for (const i of SCOPE_ITEMS) {
     assert.ok(produced.has(`${i.item}|${i.unit}`), `SCOPE_ITEMS lists "${i.item}" and nothing produces it`);
   }
+});
+
+/* ------------------------------------------------- what one mark comes to */
+
+const RATES = {
+  rates: [
+    { item: 'Remove wall board', unit: 'sq ft' as const, cents: 250n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Remove baseboard', unit: 'lf' as const, cents: 120n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Hang wall board', unit: 'sq ft' as const, cents: 420n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Tape and finish', unit: 'sq ft' as const, cents: 230n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Replace baseboard', unit: 'lf' as const, cents: 675n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Prime and paint the wall', unit: 'sq ft' as const, cents: 145n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+  ],
+};
+
+/** A second waterline, on the south wall, so two marks can be told apart. */
+const second: Damage = {
+  ...base,
+  id: 'd-2',
+  shape: {
+    kind: 'patch',
+    wallId: 'south',
+    fromAlong: parseLength(`0'`),
+    toAlong: parseLength(`4'`),
+    fromHeight: 0n,
+    toHeight: parseLength(`1'`),
+  },
+};
+
+test('the damage is priced per mark, and the marks add back to the sheet exactly', () => {
+  // Worked out by hand, on the back of the envelope this room exists to be:
+  //
+  //   d-1  north, 9' x 2' = 18.0 sq ft of face, 9.00 lf of base.
+  //        remove board   18.0 x $2.50 =  $45.00
+  //        remove base     9.00 x $1.20 =  $10.80
+  //        hang board     18.0 x $4.20 =  $75.60
+  //        tape           18.0 x $2.30 =  $41.40
+  //        replace base    9.00 x $6.75 =  $60.75
+  //        paint          the whole north face, 20' x 9' less a 3' x 6'8" door
+  //                       = 180 - 20 = 160.0 sq ft x $1.45 = $232.00
+  //                                                          -------
+  //                                                          $465.55
+  //   d-2  south, 4' x 1' = 4.0 sq ft of face, 4.00 lf of base.
+  //        remove board    4.0 x $2.50 =  $10.00
+  //        remove base     4.00 x $1.20 =   $4.80
+  //        hang board      4.0 x $4.20 =  $16.80
+  //        tape            4.0 x $2.30 =   $9.20
+  //        replace base    4.00 x $6.75 =  $27.00
+  //        paint          the whole south face, 20' x 9' = 180.0 x $1.45 = $261.00
+  //                                                          -------
+  //                                                          $328.80
+  const scope = damageScope(room, [waterline, second], '26 Aug 2026');
+  const priced = scopeMoney(scope, RATES);
+
+  assert.equal(priced.perMark.length, 2);
+  assert.equal(priced.perMark[0]!.damageId, 'd-1');
+  assert.equal(priced.perMark[0]!.subtotal, 46_555n);
+  assert.equal(priced.perMark[1]!.damageId, 'd-2');
+  assert.equal(priced.perMark[1]!.subtotal, 32_880n);
+
+  // The whole sheet is the marks added up, to the cent. Rounding happens once
+  // per line, so there is nothing between the two passes to disagree about.
+  assert.equal(priced.subtotal, 46_555n + 32_880n);
+  assert.equal(priced.total, priced.subtotal, 'no mark-up is set on this book');
+  assert.equal(priced.priced, true);
+});
+
+test('a mark-up on the book reaches the claim, once, on the whole sheet', () => {
+  const scope = damageScope(room, [waterline], '26 Aug 2026');
+  const priced = scopeMoney(scope, { ...RATES, marginBasisPoints: 1500 });
+  // 15% of $465.55 is $69.8325, which is $69.83 to the cent.
+  assert.equal(priced.subtotal, 46_555n);
+  assert.equal(priced.margin, 6983n);
+  assert.equal(priced.total, 53_538n);
+  // And it is not smeared across the marks, where it would be rounded twice.
+  assert.equal(priced.perMark[0]!.subtotal, 46_555n);
+});
+
+test('an item with no rate is named once and counted as nothing nowhere', () => {
+  const scope = damageScope(room, [waterline], '26 Aug 2026');
+  const priced = scopeMoney(scope, {
+    rates: [
+      { item: 'Hang wall board', unit: 'sq ft', cents: 420n, source: { kind: 'typed', by: 'sam', at: T0 } },
+    ],
+  });
+  assert.equal(priced.subtotal, 7560n, 'only the one item that has a rate');
+  // Named once, not once per line. An adjuster reading the same item three
+  // times learns nothing the first one did not tell him.
+  assert.deepEqual(
+    [...priced.unpriced].sort(),
+    ['Prime and paint the wall', 'Remove baseboard', 'Remove wall board', 'Replace baseboard', 'Tape and finish']
+  );
+  assert.equal(priced.unpriced.length, new Set(priced.unpriced).size);
+});
+
+test('a book with nothing in it prices nothing and says so, rather than printing zero', () => {
+  const scope = damageScope(room, [waterline], '26 Aug 2026');
+  const priced = scopeMoney(scope, { rates: [] });
+  assert.equal(priced.priced, false);
+  assert.equal(priced.subtotal, 0n);
+  assert.ok(priced.unpriced.length > 0, 'it names what it could not price');
+});
+
+test('a pin is worth nothing and produces no money at all', () => {
+  // A pin is a marker rather than a measurement, so it makes no scope line —
+  // and a mark with no lines must not appear in the money with a confident
+  // $0.00 beside it.
+  const pin: Damage = { ...base, id: 'd-pin', shape: { kind: 'pin', wallId: 'north', at: { x: parseLength(`3'`), y: 0n }, height: parseLength(`4'`) } };
+  const scope = damageScope(room, [pin], '26 Aug 2026');
+  const priced = scopeMoney(scope, RATES);
+  assert.equal(priced.perMark.length, 0);
+  assert.equal(priced.subtotal, 0n);
+  assert.equal(priced.priced, false);
 });

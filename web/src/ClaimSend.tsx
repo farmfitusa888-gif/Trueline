@@ -3,9 +3,10 @@ import type { Room } from '../../core/src/room.ts';
 import type { Damage } from '../../core/src/damage.ts';
 import type { Claim } from '../../core/src/claim.ts';
 import type { WorkScope } from '../../core/src/work.ts';
-import { type ClaimRoom, claimFile } from '../../core/src/claim-file.ts';
+import { type ClaimRoom, claimFile, lossMoney } from '../../core/src/claim-file.ts';
 import { claimReport } from '../../core/src/claim.ts';
-import { showArea, showLength } from '../../core/src/company.ts';
+import { pricing, showArea, showLength } from '../../core/src/company.ts';
+import { money } from '../../core/src/price.ts';
 import { planSvgFor } from './renderPlan.tsx';
 import { savedRooms } from './floorStore.ts';
 import { asDataUrl, fetchPhoto } from './photoStore.ts';
@@ -24,9 +25,11 @@ import { useUnits } from './units.tsx';
  * The room that is open is always in and always first: it is the one being
  * worked on, and its damage may be newer than anything in storage.
  *
- * **No prices on it.** The measurements and the evidence go to the adjuster;
- * the priced scope is the sheet that follows once the scope is agreed. An
- * adjuster who reads a number first negotiates against it.
+ * **The only money on it is the restoration scope.** What it takes to put the
+ * marked damage right, at this contractor's own rates. Never the room's remodel
+ * takeoff, which prices a floor and a ceiling nobody said needed doing and goes
+ * to a different payer entirely. Until the contractor has set restoration
+ * rates there is no figure and the document says nothing about money at all.
  */
 
 /** Every photograph named by a set of damages, as data URLs, for embedding. */
@@ -89,6 +92,23 @@ export function ClaimSend({
 
   const chosen = others.filter((o) => ticked.has(o.fileName));
 
+  // What the document will carry, worked out here so the screen can promise it
+  // before the file exists. Through `lossMoney`, which is the same function
+  // that puts the figure on the document — a screen promising one number and
+  // attaching another is worse than a screen that promises nothing.
+  const priced = useMemo(
+    () =>
+      lossMoney(
+        [{ room, damages }, ...chosen.map((o) => ({ room: o.room, damages: o.damages }))],
+        company,
+        new Date().toLocaleDateString()
+      ),
+    // `chosen` is rebuilt on every render, so the tick set is the dependency
+    // rather than the list it produces.
+    [room, damages, ticked, others, company]
+  );
+  const book = pricing(company).book;
+
   /** Every room's parts, gathered once and used by both documents. */
   async function gatherRooms(): Promise<ClaimRoom[]> {
     const parts: ClaimRoom[] = [
@@ -147,10 +167,14 @@ export function ClaimSend({
       // on the dynamic import.
       const { claimPdf } = await import('./claimPdf.ts');
       const pdf = await claimPdf({
-        report: claimReport(first.room, first.damages, claim, new Date().toLocaleDateString(), {
-          len: (v) => showLength(v, company.units),
-          area: (a) => showArea(a, company.units),
-        }),
+        report: claimReport(
+          first.room,
+          first.damages,
+          claim,
+          new Date().toLocaleDateString(),
+          { len: (v) => showLength(v, company.units), area: (a) => showArea(a, company.units) },
+          book
+        ),
         company,
         photos: byDamage,
         bytes,
@@ -204,10 +228,14 @@ export function ClaimSend({
         const { claimPdf } = await import('./claimPdf.ts');
         const byDamage = new Map(first.damages.map((d) => [d.id, d.photos]));
         pdf = await claimPdf({
-          report: claimReport(first.room, first.damages, claim, at, {
-            len: (v) => showLength(v, company.units),
-            area: (a) => showArea(a, company.units),
-          }),
+          report: claimReport(
+            first.room,
+            first.damages,
+            claim,
+            at,
+            { len: (v) => showLength(v, company.units), area: (a) => showArea(a, company.units) },
+            book
+          ),
           company,
           photos: byDamage,
           bytes,
@@ -285,10 +313,20 @@ export function ClaimSend({
         and the photographs at full size. It opens on anything, with no app and no login, and it
         works with no signal because nothing in it is fetched.
       </p>
-      <p className="mt-1 text-sm text-slate-600">
-        <strong>No prices are on it.</strong> The scope and what it costs is the sheet you send
-        after the scope is agreed — an adjuster who reads your number first negotiates against it.
-      </p>
+      {priced.priced ? (
+        <p className="mt-1 text-sm text-slate-600">
+          It carries <strong className="font-mono tabular-nums">{money(priced.total)}</strong> —
+          what it takes to put the marked damage right, at your rates, line by line with the
+          quantity and the rate beside each figure. <strong>That is the restoration scope and
+          nothing else.</strong> The room&rsquo;s remodel takeoff is a different sheet for a
+          different payer and none of it is on here.
+        </p>
+      ) : (
+        <p className="mt-1 text-sm text-slate-600">
+          <strong>No prices are on it yet.</strong> Set your restoration rates on the sheet above
+          and this document carries what the damage comes to — the marks you made, at your rates.
+        </p>
+      )}
 
       {others.length > 0 && (
         <fieldset className="mt-3">

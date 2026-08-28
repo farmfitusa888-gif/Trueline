@@ -49,9 +49,12 @@ struct ProjectsScreen: View {
     /// Whether finished work is on screen. Off by default — that is the whole
     /// point of archiving it.
     @State private var showingArchived = false
-    /// The room being renamed or filed, and the text being typed for it.
-    @State private var editing: ProjectStore.Entry?
-    @State private var typedName = ""
+    /// The rooms being put into a job, and the job being typed for them.
+    ///
+    /// There is no `typedName` beside these any more, and that is the fix
+    /// rather than a tidy-up: a room's name lives in the room, and the list
+    /// used to keep a second one of its own. See `ProjectStore.name(of:)`.
+    @State private var filing: Filing?
     @State private var typedJob = ""
     /// Said when a card could not be written, which on a phone means the disk
     /// is full. A rename that silently did not happen is worse than one that
@@ -227,11 +230,7 @@ struct ProjectsScreen: View {
                 }
             } else {
                 ForEach(grouped, id: \.job) { group in
-                Section(
-                    group.job.isEmpty
-                        ? (showingArchived ? "Archived" : "Not in a job yet")
-                        : group.job
-                ) {
+                Section {
                     ForEach(group.rooms) { entry in
                         // A capture with nothing in it IS a link now, and
                         // that is a reversal worth writing down.
@@ -317,11 +316,15 @@ struct ProjectsScreen: View {
                                 }
                             }
                             Button {
-                                editing = entry
-                                typedName = entry.title
                                 typedJob = entry.card.job
+                                filing = Filing(rooms: [entry])
                             } label: {
-                                Label("Rename or file it", systemImage: "pencil")
+                                Label(
+                                    entry.card.job.isEmpty
+                                        ? "Put it in a job"
+                                        : "Move it to another job",
+                                    systemImage: "folder"
+                                )
                             }
                             Button {
                                 if !store.archive(entry, !entry.card.archived) {
@@ -353,6 +356,17 @@ struct ProjectsScreen: View {
                                     : Label("Archive", systemImage: "archivebox")
                             }
                             .tint(Ink.accent)
+                            // The third way in, beside the header button and
+                            // the row menu -- the same three archiving already
+                            // has. One of them is the one a given person
+                            // reaches for, and nobody can be told which.
+                            Button {
+                                typedJob = entry.card.job
+                                filing = Filing(rooms: [entry])
+                            } label: {
+                                Label("Job", systemImage: "folder")
+                            }
+                            .tint(Ink.quiet)
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
@@ -370,6 +384,46 @@ struct ProjectsScreen: View {
                         // now, and indexing the wrong array deletes the wrong
                         // room.
                         indexes.map { group.rooms[$0] }.forEach(forget)
+                    }
+                } header: {
+                    // The way into a job, beside the four words that raise the
+                    // question.
+                    //
+                    // > "How do you put a room into a job?"
+                    //
+                    // It was already possible. It was a long press on a row,
+                    // a context menu, and an item that offered renaming and
+                    // filing together -- three guesses deep, and nothing on the
+                    // screen said so. A control nobody can find is a control
+                    // that does not exist, and this project has shipped three
+                    // of those in two days. So the section that says "Not in a
+                    // job yet" carries the answer to its own sentence, on the
+                    // same line.
+                    //
+                    // The old menu item is quoted in `docs/handbook.html`, and
+                    // deliberately NOT repeated here: `check-guide.py` is a
+                    // text search over this source, so a comment holding the
+                    // dead label would keep the guide check green while the
+                    // guide told somebody to tap a control that is gone. The
+                    // check is meant to fail until the handbook is rewritten.
+                    //
+                    // Only on the unfiled group and only on the current work:
+                    // a job that already has a name does not need a button
+                    // saying so, and a button on the Archived shelf would be
+                    // offering to file work that is finished.
+                    if group.job.isEmpty && !showingArchived {
+                        HStack {
+                            Text("Not in a job yet")
+                            Spacer()
+                            Button(group.rooms.count == 1 ? "Put it in a job" : "Put them in a job") {
+                                typedJob = ""
+                                filing = Filing(rooms: group.rooms)
+                            }
+                            .font(.footnote)
+                            .textCase(nil)
+                        }
+                    } else {
+                        Text(group.job.isEmpty ? "Archived" : group.job)
                     }
                 }
                 }
@@ -505,48 +559,86 @@ struct ProjectsScreen: View {
                 onClose: { showingPaywall = false }
             )
         }
-        // Renaming and filing, in one sheet, because they are the same thought:
-        // what is this and whose is it.
-        .sheet(item: $editing) { entry in
+        // Putting rooms into a job.
+        //
+        // This sheet used to rename a room as well, and that is exactly what it
+        // must not do: the name belongs to the room, is changed on the room's
+        // own screen, and is copied onto the card from there by one function.
+        // A second name typed here survived until the next time somebody opened
+        // the room and then vanished, which is how the Rooms list ended up
+        // saying "Room 2026-08-26 0927" for a room called UPSTAIRS -- the
+        // disagreement that cost a scan with 53 photographs in it.
+        //
+        // So it does one thing now, it does it for as many rooms as somebody
+        // picked, and it says where the name is changed instead of offering to
+        // change it in the wrong place.
+        .sheet(item: $filing) { job in
             NavigationStack {
                 Form {
-                    Section("What is this room?") {
-                        TextField("Kitchen", text: $typedName)
-                    }
                     Section {
                         TextField("118 Willow St", text: $typedJob)
                         // Picked rather than typed again, so the second room of
                         // a house lands in the same job as the first instead of
                         // in a job spelled slightly differently.
-                        ForEach(store.jobs().filter { $0 != typedJob }, id: \.self) { job in
-                            Button(job) { typedJob = job }
+                        ForEach(store.jobs().filter { $0 != typedJob }, id: \.self) { name in
+                            Button(name) { typedJob = name }
                         }
                     } header: {
                         Text("Which job")
                     } footer: {
                         Text(
-                            "The property this room is part of. Leave it empty and the room sits "
-                            + "on its own. The folder on this phone keeps its own name and does "
-                            + "not move — the name here is a label, and moving a folder is how a "
-                            + "backup ends up pointing at nothing."
+                            "The property these rooms are part of — the address you would say "
+                            + "on the phone. Leave it empty and they sit on their own. The "
+                            + "folders on this phone keep their own names and do not move: a "
+                            + "folder is the address every photograph in it already sits under, "
+                            + "and moving one is how a backup ends up pointing at nothing."
+                        )
+                    }
+
+                    Section {
+                        ForEach(job.rooms) { entry in
+                            Text(entry.title)
+                        }
+                    } header: {
+                        Text(job.rooms.count == 1 ? "This room" : "These \(job.rooms.count) rooms")
+                    } footer: {
+                        Text(
+                            "A room is renamed on its own screen, where the name is printed on "
+                            + "every drawing and every document it makes. It is shown here so "
+                            + "you can see which rooms are about to move, not to be typed over "
+                            + "— one name, in one place, is how the app stops a room and its "
+                            + "row disagreeing about which room they are."
                         )
                     }
                 }
-                .navigationTitle(entry.title)
+                // `first` rather than `rooms[0]`: an empty list cannot reach
+                // here today, and a title is not where anybody should find out
+                // that it did.
+                .navigationTitle(
+                    job.rooms.count == 1
+                        ? (job.rooms.first?.title ?? "Put it in a job")
+                        : "Put them in a job"
+                )
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { editing = nil }
+                        Button("Cancel") { filing = nil }
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save") {
-                            let named = store.rename(entry, to: typedName)
-                            let filed = store.file(entry, under: typedJob)
-                            if !named || !filed {
-                                trouble = "That could not be written. The phone may be out of "
-                                    + "space — the room itself is untouched."
+                            // Every room, and one message if any of them could
+                            // not be written. Reporting per room would put four
+                            // identical alerts in front of somebody whose phone
+                            // is simply full.
+                            var wrote = true
+                            for entry in job.rooms {
+                                if !store.file(entry, under: typedJob) { wrote = false }
                             }
-                            editing = nil
+                            if !wrote {
+                                trouble = "That could not be written. The phone may be out of "
+                                    + "space — the rooms themselves are untouched."
+                            }
+                            filing = nil
                         }
                     }
                 }
@@ -716,6 +808,22 @@ struct ProjectsScreen: View {
     private func show(_ scan: SavedScan) {
         store.refresh()
         path = [.review(scan)]
+    }
+
+    /// The rooms one filing sheet is about.
+    ///
+    /// A list rather than a single room, because the question somebody asks is
+    /// "these four rooms are 118 Willow St" and answering it one long press at
+    /// a time is four times the work for one fact. The header button hands over
+    /// a whole unfiled group; the row menu hands over one.
+    ///
+    /// Identified by the folders it holds, which is what `.sheet(item:)` needs
+    /// and is stable for as long as the sheet is up. Deliberately not
+    /// `rooms[0]`: an empty list would crash on the subscript, and an id is not
+    /// the place to find that out.
+    struct Filing: Identifiable {
+        let rooms: [ProjectStore.Entry]
+        var id: String { rooms.map(\.folder.path).joined(separator: "|") }
     }
 
     enum Route: Hashable {

@@ -1,0 +1,3 @@
+{
+  "_why": "Controls the audit deliberately does not drive, each with the reason it stays out. Anything not in here and not driven is on the list until somebody deals with it. A reason is required and its length is checked: an entry with a thin one is refused as loudly as an undriven control, because 'we will get to it' is how a list like this stops being read. Keyed by the control's accessible name, which is what the browser announces and what an audit would have to ask for. The file is empty on purpose -- every control on today's list is one somebody should drive, and not one of them has yet been argued out of the audit."
+}

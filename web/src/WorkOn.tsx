@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import {
   type Surface,
@@ -8,12 +8,17 @@ import {
   amountOn,
   isPicked,
   itemsFor,
+  partOn,
   picksOn,
+  readPart,
   surfaceName,
+  withPart,
   workItems,
 } from '../../core/src/work.ts';
+import { typedAmount } from '../../core/src/quantity.ts';
 import { money } from '../../core/src/price.ts';
 import { CeilingPanel } from './Ceiling.tsx';
+import { Wants } from './Measure.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -133,6 +138,141 @@ function PriceItAllAgain({ onPriceEverything }: { readonly onPriceEverything: ()
   );
 }
 
+/**
+ * How much of this surface is being done, when it is not all of it.
+ *
+ * > "I LOVE THE OPTION TO SELECT WHAT IS BEING DONE ON THE WALL, BUT SHOULD
+ * >  ALSO BE ABLE TO PUT IN HOW MUCH OF THAT WALL NEEDS REPLACING (GET TO
+ * >  CHOOSE THE EACHES)"
+ *
+ * ## Why the measured figure never leaves the screen
+ *
+ * The box sits under the room's own number and reads against it — "30 of the
+ * 84.4 sq ft on wall-5" — rather than replacing it. A typed figure that took
+ * the measurement's place would be the app presenting somebody's estimate as
+ * something it measured, which is the one thing it must never do. So both are
+ * on the row, the typed one is named as his in the sentence under it, and the
+ * same pair travels onto the sheet in `LinePart`.
+ *
+ * ## Why it appears only under a ticked line, and only where there is something
+ *
+ * A part of nothing is nothing. An item with no quantity on this surface — Doors
+ * on a wall with no door in it — offers no box, because the honest answer to
+ * "how many of them" there is not a number. And an unticked line is work that
+ * is not happening: there is no amount of it to ask about, and asking would
+ * turn "leave this wall alone" into a form with a blank in it.
+ *
+ * ## Emptying the box means all of it
+ *
+ * Not zero. Zero is refused in `readPart` and says so, because none of it is
+ * the tick coming off — the same rule the whole module keeps about absent
+ * never meaning nought.
+ */
+function HowMuch({
+  room,
+  surface,
+  scope,
+  item,
+  items,
+  measured,
+  onPick,
+}: {
+  readonly room: Room;
+  readonly surface: Surface;
+  readonly scope: WorkScope;
+  readonly item: WorkItem;
+  readonly items: readonly WorkItem[];
+  /** What the room measures here, printed — never replaced by what he types. */
+  readonly measured: string;
+  readonly onPick: (surface: Surface, item: WorkItem, items: readonly WorkItem[]) => void;
+}) {
+  const part = partOn(scope, surface, item);
+  // What is in the box while he is typing, which is not the same as what has
+  // been decided. Null hands the box back to the figure on the record, so a
+  // refused entry stays on screen to be corrected rather than vanishing.
+  const [typing, setTyping] = useState<string | null>(null);
+  const [wants, setWants] = useState<string | null>(null);
+  const what = surfaceName(surface);
+  const shown = typing ?? (part ? typedAmount(part.hundredths) : '');
+
+  function commit(text: string) {
+    if (text.trim() === '') {
+      setTyping(null);
+      setWants(null);
+      // Emptied is "the whole of it", which is what an untouched line has
+      // always meant. Only sent when there was a figure to take off, so
+      // blurring an empty box does not rewrite the scope's signature.
+      if (part) onPick(surface, withPart(item, null), items);
+      return;
+    }
+    try {
+      const next = readPart(room, surface, item, text, 'me', new Date().toISOString());
+      setTyping(null);
+      setWants(null);
+      onPick(surface, withPart(item, next), items);
+    } catch (error) {
+      // Kept in the box, and answered beside it. A number wiped by the app is
+      // a number he has to remember to type again.
+      setTyping(text);
+      setWants(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return (
+    <div className="pb-2 pl-8">
+      <label className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-slate-600">How much of it?</span>
+        <input
+          value={shown}
+          onChange={(event) => { setTyping(event.target.value); setWants(null); }}
+          onBlur={(event) => commit(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commit((event.target as HTMLInputElement).value);
+            }
+          }}
+          inputMode="decimal"
+          placeholder={measured}
+          // Long on purpose: a screen reader hears this box on its own, and
+          // "How much of it?" beside four other rows says nothing at all. It
+          // opens with the visible label, word for word, because a name that
+          // does not contain what the label says is a control somebody driving
+          // this phone by voice cannot ask for — which is the bug A12 caught on
+          // the business toggle, announcing "Your business" while showing the
+          // word "Close".
+          aria-label={`How much of it? — ${item.item} on ${what}`}
+          className="min-h-11 w-24 rounded-md border border-slate-300 px-2 py-1 text-right
+                     font-mono tabular-nums focus:border-sky-500 focus:outline-none"
+        />
+        <span className="text-xs text-slate-500">
+          {item.unit} of the {measured} {item.unit} on {what}
+        </span>
+      </label>
+      <p className={`mt-1 text-xs ${part ? 'font-medium text-amber-800' : 'text-slate-500'}`}>
+        {part
+          ? `${typedAmount(part.hundredths)} ${item.unit} of the ${measured} ${item.unit} ` +
+            `${what} measures — your figure, not a measurement.`
+          : `All ${measured} ${item.unit} of it, as the room measures it. Type a smaller ` +
+            `figure if only part of it is being done.`}
+      </p>
+      {part && (
+        <button
+          type="button"
+          onClick={() => { setTyping(null); setWants(null); onPick(surface, withPart(item, null), items); }}
+          className="mt-1 min-h-11 text-xs text-slate-500 underline underline-offset-4"
+          // Opens with what the button says, then names which line it is on:
+          // four of these on one wall would otherwise all be "Do the whole".
+          aria-label={`Do the whole ${measured} ${item.unit} — ${item.item} on ${what}`}
+        >
+          Do the whole {measured} {item.unit}
+        </button>
+      )}
+      <Wants say={wants} />
+    </div>
+  );
+}
+
 /** The tick list for one surface. Only ever rendered against a real scope. */
 function Picker({
   room,
@@ -199,6 +339,27 @@ function Picker({
                   </span>
                 </span>
               </label>
+              {/* Outside the label, deliberately. A number box inside the
+                  checkbox's own label makes tapping the figure toggle the tick
+                  — which is how somebody trying to correct 30 to 3 unticks the
+                  wall instead.
+
+                  Not offered on an item measured by a number he types. There is
+                  no measurement there to take a part of: the quantity is
+                  already his, it lives on the item in his rate book, and a
+                  second box asking for part of his own figure would be two
+                  places to change one number. */}
+              {on && amount !== '' && item.measure !== 'typed' && (
+                <HowMuch
+                  room={room}
+                  surface={surface}
+                  scope={scope}
+                  item={item}
+                  items={items}
+                  measured={amount}
+                  onPick={onPick}
+                />
+              )}
             </li>
           );
         })}

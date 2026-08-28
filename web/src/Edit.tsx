@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Room, Wall } from '../../core/src/room.ts';
 import { runLength } from '../../core/src/room.ts';
+import { renameRoom } from '../../core/src/edit.ts';
 import { confidenceLabel, isAdjusted, isVerified } from '../../core/src/measurement.ts';
 import { Wants } from './Measure.tsx';
 import { useUnits } from './units.tsx';
@@ -405,7 +406,45 @@ export function EditWall({
   );
 }
 
-/** What the room is called, at the top of every sheet this makes. */
+/**
+ * What the room is called — the one name, changed in the one place.
+ *
+ * ## The name is the room's, and this is where it changes
+ *
+ * A room has exactly one name and it lives in the room: `room.name`, saved into
+ * `corrected.json` by `persist.ts`, handed to the app on the `saved` channel,
+ * and copied from there onto the scan's card so the Rooms list and the bar at
+ * the top of the app show it too. The **folder** the scan sits in keeps its
+ * timestamped name forever — that is its address, the key it is saved under in
+ * iCloud, and the path under every photograph in it, and moving a folder is how
+ * a backup ends up pointing at nothing. A name is a label; a folder is an
+ * address. Only the label changes, and it changes here.
+ *
+ * That matters more than it sounds. A name that lives in two places is a name
+ * that will disagree, and the last time this app let one disagree — the room
+ * screen saying one thing and the Rooms list another — Sam deleted a scan with
+ * **53 photographs** in it, believing it was a duplicate of the room beside it.
+ * A wall that has been closed up cannot be photographed again.
+ *
+ * ## Why this control does not clear itself and does not close on a refusal
+ *
+ * It used to do both. `Set` on an empty box ran `if (name.trim() !== '')`,
+ * silently did nothing, cleared the box and shut the panel — and the box showed
+ * the room's current name as grey placeholder text, so it LOOKED full. Press
+ * Set on what reads as "UPSTAIRS" and the control closes as though it worked,
+ * having changed nothing. That is a rename that does not stick, reported from
+ * the only side that matters: the person who typed it.
+ *
+ * So now the box opens holding the name it is about to change, the room itself
+ * is asked whether the new name is allowed BEFORE anything closes, and a refusal
+ * appears beside the button that was pressed with the typed name still in the
+ * box. Nothing clears when a button is pressed — the same rule the rest of this
+ * file keeps, for the same reason.
+ *
+ * The rule is asked for rather than copied: `renameRoom` is the one function
+ * that decides what a room may be called, and calling it here means this screen
+ * cannot drift out of step with the reducer that calls it again a moment later.
+ */
 export function RenameRoom({
   room,
   onRename,
@@ -413,14 +452,18 @@ export function RenameRoom({
   readonly room: Room;
   readonly onRename: (name: string) => void;
 }) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(room.name);
+  const [wants, setWants] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   if (!open) {
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        // Filled from the room every time it is opened rather than once when
+        // this component was first built: the room on screen can be renamed,
+        // undone, or replaced by another one underneath a control that is shut.
+        onClick={() => { setName(room.name); setWants(null); setOpen(true); }}
         aria-label={`Rename ${room.name}`}
         className="min-h-11 text-left text-sm text-slate-500 underline underline-offset-4"
         data-sheet="no"
@@ -431,27 +474,55 @@ export function RenameRoom({
   }
 
   return (
-    <div className="flex w-full gap-2" data-sheet="no">
+    <div className="flex w-full flex-wrap gap-2" data-sheet="no">
       <input
         value={name}
-        onChange={(event) => setName(event.target.value)}
-        placeholder={room.name}
+        onChange={(event) => { setName(event.target.value); setWants(null); }}
         aria-label="What to call this room"
         autoFocus
-        className="min-h-12 w-full rounded-md border border-slate-300 px-3 py-2
+        className="min-h-12 min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2
                    focus:border-sky-500 focus:outline-none"
       />
       <button
         type="button"
         onClick={() => {
-          if (name.trim() !== '') onRename(name);
-          setName('');
+          // Asked, not guessed at. `renameRoom` refuses a blank name and one
+          // too long for the title block on the drawing, and it says why in
+          // words a person can act on. Refused here means nothing closes and
+          // nothing is cleared, so the name that was typed is still there to
+          // fix rather than to retype.
+          try {
+            renameRoom(room, name);
+          } catch (error) {
+            setWants(error instanceof Error ? error.message : String(error));
+            return;
+          }
+          setWants(null);
+          onRename(name);
           setOpen(false);
         }}
+        // Deliberately left with "Set" as its accessible name, where the
+        // wall's says "Set what to call this wall". It reads worse and it is
+        // the right call today: `a6-persist.mjs` finds this button by that
+        // exact name, that part is not this one's to edit, and a rename that
+        // breaks the check proving a rename is kept would be a poor trade for
+        // four words. It is the only plain "Set" on the panel, so nothing is
+        // currently ambiguous — see the note at the end of `a34-naming.mjs`.
         className="min-h-12 shrink-0 rounded-md bg-slate-900 px-4 font-semibold text-white
                    active:bg-slate-700"
       >
         Set
+      </button>
+      <Wants say={wants} />
+      <button
+        type="button"
+        // A way out. Without one, a refusal that will not close leaves somebody
+        // holding a box they cannot put down — which is its own kind of stuck
+        // screen, and the opposite of what refusing loudly is for.
+        onClick={() => { setName(room.name); setWants(null); setOpen(false); }}
+        className="min-h-11 basis-full text-left text-sm text-slate-500 underline underline-offset-4"
+      >
+        Leave it called {room.name}
       </button>
     </div>
   );

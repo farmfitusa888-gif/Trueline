@@ -151,9 +151,10 @@ test('everything the report says reaches the page', () => {
   assert.match(all, /THESE ARE A SCANNER/);
 });
 
-test('no price appears on it, ever', () => {
-  // The same rule the HTML has, checked the same way: the scope and its cost is
-  // a separate sheet sent after the scope is agreed.
+test('a report with no rates behind it carries no price, and says so', () => {
+  // The same rule the HTML has, checked the same way. `report` above is built
+  // without a rate book, which is a contractor who has not set his restoration
+  // prices yet, and a document announcing that is not one anybody sends.
   const { drawn } = draw();
   const all = drawn.text.map((t) => t.value).join(' ');
   assert.doesNotMatch(all, /\$/);
@@ -325,5 +326,59 @@ test('a photograph with nothing left of the page takes a fresh one', () => {
     assert.ok(shot.height >= 216, `${shot.id} at ${shot.height}`);
     assert.ok(shot.y >= 54 - 1, `${shot.id} bottom at ${shot.y}`);
     assert.ok(shot.y + shot.height <= PAGE.height - 54 + 1, `${shot.id} top off the page`);
+  }
+});
+
+/* ------------------------------------------------------------- and the money */
+
+/** The same report, priced at rates a contractor typed. */
+const BOOK = {
+  rates: [
+    { item: 'Remove wall board', unit: 'sq ft' as const, cents: 250n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Remove baseboard', unit: 'lf' as const, cents: 120n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Hang wall board', unit: 'sq ft' as const, cents: 420n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Tape and finish', unit: 'sq ft' as const, cents: 230n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Replace baseboard', unit: 'lf' as const, cents: 675n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+    { item: 'Prime and paint the wall', unit: 'sq ft' as const, cents: 145n, source: { kind: 'typed' as const, by: 'sam', at: T0 } },
+  ],
+};
+
+const pricedReport = claimReport(room, [waterline], full, '26 Aug 2026', undefined, BOOK);
+
+test('the damage is priced on the PDF, with the workings beside every figure', () => {
+  // The same arithmetic as the HTML, on the same room, done by hand:
+  //
+  //   remove board    18.0 sq ft x $2.50 =  $45.00
+  //   remove base      9.00 lf   x $1.20 =  $10.80
+  //   hang board      18.0 sq ft x $4.20 =  $75.60
+  //   tape            18.0 sq ft x $2.30 =  $41.40
+  //   replace base     9.00 lf   x $6.75 =  $60.75
+  //   paint           180.0 sq ft x $1.45 = $261.00
+  //                                         -------
+  //                                         $494.55
+  const { drawn } = draw({ report: pricedReport });
+  const all = drawn.text.map((t) => t.value).join(' | ');
+
+  assert.match(all, /What it takes to put right/);
+  assert.match(all, /Remove wall board — 18\.0 sq ft at \$2\.50 \/ sq ft/);
+  assert.match(all, /Prime and paint the wall — 180\.0 sq ft at \$1\.45 \/ sq ft/);
+  assert.match(all, /\$261\.00/);
+  assert.match(all, /The damage, priced/);
+  assert.match(all, /\$494\.55/);
+  // Beside the mark it came off, not only at the bottom of the page.
+  assert.match(all, /Putting this right: \$494\.55/);
+  // And the room's remodel takeoff is nowhere near it.
+  assert.doesNotMatch(all, /Replace floor finish/);
+  assert.doesNotMatch(all, /No prices appear on this document/);
+  assert.match(all, /not a remodel of this room/);
+});
+
+test('a priced claim still draws nothing outside the page', () => {
+  // The money is several more rows on a page that was already full, and text
+  // pushed past the bottom is text that is simply not in the file.
+  const { drawn } = draw({ report: pricedReport });
+  for (const t of drawn.text) {
+    assert.ok(t.y >= 0 && t.y <= PAGE.height, `"${t.value}" at y=${t.y}`);
+    assert.ok(t.x >= 0 && t.x < PAGE.width, `"${t.value}" at x=${t.x}`);
   }
 });
