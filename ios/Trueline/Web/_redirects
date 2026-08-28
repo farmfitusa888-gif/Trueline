@@ -1,0 +1,7 @@
+# One page, no router. Anything else resolves to it rather than 404ing, so a
+# link somebody shares works whatever path it carries — and a room that travels
+# in a URL fragment survives, because a 200 rewrite is served by the same
+# document and the fragment never left the browser to begin with.
+#
+# Read by Cloudflare Pages and by Netlify alike. See `_headers` beside it.
+/*  /index.html  200

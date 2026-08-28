@@ -1,8 +1,6 @@
 import { openChromium } from '../../core/tools/browser.mjs';
 import { check, refuseAStaleBundle, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
 
-// Say what was learned even if this part dies part way through.
-reportEvenIfItDies(`A39 — every menu folds back, at 430 by ${HEIGHT}`);
 
 /**
  * Every menu that drops down folds back up, on a phone.
@@ -52,6 +50,14 @@ reportEvenIfItDies(`A39 — every menu folds back, at 430 by ${HEIGHT}`);
 
 // 430 by 800: a large phone with the browser's own chrome taken off it.
 const HEIGHT = Number(process.env.TRUELINE_AUDIT_HEIGHT ?? 800);
+
+// Say what was learned even if this part dies part way through. It goes here
+// rather than beside the imports because the title names HEIGHT, and a `const`
+// is not there yet at the top of the file: putting the call above it made this
+// part throw a ReferenceError before a single check ran, which is a part that
+// reports NOTHING -- the exact failure this helper exists to prevent, caused
+// by the helper.
+reportEvenIfItDies(`A39 — every menu folds back, at 430 by ${HEIGHT}`);
 
 await refuseAStaleBundle();
 const browser = await openChromium();
@@ -151,6 +157,17 @@ await page.waitForTimeout(700);
 
 await section(page, 'Plan');
 await page.waitForTimeout(400);
+// wall-7, not wall-5, and the reason is a fix rather than a preference.
+// `Take it out` used to be drawn on any room with more than three walls, and
+// the model refuses the delete on most of them — so the row was offered where
+// it could never succeed. Edit.tsx now asks `deleteWall` itself before drawing
+// it, twice: as the room stands, and with the wall's openings set aside, since
+// a door is something a person can take out on the panel above.
+//
+// dining.json's wall-5 is one it correctly no longer offers: emptied of its
+// door it still cannot come out, because closing the room round it would shrink
+// wall-7 to minus nine and a half inches. wall-7 is one it does offer, so it is
+// the wall that exercises every row this part is about.
 const wall = page.getByRole('button', { name: /^Wall wall-5/ }).first();
 await wall.focus();
 await page.keyboard.press('Enter');
@@ -201,11 +218,43 @@ await page.waitForTimeout(250);
 check('opening one reaches the control it was hiding',
   (await page.getByRole('button', { name: 'Notch it' }).count()) === 1);
 
+/* --------------------------------- and the delete row, on a wall that has one */
+
+// It takes a second wall, and that is a fact about the room rather than about
+// this part. `Take it out` used to be drawn on any room with more than three
+// walls, and the model refuses the delete on most of them, so the row was
+// offered where it could never succeed. `Edit.tsx` now asks `deleteWall` itself
+// before drawing it.
+//
+// Measured on `dining.json` with `deleteWall` over every wall: the walls that
+// can come out are wall-3, opening-1, opening-2, wall-4 and wall-7, and the
+// walls that have an opening in them are wall-5, wall-6, wall-8 and wall-9.
+// **The two sets do not overlap** — a wall with a doorway in it is a wall the
+// room cannot close without. So the opening rows above need wall-5 and this
+// row needs wall-7, and no single wall could have carried both.
+await page.getByRole('button', { name: /^Wall wall-5/ }).first().click();
+await page.waitForTimeout(200);
+await page.getByRole('button', { name: /^Wall wall-7/ }).first().click();
+await page.waitForTimeout(400);
+// Every row lives behind this, on every wall.
+await page.getByRole('button', { name: 'Change this wall' }).click();
+await page.waitForTimeout(400);
+
 const takeOut = header(page, 'Take it out');
+check('the delete row is drawn on a wall the room can actually lose',
+  (await takeOut.count()) === 1, `${await takeOut.count()} found on wall-7`);
 check('a wall that is not there starts shut too',
   (await takeOut.getAttribute('aria-expanded')) === 'false');
 check('and says so on the shut row',
   /not really there/.test(await takeOut.innerText()), await takeOut.innerText());
+
+// Back to wall-5, which is the wall the rest of this part is about.
+await page.getByRole('button', { name: /^Wall wall-7/ }).first().click();
+await page.waitForTimeout(200);
+await page.getByRole('button', { name: /^Wall wall-5/ }).first().click();
+await page.waitForTimeout(400);
+await page.getByRole('button', { name: 'Change this wall' }).click();
+await page.waitForTimeout(400);
 
 /* ------------------------------------- the opening rows already did this */
 

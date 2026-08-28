@@ -40,6 +40,13 @@ function Field({
       <input
         type={type}
         value={value}
+        // A `<label>` names the control inside it with ALL of its own text, and
+        // the hint below is inside this one -- so without this the licence box
+        // is announced as "Licence number Some states require this on anything
+        // given to a homeowner." and the address box as a caption plus
+        // forty-three words. The caption is the NAME; the hint explains it, and
+        // an explanation is not a name.
+        aria-label={label}
         onChange={(event) => onChange(event.target.value)}
         autoCapitalize={type === 'email' ? 'off' : 'words'}
         autoCorrect="off"
@@ -80,6 +87,9 @@ function Lines({
       <textarea
         value={value}
         placeholder={placeholder}
+        // The same reason as `Field` above: the hint lives inside this label,
+        // and a name is not a paragraph.
+        aria-label={label}
         onChange={(event) => onChange(event.target.value)}
         rows={3}
         autoCapitalize="words"
@@ -354,6 +364,11 @@ export function Settings({ onClose }: { readonly onClose?: () => void }) {
             type="checkbox"
             checked={draft.useDefaultCeiling}
             onChange={(event) => set('useDefaultCeiling', event.target.checked)}
+            // Sixty words of explanation sit inside this label, and without
+            // this they are all read out as the name of the tickbox. Written
+            // out rather than taken from the span beside it, because the span
+            // is the sentence and the name is the question.
+            aria-label="Use my own ceiling height instead of the scanner’s"
             className="mt-1 h-5 w-5 rounded border-slate-300"
           />
           <span className="text-sm text-slate-700">

@@ -55,7 +55,12 @@ export function FieldSheet({ room, footprints, marks = [], voice = [] }: FieldSh
       setTold('copied');
     } catch {
       // Clipboard access is refused outside a secure context and in some
-      // browsers. Saying so beats a button that does nothing.
+      // browsers. Saying so beats a button that does nothing -- and the
+      // sentence it says names the list below, so the list has to BE below.
+      // Told to select it by hand while it is still folded away, somebody is
+      // being pointed at nothing, on the one path where the button could not
+      // do its job and the words are all there is.
+      setOpen(true);
       setTold('nope');
     }
   }
@@ -81,7 +86,14 @@ export function FieldSheet({ room, footprints, marks = [], voice = [] }: FieldSh
         <h3 className="text-sm font-semibold text-slate-900">Take this list with you</h3>
         <button
           type="button"
-          onClick={() => setOpen(!open)}
+          onClick={() => {
+            const next = !open;
+            setOpen(next);
+            // The refused-copy line below says the list is below. Folding the
+            // list away makes that sentence false, so it goes away with it.
+            // "Copied" is about the clipboard and stays either way.
+            if (!next && told === 'nope') setTold(null);
+          }}
           /* Sam asked for a way back off every menu that drops down. This one
              had one — the same control says Hide once it is open — and had
              none of the rest of it: no `aria-expanded`, so nothing announced

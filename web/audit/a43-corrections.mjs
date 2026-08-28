@@ -735,9 +735,15 @@ const third = await open();
     onADuplicate === 0,
     `${onADuplicate} offers on a wall whose removal leaves one wall written twice`);
 
+  // A door in the wall is not on its own a reason to draw nothing — a door can
+  // be taken out on the panel above, and a wall that could come out once it is
+  // empty keeps its row and says what has to go first. This wall is not that
+  // case: emptied, it still leaves two walls on one axis that nothing tells
+  // apart, so there is nothing to offer and nothing is drawn. The case that
+  // does say why is driven on `dining.json` at the end of this story.
   await changeWall(page, /^Wall wall-1,/);
   const onTheDoorWall = await offered();
-  check('and a wall with a door and a window in it does not offer it, being a side that is really there',
+  check('and a wall that could not come out even emptied of its door offers nothing at all',
     onTheDoorWall === 0, `${onTheDoorWall} offers on a wall carrying a door`);
 
   await changeWall(page, new RegExp(`^Wall ${STEP} back,`));
@@ -782,6 +788,33 @@ const third = await open();
     (await page.getByRole('button', { name: /^Undo/ }).count()) === 1,
     'nothing offers to undo it');
 
+  /* ------------------------- and the wall that is only waiting on its door */
+
+  // The third answer the row can give, on the room it actually happens in.
+  // `dining.json` is a real room Sam walked: eleven walls, and `wall-8` is one
+  // the room could genuinely lose — except for the door in it. A door can be
+  // taken out on the panel above, so the row is drawn and says what has to go
+  // first, in the model's own words, before anything is pressed. Nothing is
+  // pressed here because there is nothing to press: that is the check.
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  await loadScan(page, 'dining.json');
+  await section(page, 'Plan');
+  await changeWall(page, /^Wall wall-8,/);
+  const doorRow = await openRow(page, 'Take it out');
+  check('a wall the room could lose but for the door in it still offers the row',
+    (await page.getByRole('button', { name: /^Take it out/ }).count()) === 1,
+    'the row is not there at all');
+  check('and the row starts shut, like every other rare one on this panel',
+    doorRow.wasShut, 'it was already open');
+  const said = await page.locator('body').innerText();
+  check('and it says what has to come out first, rather than a button that would refuse',
+    /has door in it/.test(said) && /Take it out first/.test(said),
+    (said.match(/[^\n]*door[^\n]*/) ?? []).slice(0, 2).join(' | ') || 'nothing was said');
+  check('and there is no button under it to press, because there is nothing to press yet',
+    (await page.getByRole('button', { name: 'There is no wall here at all' }).count()) === 0,
+    'a button that can only refuse is still offered');
+
   await third.ctx.close();
   await third.browser.close();
 }
@@ -824,9 +857,14 @@ process.exit(bad > 0 ? 1 : 0);
      builds, `deleteWall` refuses four of the six, three of them because
      removing the wall leaves two walls on one axis that nothing tells apart.
      The row now asks `deleteWall` itself, which is the one function that
-     decides, and is drawn only where the answer is yes. A wall with a door in
-     it therefore loses the row rather than keeping a button that refuses, which
-     reads right: the row is for a side of the room that is not really there.
+     decides, and asks it twice: as the room stands, and with whatever is in
+     this wall set aside. A wall that could come out once its door is taken out
+     keeps its row and says so up front, in the model's own words, instead of
+     handing somebody a button that refuses; a wall that could not come out even
+     empty draws nothing. All three answers are driven above — the button on
+     `the alcove back`, nothing at all on four-walled `garage.json` and on the
+     notched room's `wall-1` and `wall-2`, and the sentence on `wall-8` of
+     `dining.json`.
    * **What "Take the tape reading off" leaves behind.** Taping wall-1 to
      20' 3" re-solves the room and the opposite wall goes to 20' 3" with it.
      Taking the reading off gives wall-1 back its scanned 20' and leaves the

@@ -63,6 +63,11 @@ function Field({
       <input
         type={type}
         value={value}
+        // The same rule as `Settings.tsx`: a `<label>` names its control with
+        // ALL of its own text, and the hint below is inside this one -- so
+        // without this, "Date of loss" is announced as "Date of loss The day it
+        // happened, not the day it was found." The caption is the name.
+        aria-label={label}
         onChange={(event) => onChange(event.target.value)}
         autoCorrect="off"
         spellCheck={false}
@@ -270,6 +275,18 @@ export function Claim({
   const set = <K extends keyof ClaimRecord>(key: K, value: ClaimRecord[K]) =>
     onChange({ ...claim, [key]: value });
 
+  // Who the claim is between, in the order the claim document prints them, and
+  // only the ones there is something to print. `describeParty` is what the
+  // document uses, so a name and a phone number are formatted once and read the
+  // same on the screen and on the paperwork.
+  const parties: readonly (readonly [string, string])[] = (
+    [
+      ['Owner', describeParty(claim.owner)],
+      ['Carrier', describeParty(claim.carrier)],
+      ['Adjuster', describeParty(claim.adjuster)],
+    ] as const
+  ).filter(([, said]) => said !== '');
+
   if (!claim.on) {
     return (
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-sheet="no">
@@ -431,12 +448,14 @@ export function Claim({
 
           <Disclosure
             title="Who it is between"
+            /* All three, because the shut row promises all three. A carrier
+               typed into the middle box and then folded away left the row
+               reading "The owner, the carrier and the adjuster" as though
+               nothing had been filled in at all. */
             summary={
-              describeParty(claim.owner) || describeParty(claim.adjuster)
-                ? [describeParty(claim.owner), describeParty(claim.adjuster)]
-                    .filter((one) => one !== '')
-                    .join(' · ')
-                : 'The owner, the carrier and the adjuster'
+              [describeParty(claim.owner), describeParty(claim.carrier), describeParty(claim.adjuster)]
+                .filter((one) => one !== '')
+                .join(' · ') || 'The owner, the carrier and the adjuster'
             }
           >
             <div className="mt-3 space-y-3">
@@ -487,23 +506,21 @@ export function Claim({
           </Disclosure>
 
           {/* Who this claim is between, in one line each, the way the claim
-              document prints them. `describeParty` is what the document uses,
-              so a name and a phone number are formatted once and read the same
-              on the screen and on the paperwork. */}
-          {(describeParty(claim.owner) || describeParty(claim.adjuster)) && (
+              document prints them -- and the document prints THREE:
+              `claimReport` adds Carrier beside Owner and Adjuster. Owner and
+              adjuster only was a summary that quietly disagreed with the
+              paperwork it claims to mirror, and the carrier is the one party a
+              contractor has no other way to check on this screen. The old guard
+              was wrong the same way: a claim with a carrier and nobody else
+              drew no block at all. */}
+          {parties.length > 0 && (
             <dl className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm">
-              {describeParty(claim.owner) && (
-                <div className="flex flex-wrap gap-x-2">
-                  <dt className="text-slate-500">Owner</dt>
-                  <dd className="text-slate-900">{describeParty(claim.owner)}</dd>
+              {parties.map(([who, said], i) => (
+                <div key={who} className={`flex flex-wrap gap-x-2${i === 0 ? '' : ' mt-0.5'}`}>
+                  <dt className="text-slate-500">{who}</dt>
+                  <dd className="text-slate-900">{said}</dd>
                 </div>
-              )}
-              {describeParty(claim.adjuster) && (
-                <div className="mt-0.5 flex flex-wrap gap-x-2">
-                  <dt className="text-slate-500">Adjuster</dt>
-                  <dd className="text-slate-900">{describeParty(claim.adjuster)}</dd>
-                </div>
-              )}
+              ))}
             </dl>
           )}
 

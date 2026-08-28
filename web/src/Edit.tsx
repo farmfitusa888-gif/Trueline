@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Room, Wall } from '../../core/src/room.ts';
 import { runLength } from '../../core/src/room.ts';
-import { renameRoom } from '../../core/src/edit.ts';
+import { deleteWall, renameRoom } from '../../core/src/edit.ts';
 import { confidenceLabel, isAdjusted, isVerified } from '../../core/src/measurement.ts';
 import { Wants } from './Measure.tsx';
 import { Disclosure } from './Disclosure.tsx';
@@ -145,9 +145,63 @@ export function EditWall({
   const [notchOut, setNotchOut] = useState('');
   const [notchAlong, setNotchAlong] = useState('');
   const [notchName, setNotchName] = useState('');
+  const [notchWants, setNotchWants] = useState<string | null>(null);
 
   const measured = isVerified(wall.length);
   const moved = isAdjusted(wall.length);
+
+  /**
+   * Whether this wall can come out, and if not yet, what is in the way.
+   *
+   * The row used to be drawn whenever `room.walls.length > 3`. That is true of
+   * every ordinary scanned rectangle, and on one the delete is always refused:
+   * four sides less one is three, and a rectilinear walk cannot close on three.
+   * So every four-walled room offered a control that could never once succeed,
+   * which is the dead button Sam reported already, built in.
+   *
+   * A wall count is not the question, and neither is the count after a merge.
+   * Measured on `garage.json` notched out to six walls, `deleteWall` refuses
+   * four of the six — one for the door in it, three because removing them
+   * leaves two walls on one axis that nothing tells apart, which `validate`
+   * calls one wall written twice. A guard counting walls after `mergeCollinear`
+   * still says five, still draws the row, and somebody still meets a button
+   * that cannot work.
+   *
+   * So the model is asked, twice, and the two answers are different questions:
+   *
+   *   1. **As the room stands.** No refusal, and the button is drawn.
+   *   2. **With whatever is in this wall set aside.** A door or a window is
+   *      something a person can take out on the panel above, so a wall that
+   *      could come out once it is empty keeps its row — and says what has to
+   *      go first, in the model's own words, where the thumb already is rather
+   *      than after a press. A wall that could not come out even empty has
+   *      nothing to offer and draws nothing.
+   *
+   * `deleteWall` is the one function that decides, and it is pure, so asking it
+   * means this row cannot drift out of step with the reducer that calls it
+   * again a moment later — the same move `RenameRoom` below makes with
+   * `renameRoom`, and the same one `wouldClose` exists in `sketch.ts` for.
+   *
+   * Only while the panel is open, because a shut panel draws none of this and
+   * each answer costs a solve.
+   */
+  const takeOut = useMemo(() => {
+    if (!open) return null;
+    const refusal = (walls: readonly Wall[]) => {
+      try {
+        deleteWall({ ...room, walls }, wall.id);
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    };
+    const now = refusal(room.walls);
+    if (now === null) return { ready: true, first: null };
+    if ((wall.openings?.length ?? 0) === 0) return null;
+    const { openings: _inIt, ...emptied } = wall;
+    if (refusal(room.walls.map((one) => (one.id === wall.id ? emptied : one))) !== null) return null;
+    return { ready: false, first: now };
+  }, [open, room, wall]);
 
   if (!open) {
     return (
@@ -403,7 +457,7 @@ export function EditWall({
         <div className="mt-1 grid grid-cols-3 gap-2">
           <input
             value={notchOut}
-            onChange={(event) => setNotchOut(event.target.value)}
+            onChange={(event) => { setNotchOut(event.target.value); setNotchWants(null); }}
             placeholder="how deep"
             inputMode="decimal"
             aria-label="How deep the step goes"
@@ -412,7 +466,7 @@ export function EditWall({
           />
           <input
             value={notchAlong}
-            onChange={(event) => setNotchAlong(event.target.value)}
+            onChange={(event) => { setNotchAlong(event.target.value); setNotchWants(null); }}
             placeholder="how wide"
             inputMode="decimal"
             aria-label="How wide the step is"
@@ -421,7 +475,7 @@ export function EditWall({
           />
           <input
             value={notchName}
-            onChange={(event) => setNotchName(event.target.value)}
+            onChange={(event) => { setNotchName(event.target.value); setNotchWants(null); }}
             placeholder="call it"
             aria-label="What to call the step"
             className="min-h-12 rounded-md border border-slate-300 px-2 py-2
@@ -431,8 +485,26 @@ export function EditWall({
         <button
           type="button"
           onClick={() => {
+            // Three boxes, and every empty one named at once -- the same shape
+            // `Cut it` above already uses, and for the same reason: three
+            // rounds of pressing and being refused is three chances to give up.
+            //
+            // It used to be a bare `return`. Pressing Notch it with the boxes
+            // empty changed not one byte of the screen, which on a phone is
+            // indistinguishable from a dead button; every other button on this
+            // panel says what it wants, and this is the class of bug
+            // `a12-everything.mjs` found in seven forms.
             const stem = notchName.trim();
-            if (notchOut.trim() === '' || notchAlong.trim() === '' || stem === '') return;
+            const missing = [
+              notchOut.trim() === '' && 'how deep the step goes',
+              notchAlong.trim() === '' && 'how wide the step is',
+              stem === '' && 'what to call it',
+            ].filter(Boolean);
+            if (missing.length) {
+              setNotchWants(`Fill in ${missing.join(', and ')} first.`);
+              return;
+            }
+            setNotchWants(null);
             onNotch(notchOut, notchAlong, `${stem} back`, `${stem} side`);
           }}
           className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3 text-sm
@@ -440,6 +512,7 @@ export function EditWall({
         >
           Notch it
         </button>
+        <Wants say={notchWants} />
         <p className="mt-1 text-xs text-slate-500">
           For an alcove or a chase the scanner flattened into a straight wall. It puts{' '}
           <strong>two</strong> walls in, because a room with square corners always has an even
@@ -449,20 +522,27 @@ export function EditWall({
         </p>
       </Row>
 
-      {room.walls.length > 3 && (
+      {takeOut && (
         <Row
           label="Take it out"
           open={false}
           summary="For a side of the room that is not really there"
         >
-          <button
-            type="button"
-            onClick={onDelete}
-            className="mt-1 min-h-11 rounded-md border border-red-300 bg-red-50 px-3 text-sm
-                       font-medium text-red-800 active:bg-red-100"
-          >
-            There is no wall here at all
-          </button>
+          {takeOut.ready ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="mt-1 min-h-11 rounded-md border border-red-300 bg-red-50 px-3 text-sm
+                         font-medium text-red-800 active:bg-red-100"
+            >
+              There is no wall here at all
+            </button>
+          ) : (
+            // The model's own sentence, not a copy of it, and here rather than
+            // under the button it would otherwise refuse. There is nothing to
+            // press until what is in the wall comes out, so there is no button.
+            <Wants say={takeOut.first} />
+          )}
           <p className="mt-1 text-xs text-slate-500">
             Not the same as an open span — this removes the side from the room, and the walls on
             that axis grow or shrink to close it back up. The line under the plan says which

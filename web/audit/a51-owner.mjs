@@ -264,8 +264,10 @@ async function walkOn({ scheme, deep, only, browser, ctx, page }) {
     check(
       'an empty screen says it is empty rather than printing a row of noughts',
       /No report from Apple has been read in yet/.test(open) &&
-        /No free months have been given away/.test(open),
-      open.slice(0, 600)
+        /No free months have been given away/.test(open) &&
+        !/\$0\.00/.test(open) &&
+        /There are no figures yet, rather than figures of nought/.test(open),
+      (open.match(/.{0,80}\$0\.00.{0,40}/) ?? []).join(' | ') || open.slice(0, 600)
     );
     const phraseInStore = await page.evaluate(() => window.localStorage.getItem('trueline.owner.lock'));
     check(
@@ -324,9 +326,15 @@ async function walkOn({ scheme, deep, only, browser, ctx, page }) {
       /\$241\.99/.test(money) && /\$169\.39/.test(money) && /\$72\.60/.test(money) && /\$7\.99/.test(money),
       money.slice(0, 1200)
     );
+    // The file name has to be on the MONTH's own line, not merely somewhere on
+    // the page: the line that says what was just read in names it too, and a
+    // check that accepted either would go on passing with the provenance gone
+    // off every row.
     check(
       'the months themselves are on the screen, each saying which file it came from',
-      /July 2026/.test(money) && /August 2026/.test(money) && /S_M_money_July\.txt/.test(money),
+      /July 2026/.test(money) &&
+        /August 2026/.test(money) &&
+        /refunded \u00b7 from S_M_money_July\.txt and S_M_events_July\.txt/.test(money),
       money.slice(0, 1200)
     );
     check(

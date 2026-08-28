@@ -1,0 +1,30 @@
+# Headers for the app, in the one format both hosts read.
+#
+# Cloudflare Pages and Netlify both read a `_headers` file out of the published
+# directory, so the rules live here rather than in either host's own config —
+# which means the second host is a fallback that actually works rather than one
+# nobody has checked. `netlify.toml` at the top of the repository says the same
+# things in Netlify's own syntax and is deliberately kept in step; if you change
+# one, change the other.
+#
+# It is in `web/public/` because that is what Vite copies into `web/dist`
+# verbatim, and `web/dist` is what gets published.
+
+/*
+  # Nothing here loads from anywhere else, so nothing here may. There is no
+  # server to talk to and no font, script, style or image from another origin.
+  # The one thing this page reads that is not its own is a file the person
+  # chose themselves, which is not a network request at all.
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+  # A room can travel in the fragment of a URL. A fragment is never sent to any
+  # server — not in the request line, not in `Referer` — and this makes sure the
+  # rest of the address is not sent anywhere either.
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  # This app asks for none of these and never will. Said out loud so that a
+  # future dependency cannot quietly start asking.
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
+
+/assets/*
+  # Vite puts a hash in every asset name, so a name is a version.
+  Cache-Control: public, max-age=31536000, immutable
