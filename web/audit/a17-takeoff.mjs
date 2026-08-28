@@ -1,4 +1,7 @@
-import { check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A17 — the sheet somebody orders material from');
 
 /**
  * The sheet somebody orders material from.

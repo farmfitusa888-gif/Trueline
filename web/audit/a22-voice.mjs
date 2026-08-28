@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, noise, openAsApp, pick, report, section, sentTo, SP, URL } from './lib.mjs';
+import { check, noise, openAsApp, pick, report, reportEvenIfItDies, section, sentTo, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A22 — what was said, and what was marked');
 
 /**
  * Talking at a wall, and marking one on a job nobody is claiming for.

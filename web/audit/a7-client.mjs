@@ -1,4 +1,7 @@
-import { SP, check, loadScan, noise, open, pick, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, pick, report, reportEvenIfItDies, section, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A7 — findings, overrides, the client file');
 const { browser, ctx, page } = await open();
 await loadScan(page);
 

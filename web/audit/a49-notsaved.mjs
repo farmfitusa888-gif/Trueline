@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { SP, check, openAsApp, pick, report, sentTo } from './lib.mjs';
+import { check, openAsApp, pick, report, reportEvenIfItDies, sentTo, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A49 — the phone would not take it, and the app said so');
 
 /**
  * A49 — when the phone will not take the room, the app says so.

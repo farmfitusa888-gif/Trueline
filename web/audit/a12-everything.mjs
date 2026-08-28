@@ -1,6 +1,9 @@
 import { openChromium } from '../../core/tools/browser.mjs';
 
-import { HEIGHT, URL, check, loadScan, report, section } from './lib.mjs';
+import { check, HEIGHT, loadScan, report, reportEvenIfItDies, section, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A12 — the complete click-through');
 
 
 /**

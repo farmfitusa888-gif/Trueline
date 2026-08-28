@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { SP, check, openAsApp, report, section, sentTo } from './lib.mjs';
+import { check, openAsApp, report, reportEvenIfItDies, section, sentTo, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A53 — every drawing that leaves, sampled as pixels');
 
 /**
  * A53 — the drawing is a drawing wherever it goes, and not a black square.

@@ -1,4 +1,7 @@
-import { check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A11 — the calendar and the invoice');
 
 /**
  * The calendar and the invoice: the two things every competitor charges a

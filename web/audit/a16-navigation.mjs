@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { check, noise, open, report, SP, URL } from './lib.mjs';
+import { check, noise, open, report, reportEvenIfItDies, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A16 — the app as it opens, and where the tabs land');
 
 /**
  * The app as somebody meets it, and where the tabs land.

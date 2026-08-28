@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, noise, open, report, SP, URL } from './lib.mjs';
+import { check, noise, open, report, reportEvenIfItDies, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A21 — the worked example and the guided tour');
 
 /**
  * The worked example, and the guided tour over the top of it.

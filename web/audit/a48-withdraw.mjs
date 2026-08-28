@@ -1,4 +1,7 @@
-import { check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A48 — withdrawing an agreement, and the record it leaves');
 
 /**
  * The way out of an agreement, and the record it leaves behind.

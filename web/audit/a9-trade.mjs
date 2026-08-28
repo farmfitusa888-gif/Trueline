@@ -1,4 +1,7 @@
-import { SP, check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A9 — what the trade changes, and what it must not');
 
 /**
  * The trade somebody picks changes the words and the order, and nothing else.

@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { check, noise, openAsApp, pick, report, section, sentTo, SP } from './lib.mjs';
+import { check, noise, openAsApp, pick, report, reportEvenIfItDies, section, sentTo, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A23 — costing what is actually being done');
 
 /**
  * Costing what is actually being done, driven through the real app.

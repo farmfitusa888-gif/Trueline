@@ -1,4 +1,7 @@
-import { check, noise, open, report } from './lib.mjs';
+import { check, noise, open, report, reportEvenIfItDies } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A3 — drawing a room by hand');
 const { browser, page } = await open();
 
 /* ------------------------------------------------------- draw a room by hand */

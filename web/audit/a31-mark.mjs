@@ -1,5 +1,8 @@
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, URL, SP, pick, report, section } from './lib.mjs';
+import { check, pick, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A31 — the mark button, on a real scan');
 
 /**
  * A refusal you cannot see is a button that does not work.

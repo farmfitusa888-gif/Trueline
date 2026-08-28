@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, URL, SP, report, section } from './lib.mjs';
+import { check, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A38 — the record that a document left this phone');
 
 /**
  * The record that a document left this phone — driven through the real app.

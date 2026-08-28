@@ -1,4 +1,7 @@
-import { SP, check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A36 — the address of the place of business');
 
 /**
  * The address of the seller's place of business, from the profile to the paper.

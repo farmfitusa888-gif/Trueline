@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { check, noise, openAsApp, pick, report, section, sentTo, SP } from './lib.mjs';
+import { check, noise, openAsApp, pick, report, reportEvenIfItDies, section, sentTo, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A33 — how much of it is being done');
 
 /**
  * How much of a surface is being done, driven through the real app.

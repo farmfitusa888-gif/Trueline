@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { SECTIONS, SP, check, contrast, noise, openAsApp, report, section } from './lib.mjs';
+import { check, contrast, noise, openAsApp, report, reportEvenIfItDies, section, SECTIONS, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A50 — readable on both grounds, on the colour actually painted');
 
 /**
  * A50 — every word on every screen, against the ground it is actually painted on.

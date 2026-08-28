@@ -1,4 +1,7 @@
-import { SP, check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A26 — the stores you buy at');
 
 /**
  * The stores a contractor buys at, driven through the real app.

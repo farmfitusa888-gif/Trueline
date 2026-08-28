@@ -1,4 +1,7 @@
-import { HEIGHT, check, loadScan, noise, open, pick, report, section } from './lib.mjs';
+import { check, HEIGHT, loadScan, noise, open, pick, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A41 — the list that goes into a pocket');
 
 /**
  * The list that goes into a pocket — the three controls that get it out.
@@ -387,6 +390,88 @@ for (const [what, control] of [['Send it', sendIt], ['Copy', copy], ['Print', pr
     at.onScreen, at.said);
 }
 
+/* ==========================================================================
+   7. A copy the browser refuses points at a list that is actually there.
+   ========================================================================== */
+
+// The one path where the button cannot do its job, and the words are all there
+// is. `copy()` answers a clipboard the browser will not write to with "The list
+// is below — select it and copy by hand", and the list was `hidden` until
+// somebody pressed Show — so the app named something it was simultaneously
+// hiding, and the toggle still said "Show". Driven here with `writeText`
+// replaced by a stub that rejects, which is what a page served over plain HTTP
+// gets on a real phone.
+//
+// Left until last on purpose: every check above needs a clipboard that works.
+const stubbed = await page.evaluate(() => {
+  try {
+    Object.defineProperty(navigator.clipboard, 'writeText', {
+      configurable: true,
+      value: () => Promise.reject(new Error('this browser would not let the page copy')),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+});
+check('the clipboard can be made to refuse, which is the state this section is about',
+  stubbed, 'writeText could not be replaced, so nothing below proves anything');
+
+check('the list is folded away again before the refusal, or this proves nothing',
+  (await sheet.locator('pre').first().isVisible()) === false
+  && (await toggle.innerText()).trim() === 'Show',
+  `visible ${await sheet.locator('pre').first().isVisible()}, says ${await toggle.innerText()}`);
+
+await press(copy, 'copy the list into a clipboard that refuses');
+
+const refused = sheet.getByRole('status');
+const refusedSays = (await refused.count()) ? await refused.innerText() : '';
+check('a copy the browser refused says so, rather than looking like a button that did nothing',
+  (await refused.count()) === 1 && /would not let the page copy/.test(refusedSays),
+  refusedSays || 'nothing was said at all');
+check('and it says what to do instead, which is to take the list by hand',
+  /select it and copy by hand/.test(refusedSays), refusedSays || 'nothing was said at all');
+
+// The whole bug, in one line. The sentence above names the list; before this
+// was fixed `boundingBox()` on it returned null, because it was still `hidden`.
+const listNow = sheet.locator('pre').first();
+const listBox = await listNow.boundingBox();
+check('and the list it tells you to copy by hand is on the screen to be copied by hand',
+  listBox !== null && (await listNow.isVisible()),
+  listBox === null ? 'the list has no box at all: it is still folded away' : 'it is drawn');
+check('and the control that folds it now offers to put it away, rather than still offering to show it',
+  (await toggle.innerText()).trim() === 'Hide', await toggle.innerText());
+// Against the list as it stands NOW, mark and all — `onTheScreen` was read
+// before section 6 put a condition on wall-1, and a check that compared with it
+// would go red over a list that had correctly grown.
+check('and what is now on the screen is the list itself, not an empty box',
+  (await listNow.innerText()).trim() === withMark,
+  `${(await listNow.innerText()).trim().length} characters against ${withMark.length}`);
+
+const refusedAt = await whereItIs(refused);
+check('the refusal is on the screen, where the thumb that pressed Copy already is',
+  refusedAt.onScreen, refusedAt.said);
+const copyNow = (await copy.count()) ? await copy.first().boundingBox() : null;
+const refusedNow = (await refused.count()) ? await refused.first().boundingBox() : null;
+const refusedGap = copyNow && refusedNow
+  ? Math.round(refusedNow.y - (copyNow.y + copyNow.height))
+  : null;
+check('and it is beside the button that was pressed, not 280 px away from it',
+  refusedGap !== null && refusedGap >= 0 && refusedGap < 120,
+  `${refusedGap} px below the Copy button (button ${JSON.stringify(copyNow)}, `
+    + `message ${JSON.stringify(refusedNow)})`);
+
+// And folding the list away again takes the sentence with it. A line that says
+// "the list is below" over a list that is no longer below is the same bug
+// pointing the other way.
+await toggle.click();
+await page.waitForTimeout(300);
+check('folding the list away again takes the sentence that pointed at it with it',
+  (await sheet.locator('pre').first().isVisible()) === false
+  && (await sheet.getByRole('status').count()) === 0,
+  `visible ${await sheet.locator('pre').first().isVisible()}, `
+    + `${await sheet.getByRole('status').count()} messages left on the screen`);
+
 check('no console or page errors across the whole run', noise().length === 0, noise().join(' | '));
 
 const bad = report('A41 — the list that goes into a pocket');
@@ -397,16 +482,15 @@ process.exit(bad > 0 ? 1 : 0);
 /* ==========================================================================
    What this part found, and what it deliberately does not check.
 
-   * **A refused copy points at a list that is not there.** `copy()` answers a
-     browser that will not let a page write to the clipboard with "This browser
-     would not let the page copy. The list is below — select it and copy by
-     hand." The list is `hidden` until somebody presses Show, so on the one
-     path where the button cannot do its job the sentence names something that
-     is not on the screen — and the toggle still says "Show", so the app is
-     telling the person to read something it is simultaneously hiding. Driven
-     with `navigator.clipboard.writeText` replaced by a rejecting stub: the
-     status appears and `pre` has no bounding box at all. Reported rather than
-     fixed; the old/new is in the integration note.
+   * **A refused copy pointed at a list that was not there — fixed, and section
+     7 is what holds it fixed.** `copy()` answers a browser that will not let a
+     page write to the clipboard with "This browser would not let the page copy.
+     The list is below — select it and copy by hand." The list was `hidden`
+     until somebody pressed Show, so on the one path where the button cannot do
+     its job the sentence named something that was not on the screen — and the
+     toggle still said "Show", so the app was telling the person to read
+     something it was simultaneously hiding. The refusal now opens the list, and
+     folding the list away again clears the sentence that pointed at it.
    * **A room with a tape on every wall and nothing marked on it.**
      `FieldSheet` returns `null` for that room and draws no section at all,
      which is right and is not checked here: getting there means measuring four

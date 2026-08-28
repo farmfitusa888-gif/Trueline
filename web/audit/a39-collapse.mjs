@@ -1,5 +1,8 @@
 import { openChromium } from '../../core/tools/browser.mjs';
-import { SP, URL, check, refuseAStaleBundle, report, section } from './lib.mjs';
+import { check, refuseAStaleBundle, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies(`A39 — every menu folds back, at 430 by ${HEIGHT}`);
 
 /**
  * Every menu that drops down folds back up, on a phone.

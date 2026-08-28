@@ -1,4 +1,7 @@
-import { check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A15 — an open plan, priced as several');
 
 /**
  * An open plan, priced as the several spaces it has to be.

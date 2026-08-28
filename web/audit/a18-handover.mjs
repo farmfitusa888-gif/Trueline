@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
-import {
-  SECTIONS, SP, check, contrast, noise, openAsApp, report, section,
-} from './lib.mjs';
+import { check, contrast, noise, openAsApp, report, reportEvenIfItDies, section, SECTIONS, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A18 — the hand-over, and nothing blank');
 
 /**
  * The hand-over, and the rule that no screen is ever blank.

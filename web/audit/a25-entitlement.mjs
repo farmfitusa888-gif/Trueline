@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { SECTIONS, SP, check, loadScan, noise, open, openAsApp, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, openAsApp, report, reportEvenIfItDies, section, SECTIONS, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A25 — one free room, and the work already done');
 
 /**
  * One room free, and the work already done is never touched.

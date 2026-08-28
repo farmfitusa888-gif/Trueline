@@ -1,4 +1,7 @@
-import { SP, check, loadScan, open, report, section } from './lib.mjs';
+import { check, loadScan, open, report, reportEvenIfItDies, section, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A4 — business, units, floor');
 const { browser, page } = await open();
 
 /* ------------------------------------------------------------ the business */

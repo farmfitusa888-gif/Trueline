@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { SP, URL, check, contrast, noise, openAsApp, pick, report, section, sentTo } from './lib.mjs';
+import { check, contrast, noise, openAsApp, pick, report, reportEvenIfItDies, section, sentTo, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A29 — knowing you tapped the wall');
 
 /**
  * Tapping a wall, and being able to tell that you did.

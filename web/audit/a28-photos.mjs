@@ -1,4 +1,7 @@
-import { SP, check, loadScan, noise, open, pick, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, pick, report, reportEvenIfItDies, section, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A28 — taking several photographs off, and getting them back');
 
 /**
  * Taking several photographs off a mark at once, without losing the wrong ones.

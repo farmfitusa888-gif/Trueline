@@ -1,4 +1,7 @@
-import { check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A10 — the gate, from both sides');
 
 /**
  * The paywall, from both sides of it.

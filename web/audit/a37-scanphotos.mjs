@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, URL, SP, pick, report, section } from './lib.mjs';
+import { check, pick, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A37 — taking the walk\'s own photographs off, on a real scan');
 
 /**
  * Taking the walk's own photographs off, without losing the wrong ones.

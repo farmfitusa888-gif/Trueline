@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { check, noise, openAsApp, report, section, sentTo, SP } from './lib.mjs';
+import { check, noise, openAsApp, report, reportEvenIfItDies, section, sentTo, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A34 — what a room is called, in one place');
 
 /**
  * What a room is called — one fact, one home, on every screen that shows it.

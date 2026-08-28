@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { check, noise, openAsApp, report, section, sentTo, SP } from './lib.mjs';
+import { check, noise, openAsApp, report, reportEvenIfItDies, section, sentTo, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A20 — what the phone will write, and what it will not');
 
 /**
  * The four things the phone can write, and the one rule they all obey.

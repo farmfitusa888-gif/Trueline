@@ -290,6 +290,37 @@ export async function loadScan(page, file = 'garage.json') {
   await page.waitForTimeout(500);
 }
 
+/**
+ * Report what was learned even when the part dies part way through.
+ *
+ * `check()` only remembers; `report()` is what prints. So a part that threw on
+ * the way — a locator that now matches nothing, a button that never becomes
+ * pressable, a page that would not load — printed **nothing at all**, and the
+ * one thing it was written to notice became the one thing it could not say.
+ *
+ * That was not theoretical. Five deliberate breakages of `a47` proved nothing
+ * whatsoever until this existed: the part died, the terminal showed a stack
+ * trace, and every check it had already passed went unmentioned. It is the
+ * same failure `check-the-checks.py` exists for, one level up — a part that
+ * cannot be watched failing is not a part.
+ *
+ * Call it once, near the top, passing the same title `report` will be given.
+ * Every part gets it; there is no reason for one not to.
+ */
+export function reportEvenIfItDies(title) {
+  const stopOn = (trouble) => {
+    check(
+      'this part ran to the end rather than dying part way through',
+      false,
+      String(trouble && trouble.message ? trouble.message : trouble).split('\n')[0].slice(0, 200)
+    );
+    report(title);
+    process.exit(1);
+  };
+  process.on('uncaughtException', stopOn);
+  process.on('unhandledRejection', stopOn);
+}
+
 export function report(title) {
   const bad = results.filter((r) => !r.ok);
   console.log(`\n===== ${title} =====`);

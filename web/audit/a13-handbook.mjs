@@ -3,7 +3,10 @@ import { dirname, join } from 'node:path';
 
 import { openChromium } from '../../core/tools/browser.mjs';
 
-import { SP, URL, check, report } from './lib.mjs';
+import { check, report, reportEvenIfItDies, SP, URL } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A13 — the handbook, inside the app, offline');
 
 /**
  * How many cards the handbook should have, counted from the handbook.

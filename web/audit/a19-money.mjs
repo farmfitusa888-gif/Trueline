@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { check, contrast, noise, openAsApp, report, section, sentTo, SECTIONS, SP } from './lib.mjs';
+import { check, contrast, noise, openAsApp, report, reportEvenIfItDies, section, SECTIONS, sentTo, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A19 — scan to money, end to end');
 
 /**
  * The path Sam actually walks, from a scan to money, without leaving it.

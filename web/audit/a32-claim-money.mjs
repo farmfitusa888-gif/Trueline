@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { inflateSync } from 'node:zlib';
-import { check, noise, open, pick, report, section, SP } from './lib.mjs';
+import { check, noise, open, pick, report, reportEvenIfItDies, section, SP } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A32 — the damage priced on the claim, and a drawing that is not black');
 
 /**
  * Two things Sam found on his own phone, on his own scan.

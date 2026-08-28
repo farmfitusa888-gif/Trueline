@@ -1,4 +1,7 @@
-import { HEIGHT, check, loadScan, noise, open, pick, report, section } from './lib.mjs';
+import { check, HEIGHT, loadScan, noise, open, pick, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A43 — correcting a wall');
 
 /**
  * Correcting a wall — the screen the whole product is built around.
@@ -425,19 +428,34 @@ const second = await open();
       .test(await page.locator('body').innerText()),
     'the refused height was taken anyway');
 
-  // Where the refusal actually lands, measured. See the note at the foot of
-  // this file: it is off the top of a phone screen by a long way, and this
-  // number is printed rather than asserted because it is a finding about the
-  // app, not a promise this part is keeping.
+  // Where the refusal actually lands, asserted. This used to be a `console.log`
+  // and nothing more, because the banner was drawn above the whole room while
+  // the button that produced it sat most of a screen down inside a correction
+  // panel: measured on this part's own runs at 430 by 800, a 12 ft wall refused
+  // under a 9 ft ceiling put it at y = -1874, which is 2,213 px ABOVE the
+  // button, with nothing moving and nothing scrolling. Pressing the button
+  // looked exactly like pressing a dead one — the bug Sam already reported once
+  // at 280 px, at eight times the distance, on the screen the product is built
+  // around. The banner is sticky now and is scrolled to and focused, so this is
+  // a promise the app keeps and a check can hold it to.
+  const refusalAt = await whereItIs(page, refusal);
+  check('the model\'s refusal is on the screen, not drawn off the top of it',
+    refusalAt.ok, refusalAt.said);
   const refusalBox = (await refusal.count()) ? await refusal.boundingBox() : null;
   const buttonBox = (await setHigh.count()) ? await setHigh.first().boundingBox() : null;
-  if (refusalBox && buttonBox) {
-    console.log(
-      `A43: the refusal for a too-tall wall is drawn ${
-        Math.round(buttonBox.y - (refusalBox.y + refusalBox.height))
-      } px above the button that caused it, at y=${Math.round(refusalBox.y)} in a ${HEIGHT} px window.`
-    );
-  }
+  const apart = refusalBox && buttonBox
+    ? Math.round(buttonBox.y - (refusalBox.y + refusalBox.height))
+    : null;
+  check('and it is within one screen of the button that caused it, not 2,213 px above it',
+    apart !== null && Math.abs(apart) < HEIGHT,
+    `${apart} px from the button, refusal at y=${refusalBox ? Math.round(refusalBox.y) : 'none'}, `
+      + `button at y=${buttonBox ? Math.round(buttonBox.y) : 'none'}, in a ${HEIGHT} px window`);
+  // And the person can see BOTH at once: the thing that refused and the thing
+  // that was pressed. That is what "where the person is looking" means, and it
+  // is the check the sticky banner exists to pass.
+  const buttonAt = await whereItIs(page, setHigh);
+  check('and the button that was pressed is still on the screen beside it, so the two are read together',
+    buttonAt.ok, buttonAt.said);
 
   const close = refusal.getByRole('button', { name: 'Close', exact: true });
   check('the refusal offers a way to put it away, so it is not stuck on the screen',
@@ -568,6 +586,25 @@ const third = await open();
   await loadScan(page);
   await changeWall(page, /^Wall wall-2,/);
 
+  // Before anything is notched, on the room every scan of an ordinary rectangle
+  // produces. The row that removes a side used to be drawn whenever the room
+  // had more than three walls, which is true here — and here the model refuses
+  // every delete, because four sides less one is three and a rectilinear walk
+  // cannot close on three. So an ordinary four-walled room offered a control
+  // that could never once succeed. It is offered on the rooms it works on and
+  // nowhere else now, and the two checks below are the pair: not here, and —
+  // further down — yes on the wall the notch makes it possible on.
+  const walls = await wallsOn(page);
+  check('the room this story starts on is an ordinary four-walled scan',
+    walls.length === 4, walls.join(' | '));
+  // The ROW as well as the button, because the row starts shut and a shut
+  // disclosure takes its contents out of the page — so asking for the button
+  // alone would pass on a panel that offers the row.
+  const onARectangle = (await page.getByRole('button', { name: /^Take it out/ }).count())
+    + (await page.getByRole('button', { name: 'There is no wall here at all' }).count());
+  check('and a four-walled room does not offer to take a side out, because it can never work',
+    onARectangle === 0, `${onARectangle} rows or buttons offered on a four-walled scan`);
+
   const notchRow = await openRow(page, 'Notch the corner after it');
   check('the notch row starts shut, and says it is shut rather than giving no sign',
     notchRow.wasShut, 'the notch row was already open');
@@ -590,13 +627,49 @@ const third = await open();
   const notchAt = await reachable(page, notchIt);
   check('and so is the button that does it', notchAt.ok, notchAt.said);
 
-  // Pressed with a box empty, this button returns without a word — see the note
-  // at the foot of this file. What can be checked without a fix is that it at
-  // least does not put a half-made step into somebody's room.
+  // Three empty boxes, and it has to name all three at once — the same promise
+  // `Cut it` keeps two rows above, for the same reason: three rounds of
+  // pressing and being refused is three chances to give up.
+  //
+  // This button used to answer three empty boxes with a bare `return`. Pressing
+  // it changed not one byte of the screen: no alert, no status, `innerText`
+  // identical before and after. On a phone that is indistinguishable from a
+  // dead button, and it is the exact class `a12-everything.mjs` found in seven
+  // forms and that the rest of `Edit.tsx` was fixed for.
   const before = await wallsOn(page);
   await press(page, notchIt, 'notch a corner', 500);
   check('pressing Notch it with the boxes empty puts nothing into the room',
     (await wallsOn(page)).join('|') === before.join('|'), (await wallsOn(page)).join(' | '));
+
+  const notchWants = page.getByText(/Fill in /).first();
+  const notchSaid = (await notchWants.count()) ? await notchWants.innerText() : '';
+  check('and it says what it wants, rather than answering three empty boxes with silence',
+    /how deep the step goes/.test(notchSaid)
+    && /how wide the step is/.test(notchSaid)
+    && /what to call it/.test(notchSaid),
+    notchSaid || 'nothing was said at all');
+  const notchWantsAt = await whereItIs(page, notchWants);
+  const notchGap = await gapBelow(notchIt, notchWants);
+  check('and it says it beside the button that was pressed, where the thumb already is',
+    notchWantsAt.ok && notchGap !== null && notchGap >= 0 && notchGap < 160,
+    `${notchWantsAt.said}; ${notchGap} px below the button`);
+
+  // Nothing clears when a button is pressed, and what is already filled in is
+  // not asked for again — the rule the whole file keeps.
+  await type(deep, STEP_OUT, 'how deep the step goes');
+  await press(page, notchIt, 'notch a corner', 500);
+  check('a refused notch keeps what was already typed, so nobody retypes three boxes to fix one',
+    (await deep.inputValue()) === STEP_OUT,
+    `the box now holds ${JSON.stringify(await deep.inputValue())}`);
+  const stillWanted = (await page.getByText(/Fill in /).count())
+    ? await page.getByText(/Fill in /).first().innerText()
+    : '(nothing was said at all)';
+  check('and it names only the boxes that are still empty',
+    (await page.getByText(/Fill in /).count()) > 0
+    && !/how deep the step goes/.test(stillWanted)
+    && /how wide the step is/.test(stillWanted)
+    && /what to call it/.test(stillWanted),
+    stillWanted);
 
   await type(deep, STEP_OUT, 'how deep the step goes');
   await type(wide, STEP_ALONG, 'how wide the step is');
@@ -638,12 +711,41 @@ const third = await open();
   /* --------------------------------------- a side of the room that is not there */
 
   await section(page, 'Plan');
+
+  // Six walls now, and still not every wall. `deleteWall` refuses four of the
+  // six on this room: `wall-1` has a door and a window in it, and taking
+  // `wall-2`, `wall-3` or `wall-4` out leaves two walls on one axis that
+  // nothing tells apart, which the model calls one wall written twice. Only
+  // the two the notch put in can actually come out.
+  //
+  // That is why the row asks the model rather than counting walls. A guard
+  // counting what `mergeCollinear` leaves would say five here, draw the row on
+  // `wall-2`, and hand somebody a button that cannot work — which is the bug
+  // this is the fix for, moved rather than removed.
+  // The ROW, not the button inside it. The row starts shut and a shut
+  // disclosure takes its contents out of the page altogether, so asking for the
+  // button alone would pass on a panel that offers the row — which is exactly
+  // the state being checked against.
+  const offered = async () => (await page.getByRole('button', { name: /^Take it out/ }).count())
+    + (await page.getByRole('button', { name: 'There is no wall here at all' }).count());
+
+  await changeWall(page, /^Wall wall-2,/);
+  const onADuplicate = await offered();
+  check('a wall the model will not let go of does not offer to be taken out either',
+    onADuplicate === 0,
+    `${onADuplicate} offers on a wall whose removal leaves one wall written twice`);
+
+  await changeWall(page, /^Wall wall-1,/);
+  const onTheDoorWall = await offered();
+  check('and a wall with a door and a window in it does not offer it, being a side that is really there',
+    onTheDoorWall === 0, `${onTheDoorWall} offers on a wall carrying a door`);
+
   await changeWall(page, new RegExp(`^Wall ${STEP} back,`));
   await openRow(page, 'Take it out');
 
   const takeOut = page.getByRole('button', { name: 'There is no wall here at all' });
   const openSpan = page.getByRole('button', { name: 'There is no wall here', exact: true });
-  check('there is a control for a side of the room that is not really there',
+  check('and the wall the room can actually lose does offer it',
     (await takeOut.count()) === 1, `${await takeOut.count()} found`);
   // Two controls, two meanings, on one panel. One takes the side out of the
   // room and the walls on that axis close it up; the other leaves the side
@@ -692,35 +794,39 @@ process.exit(bad > 0 ? 1 : 0);
 /* ==========================================================================
    What this part found, and what it deliberately does not check.
 
-   * **Every refusal from the model is drawn off the top of the screen.** The
-     model's own refusals — a wall taller than its room, a room that cannot
-     lose another side — go into `state.error`, which `App.tsx` draws as a
-     banner ABOVE the whole room, while the button that caused them is most of
-     a screen down inside a correction panel. Measured on this run at 430 by
-     800: the too-tall refusal lands roughly 2,200 px above the button, at a
-     negative y, and the delete refusal roughly 2,500 px above it. Both are
-     printed by this part on every run. That is bug two of the four this audit
-     exists for — "the mark button refused 280 pixels above the button being
-     pressed; Sam reported it as a dead button" — at eight times the distance,
-     on the screen the product is built around. The checks above deliberately
-     assert only that the refusal EXISTS and says enough to act on, because
-     making them assert where it lands would need a fix this part does not own.
-     Reported rather than fixed; the old/new is in the integration note.
-   * **`Notch it` answers an empty box with silence.** Every other button on
-     this panel says what it wants — `Set what to call this wall`, `Move it`,
-     `Set how high this wall stands`, `Cut it` all set a `Wants` line. The notch
-     has no `Wants` under it and its handler returns without setting one, so
-     pressing it with a box empty does nothing at all and says nothing at all.
-     That is the exact class a12-everything found in seven forms and that the
-     rest of this file was fixed for; the notch was missed. Driven above: the
-     only thing that can be checked today is that it does not half-make a step.
-   * **`There is no wall here at all` is offered on rooms it can never work
-     on.** The row is drawn whenever `room.walls.length > 3`, and on an ordinary
-     four-walled room the delete is refused by the model — a rectilinear walk
-     cannot close on three sides. So every scanned rectangle offers a control
-     that always fails. The third story above therefore notches the room to six
-     walls first, which is a room the control genuinely works on; the four-wall
-     refusal is in the integration note with its measured placement.
+   * **Refusals from the model used to be drawn off the top of the screen —
+     fixed, and the placement is asserted now rather than printed.** The model's
+     own refusals go into `state.error`, which `App.tsx` drew as a banner ABOVE
+     the whole room while the button that caused them sat most of a screen down
+     inside a correction panel. Measured on this part's own runs at 430 by 800:
+     the too-tall refusal landed at y = -1874, which is 2,213 px above the
+     button, and taking a fourth side out of a four-walled room put it 2,527 px
+     above. Nothing moved and nothing scrolled. That was bug two of the four
+     this audit exists for — "the mark button refused 280 pixels above the
+     button being pressed; Sam reported it as a dead button" — at eight times
+     the distance, on the screen the product is built around. The banner is
+     sticky now and is scrolled to and focused, and the two `console.log` lines
+     this part carried have become three checks: the refusal is on the screen,
+     it is within one screen of its button, and the button is still beside it.
+   * **`Notch it` answered an empty box with silence — fixed.** Every other
+     button on this panel says what it wants; the notch returned on a bare
+     `return`, so pressing it with a box empty changed nothing on the page and
+     said nothing at all. That is the exact class a12-everything found in seven
+     forms and that the rest of `Edit.tsx` was fixed for; the notch was missed.
+     It now names every empty box at once, the way `Cut it` does, keeps what was
+     already typed, and each box clears the line as it is filled in.
+   * **`There is no wall here at all` was offered on rooms it can never work on
+     — fixed by asking the model instead of counting walls.** The row was drawn
+     whenever `room.walls.length > 3`, which is true of every ordinary scanned
+     rectangle, and on one the delete is always refused: a rectilinear walk
+     cannot close on three sides. Counting walls after `mergeCollinear` would
+     not have fixed it either — measured on the six-walled room this story
+     builds, `deleteWall` refuses four of the six, three of them because
+     removing the wall leaves two walls on one axis that nothing tells apart.
+     The row now asks `deleteWall` itself, which is the one function that
+     decides, and is drawn only where the answer is yes. A wall with a door in
+     it therefore loses the row rather than keeping a button that refuses, which
+     reads right: the row is for a side of the room that is not really there.
    * **What "Take the tape reading off" leaves behind.** Taping wall-1 to
      20' 3" re-solves the room and the opposite wall goes to 20' 3" with it.
      Taking the reading off gives wall-1 back its scanned 20' and leaves the

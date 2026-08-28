@@ -1,4 +1,7 @@
-import { check, loadScan, noise, open, report, section } from './lib.mjs';
+import { check, loadScan, noise, open, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A27 — the signed copy that came back, and the three-day notice');
 
 /**
  * The second way to get a proposal signed, and the notice the law puts on it.

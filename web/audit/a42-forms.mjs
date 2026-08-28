@@ -1,4 +1,7 @@
-import { HEIGHT, check, loadScan, noise, open, pick, report, section } from './lib.mjs';
+import { check, HEIGHT, loadScan, noise, open, pick, report, reportEvenIfItDies, section } from './lib.mjs';
+
+// Say what was learned even if this part dies part way through.
+reportEvenIfItDies('A42 — the business, the carrier, and the adjuster');
 
 /**
  * Two forms nothing had ever filled in: the seller's own details, and the
@@ -60,6 +63,8 @@ const CREDENTIALS_LINE = `Licence ${LICENCE} · Insured — ${INSURANCE}`;
 
 /** A contractor whose houses are all the same height, and is tired of typing it. */
 const MY_CEILING = `9' 6"`;
+/** The paragraph under the ceiling tickbox, which must stay a hint, not a name. */
+const CEILING_EXPLAINS = 'Off by default, and that is deliberate';
 /** What the app must never quietly use instead. */
 const HARD_CODED = `8'`;
 /** 2x6 framing with nothing on it: `ASSEMBLIES` calls the build 2x6. */
@@ -132,6 +137,26 @@ async function press(control, whatFor, waitFor = 400) {
   return true;
 }
 
+/**
+ * Types into a box, or fails a check saying why the walk stops here.
+ *
+ * The same reason `press` exists above. `fill()` on a locator that matches
+ * nothing waits thirty seconds and then throws, and a run that dies reports one
+ * stack trace where it should have reported the red check that explains it.
+ * Found by watching this file fail: taking the name off the ceiling tickbox
+ * should go red on the two checks that ask for it by name and leave the rest of
+ * the part reporting, and instead it killed the run three checks later.
+ */
+async function type(control, text, whatFor) {
+  if ((await control.count()) === 0) {
+    check(`there is a box for ${whatFor}, which the rest of this part needs`,
+      false, 'it is not on the screen, so what follows cannot be walked');
+    return false;
+  }
+  await control.first().fill(text);
+  return true;
+}
+
 /** The profile, opened. It closes itself on Save, so this is said often. */
 async function openProfile() {
   await page.getByRole('button', { name: 'Your business' }).click();
@@ -144,18 +169,37 @@ async function openProfile() {
 
 await openProfile();
 
-// `Phone` and `Email` have nothing but their caption above them, so the words
-// a person would say are the words that find the box. `Licence number` and
-// `Insurance` each carry an explanatory line INSIDE the same `<label>`, so
-// asking for them exactly finds nothing — see the note at the foot of this
-// file. Either way there has to be exactly one of each, or two fields are
-// answering to one name and this app has had that bug twice.
-for (const name of ['Phone', 'Email', 'Licence number', 'Insurance']) {
-  const box = page.getByLabel(name);
-  check(`the profile has exactly one box a person would call "${name}"`,
-    (await box.count()) === 1, `${await box.count()} found`);
+// Exactly, and that is the whole point of asking this way. A `<label>` names
+// the control inside it with ALL of its own text, and `Field` and `Lines` put
+// the explanatory hint inside the same one — so the licence box announced
+// itself as "Licence number Some states require this on anything given to a
+// homeowner." and the address box as its caption plus forty-three words. That
+// is what a screen reader reads out as the NAME of the field, and asking for
+// exactly "Licence number" found nothing at all.
+//
+// There also has to be exactly one of each, or two fields are answering to one
+// name and this app has had that bug twice.
+for (const name of ['Business name', 'Phone', 'Email', 'Business address',
+                    'Licence number', 'Insurance']) {
+  const box = page.getByLabel(name, { exact: true });
+  check(`the profile has exactly one box called "${name}", and called only that`,
+    (await box.count()) === 1, `${await box.count()} answer to exactly "${name}"`);
   const at = await reachable(box);
   check(`and "${name}" can be brought whole onto a phone screen`, at.ok, at.said);
+}
+
+// The other half of it. A name trimmed back to its caption by DELETING the
+// sentence underneath would pass every check above and lose the reason the
+// sentence was written — so each one is looked for on the screen, where it
+// belongs, as a hint rather than as a name.
+for (const [name, hint] of [
+  ['Business address', 'federal law'],
+  ['Licence number', 'Some states require this'],
+  ['Insurance', 'Carrier and policy number'],
+]) {
+  check(`and the sentence that explains "${name}" is still on the screen, below it rather than in its name`,
+    (await page.locator('section').first().innerText()).includes(hint),
+    `"${hint}" is nowhere on the profile`);
 }
 
 await page.getByLabel('Business name').fill(BUSINESS);
@@ -313,8 +357,26 @@ check('the box for a ceiling height is not there until somebody asks for one',
   (await page.getByLabel('Default ceiling height').count()) === 0,
   'the height box is on the screen with the preference switched off');
 
-await page.getByRole('checkbox').first().check();
-await page.waitForTimeout(300);
+// By its name, not by being the only tickbox on the screen. Sixty words of
+// explanation sit inside this label, and until it was given a name of its own
+// the tickbox announced itself as the caption plus all sixty — which is also
+// why nothing could ask for it by the words written beside it.
+// Written out, not held in a constant. `check-controls.py` reads these files
+// for the names an audit asks for, and a name it can only see as a variable is
+// a name it has to count as undriven — which is exactly the state this tickbox
+// was in until it was given one.
+const ceilingBox = page.getByRole('checkbox', {
+  name: 'Use my own ceiling height instead of the scanner’s', exact: true,
+});
+check('the tickbox for a contractor\'s own ceiling height answers to the question written beside it',
+  (await ceilingBox.count()) === 1, `${await ceilingBox.count()} tickboxes answer to it`);
+check('and the paragraph that explains it is still on the screen, under it rather than in its name',
+  (await page.locator('section').first().innerText()).includes(CEILING_EXPLAINS),
+  'the explanation went away with the name');
+// Through `press`, not `check()`: a tickbox that has lost its name should make
+// the check above go red and let the rest of the part report, not kill the run
+// on a thirty-second timeout that hides everything after it.
+await press(ceilingBox, 'ask for a ceiling height of this business\'s own', 300);
 
 const ceiling = page.getByLabel('Default ceiling height');
 check('ticking it puts a box there, exactly one',
@@ -323,14 +385,14 @@ const ceilingAt = await reachable(ceiling);
 check('and that box can be brought whole onto a phone screen',
   ceilingAt.ok, ceilingAt.said);
 
-await ceiling.fill('nine feet six');
+await type(ceiling, 'nine feet six', 'a ceiling height that is not a length');
 await page.waitForTimeout(400);
 shown = await profile.innerText();
 check('a height that is not a length is answered beside the box rather than accepted',
   !/Reads as/.test(shown) && /nine feet six|not a length|could not/i.test(shown),
   (shown.match(/Reads as[^\n]*|[^\n]*not a length[^\n]*/) ?? []).join(' | '));
 
-await ceiling.fill(MY_CEILING);
+await type(ceiling, MY_CEILING, 'a ceiling height of this business\'s own');
 await page.waitForTimeout(400);
 shown = await profile.innerText();
 check('and a height that is one is read back in the units this business reads',
@@ -415,14 +477,21 @@ const claim = page
   .locator('section', { has: page.getByRole('heading', { name: 'The claim' }) })
   .first();
 
-// Every one of the five, by the words above it, before anything is typed.
-for (const name of ['Found on', "Owner's phone", 'Carrier', "Adjuster's phone", "Adjuster's email"]) {
+// Every one of them, by the words above it and by nothing else, before
+// anything is typed. `Date of loss` carries a hint inside its own `<label>`
+// exactly as the profile's boxes did, so it is asked for exactly here too.
+for (const name of ['Claim number', 'Date of loss', 'Found on', 'Property address',
+                    'Owner', "Owner's phone", 'Carrier', 'Adjuster',
+                    "Adjuster's phone", "Adjuster's email"]) {
   const box = claim.getByLabel(name, { exact: true });
-  check(`the claim has exactly one box called "${name}"`,
-    (await box.count()) === 1, `${await box.count()} found`);
+  check(`the claim has exactly one box called "${name}", and called only that`,
+    (await box.count()) === 1, `${await box.count()} answer to exactly "${name}"`);
   const at = await reachable(box);
   check(`and "${name}" can be brought whole onto a phone screen`, at.ok, at.said);
 }
+check('and the sentence that explains which date is wanted is still on the screen, below the box',
+  (await claim.innerText()).includes('The day it happened, not the day it was found'),
+  'the hint went away with the name');
 
 // Two dates, and they are two questions. Adjusters ask for both, and a claim
 // that carried one of them would be answering the wrong one half the time: the
@@ -458,6 +527,32 @@ check('the owner reads on screen as one person with a number, not as two facts',
   saidOnScreen.includes(OWNER_LINE), saidOnScreen.slice(-600));
 check('and the adjuster as one person with a number and an address',
   saidOnScreen.includes(ADJUSTER_LINE), saidOnScreen.slice(-600));
+
+// The block under the boxes is the contractor checking his own work, and it is
+// commented in the source as "the way the claim document prints them". The
+// document prints THREE parties; the block printed two, so a carrier typed in
+// appeared nowhere on the screen at all and the only way to see it was behind
+// the "The report" toggle. The carrier is also the one party there is no other
+// way to check here.
+check('the carrier a contractor typed reads back on the screen, not only on the paper',
+  new RegExp(`Carrier\\s+${CARRIER}$`, 'm').test(saidOnScreen), saidOnScreen.slice(-600));
+check('and the three of them read back in the order the claim document prints them',
+  saidOnScreen.indexOf(OWNER_LINE) < saidOnScreen.lastIndexOf(CARRIER)
+  && saidOnScreen.lastIndexOf(CARRIER) < saidOnScreen.indexOf(ADJUSTER_LINE),
+  `owner at ${saidOnScreen.indexOf(OWNER_LINE)}, carrier at ${saidOnScreen.lastIndexOf(CARRIER)}, `
+    + `adjuster at ${saidOnScreen.indexOf(ADJUSTER_LINE)}`);
+
+// And the shut row says the same three. A row folded away is how this screen
+// is read once it is filled in, and "The owner, the carrier and the adjuster"
+// is what it said with a carrier typed into it — which reads as an empty form.
+const between = claim.getByRole('button', { name: /^Who it is between/ });
+await press(between, 'fold away who the claim is between', 400);
+const folded = (await between.count()) ? await between.innerText() : '';
+check('the folded row says who the claim is actually between, rather than what it would hold',
+  folded.includes(OWNER) && folded.includes(CARRIER) && folded.includes(ADJUSTER)
+  && !/The owner, the carrier and the adjuster/.test(folded),
+  folded || 'the row is not there at all');
+await press(between, 'open who the claim is between again', 400);
 
 /* ------------------------------------------------- and onto the document */
 
@@ -530,6 +625,16 @@ check('and the screen says out loud what is now missing, without stopping anythi
   /Still to fill in[^.]*whose property it is/.test(await claim.innerText()),
   (await claim.innerText()).slice(-400));
 
+// The owner's line goes; the other two stay. A block that vanished whole
+// because one party was emptied would be the same bug as the one that never
+// showed the carrier, wearing the other face.
+const leftOnScreen = await claim.innerText();
+check('emptying the owner takes the owner\'s line off the screen and leaves the other two',
+  !leftOnScreen.includes(OWNER_LINE)
+  && new RegExp(`Carrier\\s+${CARRIER}$`, 'm').test(leftOnScreen)
+  && leftOnScreen.includes(ADJUSTER_LINE),
+  leftOnScreen.slice(-600));
+
 check('no console or page errors across the whole run', noise().length === 0, noise().join(' | '));
 
 const bad = report('A42 — the business, the carrier, and the adjuster');
@@ -540,24 +645,26 @@ process.exit(bad > 0 ? 1 : 0);
 /* ==========================================================================
    What this part found, and what it deliberately does not check.
 
-   * **Three boxes on the profile are announced as a paragraph.** `Field` and
-     `Lines` in `Settings.tsx` put the explanatory `hint` INSIDE the same
-     `<label>` as the caption, so the box's accessible name is the caption plus
-     the whole sentence: a screen reader says "Licence number Some states
-     require this on anything given to a homeowner." as the NAME of the field.
-     `Business address` and `Insurance` are the same, and so is the ceiling
-     checkbox, whose name is a caption plus eighty words. It is why every
-     `getByLabel` above is a substring match rather than `{ exact: true }` —
-     asking for exactly "Licence number" finds nothing. `Claim.tsx` has the
-     same `Field`, and `Date of loss` the same shape. Reported rather than
-     fixed; the old/new is in the integration note.
-   * **The claim screen's summary drops the carrier.** The block under the
-     boxes is commented "the way the claim document prints them" and prints
-     Owner and Adjuster only, while `claimReport` prints all three. A
-     contractor who types a carrier and looks below to check his work sees
-     nothing, and the only place the carrier appears on screen is behind the
-     "The report" toggle. Driven above: the document carries it, the summary
-     does not. Reported rather than fixed.
+   * **Boxes announced as a paragraph — fixed, and every `getByLabel` above is
+     now exact.** `Field` and `Lines` in `Settings.tsx`, and `Field` in
+     `Claim.tsx`, put the explanatory `hint` INSIDE the same `<label>` as the
+     caption, so the box's accessible name was the caption plus the whole
+     sentence: a screen reader said "Licence number Some states require this on
+     anything given to a homeowner." as the NAME of the field, the address box
+     carried forty-three words and the ceiling tickbox sixty. Each control now
+     carries an `aria-label` that is its caption and nothing else, and the hint
+     stays on the screen as a hint — which is why every name above is asked for
+     with `{ exact: true }` and every sentence is checked for separately. Note
+     that `check-controls.py` recorded the SHORT name all along, so before this
+     the checker and the browser disagreed about what these controls were
+     called and the checker was the optimistic one.
+   * **The claim screen's summary dropped the carrier — fixed.** The block
+     under the boxes is commented "the way the claim document prints them" and
+     printed Owner and Adjuster only, while `claimReport` prints all three. A
+     contractor who typed a carrier and looked below to check his work saw
+     nothing, and the only place the carrier appeared on screen was behind the
+     "The report" toggle; the shut disclosure above it had the same hole. Driven
+     above on the screen, in the folded summary, and on the document.
    * **That any of this survives the phone.** The client file and the claim
      document are read here as bytes; what iCloud, Mail and Messages do with
      them is device-only, and `docs/on-the-phone.md` is where that lives.
