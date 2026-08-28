@@ -29,6 +29,23 @@ import { fileURLToPath } from 'node:url';
 export const SP = dirname(fileURLToPath(import.meta.url));
 export const URL = process.env.TRUELINE_AUDIT_URL ?? 'http://127.0.0.1:4173/';
 
+/**
+ * How tall a window these parts open, and why it is a variable.
+ *
+ * 1600 is not a phone. An iPhone 15 Pro Max is 932 points tall and a browser
+ * takes a bite out of that, so a real one is nearer 800. At 1600 NOTHING is
+ * ever below the fold — which means no check about whether a person can SEE
+ * something has ever been able to fail here, and four bugs in two days were
+ * exactly that: the paywall the app could never present, a refusal 280px above
+ * the button that caused it, a photograph control hidden inside a row that gave
+ * no sign it opened, and a tour card covering half the screen.
+ *
+ * `TRUELINE_AUDIT_HEIGHT=800` runs the whole suite at a real phone height. The
+ * default stays 1600 only until every part has been through it once; moving it
+ * without looking would turn a real finding into thirty red lines nobody reads.
+ */
+export const HEIGHT = Number(process.env.TRUELINE_AUDIT_HEIGHT ?? 1600);
+
 export const results = [];
 let problems = [];
 
@@ -38,7 +55,7 @@ export function check(name, condition, detail = '') {
 
 export async function open() {
   const browser = await openChromium();
-  const ctx = await browser.newContext({ viewport: { width: 430, height: 1600 }, acceptDownloads: true });
+  const ctx = await browser.newContext({ viewport: { width: 430, height: HEIGHT }, acceptDownloads: true });
   const page = await ctx.newPage();
   problems = [];
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
@@ -84,7 +101,7 @@ export async function sentTo(page, name) {
 export async function openAsApp(payload, { scheme = 'light' } = {}) {
   const browser = await openChromium();
   const ctx = await browser.newContext({
-    viewport: { width: 430, height: 1600 },
+    viewport: { width: 430, height: HEIGHT },
     acceptDownloads: true,
     colorScheme: scheme,
   });
