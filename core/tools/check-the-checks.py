@@ -652,7 +652,22 @@ def bridge(bench: Bench) -> None:
            fires=True, saying='never registers it')
     bench.restore(web)
 
-    bench.write(fakes, bench.read(fakes).replace("'voice', 'haptic']", "'voice']"))
+    # The LAST channel in the list, whatever it is called today.
+    #
+    # This used to name two channels literally and drop one of them. Adding
+    # `barcode` to the list on 2026-08-28 made that string stop matching, so the
+    # mutation became a no-op and this case passed on a file nothing had changed
+    # — a checker going green because the test forgot to break anything. Found
+    # by the pre-push hook, which is what it is for.
+    #
+    # Read off the file instead: the newest channel is the one somebody actually
+    # forgets to add here, so it is the right one to take away.
+    inList = bench.read(fakes)
+    opens = inList.index('for (const name of [')
+    shuts = inList.index(']', opens)
+    names = [one.strip() for one in inList[opens + len('for (const name of ['):shuts].split(',')]
+    bench.write(fakes, inList[:opens] + 'for (const name of ['
+                + ', '.join(names[:-1]) + inList[shuts:])
     code, out = bench.run('check-bridge.py')
     expect('a channel no browser audit can see', code, out,
            fires=True, saying='no browser audit can see it')
