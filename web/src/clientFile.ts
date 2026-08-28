@@ -26,9 +26,12 @@ import { planSvg } from './sheet.ts';
  *   - **A few small photographs, not all of them.** One garage scan is 26 MB of
  *     pictures and a client file that will not go through a text message has
  *     failed at the only thing it does.
- *   - **The contractor's name on it, and ours small.** A homeowner handed a
- *     document with somebody else's brand on it is being handed a tool their
- *     contractor is borrowing.
+ *   - **The contractor's name and address on it, and ours small.** A homeowner
+ *     handed a document with somebody else's brand on it is being handed a tool
+ *     their contractor is borrowing. The address comes off the business profile
+ *     through `letterhead()`, so a client holding this can write back to a
+ *     place rather than only ring a number — and a profile that has not got one
+ *     prints no address line at all rather than a gap where one should be.
  *   - **The caveat travels.** If nobody has put a tape on a wall, the client is
  *     told so in the same words the contractor sees. This is the one document
  *     that leaves the building, and it is the last chance to be honest about
@@ -45,6 +48,30 @@ function safe(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * A block of text a person typed, as HTML lines.
+ *
+ * Escaped FIRST, broken into lines SECOND, and never the other way round. Do it
+ * the other way and the `<br>` this inserts is itself escaped and the reader
+ * sees the tag; escape after inserting it and anything a person typed — a
+ * business name with a `<` in it, an address pasted out of a web page — becomes
+ * real markup in a document that leaves the building and gets opened on
+ * somebody else's phone.
+ *
+ * Here because a letterhead line can carry a line break. `letterhead()`
+ * flattens the address so that the ordinary case never does, but a business
+ * name is free text and somebody will type one on two lines; a run-on
+ * "Gilbert RemodelingCleveland" is the small failure and injected markup is the
+ * large one, and this closes both with one function.
+ */
+function safeLines(text: string): string {
+  return safe(text)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .join('<br>');
 }
 
 export interface ClientFileParts {
@@ -175,8 +202,8 @@ export function clientFile(parts: ClientFileParts): string {
 <main>
   <header>
     <div class="who">
-      ${head[0] ? safe(head[0]) : 'Trueline'}
-      ${head.slice(1).map((line) => `<span>${safe(line)}</span>`).join('')}
+      ${head[0] ? safeLines(head[0]) : 'Trueline'}
+      ${head.slice(1).map((line) => `<span>${safeLines(line)}</span>`).join('')}
     </div>
     ${company.logo ? `<img src="${company.logo}" alt="" style="height:44px;width:auto">` : ''}
   </header>

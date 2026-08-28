@@ -1,6 +1,10 @@
 import { type Baseline } from '../../core/src/baseline.ts';
 import { type Company, letterhead } from '../../core/src/company.ts';
-import { type CancellationNotice, WHAT_THIS_DOES_NOT_KNOW } from '../../core/src/cooling.ts';
+import {
+  type CancellationNotice,
+  NOTICE_NOT_COMPLETED,
+  WHAT_THIS_DOES_NOT_KNOW,
+} from '../../core/src/cooling.ts';
 import {
   type ReturnedDocument,
   CAME_BACK_SAYS,
@@ -50,6 +54,14 @@ import { type Proposal, chosenOption } from '../../core/src/proposal.ts';
  * for more than $25 is squarely inside the rule. What triggers it, what it
  * says, and how the deadline is counted all live in `core/src/cooling.ts` with
  * the regulation quoted; this file only lays it out.
+ *
+ * And when it cannot be laid out — the rule applies and the seller's own
+ * details are not on the profile — the document says so, in the same place and
+ * the same type the forms would have been in. It does not print a form with a
+ * blank where the address goes. A buyer who cannot tell where to send a
+ * cancellation has been handed a defective notice, and a buyer handed a
+ * document that says nothing about a notice he was owed cannot even tell that
+ * something is missing.
  */
 
 /** Anything a person typed, safe to put in HTML. */
@@ -59,6 +71,30 @@ function safe(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * A block of text a person typed, as HTML lines.
+ *
+ * Escaped FIRST, broken into lines SECOND, and never the other way round. Do it
+ * the other way and the `<br>` this inserts is itself escaped and the reader
+ * sees the tag; escape after inserting it and anything a person typed — a
+ * business name with a `<` in it, an address pasted out of a web page — becomes
+ * real markup in a document that leaves the building and gets opened on
+ * somebody else's phone.
+ *
+ * Here because a letterhead line can carry a line break. `letterhead()`
+ * flattens the address so that the ordinary case never does, but a business
+ * name is free text and somebody will type one on two lines; a run-on
+ * "Gilbert RemodelingCleveland" is the small failure and injected markup is the
+ * large one, and this closes both with one function.
+ */
+function safeLines(text: string): string {
+  return safe(text)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .join('<br>');
 }
 
 export interface ProposalFileParts {
@@ -81,6 +117,29 @@ export interface ProposalFileParts {
    * what 16 CFR 429.1 actually requires, quoted.
    */
   readonly cooling: CancellationNotice | null;
+  /**
+   * Why the cancellation notice could not be completed, when it could not be.
+   *
+   * ## The hole this fills
+   *
+   * `cooling` being `null` used to mean two completely different things and the
+   * document could not tell them apart. Either the rule does not apply — signed
+   * at the contractor's own premises, or under the dollar threshold — and
+   * saying nothing is right; or the rule *does* apply and the notice could not
+   * be filled in, and saying nothing means a buyer is handed a document that
+   * looks complete, on a sale the rule covers, with no notice, no forms and no
+   * hint that any of it was owed. He cannot see what is missing, so he cannot
+   * ask for it.
+   *
+   * A sentence here is that second case. `null` or absent is the first, and the
+   * document stays quiet — which is right, because a line saying "you have no
+   * right to cancel" would be wrong: a state's own home-solicitation law may
+   * give one and this app has not checked any state's law.
+   *
+   * The sentence is the one `core/src/cooling.ts` refused with, so the words on
+   * the document and the words on the contractor's screen are the same words.
+   */
+  readonly coolingTrouble?: string | null;
   /**
    * Signed copies that came back — a photograph, a PDF, a scan of paper.
    *
@@ -168,6 +227,7 @@ export function proposalFile({
   baseline,
   at,
   cooling,
+  coolingTrouble = null,
   returned,
 }: ProposalFileParts): string {
   const head = letterhead(company);
@@ -180,7 +240,15 @@ export function proposalFile({
   const signed = baseline
     ? `
   <section class="signed">
-    <h2>Signed</h2>
+    <h2>${baseline.agreedBy ? 'Agreed on a signed copy that came back' : 'Signed'}</h2>
+    ${
+      // The weakness travels onto the document itself, not only onto the phone.
+      // An adjuster, a homeowner or a court reads the same sentence the app
+      // does -- and a baseline frozen on a returned copy has no signature at
+      // all, so a heading saying "Signed" over nothing is the exact silence
+      // this decision exists to remove.
+      baseline.agreedBy ? `<p class="fine">${safe(baseline.agreedBy.weakness)}</p>` : ''
+    }
     ${baseline.signatures
       .map(
         (s) => `
@@ -226,6 +294,33 @@ export function proposalFile({
   </section>`
     : '';
 
+  /**
+   * Where the two forms would have been, when there are not going to be two
+   * forms.
+   *
+   * Set in the same ten point bold the rule sets the forms in, and boxed like
+   * them, because it is standing in for them and a contractor flicking through
+   * the document has to hit it exactly where he expected the forms to be. It is
+   * deliberately not captioned "NOTICE OF CANCELLATION": a buyer must not be
+   * able to sign this, post it, and believe he has cancelled.
+   *
+   * The caveats about state law go under it as well, and that is on purpose. A
+   * buyer holding a document with no forms on it needs to know that the right
+   * to cancel does not depend on the seller's paperwork existing.
+   */
+  const cannot = coolingTrouble
+    ? `
+  <section class="notice missing">
+    <p class="which">Where the cancellation forms should be</p>
+    ${NOTICE_NOT_COMPLETED.map((line) => `<p class="ten">${safe(line)}</p>`).join('')}
+    <p class="fine">${safe(coolingTrouble)}</p>
+  </section>
+  <section class="caveat">
+    <h2>About that three-day right</h2>
+    <ul>${WHAT_THIS_DOES_NOT_KNOW.map((line) => `<li>${safe(line)}</li>`).join('')}</ul>
+  </section>`
+    : '';
+
   const notices = cooling
     ? `
   ${cancellationForm(cooling, 'Copy 1 of 2 — send this one back if you cancel')}
@@ -234,7 +329,7 @@ export function proposalFile({
     <h2>About that three-day right</h2>
     <ul>${WHAT_THIS_DOES_NOT_KNOW.map((line) => `<li>${safe(line)}</li>`).join('')}</ul>
   </section>`
-    : '';
+    : cannot;
 
   const back = returned.length
     ? `
@@ -309,6 +404,10 @@ export function proposalFile({
   .stmt { border: 2px solid #16212B; padding: 12px 14px; margin: 26px 0 0; }
   .stmt .ten { margin: 0; }
   .notice { border: 2px solid #16212B; padding: 16px; margin: 22px 0 0; }
+  /* The block that stands in for the two forms when they could not be
+     completed. Marked out rather than made to look like a form, so nobody
+     signs it and posts it believing they have cancelled. */
+  .notice.missing { border-color: #B8590A; background: #FFF8F0; }
   .notice .which { font-size: .74rem; letter-spacing: .06em; text-transform: uppercase;
                    color: #56606A; margin: 0 0 .6rem; }
   .cap { font-size: 1.05rem; letter-spacing: .04em; margin: 0 0 .9rem; }
@@ -333,13 +432,13 @@ export function proposalFile({
   }
 </style>
 <div class="head">
-  <h1>${safe(head[0] ?? 'Proposal')}</h1>
-  ${head.slice(1).map((line) => `<p>${safe(line)}</p>`).join('')}
+  <h1>${safeLines(head[0] ?? 'Proposal')}</h1>
+  ${head.slice(1).map((line) => `<p>${safeLines(line)}</p>`).join('')}
 </div>
 
 <dl class="to">
   <dt>For</dt><dd>${safe(proposal.client.name || '—')}</dd>
-  <dt>Work at</dt><dd>${safe(proposal.client.address || proposal.roomName)}</dd>
+  <dt>Work at</dt><dd>${safeLines(proposal.client.address || proposal.roomName)}</dd>
   <dt>Issued</dt><dd>${safe(at)}</dd>
   ${proposal.validUntil ? `<dt>Prices hold until</dt><dd>${safe(proposal.validUntil)}</dd>` : ''}
 </dl>

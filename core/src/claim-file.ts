@@ -1,6 +1,6 @@
 import { type Room, RoomError } from './room.ts';
 import type { Damage } from './damage.ts';
-import { TONES } from './design.ts';
+import { onPaper } from './design.ts';
 import { type Company, letterhead, pricing, showArea, showLength } from './company.ts';
 import { type Claim, type ClaimReport, claimReport, missingFromClaim } from './claim.ts';
 import { money } from './price.ts';
@@ -80,61 +80,14 @@ function safe(text: string): string {
  * paper, and a claim printed out of the dark palette is a sheet of black ink
  * arriving at an adjuster.
  */
-const PAPER: ReadonlyMap<string, string> = new Map(
-  Object.entries(TONES).map(([name, tone]) => {
-    const hex = /^#([0-9a-f]{6})$/i.exec(tone.light);
-    if (!hex) throw new ClaimFileError(`${name} is not a six-digit hex colour.`);
-    const n = parseInt(hex[1]!, 16);
-    return [
-      `--c-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`,
-      `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`,
-    ];
-  })
-);
-
 /**
- * The plan’s colours, resolved, because a `var()` cannot leave the document
- * that defines it.
- *
- * ## The bug this is the answer to
- *
- * > "The claim document has a black square where the drawing should be."
- *
- * The plan paints with `fill="rgb(var(--c-raise))"` and `stroke="rgb(var(--c-ink))"`,
- * and those custom properties are declared once, on the app’s own `:root`. The
- * drawing is serialised **out** of that document and pasted into this one,
- * where nothing declares them. CSS then does the worst possible thing: a
- * `var()` that resolves to nothing is not ignored, it makes the whole
- * declaration invalid at computed-value time, so `fill` and `stroke` fall back
- * to their initial values — solid black and no stroke. The full-bleed
- * background rectangle paints black across the viewBox and every line on top of
- * it disappears. Measured on the audit’s own claim file: 99.7% of the drawing
- * was `rgb(0, 0, 0)`.
- *
- * A colour that is one indirection away from being defined is a colour that has
- * to be resolved before the drawing is allowed to travel. That is what this
- * does, and it is why `claimFile` is the last thing the SVG passes through.
- *
- * Colour tokens only, and that is deliberate. `--c-` names are the shared
- * palette and every one of them has to resolve or the drawing goes black; a
- * `var()` holding a stroke width comes from an inline style on the element
- * itself and travels perfectly well. Resolving those too would be this function
- * knowing about things that are not its business.
- *
- * An unknown colour token is refused rather than left in. Leaving it would put
- * the black square back, on the one document that goes to somebody who pays.
+ * The plan's colours, resolved to paper, so the drawing survives leaving the
+ * app. It lives in `design.ts` beside the palette itself, because the same bug
+ * is live on every other path a drawing takes out of here — the client file,
+ * the PNG, every thumbnail — and one copy of the fix is the only way they stay
+ * fixed together. See `onPaper` for the whole story and the measurements.
  */
-function resolvePalette(svg: string): string {
-  return svg.replace(/var\((--c-[a-z0-9-]+)\)/gi, (whole, name: string) => {
-    const channels = PAPER.get(name.toLowerCase());
-    if (channels) return channels;
-    throw new ClaimFileError(
-      `The drawing paints with ${name}, which is not a colour in the shared palette. Left as ` +
-        `it is, ${whole} resolves to nothing outside the app and the drawing prints as a black ` +
-        `rectangle.`
-    );
-  });
-}
+const resolvePalette = onPaper;
 
 /** One room's part of the claim: its own drawing, its damage, its evidence. */
 export interface ClaimRoom {

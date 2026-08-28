@@ -155,6 +155,8 @@ for (const box of await rates.getByRole('textbox').all()) {
 await page.getByRole('button', { name: 'Your business' }).click();
 await page.waitForTimeout(400);
 await page.getByRole('textbox', { name: /Business name/i }).first().fill('Alvarez Remodeling');
+await page.getByRole('textbox', { name: /Business address/i }).first()
+  .fill('2200 Oak Street, Mesa AZ 85201');
 await page.getByRole('button', { name: 'Save', exact: true }).click();
 await page.waitForTimeout(500);
 
@@ -204,8 +206,6 @@ await page.waitForTimeout(300);
 const SIGNED_ON = '2026-08-28';         // a Friday
 const DEADLINE = deadlineFor(SIGNED_ON); // Tuesday 1 September 2026
 await page.getByLabel('The day it gets signed').fill(SIGNED_ON);
-await page.getByLabel('Where a cancellation gets sent')
-  .fill('2200 Oak Street, Mesa AZ 85201');
 await page.waitForTimeout(400);
 t = await panel.innerText();
 

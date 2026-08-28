@@ -266,7 +266,10 @@ export interface Loaded {
    * Signed copies of the proposal that came back — a photograph, a PDF, a scan.
    *
    * Appended, never edited, like `agreedChanges`. Deliberately NOT a
-   * `Signature` and deliberately not enough on its own to freeze a baseline.
+   * `Signature`, and it never becomes one. It CAN freeze a baseline, through
+   * `freezeOnReturnedCopy` and nothing else — and the baseline it freezes
+   * records that it was agreed this way, so every invoice and export says so.
+   * See `core/src/baseline.ts`.
    */
   readonly returnedCopies: readonly ReturnedDocument[];
   /**
@@ -433,6 +436,21 @@ export type Action =
   | { type: 'cutTo'; damageId: string; text: string | null }
   | { type: 'reading'; damageId: string; reading: Reading }
   | { type: 'damagePhotos'; damageId: string; photos: readonly string[] }
+  /**
+   * The photographs the walk itself took, as the scan should now hold them.
+   *
+   * The whole list rather than "these ones went", because putting a delete back
+   * is then the same action read the other way round — one path in and out
+   * means one thing to get right. `WallPhotos` works out what is going through
+   * `plannedScanDeletion`, in the model where it can be tested, and hands the
+   * survivors over.
+   *
+   * A photograph is an observation about a building and a wall is a measurement
+   * of one — the same separation the damages and the recordings already keep —
+   * so taking a frame off moves no dimension, and correcting a wall touches no
+   * photograph.
+   */
+  | { type: 'scanPhotos'; photos: readonly Photo[] }
   /**
    * What is being done to one surface, turned on or off.
    *
@@ -1698,6 +1716,44 @@ export function reduce(state: State, action: Action): State {
               : before - after === 1
                 ? `Took a photograph off. ${after} left on this mark.`
                 : `Took ${before - after} photographs off. ${after} left on this mark.`,
+        },
+      };
+    }
+
+    /**
+     * The walk's own photographs, put where the old list was.
+     *
+     * The one write path for `Loaded.photos` after the import, and it is a
+     * replacement rather than a removal so that "put them back" is this same
+     * case with the longer list. Nothing else in the room is touched: a frame
+     * going off the scan is not an edit to a wall, so it does not go on the
+     * undo stack that holds rooms.
+     *
+     * Saying nothing when the list has not changed length is deliberate — "Took
+     * 0 photographs off" under the plan is noise, and this is the line somebody
+     * reads to find out what they just did.
+     */
+    case 'scanPhotos': {
+      const loaded = state.loaded;
+      if (!loaded) return state;
+      const before = loaded.photos.length;
+      const after = action.photos.length;
+      const took = before - after;
+      return {
+        ...state,
+        error: null,
+        loaded: {
+          ...loaded,
+          photos: [...action.photos],
+          lastEdit:
+            took === 0
+              ? loaded.lastEdit
+              : took < 0
+                ? `Put ${-took === 1 ? 'a photograph' : `${-took} photographs`} back. ` +
+                  `${after} in this scan now.`
+                : took === 1
+                  ? `Took a photograph off the scan. ${after} left.`
+                  : `Took ${took} photographs off the scan. ${after} left.`,
         },
       };
     }

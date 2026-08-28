@@ -247,3 +247,83 @@ export const TOUCH = { least: 44, comfortable: 48 } as const;
 
 /** Every named colour, for a generator that wants to walk them all. */
 export const TONES: Readonly<Record<string, Tone>> = { ...NEUTRAL, ...MEANING };
+
+/* ------------------------------------------------- a drawing that has to travel */
+
+/** A `--c-` name in a drawing that is not one of the colours above. */
+export class PaletteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PaletteError';
+  }
+}
+
+/**
+ * Every `--c-` token, as the `r g b` channels of its **light** value.
+ *
+ * Light because anything that leaves the app as a document is paper, and paper
+ * does not follow the phone's dark mode. Built from `TONES` rather than parsed
+ * back out of `tokens.css`, so the generator and this share one source and
+ * cannot drift.
+ */
+const PAPER: ReadonlyMap<string, string> = new Map(
+  Object.entries(TONES).map(([name, tone]) => {
+    const hex = /^#([0-9a-f]{6})$/i.exec(tone.light);
+    if (!hex) throw new PaletteError(`${name} is not a six-digit hex colour.`);
+    const n = parseInt(hex[1]!, 16);
+    return [
+      `--c-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`,
+      `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`,
+    ];
+  })
+);
+
+/**
+ * A serialised drawing with its colours resolved, because a `var()` cannot
+ * leave the document that declares it.
+ *
+ * ## The bug this is the answer to
+ *
+ * > "The claim document has a black square where the drawing should be."
+ *
+ * The plan paints with `fill="rgb(var(--c-raise))"` and
+ * `stroke="rgb(var(--c-ink))"`, and those custom properties are declared once,
+ * on the app's own `:root`. Serialise the drawing out of that document — into a
+ * claim file, a client file, or a data URL an `<img>` loads — and nothing
+ * declares them any more. CSS then does the worst possible thing: a `var()`
+ * that resolves to nothing is not ignored, it makes the whole declaration
+ * invalid at computed-value time, so `fill` falls back to its initial value,
+ * which is solid black, and `stroke` to none. The full-bleed background
+ * rectangle paints black across the viewBox and every line on top of it
+ * disappears.
+ *
+ * Measured two ways: 99.72% of the audit's own claim document was `rgb(0,0,0)`,
+ * three distinct colours in the whole picture; and an SVG painted this way,
+ * loaded through a data URL into an `<img>` **from a page that does declare the
+ * tokens**, comes back 10,000 pixels out of 10,000 black — an SVG loaded as an
+ * image is its own isolated document and cannot see the host page's `:root`.
+ *
+ * So it is resolved at the one place a drawing is serialised, and every path
+ * out of the app goes through that: the claim document, the client file, the
+ * PNG a contractor texts, and every thumbnail in the scan list.
+ *
+ * Colour tokens only, and that is deliberate. `--c-` names are the shared
+ * palette and every one of them has to resolve or the drawing goes black; a
+ * `var()` holding a stroke width comes from an inline style on the element
+ * itself and travels perfectly well. Resolving those too would be this function
+ * knowing about things that are not its business.
+ *
+ * An unknown colour token is refused rather than left in. Leaving it would put
+ * the black square back, on a document that goes to somebody who pays.
+ */
+export function onPaper(svg: string): string {
+  return svg.replace(/var\((--c-[a-z0-9-]+)\)/gi, (whole, name: string) => {
+    const channels = PAPER.get(name.toLowerCase());
+    if (channels) return channels;
+    throw new PaletteError(
+      `The drawing paints with ${name}, which is not a colour in the shared palette. Left as ` +
+        `it is, ${whole} resolves to nothing outside the app and the drawing prints as a black ` +
+        `rectangle.`
+    );
+  });
+}

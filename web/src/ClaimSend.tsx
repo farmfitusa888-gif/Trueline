@@ -10,7 +10,7 @@ import { money } from '../../core/src/price.ts';
 import { planSvgFor } from './renderPlan.tsx';
 import { savedRooms } from './floorStore.ts';
 import { asDataUrl, fetchPhoto } from './photoStore.ts';
-import { fileNameFor, sendFile } from './sheet.ts';
+import { fileNameFor, sendFile, whatWentOut } from './sheet.ts';
 import { useUnits } from './units.tsx';
 
 /**
@@ -49,6 +49,26 @@ async function gather(damages: readonly Damage[]): Promise<Map<string, string>> 
     }
   }
   return out;
+}
+
+/**
+ * What the record says about one document, under the button that sends it.
+ *
+ * Silent until something has actually gone out — a line saying "this has never
+ * left" under an unpressed button is noise, and the record is device-local so
+ * silence is not knowledge anyway. `whatWentOut` is given `null` for the
+ * fingerprint because the screen has not built the file at this moment; the
+ * count is still true and no claim is made about which version anybody holds.
+ */
+function WentOut({ document }: { readonly document: string }) {
+  let out;
+  try {
+    out = whatWentOut(document, null);
+  } catch {
+    return null;
+  }
+  if (out.sendings.length === 0) return null;
+  return <p className="mt-1 text-xs text-slate-500">{out.summary}</p>;
 }
 
 export function ClaimSend({
@@ -379,6 +399,7 @@ export function ClaimSend({
       >
         {busy === 'html' ? 'Putting it together…' : 'Make the claim document'}
       </button>
+      <WentOut document={fileNameFor(claim.claimNumber?.trim() || room.name, 'html', 'claim')} />
 
       <button
         type="button"
@@ -389,6 +410,7 @@ export function ClaimSend({
       >
         {busy === 'pdf' ? 'Drawing it…' : 'As a PDF instead'}
       </button>
+      <WentOut document={fileNameFor(claim.claimNumber?.trim() || room.name, 'pdf', 'claim')} />
       <p className="mt-1 text-xs text-slate-500">
         The file above is the better document — the drawing in it is a real drawing rather than a
         picture of one, and it opens on anything. Send the PDF when the carrier&rsquo;s system
@@ -405,6 +427,7 @@ export function ClaimSend({
       >
         {busy === 'job' ? 'Packing it…' : 'Everything, in one archive'}
       </button>
+      <WentOut document={fileNameFor(claim.claimNumber?.trim() || room.name, 'zip', 'job')} />
       <p className="mt-1 text-xs text-slate-500">
         The claim both ways, the drawing as CAD, the room&rsquo;s takeoff and the damage scope as
         spreadsheets, and the photographs as they were taken — with a plain list inside saying

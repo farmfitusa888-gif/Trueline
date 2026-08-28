@@ -105,6 +105,14 @@ export function readCompany(text: string | null): Company {
       email: typeof raw.email === 'string' ? raw.email : '',
       licence: typeof raw.licence === 'string' ? raw.licence : '',
       insurance: typeof raw.insurance === 'string' ? raw.insurance : '',
+      // Spread in only when there is one, the same way the logo is. A profile
+      // saved before there was an address field has no key here, and it has to
+      // come back with no key here: `address: ''` would read as an address to
+      // anything that has not been told otherwise, and the thing it would be
+      // printed on is the federal cancellation form. Absent stays absent.
+      ...(typeof raw.address === 'string' && raw.address.trim() !== ''
+        ? { address: raw.address }
+        : {}),
       ...(typeof raw.logo === 'string' ? { logo: raw.logo } : {}),
       units: raw.units === 'metric' ? 'metric' : 'imperial',
       // Through tradeOf so a profile naming a trade this build does not have

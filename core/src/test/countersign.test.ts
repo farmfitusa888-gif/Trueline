@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import { hashOf } from '../signature.ts';
 import {
   type FileBackRequest,
+  AGREED_BY_SAYS,
+  CAME_BACK_SAYS,
   CountersignError,
   WEAKER_THAN_SIGNING_HERE,
   checkReturned,
   describeReturned,
   fileSignedBack,
+  notTheSignedVersion,
   whatItDoesNotProve,
   whatItProves,
 } from '../countersign.ts';
@@ -246,4 +249,34 @@ test('a returned copy is not a signature and cannot be mistaken for one', async 
   for (const name of ['who', 'at', 'intent', 'consented', 'mark', 'documentHash', 'role']) {
     assert.equal(name in filed, false, `a returned copy must not carry "${name}"`);
   }
+});
+
+/* ================================ the words two modules have to share */
+
+test('both ways of naming how it arrived read as English where they are used', () => {
+  // Two maps because they finish two different sentences, and the bug they
+  // exist to stop is "agreed by on paper, by hand" printed on a bill.
+  for (const by of ['photograph', 'pdf', 'paper'] as const) {
+    assert.ok(`it came back ${CAME_BACK_SAYS[by]}`.length > 0);
+    assert.doesNotMatch(`Agreed by ${AGREED_BY_SAYS[by]}`, /Agreed by on /);
+    assert.match(`Agreed by ${AGREED_BY_SAYS[by]}`, /^Agreed by a /);
+  }
+});
+
+test('a drifted document gets one sentence, wherever it is noticed', async () => {
+  const filed = await fileSignedBack(DOCUMENT, await request());
+  const seal = await checkReturned({ ...DOCUMENT, total: 9_99n }, filed);
+  assert.equal(seal.ok, false);
+  // `baseline.ts` raises the same alarm for a baseline frozen on a returned
+  // copy, and it has to raise it in exactly these words -- two hand-written
+  // copies of one sentence drift, and the one that drifts is the one on the
+  // document the contractor hands over.
+  assert.equal(
+    seal.ok === false ? seal.why : '',
+    notTheSignedVersion('proposal', 'M. Alvarez', '2026-08-25')
+  );
+  assert.match(
+    notTheSignedVersion('proposal', 'M. Alvarez', '2026-08-25'),
+    /not the proposal M\. Alvarez signed and sent back on 2026-08-25/
+  );
 });

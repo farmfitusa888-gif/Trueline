@@ -78,6 +78,24 @@ export const CAME_BACK_SAYS: Record<CameBackBy, string> = {
   paper: 'on paper, by hand',
 };
 
+/**
+ * The same three, phrased to follow the words "agreed by".
+ *
+ * A second map rather than a second use of the first one, because the two
+ * sentences they sit in are different sentences. `CAME_BACK_SAYS` completes
+ * "it came back ___", and "agreed by on paper, by hand" is not English --
+ * which is the kind of thing that gets read on a bill by somebody's lawyer.
+ * They are kept together so a reader changing one sees the other.
+ *
+ * Used by `baseline.ts` to write, once and in one place, the sentence a
+ * baseline agreed on a returned copy carries for the rest of its life.
+ */
+export const AGREED_BY_SAYS: Record<CameBackBy, string> = {
+  photograph: 'a photograph of the signed page',
+  pdf: 'a signed PDF that came back',
+  paper: 'a signed sheet handed over on paper',
+};
+
 /** Which document a returned copy signs. Named, so nothing is guessed. */
 export type SignedDocumentKind = 'proposal' | 'change order';
 
@@ -271,12 +289,29 @@ export async function checkReturned(
     ok: false,
     hash,
     signed: returned.sentHash,
-    why:
-      `This is not the ${returned.documentKind} ${returned.saysSignedBy} signed and sent ` +
-      `back on ${returned.saysSignedOn}. Something in it has changed since it went out. ` +
-      'The version they signed is the one that counts, and the change belongs in a change ' +
-      'order.',
+    why: notTheSignedVersion(returned.documentKind, returned.saysSignedBy, returned.saysSignedOn),
   };
+}
+
+/**
+ * The sentence a document gets when it has moved under a copy signed against it.
+ *
+ * Its own function because two places have to say it and they must say it the
+ * same way: here, and `changesSinceVerified` in `baseline.ts`, which raises the
+ * same alarm for a baseline frozen on a returned copy. Two hand-written copies
+ * of one sentence drift, and the one that drifts is the one on the document the
+ * contractor hands over.
+ */
+export function notTheSignedVersion(
+  kind: SignedDocumentKind,
+  saysSignedBy: string,
+  saysSignedOn: string
+): string {
+  return (
+    `This is not the ${kind} ${saysSignedBy} signed and sent back on ${saysSignedOn}. ` +
+    'Something in it has changed since it went out. The version they signed is the one ' +
+    'that counts, and the change belongs in a change order.'
+  );
 }
 
 /**

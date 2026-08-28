@@ -1018,7 +1018,17 @@ export function App() {
                     }
                   />
 
-                  <WallPhotos room={loaded.room} wallId={selectedWall.id} photos={loaded.photos} />
+                  {/* `onPhotos` is what turns the strip's delete on. It is
+                      optional on purpose: without it there is no picker and no
+                      delete button at all, rather than a control that presses
+                      and does nothing — which is the one failure a person
+                      cannot tell apart from a delete of the wrong thing. */}
+                  <WallPhotos
+                    room={loaded.room}
+                    wallId={selectedWall.id}
+                    photos={loaded.photos}
+                    onPhotos={(photos) => dispatch({ type: 'scanPhotos', photos })}
+                  />
 
                   {/* What somebody said about this wall, as opposed to about
                       something marked on it. Beside the photographs because

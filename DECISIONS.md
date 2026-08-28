@@ -2085,3 +2085,46 @@ one derivation rather than two. The four quantity formatters moved to
 Verified: 881 core tests, typecheck clean, and `web/audit/a23-scope.mjs` — 35
 checks driving the real app in Chromium, every figure worked out on the audit's
 own side from the numbers the app printed beside its tick boxes.
+
+## A job agreed on a photograph, and the weakness written on the agreement
+
+Asked what should happen when a client signs the paper proposal and sends back a
+photograph of it — because today that could not make the job billable, so the
+contractor held a signed agreement the app refused to invoice against. Sam:
+
+> **"Let it freeze the job, with the weakness written on the agreement"**
+
+The option he took: *the returned photograph freezes the baseline, and the
+baseline itself records that it was agreed by a returned copy rather than signed
+on the phone — so every invoice and every export carries that fact. You can
+invoice; nobody is ever misled about the strength of the evidence.*
+
+This changes something in the locked set (`core/src/baseline.ts`), so it is
+recorded in `HANDOFF.md` with the reason as well as here.
+
+| Decision | Answer |
+|---|---|
+| `freeze()` | **Untouched.** Still refuses anything without a client `Signature`, and the baseline it returns is byte for byte the record it always was — same keys, same canonical text, same fingerprint. Every job file already on a phone reads back unchanged. |
+| A returned copy becoming a signature | **Never.** `ReturnedDocument` still has no field a `Signature` has, and the test that asserts that field by field still passes. A baseline agreed this way carries `signatures: []` — nothing is synthesised. |
+| How the second path is reached | A **separate, explicitly named** `freezeOnReturnedCopy()`. Not another argument to `freeze()`: nothing must reach this path by leaving a field blank or passing an empty list. |
+| What the baseline records | `agreedBy` — how it was agreed, who says they signed and when, how the copy arrived, both fingerprints, and the sentence the fact is said in. **Absent** on an on-phone baseline, so its absence means the strongest evidence the app can take. Self-describing: anything holding one can tell without looking anywhere else. |
+| Where the weakness travels | The agreement block, the proposal document, the invoice line under the money, `describeInvoice`, and the QuickBooks CSV a bookkeeper opens. The words live on the record, written once, so no two screens can phrase it differently. |
+| Does it still bind | Yes, and harder than before. Freezing refuses if the proposal no longer hashes to the version that went out, and `changesSinceVerified` now checks that fingerprint on a returned-copy baseline — it used to return early whenever there was no signature, so an edited proposal raised no alarm and went on being billed against. |
+| Why at all | A contractor holding a signed photograph who cannot invoice in the app will invoice outside it, and then the app knows less about his job than his email does. Refusing to act never made the evidence stronger; it made the evidence leave. |
+
+Two words changed on screens as well: the proposal document's heading over that
+block is **Agreed on a signed copy that came back** rather than **Signed**, and
+the button that does it says *Agree the job on this signed copy*.
+
+Verified: 1123 core tests including 21 new ones (11 in `baseline.test.ts`, 8 in
+`invoice.test.ts`, 2 added to `countersign.test.ts`), typecheck clean, and
+`web/audit/a35-returned.mjs` — 36 checks driving the real app in Chromium on
+`dining.json`, every figure worked out on the audit's own side from the
+quantities the app printed on its own takeoff. Every new check was watched
+failing on a deliberately introduced mistake before it was trusted.
+
+The app half — five edits to `web/src/Agree.tsx`, `web/src/proposalFile.ts` and
+`web/src/state.ts` — is written out but **not applied**, because the session
+that built this did not own those files. Until it lands,
+`check-reachable.py` correctly reports `freezeOnReturnedCopy` as proven and
+unreachable.

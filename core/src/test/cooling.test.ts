@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { EMPTY_COMPANY, postalAddress } from '../company.ts';
 import {
   BUSINESS_DAYS_TO_CANCEL,
   CoolingError,
+  NOTICE_NOT_COMPLETED,
   RIGHT_TO_CANCEL_STATEMENT,
   WHAT_THIS_DOES_NOT_KNOW,
   addBusinessDays,
@@ -212,6 +214,68 @@ test('a notice with no seller on it is refused rather than printed with a hole',
     () => cancellationNotice({ name: 'Alvarez Remodeling', address: '   ' }, '2026-08-28'),
     CoolingError
   );
+});
+
+test('a seller with no address at all is refused exactly like one with a blank', () => {
+  // The state every profile saved before there was an address field is in.
+  // `undefined` has to reach here as `undefined` and be refused on arrival —
+  // if a caller were forced to turn it into '' on the way in, the absence
+  // would be gone by the time anything could refuse it.
+  assert.throws(
+    () => cancellationNotice({ name: 'Alvarez Remodeling', address: undefined }, '2026-08-28'),
+    CoolingError
+  );
+  assert.throws(
+    () => cancellationNotice({ name: 'Alvarez Remodeling', address: postalAddress(EMPTY_COMPANY) },
+      '2026-08-28'),
+    CoolingError
+  );
+});
+
+test('the refusal names the business profile, because that is where the fix is', () => {
+  // A refusal a contractor cannot act on is a refusal he ignores. It used to
+  // say the address was needed without saying where to put it, back when the
+  // answer was a box on the Agreement screen he had already walked past.
+  assert.throws(
+    () => cancellationNotice({ name: 'Alvarez Remodeling', address: undefined }, '2026-08-28'),
+    (error: unknown) => {
+      assert.ok(error instanceof CoolingError);
+      assert.match(error.message, /business profile/);
+      assert.match(error.message, /429\.1\(c\)/);
+      return true;
+    }
+  );
+});
+
+test('an address typed over several lines reaches the form as one sentence', () => {
+  // § 429.1(b) puts the address inside a sentence — "mail or deliver ... to
+  // NAME, at ADDRESS, NOT LATER THAN ..." — so the lines somebody typed have
+  // to arrive flattened. A line break inside that sentence would break the
+  // sentence, and on the HTML document it would either vanish or, escaped
+  // wrongly, become markup.
+  const company = { ...EMPTY_COMPANY, address: '2200 Oak Street\nMesa AZ 85201' };
+  const notice = cancellationNotice(
+    { name: 'Alvarez Remodeling', address: postalAddress(company) },
+    '2026-08-28'
+  );
+  assert.equal(notice.sellerAddress, '2200 Oak Street, Mesa AZ 85201');
+  assert.match(notice.form.join('\n'), /at 2200 Oak Street, Mesa AZ 85201, NOT LATER THAN/);
+  for (const line of notice.form) assert.doesNotMatch(line, /[\r\n]/, line);
+});
+
+test('when the form cannot be completed there are words for saying so, and they are not a form', () => {
+  const said = NOTICE_NOT_COMPLETED.join(' ');
+  assert.match(said, /THIS NOTICE COULD NOT BE COMPLETED/);
+  // It says what is missing, whose job it was, and what each of the two people
+  // holding the document should do about it.
+  assert.match(said, /16 CFR 429\.1\(c\)/);
+  assert.match(said, /address of the seller’s place of business/);
+  assert.match(said, /business profile/);
+  assert.match(said, /the right to cancel does not depend on this paperwork existing/);
+  // And it is never captioned like the real form. A buyer must not be able to
+  // fill this in, post it, and believe he has cancelled.
+  assert.doesNotMatch(said, /NOTICE OF CANCELLATION/);
+  assert.doesNotMatch(said, /I HEREBY CANCEL/);
 });
 
 test('what the app does not know is said, not left out', () => {

@@ -13,6 +13,21 @@
  * type sizes and its own font stack. That is why it is written that way.
  */
 
+import { onPaper } from '../../core/src/design.ts';
+import {
+  type Handover,
+  addHandover,
+  describeHandover,
+  handoverFingerprint,
+  handoverTime,
+  readHandovers,
+  recordHandover,
+  sayHandovers,
+  sendingsOf,
+  versionGap,
+  writeHandovers,
+} from '../../core/src/sent.ts';
+
 export class SheetError extends Error {}
 
 /** Everything that only exists to be touched. It has no business in a picture. */
@@ -42,7 +57,15 @@ export function planSvg(source: SVGSVGElement): string {
   const [, , w, h] = box.split(/\s+/).map(Number);
   clone.setAttribute('width', String(w));
   clone.setAttribute('height', String(h));
-  return new XMLSerializer().serializeToString(clone);
+  // Resolved before it leaves, at the one place a plan is serialised. The
+  // drawing paints with `rgb(var(--c-ink))`, and those properties are declared
+  // on the app's own `:root`. Anywhere else -- a claim file, a client file, an
+  // <img> holding the PNG, a thumbnail in the scan list -- the var() resolves
+  // to nothing, which does not fall back: it invalidates the declaration, so
+  // `fill` becomes black and the whole drawing prints as a black rectangle.
+  // Measured: 10,000 pixels out of 10,000, on a page that DOES declare the
+  // tokens, because an SVG loaded as an image is its own document.
+  return onPaper(new XMLSerializer().serializeToString(clone));
 }
 
 /**
@@ -117,6 +140,86 @@ export async function sendPicture(blob: Blob, name: string, title: string): Prom
   return await sendFile(blob, name, title);
 }
 
+/* ---------------------------------------------- what has left this phone */
+
+/**
+ * Where the record of documents leaving this phone is kept.
+ *
+ * `localStorage`, alongside the corrected rooms, rather than inside the job
+ * file. Every send in the app goes through `sendFile`, and `sendFile` is handed
+ * a blob and a name and has no idea which job is open — so the record is
+ * device-wide and keyed by the file name, which `fileNameFor` already builds
+ * out of the room or claim number and the kind of document.
+ *
+ * The consequence is worth stating rather than discovering: this record does
+ * not travel with the job file to a second phone. `core/src/sent.ts` is written
+ * so it can be moved into the job's `extras` without changing a word of it, and
+ * `sayHandovers` never says "not sent" for exactly this reason — a phone that
+ * has no record is not a phone from which nothing went out.
+ */
+export const HANDOVER_LOG = 'trueline.handovers.v1';
+
+/**
+ * Writes down that a file left, after it has left.
+ *
+ * Deliberately after, and deliberately swallowing its own failures. The file is
+ * already gone by the time this runs; turning a completed hand-over into an
+ * error message on screen would tell the contractor the opposite of what
+ * happened. If the log cannot be read — corrupt, or written by a newer version
+ * — it is left exactly as it is rather than overwritten, because an unreadable
+ * record is still evidence and a fresh empty one is not.
+ */
+async function note(blob: Blob, name: string, title: string, how: Handover['how']): Promise<void> {
+  try {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const one = recordHandover({
+      document: name,
+      says: title,
+      mediaType: blob.type,
+      bytes: bytes.byteLength,
+      fingerprint: await handoverFingerprint(bytes),
+      at: handoverTime(new Date()),
+      how,
+    });
+    const kept = addHandover(readHandovers(localStorage.getItem(HANDOVER_LOG)), one);
+    localStorage.setItem(HANDOVER_LOG, writeHandovers(kept));
+  } catch {
+    // Nothing is retried and nothing is reported here. See above.
+  }
+}
+
+/** Every hand-over this phone has a record of. Throws if the record is unreadable. */
+export function handovers(): readonly Handover[] {
+  return readHandovers(localStorage.getItem(HANDOVER_LOG));
+}
+
+/**
+ * What a screen can say about one document, in one call.
+ *
+ * `fingerprintNow` is the SHA-256 of the file as it would be built today — the
+ * same value `note` records, so the two are comparable. Pass null where the
+ * screen has not built it; the count is still true and no claim is made about
+ * which version is in somebody's hands.
+ */
+export function whatWentOut(
+  document: string,
+  fingerprintNow: string | null
+): {
+  readonly sendings: readonly Handover[];
+  readonly summary: string;
+  readonly gap: string | null;
+  readonly detail: readonly (readonly string[])[];
+} {
+  const all = handovers();
+  const sendings = sendingsOf(all, document);
+  return {
+    sendings,
+    summary: sayHandovers(all, document, fingerprintNow),
+    gap: fingerprintNow === null ? null : versionGap(all, document, fingerprintNow),
+    detail: sendings.map(describeHandover),
+  };
+}
+
 /**
  * Hands any file to whatever the phone uses to send things, or saves it.
  *
@@ -125,6 +228,16 @@ export async function sendPicture(blob: Blob, name: string, title: string): Prom
  * — a desktop browser, an older web view — it falls back to a download, and
  * says which of the two happened rather than leaving somebody looking for a
  * share sheet that never opened.
+ *
+ * Both paths write the sending down, through `note`. This is the only place in
+ * the app a document leaves, so it is the only place that has to record one.
+ *
+ * It used to answer the share with the single word "Sent." It does not any
+ * more, and the reason is the whole of `core/src/sent.ts`: the share sheet
+ * resolves the same way whether the person sent a message, saved the file, or
+ * picked Messages and then deleted the draft. "Sent" is a claim about somebody
+ * else's phone. "Handed over" is a claim about this one, and it is the only one
+ * of the two the app can stand behind if it is ever read out in a dispute.
  */
 export async function sendFile(blob: Blob, name: string, title: string): Promise<string> {
   const file = new File([blob], name, { type: blob.type });
@@ -133,10 +246,16 @@ export async function sendFile(blob: Blob, name: string, title: string): Promise
   if (share && canShareFiles) {
     try {
       await share.call(navigator, { files: [file], title });
-      return 'Sent.';
+      await note(blob, name, title, 'handed');
+      return 'Handed over — this app cannot confirm it was delivered.';
     } catch (error) {
       // Changing your mind is not a failure. Anything else falls through to a
       // download rather than doing nothing twice.
+      //
+      // Nothing is recorded here, and that matters: the cancel is the one
+      // honest signal the share sheet gives back, and a record written on a
+      // share the contractor backed out of would be the app's first outright
+      // false statement about a document.
       if (error instanceof DOMException && error.name === 'AbortError') return '';
     }
   }
@@ -146,6 +265,7 @@ export async function sendFile(blob: Blob, name: string, title: string): Promise
   link.download = name;
   link.click();
   URL.revokeObjectURL(url);
+  await note(blob, name, title, 'saved');
   return `Saved as ${name}.`;
 }
 

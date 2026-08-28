@@ -1,5 +1,11 @@
 import { type Nanometres, hypotenuse } from './length.ts';
 import { type Point, type Room, RoomError, corners, validate } from './room.ts';
+// A wall is called `wall-5` in the model and "Wall 5" out loud, and a delete
+// that names the walls it is about to blind has to name them the way the
+// drawing does. `nameOf` is the one place that translation lives, and a second
+// copy of the rule here is a second chance for a screen to say a different
+// thing about the same wall.
+import { nameOf } from './wallLabel.ts';
 
 /**
  * A photo that knows where it was taken from, and therefore which walls it shows.
@@ -342,6 +348,16 @@ export interface DeletionRequest {
   readonly held: readonly string[];
   /** Whether an app is here that filed a copy of each one with the scan. */
   readonly filedWithScan: boolean;
+  /**
+   * The dates on which a document carrying these photographs left this phone,
+   * newest first, from the hand-over record in `sent.ts`.
+   *
+   * Empty means the record says nothing went out — which is not the same as
+   * knowing nothing did, because the record lives on this device. The sentence
+   * this produces is worded for that: it names what the record shows and never
+   * says "nothing has been sent".
+   */
+  readonly wentOutOn?: readonly string[];
 }
 
 export interface Deletion {
@@ -443,12 +459,20 @@ export function plannedDeletion(request: DeletionRequest): Deletion {
     );
   }
 
-  // The honest answer to "is it already out there". This app writes documents
-  // and hands them over; it keeps no record of what was sent, to whom, or when,
-  // so it must not pretend it can reach one back.
+  // The honest answer to "is it already out there". Until there was a record of
+  // documents leaving this phone, this could only ever be a generality. Now it
+  // can name the day -- and where the record is silent it still must not say
+  // "nothing went out", because the record is on this device and a device can
+  // lose it.
+  const wentOut = request.wentOutOn ?? [];
   inUse.push(
-    'A claim document or an archive that has already gone out keeps the photographs that went ' +
-      'with it. Nothing this app makes from now on will have them.'
+    wentOut.length === 0
+      ? 'If a claim document or an archive has already gone out, it keeps the photographs ' +
+          'that went with it. Nothing this app makes from now on will have them.'
+      : `A claim document or an archive left this phone ${
+          wentOut.length === 1 ? `on ${wentOut[0]}` : `${wentOut.length} times, last on ${wentOut[0]}`
+        }. That copy keeps the photographs that were in it, and nothing this app makes from ` +
+        'now on will have them.'
   );
 
   return {
@@ -459,5 +483,225 @@ export function plannedDeletion(request: DeletionRequest): Deletion {
     finality:
       'You can put them back until you leave this screen. After that the pictures this browser ' +
       'is holding are dropped for good.',
+  };
+}
+
+/* ------------------------------- taking photographs out of the scan itself */
+
+/**
+ * Which photographs are the only one showing a wall, and which wall that is.
+ *
+ * ## Why this is a question at all
+ *
+ * A walk takes about fifty frames and most of them overlap, so it is easy to
+ * look at a strip of near-identical pictures and believe any one of them is
+ * spare. Some of them are not. `photosOfWall` matches poses to walls, and in a
+ * room shot from a doorway there are walls exactly one frame ever saw — the
+ * short return by the hallway, the piece of wall behind the door. Deleting that
+ * frame is the difference between a wall somebody can show an adjuster and a
+ * wall that is a number on a drawing with nothing behind it, which is what
+ * `unphotographedWalls` above already calls the wall that gets argued about.
+ *
+ * So it is worked out here, from the poses, and handed to the screen. A screen
+ * deciding for itself which pictures look spare is the 53 photographs again.
+ *
+ * Keyed by photograph id, and a photograph only appears when it is somebody's
+ * last one: an id missing from the map is a frame no wall depends on.
+ */
+export function onlyPhotographOf(
+  photos: readonly Photo[],
+  room: Room
+): ReadonlyMap<string, readonly string[]> {
+  validate(room);
+
+  const seenBy = new Map<string, string[]>();
+  for (const photo of photos) {
+    for (const inFrame of wallsInFrame(photo, room)) {
+      const already = seenBy.get(inFrame.wallId);
+      if (already) already.push(photo.id);
+      else seenBy.set(inFrame.wallId, [photo.id]);
+    }
+  }
+
+  const sole = new Map<string, string[]>();
+  for (const [wallId, ids] of seenBy) {
+    // Two frames of a wall means neither of them is the last one, however alike
+    // they look. Only a wall with exactly one witness puts a photograph here.
+    if (ids.length !== 1) continue;
+    const only = ids[0]!;
+    const walls = sole.get(only);
+    if (walls) walls.push(wallId);
+    else sole.set(only, [wallId]);
+  }
+  return sole;
+}
+
+/**
+ * What deleting a set of the scan's own photographs is about to do.
+ *
+ * ## The same 53 photographs, one screen further along
+ *
+ * `plannedDeletion` above says this for the photographs somebody takes of a
+ * damage. These are the other kind: the fifty-odd frames the walk itself takes,
+ * which is the batch Sam was actually talking about and which had no delete
+ * anywhere in the app at all. Everything the damage version learned applies
+ * here unchanged — the count is said in words and never left to be worked out
+ * off which thumbnails happen to be ringed, and what a photograph is doing is
+ * named before it goes.
+ *
+ * What is different, and it is the whole reason this is its own function:
+ *
+ *   - These frames carry **camera poses**, so a photograph is not just a
+ *     picture — it is the only thing that shows a particular wall. That is a
+ *     fact about the room, it is computable, and it is stated.
+ *   - **The record owns the truth and the file does not.** The pictures are
+ *     served out of the scan's own folder by the app that wrote them, and this
+ *     page has no way to delete a file there and never claims to. What goes is
+ *     the corrected room's list of frames. Saying "deleted for good" would be a
+ *     lie, and so would saying nothing at all — the photograph is off the job
+ *     either way.
+ */
+export interface ScanDeletionRequest {
+  /** Every photograph the scan is carrying, in the order the room holds them. */
+  readonly inScan: readonly Photo[];
+  /** The ones somebody has actually ticked, by photograph id. */
+  readonly picked: readonly string[];
+  /** The room they were taken in, so what each one is doing can be worked out. */
+  readonly room: Room;
+  /** Whether an app is here holding the scan's folder the pictures are served from. */
+  readonly filedWithScan: boolean;
+}
+
+export interface ScanDeletion {
+  /** Exactly what goes, in the scan's own order. */
+  readonly going: readonly Photo[];
+  /** Exactly what is left, in the scan's own order. */
+  readonly staying: readonly Photo[];
+  /** "Delete 14 photographs." — the count, in words, before anything goes. */
+  readonly headline: string;
+  /** Of the ones going, the ids that are the only photograph of some wall. */
+  readonly soleWitnesses: readonly string[];
+  /** Walls something shows now and nothing would show afterwards. */
+  readonly wallsLeftBlind: readonly string[];
+  /** Every true sentence about what these photographs are doing. */
+  readonly inUse: readonly string[];
+  /** What can be taken back, and what cannot. Never implies a net that is not there. */
+  readonly finality: string;
+}
+
+/** "Wall 1, Wall 4 and Wall 9" — the way somebody reads a list out loud. */
+function listOf(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`;
+}
+
+/**
+ * Works out the delete, or refuses it.
+ *
+ * The three refusals are the ones `plannedDeletion` makes and for the same
+ * reasons: a delete aimed at a frame this scan does not have is aimed at
+ * something other than what is on the screen, a frame ticked twice makes
+ * "delete 14" take 13, and a delete of nothing is a button that did something
+ * invisible.
+ */
+export function plannedScanDeletion(request: ScanDeletionRequest): ScanDeletion {
+  const inScan = request.inScan;
+  const wanted = new Set(request.picked);
+
+  if (wanted.size !== request.picked.length) {
+    throw new PhotoError(
+      'The same photograph is ticked twice. That would delete fewer than it says it will, ' +
+        'and the number in front of somebody is the whole point of this.'
+    );
+  }
+  if (wanted.size === 0) {
+    throw new PhotoError('Nothing is picked, so there is nothing to delete.');
+  }
+  const here = new Set(inScan.map((photo) => photo.id));
+  const strays = request.picked.filter((id) => !here.has(id));
+  if (strays.length > 0) {
+    throw new PhotoError(
+      `${strays.join(', ')} ${strays.length === 1 ? 'is' : 'are'} not in this scan, so this ` +
+        'delete is pointed at something other than what is on the screen. Nothing has been ' +
+        'taken off.'
+    );
+  }
+
+  // Both lists in the scan's order rather than the order somebody tapped
+  // things. What the sentence says and what the record shows have to be the
+  // same list read the same way round.
+  const going = inScan.filter((photo) => wanted.has(photo.id));
+  const staying = inScan.filter((photo) => !wanted.has(photo.id));
+
+  // What each frame is doing, from the poses. `unphotographedWalls` is asked
+  // twice rather than reasoned about: once as the room stands and once as it
+  // would stand, and the difference is exactly the walls this delete blinds.
+  // Walls nothing shows already are not this delete's doing and are not laid at
+  // its door.
+  const blindNow = new Set(unphotographedWalls(inScan, request.room));
+  const wallsLeftBlind = unphotographedWalls(staying, request.room).filter(
+    (wallId) => !blindNow.has(wallId)
+  );
+  const sole = onlyPhotographOf(inScan, request.room);
+  const soleWitnesses = going.filter((photo) => sole.has(photo.id)).map((photo) => photo.id);
+
+  const inUse: string[] = [];
+
+  if (soleWitnesses.length > 0) {
+    inUse.push(
+      `${soleWitnesses.length} of these ${soleWitnesses.length === 1 ? 'is' : 'are'} the only ` +
+        `photograph of a wall.`
+    );
+  }
+
+  if (wallsLeftBlind.length > 0) {
+    // Named, not counted. "3 walls lose their photograph" leaves somebody to
+    // work out which three off the drawing, and working it out off the screen
+    // is how 53 photographs went.
+    const named = wallsLeftBlind.map(nameOf);
+    const shown = named.length > 8 ? named.slice(0, 8) : named;
+    const rest = named.length - shown.length;
+    inUse.push(
+      `Afterwards nothing shows ${listOf(shown)}${rest > 0 ? `, and ${rest} more` : ''}. ` +
+        `${wallsLeftBlind.length === 1 ? 'That is the wall' : 'Those are the walls'} that ` +
+        `${wallsLeftBlind.length === 1 ? 'gets' : 'get'} argued about later.`
+    );
+  }
+
+  if (staying.length === 0) {
+    inUse.push(
+      'That is every photograph the walk took. The room and its measurements stay exactly as ' +
+        'they are, and there will be nothing behind any of them to look at.'
+    );
+  } else {
+    inUse.push(
+      `${photographs(staying.length)} ${staying.length === 1 ? 'stays' : 'stay'} in this scan.`
+    );
+  }
+
+  // Which side owns the truth, said plainly. The app serves these pictures
+  // read-only out of the scan's own folder — see `WebBundle.swift` — and there
+  // is no message on the bridge that deletes a file there. So the corrected
+  // room's list of frames is the thing that goes, and claiming the picture was
+  // wiped would be inventing a consequence.
+  inUse.push(
+    request.filedWithScan
+      ? "The picture files stay in the scan's folder where the app put them. This takes the " +
+        'photographs off the job — off the plan and off anything printed from it — rather than ' +
+        'wiping anything off the phone.'
+      : 'There is no app here holding the scan folder, so this takes the photographs off this ' +
+        'room and nothing else. Whatever the scan was opened from still has the pictures.'
+  );
+
+  return {
+    going,
+    staying,
+    headline: `Delete ${photographs(going.length)}.`,
+    soleWitnesses,
+    wallsLeftBlind,
+    inUse,
+    finality:
+      'You can put them back until you leave this screen. After that this room is saved without ' +
+      'them, and the saved room is what opens next time — so they do not come back on their own.',
   };
 }

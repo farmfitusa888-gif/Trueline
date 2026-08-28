@@ -6,8 +6,11 @@ import {
   type Company,
   CompanyError,
   EMPTY_COMPANY,
+  addressLines,
+  hasAddress,
   isPresentable,
   letterhead,
+  postalAddress,
   showArea,
   showLength,
   showRun,
@@ -55,6 +58,92 @@ test('nothing at all is not presentable, and whitespace is nothing', () => {
   assert.equal(isPresentable({ ...EMPTY_COMPANY, name: '   ' }), false);
   assert.equal(isPresentable(gilbert), true);
   assert.deepEqual(letterhead(EMPTY_COMPANY), []);
+});
+
+/* --------------------------------------------------------------- the address */
+
+test('a profile saved before there was an address field has no address, not a blank one', () => {
+  // The whole reason the field is optional. Every profile on every phone and in
+  // every iCloud account was written before this existed, and the one thing
+  // that must never happen is one of them turning into an address of "" — an
+  // empty string satisfies every `if (address)` between here and the paper, and
+  // the paper is a legal form telling a buyer where to post a cancellation.
+  assert.equal(EMPTY_COMPANY.address, undefined);
+  assert.equal(hasAddress(EMPTY_COMPANY), false);
+  assert.deepEqual(addressLines(EMPTY_COMPANY), []);
+  assert.equal(postalAddress(EMPTY_COMPANY), undefined);
+});
+
+test('an address of nothing but whitespace is no address at all', () => {
+  // Somebody hits the space bar in the box and moves on. The form must refuse
+  // that exactly as loudly as it refuses an empty one, because a space prints
+  // as a hole.
+  for (const typed of ['', '   ', '\n', ' \n \n ', '\r\n']) {
+    const company: Company = { ...EMPTY_COMPANY, address: typed };
+    assert.equal(hasAddress(company), false, JSON.stringify(typed));
+    assert.deepEqual(addressLines(company), [], JSON.stringify(typed));
+    assert.equal(postalAddress(company), undefined, JSON.stringify(typed));
+  }
+});
+
+test('an address is the lines it was typed on, trimmed, with the empty ones dropped', () => {
+  // A trailing return is what a phone keyboard leaves behind, and a document
+  // that prints an empty line where a town should be looks like a mistake.
+  const company: Company = {
+    ...EMPTY_COMPANY,
+    address: '  2200 Oak Street\n\n  Suite 4 \nMesa AZ 85201\n',
+  };
+  assert.deepEqual(addressLines(company), ['2200 Oak Street', 'Suite 4', 'Mesa AZ 85201']);
+  assert.equal(postalAddress(company), '2200 Oak Street, Suite 4, Mesa AZ 85201');
+  assert.equal(hasAddress(company), true);
+});
+
+test('windows line endings are line endings too', () => {
+  // A price list pasted out of a supplier's email carries \r\n, and so does an
+  // address. A stray carriage return on the end of "85201" is invisible on
+  // screen and turns up as a box in a PDF.
+  const company: Company = { ...EMPTY_COMPANY, address: '2200 Oak Street\r\nMesa AZ 85201' };
+  assert.deepEqual(addressLines(company), ['2200 Oak Street', 'Mesa AZ 85201']);
+});
+
+test('the address goes on the letterhead, on one line, under the name', () => {
+  const withOne: Company = { ...gilbert, address: '119 Fifth Street\nCleveland OH 44113' };
+  assert.deepEqual(letterhead(withOne), [
+    'Gilbert Remodeling',
+    '119 Fifth Street, Cleveland OH 44113',
+    '(216) 555-0142 · gil@example.com',
+    'Licence OH-CT-88213 · Insured — Westfield #4471',
+  ]);
+});
+
+test('a letterhead line never carries a line break out of this module', () => {
+  // Every caller lays a letterhead out as a stack of single lines — a drawing
+  // in SVG, an HTML document, a PDF — and none of them would break the line.
+  // "119 Fifth StreetCleveland OH 44113" on somebody's blueprint is the bug
+  // this flattening prevents, and it is prevented here rather than in each of
+  // the four places that draw one.
+  const withOne: Company = { ...gilbert, address: '119 Fifth Street\nCleveland OH 44113' };
+  for (const line of letterhead(withOne)) {
+    assert.doesNotMatch(line, /[\r\n]/, line);
+  }
+});
+
+test('a profile with no address has no address line, exactly like a missing licence', () => {
+  // The rule for everything on a letterhead: leave it out rather than print it
+  // empty. A document with a gap where an address should be is the thing this
+  // whole change exists to stop.
+  assert.deepEqual(letterhead({ ...EMPTY_COMPANY, name: 'Gilbert Remodeling' }), [
+    'Gilbert Remodeling',
+  ]);
+  assert.deepEqual(letterhead({ ...EMPTY_COMPANY, name: 'Gilbert Remodeling', address: '  ' }), [
+    'Gilbert Remodeling',
+  ]);
+});
+
+test('an address alone still needs a name before anything is presentable', () => {
+  // An address is not an identity. A drawing headed "119 Fifth Street" with no
+  // business on it is a drawing nobody can be held to.
+  assert.equal(isPresentable({ ...EMPTY_COMPANY, address: '119 Fifth Street' }), false);
 });
 
 /* ------------------------------------------------------- what a room starts at */

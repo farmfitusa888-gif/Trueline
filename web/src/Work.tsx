@@ -69,7 +69,7 @@ import { handBackVisits } from './bridge.ts';
 import { SignaturePad } from './SignaturePad.tsx';
 import { changeFile, changeFileName } from './changeFile.ts';
 import { useQuote } from './quoteOf.ts';
-import { sendFile } from './sheet.ts';
+import { sendFile, whatWentOut } from './sheet.ts';
 import { useUnits } from './units.tsx';
 
 function Field({
@@ -95,6 +95,24 @@ function Field({
       />
     </label>
   );
+}
+
+/**
+ * What the record says about a change order, under the button that sends it.
+ *
+ * A change order that went out and then moved is the failure `change.ts` exists
+ * for, one level up — so the line names how many times this document left and
+ * whether what left is this version. Silent until something has gone out.
+ */
+function WentOut({ document }: { readonly document: string }) {
+  let out;
+  try {
+    out = whatWentOut(document, null);
+  } catch {
+    return null;
+  }
+  if (out.sendings.length === 0) return null;
+  return <p className="mt-1 text-xs text-slate-500">{out.summary}</p>;
 }
 
 export function Work({
@@ -463,6 +481,7 @@ export function Work({
                     >
                       Send the signed copy
                     </button>
+                    <WentOut document={changeFileName(one.document)} />
                   </li>
                 ))}
               </ul>
@@ -551,6 +570,7 @@ export function Work({
                 >
                   Send it to be signed
                 </button>
+                <WentOut document={changeFileName(raisedChange)} />
 
                 <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
                   <Field label="Who is signing" value={coWho} onChange={setCoWho}

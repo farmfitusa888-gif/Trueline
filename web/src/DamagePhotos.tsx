@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { handBackDamagePhoto, insideApp } from './bridge.ts';
+import { handovers } from './sheet.ts';
 import {
   asDataUrl,
   fetchPhoto,
@@ -184,6 +185,32 @@ export function DamagePhotos({
   } | null>(null);
   const backed = insideApp();
 
+  /**
+   * The days a document that carries photographs left this phone.
+   *
+   * Matched on the file name's own ending rather than rebuilt from a claim
+   * number this screen does not have: `fileNameFor` writes every claim PDF as
+   * `<name> claim.pdf` and every archive as `<name> job.zip`, and both are
+   * documents the pictures travel inside. Newest first, because the sentence
+   * names the last one.
+   *
+   * A failure to read the log falls back to no dates, which produces the
+   * sentence that makes no claim. That is the right way to fail here: the
+   * record is on this device, and a device losing it is not evidence that
+   * nothing went out.
+   */
+  const wentOutOn = (() => {
+    try {
+      return handovers()
+        .filter((one) => /\sclaim\.pdf$|\sjob\.zip$/.test(one.document))
+        .map((one) => one.at.slice(0, 10))
+        .sort()
+        .reverse();
+    } catch {
+      return [];
+    }
+  })();
+
   // What a claim document has on it at this moment, straight from the list that
   // prints it. See `showingOnClaim` — it can only ever understate, so this
   // confirmation is never able to invent a use that is not there.
@@ -266,6 +293,7 @@ export function DamagePhotos({
           onClaim: photos.filter((name) => onTheClaim.has(name)),
           held: [...held],
           filedWithScan: backed,
+          wentOutOn,
         })
       );
       setTold(null);

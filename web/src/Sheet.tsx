@@ -195,7 +195,10 @@ export function Sheet({
       const said = await sendFile(
         new Blob([html], { type: 'text/html;charset=utf-8' }),
         fileNameFor(room.name, 'html'),
-        room.name
+        // What the share sheet shows, and what the hand-over record keeps.
+        // A bare file name told the contractor nothing about which document
+        // he was about to send.
+        `${room.name} — for the client`
       );
       if (said) setTold(said);
     } catch (error) {

@@ -166,8 +166,15 @@ check('it says where the only copy of them is',
   /3 of them are on this browser only\. Nothing else has a copy\./.test(t), t);
 check('it says what can be taken back, and what cannot',
   /put them back until you leave this screen/.test(t) && /dropped for good/.test(t), t);
+// Two things at once. It says the consequence -- a document that went out
+// keeps the pictures that were in it -- and, where the hand-over record is
+// silent, it says "if" rather than "nothing has been sent". The record lives on
+// this device, so silence in it is not knowledge that nothing went out.
 check('and it never pretends it can reach a document that has already gone out',
-  /already gone out keeps the photographs/.test(t), t);
+  /keeps the photographs that went with it/.test(t), t);
+check('and where the record says nothing, it claims nothing',
+  /If a claim document or an archive has already gone out/.test(t)
+    && !/nothing has been sent|has not been sent/i.test(t), t);
 
 // Backing out has to be free.
 await asking.getByRole('button', { name: 'Keep them' }).click();

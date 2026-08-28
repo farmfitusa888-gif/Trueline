@@ -43,6 +43,7 @@ import {
   changesSinceVerified,
   describeChanges,
   freeze,
+  freezeOnReturnedCopy,
 } from '../../core/src/baseline.ts';
 import { money } from '../../core/src/price.ts';
 import {
@@ -57,6 +58,8 @@ import {
   proposalOf,
 } from '../../core/src/proposal.ts';
 import { type Override } from '../../core/src/override.ts';
+import { postalAddress } from '../../core/src/company.ts';
+import { handoverTime } from '../../core/src/sent.ts';
 import { type Room } from '../../core/src/room.ts';
 import type { WorkScope } from '../../core/src/work.ts';
 import {
@@ -90,7 +93,7 @@ import { DraftButton, DraftedNote } from './Draft.tsx';
 import { useUnits } from './units.tsx';
 import { proposalFile } from './proposalFile.ts';
 import { SignaturePad } from './SignaturePad.tsx';
-import { fileNameFor, sendFile } from './sheet.ts';
+import { fileNameFor, sendFile, whatWentOut } from './sheet.ts';
 
 function Field({
   label,
@@ -249,6 +252,10 @@ export function Agree({
         baseline,
         at: new Date().toLocaleDateString(),
         cooling: notice.ready,
+        // Why it could not be completed, when it could not be. Without this the
+        // document is silent about a notice the buyer was owed, and a buyer who
+        // cannot see that something is missing cannot ask for it.
+        coolingTrouble: notice.trouble,
         returned: filed,
       });
       const said = await sendFile(
@@ -257,11 +264,16 @@ export function Agree({
         `${proposal.roomName} — proposal`
       );
       // The fingerprint of the document AT THE MOMENT IT WENT OUT, kept so a
-      // signed copy that comes back can be checked against it. Taken after the
-      // send rather than before, so a share the contractor cancelled does not
-      // leave a record saying a document is out when it is not.
-      setSentOut({ at: new Date().toISOString(), hash: await hashOf(proposal) });
-      if (said) setSent(said);
+      // signed copy that comes back can be checked against it.
+      //
+      // Only when something actually left. `sendFile` answers a share the
+      // contractor backed out of with an empty string and nothing else does,
+      // and this used to write the record regardless -- so cancelling out of
+      // the share sheet put "Sent" and a fingerprint on screen for a document
+      // that never left the phone.
+      if (!said) return;
+      setSentOut({ at: handoverTime(new Date()), hash: await hashOf(proposal) });
+      setSent(said);
     } catch (error) {
       setSent(error instanceof Error ? error.message : String(error));
     } finally {
@@ -307,15 +319,6 @@ export function Agree({
   const setVenue = onSaleVenue;
   /** The day it gets signed. Today until he says otherwise, and always shown. */
   const [signingDay, setSigningDay] = useState(today());
-  /**
-   * Where a cancellation gets posted.
-   *
-   * Asked here because the company profile has no address on it, and 16 CFR
-   * 429.1(c) makes putting the seller's address on both cancellation forms the
-   * seller's own job. A form that tells a buyer to post his cancellation to
-   * nowhere is a defect in the contractor's paperwork.
-   */
-  const [sellerAddress, setSellerAddress] = useState('');
   /**
    * The proposal as it went out: when, and its fingerprint at that moment.
    *
@@ -384,8 +387,15 @@ export function Agree({
     if (!cooling?.applies) return { ready: null, trouble: null };
     try {
       return {
+        // Off the business profile, never off a box on this screen. It is the
+        // same address on every job, so asking for it here meant retyping it on
+        // every proposal -- and a field somebody retypes is a field somebody
+        // eventually leaves blank, on the one form whose purpose is telling a
+        // buyer where to send a cancellation. `postalAddress` hands back
+        // `undefined` when nobody has filled one in, and `cancellationNotice`
+        // refuses on that rather than printing a form with a hole in it.
         ready: cancellationNotice(
-          { name: company.name, address: sellerAddress },
+          { name: company.name, address: postalAddress(company) },
           transactionDay
         ),
         trouble: null,
@@ -393,7 +403,7 @@ export function Agree({
     } catch (error) {
       return { ready: null, trouble: error instanceof Error ? error.message : String(error) };
     }
-  }, [cooling?.applies, company.name, sellerAddress, transactionDay]);
+  }, [cooling?.applies, company.name, company.address, transactionDay]);
 
   // Everything that has moved since it was signed, re-read whenever the room
   // or the rates do. Asynchronous because verifying the seal is.
@@ -706,7 +716,11 @@ export function Agree({
           )}
           {sentOut && (
             <p className="mt-2 text-xs leading-relaxed text-slate-500">
-              Sent {sentOut.at.slice(0, 10)}. The fingerprint of what went out is{' '}
+              {/* Not "Sent". The app hands a file to the share sheet and cannot
+                  know it was delivered — and `proposalSent` only ever kept the
+                  last sending, where the hand-over record keeps every one. */}
+              {whatWentOut(fileNameFor(proposal.roomName, 'html', 'proposal'), null).summary}{' '}
+              The fingerprint of what went out is{' '}
               <span className="font-mono">{sentOut.hash.slice(0, 16)}…</span>. A signed copy
               that comes back gets checked against it.
             </p>
@@ -762,12 +776,6 @@ export function Agree({
                 type="date"
               />
             )}
-            <Field
-              label="Where a cancellation gets sent"
-              value={sellerAddress}
-              onChange={setSellerAddress}
-              placeholder="2200 Oak Street, Mesa AZ 85201"
-            />
           </div>
         )}
 
@@ -1047,6 +1055,51 @@ export function Agree({
                   <li key={line}>{line}</li>
                 ))}
               </ul>
+              {/*
+                The second way a job gets agreed. Sam: "Let it freeze the job,
+                with the weakness written on the agreement."
+
+                A contractor holding a signed photograph who cannot invoice in
+                the app invoices outside it, and the app then knows less about
+                his job than his email does. So this freezes the job -- and the
+                baseline it writes carries, on itself and for ever, the fact
+                that it was agreed on a returned copy rather than signed here.
+                Nothing is softened: `freezeOnReturnedCopy` never produces a
+                `Signature`, and the sentence below is the one that then prints
+                on every invoice and every export.
+
+                Hidden once there is a baseline (a job is agreed once) and while
+                the proposal has moved under the copy: the core refuses that
+                anyway, and a button that can only fail is worse than no button.
+              */}
+              {!baseline && !drifted[one.id] && taken && (
+                <div className="mt-3 border-t border-slate-200 pt-3">
+                  <p className="text-xs leading-relaxed text-slate-600">
+                    Agreeing the job on this copy lets you invoice against it. Every invoice and
+                    every document then says it was agreed on {CAME_BACK_SAYS[one.cameBackBy]}
+                    {' '}and not signed here, so nobody is misled about what you are holding.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void (async () => {
+                        try {
+                          setBackTrouble(null);
+                          onBaseline(
+                            await freezeOnReturnedCopy(proposal, one, new Date().toISOString())
+                          );
+                        } catch (error) {
+                          setBackTrouble(error instanceof Error ? error.message : String(error));
+                        }
+                      })();
+                    }}
+                    className="mt-2 min-h-12 w-full rounded-md border-2 border-slate-900 px-5
+                               font-semibold text-slate-900 active:bg-slate-100"
+                  >
+                    Agree the job on this signed copy — {money(taken.total)}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </section>
@@ -1062,6 +1115,17 @@ export function Agree({
           <h2 className="font-semibold text-emerald-900">
             Agreed — {baseline.agreed.name}, {money(baseline.agreed.total)}
           </h2>
+          {/*
+            How it was agreed, said in the same breath as that it was. The
+            words are the baseline's own (`AgreedByReturnedCopy.weakness` in
+            core/src/baseline.ts) rather than written again here, so the screen,
+            the document and the bill cannot drift apart.
+          */}
+          {baseline.agreedBy && (
+            <p className="mt-2 rounded-md bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
+              {baseline.agreedBy.weakness}
+            </p>
+          )}
           {baseline.signatures.map((signature) => (
             <div key={signature.id} className="mt-3">
               <img

@@ -375,7 +375,18 @@ export function sayDate(day: string): string {
 /** Who the buyer sends the cancellation to. § 429.1(c) requires both. */
 export interface Seller {
   readonly name: string;
-  readonly address: string;
+  /**
+   * The address of the seller's place of business, in § 429.1(c)'s own words.
+   *
+   * `string | undefined` rather than `string`, because a business profile
+   * written before there was anywhere to put an address has no address, and
+   * that absence has to survive all the way to here. A caller forced to hand
+   * over a string would hand over `''`, and an empty string is the failure
+   * this whole module exists to refuse: it satisfies every truthiness check
+   * between the profile and the paper and then prints as a hole on the one
+   * form whose purpose is telling a buyer where to send a cancellation.
+   */
+  readonly address: string | undefined;
 }
 
 /**
@@ -421,22 +432,25 @@ export function cancellationNotice(
 ): CancellationNotice {
   if (!seller.name.trim()) {
     throw new CoolingError(
-      'The cancellation notice needs your business name on it. 16 CFR 429.1(c) makes ' +
-        'filling it in the seller’s job, and a form with nobody’s name on it is one ' +
-        'the buyer cannot use.'
+      'The cancellation notice needs your business name on it. Put it on your business ' +
+        'profile. 16 CFR 429.1(c) makes filling it in the seller’s job, and a form with ' +
+        'nobody’s name on it is one the buyer cannot use.'
     );
   }
-  if (!seller.address.trim()) {
+  // `?? ''` and then a trim, so that "nobody has said" and "somebody typed a
+  // space" are refused by the same line. They are the same thing on paper.
+  if (!(seller.address ?? '').trim()) {
     throw new CoolingError(
-      'The cancellation notice needs the address of your place of business. That is where ' +
-        'the buyer has to send a cancellation, and 16 CFR 429.1(c) makes putting it there ' +
-        'your job, not theirs.'
+      'The cancellation notice needs the address of your place of business. Put it on your ' +
+        'business profile — it is the same on every job. That is where the buyer has to ' +
+        'send a cancellation, and 16 CFR 429.1(c) makes putting it there your job, not ' +
+        'theirs.'
     );
   }
   const deadline = cancellationDeadline(transactionDate);
   const said = sayDate(deadline);
   const name = seller.name.trim();
-  const address = seller.address.trim();
+  const address = (seller.address ?? '').trim();
   return {
     transactionDate,
     deadline,
@@ -473,6 +487,46 @@ export function cancellationNotice(
     copies: 2,
   };
 }
+
+/**
+ * What a document has to say when the rule applies and the form could not be
+ * completed.
+ *
+ * ## The failure this closes
+ *
+ * `cancellationNotice` refuses rather than printing a form with a hole in it,
+ * which is right, and for a while it was the whole story: the screen showed the
+ * refusal to the contractor and the proposal simply went out with no
+ * cancellation forms on it and nothing said. That is worse than it sounds. The
+ * buyer is handed a document that looks complete, on a sale the FTC rule
+ * covers, with no notice, no forms and no hint that any of it was owed. He
+ * cannot tell that something is missing, so he cannot ask for it.
+ *
+ * A form with a blank where the address goes is a defective notice. A document
+ * that says, in the same ten point bold the forms are set in, that the notice
+ * could not be completed and why, is at least a document that tells the truth
+ * to both of the people holding it — and it is the one a contractor notices
+ * before he hands it over, which is the point.
+ *
+ * It is deliberately not a form. Nothing here is captioned "NOTICE OF
+ * CANCELLATION", because a buyer must never be able to fill this in and post
+ * it believing he has cancelled.
+ */
+export const NOTICE_NOT_COMPLETED: readonly string[] = [
+  'THIS NOTICE COULD NOT BE COMPLETED.',
+  'Federal law (16 CFR Part 429) gives the buyer of a sale like this one three business ' +
+    'days to cancel, and it requires the seller to hand over a notice and two completed ' +
+    'cancellation forms at the time of signing. Those forms are not on this document ' +
+    'because the seller’s details needed to complete them are missing.',
+  '16 CFR 429.1(c) makes completing the forms the seller’s job — the seller’s name, the ' +
+    'address of the seller’s place of business, the date of the transaction, and the date ' +
+    'by which the buyer may cancel. Without the address there is nowhere for a ' +
+    'cancellation to be sent, so a form printed with that blank left empty would be worse ' +
+    'than none: it would look like a notice and could not be used as one.',
+  'Seller: fill in your business address on your business profile and send this again. ' +
+    'Buyer: the right to cancel does not depend on this paperwork existing — ask the ' +
+    'seller for the notice and the two forms the rule requires.',
+];
 
 /**
  * What this app does not know, said out loud on every notice it prints.

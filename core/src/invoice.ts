@@ -1,4 +1,10 @@
-import { type Baseline, type Change, type ChangeOrder } from './baseline.ts';
+import {
+  type AgreedByReturnedCopy,
+  type Baseline,
+  type Change,
+  type ChangeOrder,
+} from './baseline.ts';
+import { AGREED_BY_SAYS } from './countersign.ts';
 import { type AgreedChange, agreedDifference, notYetAgreed, verifyChange } from './change.ts';
 import { type Company } from './company.ts';
 import { type Cents, money } from './price.ts';
@@ -69,6 +75,21 @@ export interface Invoice {
   readonly agreed: Cents;
   /** Everything asked for before this one, on this job. */
   readonly alreadyBilled: Cents;
+  /**
+   * How the agreement under this bill was reached, when it was not a signature
+   * taken on the phone.
+   *
+   * Carried on the invoice itself, not left to be looked up from the baseline.
+   * An invoice is the document that leaves the job and gets forwarded, printed,
+   * exported to a bookkeeper and put in front of an adjuster or a court, and it
+   * has to be able to answer "how do you know this was agreed?" on its own. The
+   * words are the baseline's own; see `AgreedByReturnedCopy` in `baseline.ts`.
+   *
+   * Absent on every invoice raised against a signature taken on the phone --
+   * including every invoice already saved on somebody's phone, which reads back
+   * exactly as it was written.
+   */
+  readonly agreedBy?: AgreedByReturnedCopy;
   readonly issuedAt: string;
   /** When it is due, as a date. Empty when the contractor sets no terms. */
   readonly dueAt: string;
@@ -229,12 +250,22 @@ export function invoiceOf(request: InvoiceRequest): Invoice {
   const agreed = request.baseline.agreed.total + difference;
   const amount = amountFor(request.stage, agreed, request.alreadyBilled, request.share ?? {});
 
+  // How this was agreed, on the line that carries the agreed figure -- so the
+  // strength of the evidence sits beside the money it is being used to ask for,
+  // on the screen, on the document, and in the QuickBooks export, which prints
+  // this field verbatim. A bookkeeper reading the CSV six months later sees the
+  // same sentence the homeowner does.
+  const agreedBy = request.baseline.agreedBy;
+  const day = request.baseline.frozenAt.slice(0, 10);
   const lines: InvoiceLine[] = [
     {
       what: request.baseline.agreed.name,
-      detail:
-        `Agreed ${request.baseline.frozenAt.slice(0, 10)}, signed by ` +
-        `${request.baseline.signatures.map((s) => s.who).join(' and ')}.`,
+      detail: agreedBy
+        ? `Agreed ${day} by ${AGREED_BY_SAYS[agreedBy.cameBackBy]} from ` +
+          `${agreedBy.saysSignedBy}. Not signed on the phone: nobody watched them sign and ` +
+          'no identity was checked.'
+        : `Agreed ${day}, signed by ` +
+          `${request.baseline.signatures.map((s) => s.who).join(' and ')}.`,
       amount: request.baseline.agreed.total,
     },
   ];
@@ -265,6 +296,10 @@ export function invoiceOf(request: InvoiceRequest): Invoice {
     amount,
     agreed,
     alreadyBilled: request.alreadyBilled,
+    // Spread rather than written as `agreedBy: undefined`, so an invoice raised
+    // on a signature taken on the phone has exactly the keys it has always had
+    // and canonicalises to exactly the text it always did.
+    ...(agreedBy ? { agreedBy } : {}),
     issuedAt: request.issuedAt,
     dueAt: request.dueAt ?? '',
     payTo: request.payTo ?? '',
@@ -300,9 +335,14 @@ export function outstandingAfter(invoice: Invoice): Cents {
 /** The invoice said out loud, for a list. */
 export function describeInvoice(invoice: Invoice): string {
   const left = outstandingAfter(invoice);
+  // Read defensively: every invoice written before there was a second way to
+  // agree a job has no `agreedBy` on it, and absent is exactly right for those
+  // -- they were all raised against a signature taken on the phone.
+  const how = invoice.agreedBy ? ` ${invoice.agreedBy.says}` : '';
   return (
     `${STAGE_TITLE[invoice.stage]} ${invoice.number} — ${money(invoice.amount)}` +
-    (left > 0n ? `, leaving ${money(left)} on the job.` : ', which settles the job.')
+    (left > 0n ? `, leaving ${money(left)} on the job.` : ', which settles the job.') +
+    how
   );
 }
 

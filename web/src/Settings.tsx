@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatFeetInches, parseLength } from '../../core/src/length.ts';
-import { type Company, letterhead } from '../../core/src/company.ts';
+import { type Company, addressLines, hasAddress, letterhead } from '../../core/src/company.ts';
 import { ASSEMBLIES } from '../../core/src/thickness.ts';
 import { useUnits } from './units.tsx';
 import { TRADES, describeTrade, tradeOf } from '../../core/src/trade.ts';
@@ -50,6 +50,70 @@ function Field({
       {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
     </label>
   );
+}
+
+/**
+ * A box for something that is written on more than one line.
+ *
+ * Its own component rather than a taller `Field`, because an address is
+ * genuinely several lines and a contractor typing one into a single-line box
+ * either runs it together or gives up. Three rows, because three lines is what
+ * a US address usually is and a box that has to be scrolled to be read back is
+ * a box people mistype into.
+ */
+function Lines({
+  label,
+  value,
+  onChange,
+  hint,
+  placeholder,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (next: string) => void;
+  readonly hint?: string;
+  readonly placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <textarea
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        rows={3}
+        autoCapitalize="words"
+        autoCorrect="off"
+        spellCheck={false}
+        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2
+                   focus:border-sky-500 focus:outline-none"
+      />
+      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
+    </label>
+  );
+}
+
+/**
+ * The profile as it should be written down, rather than as it was typed.
+ *
+ * One job: an address box somebody emptied must be stored as *no address*, not
+ * as an empty string. Every reader already treats a blank address as absent, so
+ * this changes nothing anybody sees — it means what is saved to the phone and
+ * sent to iCloud says the same thing the app says. A stored `address: ""` is a
+ * value that reads as present to anything that has not been told otherwise, and
+ * this is the last place before it becomes somebody's saved file.
+ *
+ * The line breaks somebody typed are kept, trimmed and with the empty lines
+ * dropped, because an address is several lines and this is the copy of it a
+ * person will open again and edit.
+ */
+function tidy(draft: Company): Company {
+  const lines = addressLines(draft);
+  if (lines.length === 0) {
+    const { address: _blank, ...rest } = draft;
+    return rest;
+  }
+  return { ...draft, address: lines.join('\n') };
 }
 
 export function Settings({ onClose }: { readonly onClose?: () => void }) {
@@ -137,6 +201,34 @@ export function Settings({ onClose }: { readonly onClose?: () => void }) {
           <Field label="Phone" value={draft.phone} onChange={(v) => set('phone', v)} type="tel" />
           <Field label="Email" value={draft.email} onChange={(v) => set('email', v)} type="email" />
         </div>
+        {/*
+          Here rather than on every proposal.
+
+          It used to be a box on the Agreement screen called "Where a
+          cancellation gets sent", asked once per job. It is the same on every
+          job, so it was retyped on every proposal, and a field somebody retypes
+          is one somebody eventually leaves blank — on the federal cancellation
+          form, whose entire purpose is telling a buyer where to send a
+          cancellation. Typed here once, it is on every document from then on.
+        */}
+        <Lines
+          label="Business address"
+          value={draft.address ?? ''}
+          onChange={(v) => set('address', v)}
+          placeholder={'2200 Oak Street\nMesa AZ 85201'}
+          hint={
+            'Where you actually are. It goes on your letterhead, and it is the address a ' +
+            'client has to send a cancellation to on the three-day notice — federal law ' +
+            'makes filling that in your job, not theirs.'
+          }
+        />
+        {!hasAddress(draft) && (
+          <p className="text-xs leading-relaxed text-amber-800">
+            No address yet. Everything else still works, but a proposal signed at a
+            client&rsquo;s home cannot carry its cancellation forms without one, and the
+            document will say so rather than print a form with a blank on it.
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
             label="Licence number"
@@ -354,7 +446,7 @@ export function Settings({ onClose }: { readonly onClose?: () => void }) {
       <button
         type="button"
         onClick={() => {
-          save(draft);
+          save(tidy(draft));
           setSaved(true);
           onClose?.();
         }}
