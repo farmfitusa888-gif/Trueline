@@ -35,6 +35,7 @@ import { Settings } from './Settings.tsx';
 import { PriceList } from './PriceList.tsx';
 import { RateBook } from './Rates.tsx';
 import { Trouble } from './Trouble.tsx';
+import { Owner, ownerLockIsSet } from './Owner.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Sketch } from './Sketch.tsx';
 import { Price } from './Price.tsx';
@@ -196,7 +197,7 @@ function NothingHere({ onDraw }: { onDraw: () => void }) {
  * Anything unrecognised opens the room, which is the old behaviour and the
  * right default: a bad route should cost nothing.
  */
-export function openedAt(): 'room' | 'floor' | 'business' | 'draw' | 'demo' | 'tour' {
+export function openedAt(): 'room' | 'floor' | 'business' | 'draw' | 'demo' | 'tour' | 'owner' {
   let hash = '';
   try {
     hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
@@ -204,7 +205,7 @@ export function openedAt(): 'room' | 'floor' | 'business' | 'draw' | 'demo' | 't
     return 'room';
   }
   return hash === 'floor' || hash === 'business' || hash === 'draw' || hash === 'demo'
-    || hash === 'tour'
+    || hash === 'tour' || hash === 'owner'
     ? hash
     : 'room';
 }
@@ -493,6 +494,13 @@ export function App() {
 
   const native = insideApp();
 
+  // The owner's screen is the whole page when it is asked for: no room, no tab
+  // bar and nothing of the app around it. It is Sam's and nobody else's, and a
+  // screen that drew itself inside a contractor's room would be one tap from
+  // being found. It comes after every hook above, so a route never changes the
+  // order the hooks are called in.
+  if (openedOn === 'owner') return <Owner />;
+
   return (
     // The bottom padding clears the room's own bar and nothing more. It was
     // 6.5rem for a 3.5rem bar, which left an inch of empty page under every
@@ -607,6 +615,19 @@ export function App() {
               somebody meets when they open the sheet to type a licence number.
               It draws nothing at all outside the app -- see `Trouble`. */}
           {openedOn === 'business' && <Trouble />}
+
+          {/* The way in from the app's own chrome, and only on the device where
+              the phrase has already been set. On a contractor's phone
+              `ownerLockIsSet` is false and nothing is drawn here at all, so
+              there is no control pointing at a screen he cannot open. */}
+          {openedOn === 'business' && ownerLockIsSet() && (
+            <a
+              href="#owner"
+              className="inline-flex min-h-11 items-center text-sm text-slate-500 underline underline-offset-4"
+            >
+              The books
+            </a>
+          )}
         </div>
       )}
 
