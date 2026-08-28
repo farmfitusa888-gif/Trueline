@@ -535,29 +535,43 @@ await setStandardRates('6.00');
 const second = await pricedHere(AT_SIX);
 
 /**
- * What the six moved lines are worth, worked out here.
+ * What the six moved lines are worth BEFORE the job's mark-up.
  *
  * A dollar a unit across the six the app ships with, against the quantities the
- * app printed on its own takeoff. That is the figure a change order for a
- * repricing is: the difference between the signed lines and the same lines now.
- *
- * Deliberately NOT `second.total - first.total`. Those two are the quoted
- * price, which carries the job's mark-up; this is the sum of the lines, which
- * does not. The app's change order is the second of those, and the gap between
- * them is a real defect written up in scratchpad/integration/drive-last.md.
- * What is checked here is the arithmetic the app actually does, to the cent,
- * against the quantities it printed itself.
+ * app printed on its own takeoff.
  */
-const MOVED = ITEMS.filter((item) => item !== 'Open span')
+const MOVED_LINES = ITEMS.filter((item) => item !== 'Open span')
   .reduce((sum, item) => sum + cents(100n, second.quantities[item] ?? '0'), 0n);
+
+/** The same subtotal-to-total arithmetic `pricedHere` does, for a figure this
+ *  part works out rather than reads. */
+const withMarkUp = (subtotal) => subtotal + (subtotal * BigInt(MARK_UP) * 100n + 5000n) / 10_000n;
+
+/**
+ * What the change order is worth, mark-up and all.
+ *
+ * This used to be `MOVED_LINES`, and this part said in its own comment that the
+ * gap between the two was a real defect: the app put the difference between the
+ * LINES on a change order and then added that pre-mark-up figure to a
+ * post-mark-up agreed total. On these quantities it under-billed by $75.66 on
+ * one change, every time.
+ *
+ * Sam: **"Put the mark-up on the change too."** So the change order is now the
+ * difference between the two quoted prices, which is what a fresh quote would
+ * have said, and this part checks that identity rather than the sum of the
+ * lines. `MOVED_LINES` is still checked on its own, against the subtotal.
+ */
+const MOVED = second.total - first.total;
+/** The job's mark-up on that change, on its own line on every document. */
+const MOVED_MARK_UP = MOVED - MOVED_LINES;
 
 check('the six rates that moved are the six the app ships with, at the quantities it printed',
   Object.keys(second.quantities).length === 7
   && JSON.stringify(second.quantities) === JSON.stringify(first.quantities),
   `${JSON.stringify(first.quantities)} then, ${JSON.stringify(second.quantities)} now`);
 check('the dearer subtotal the app prints is a dollar a unit more, to the cent',
-  second.subtotal === first.subtotal + MOVED,
-  `worked out ${money(first.subtotal + MOVED)}, app said ${money(second.subtotal)}`);
+  second.subtotal === first.subtotal + MOVED_LINES,
+  `worked out ${money(first.subtotal + MOVED_LINES)}, app said ${money(second.subtotal)}`);
 
 await section(page, 'Work');
 await page.waitForTimeout(600);
@@ -567,7 +581,12 @@ check('the agreed figure does not move because a rate did',
 check('the app says how many things moved, and what they are worth, to the cent',
   new RegExp(`6 things moved since this was signed, worth ${re(MOVED)}`).test(w)
   && /None of it is on a bill/.test(w),
-  `worked out ${money(MOVED)} from ${JSON.stringify(second.quantities)} at a dollar a unit`);
+  `worked out ${money(MOVED)} as ${money(MOVED_LINES)} of lines plus ${money(MOVED_MARK_UP)} ` +
+    `of mark-up, from ${JSON.stringify(second.quantities)} at a dollar a unit`);
+check('and the job mark-up is on that change, named and on its own line',
+  MOVED_MARK_UP > 0n
+  && new RegExp(`Mark-up on this change: ${re(MOVED_MARK_UP)}`).test(w),
+  `worked out ${money(MOVED_MARK_UP)} as ${MARK_UP}% of ${money(MOVED_LINES)}`);
 check('and it says so again beside the money, so it is not missed',
   new RegExp(`${re(MOVED)} has moved on this job that nobody has signed for`).test(w),
   w.slice(0, 2000));
@@ -671,7 +690,9 @@ check('and the change order says, under the button, that it has left this phone'
  * is the 4.28 lf the app printed on its own takeoff, so what this is worth —
  * four dollars a foot of it — is arithmetic done here.
  */
-const SPAN = cents(400n, first.quantities['Open span']);
+const SPAN_LINE = cents(400n, first.quantities['Open span']);
+/** The same again with the job's mark-up on it, which is what the app raises. */
+const SPAN = withMarkUp(second.subtotal + SPAN_LINE) - second.total;
 {
   const rates = await openTheRates();
   await rates.getByRole('button', { name: 'Remove Open span' }).click();
@@ -692,7 +713,7 @@ check('a line the signed change order never covered shows up as unsigned, to the
   new RegExp(`1 thing moved since this was signed, worth ${re(SPAN)}`).test(w)
   && /Open span was \$5\.00 per lf, now \$9\.00\./.test(w),
   `worked out ${money(SPAN)} as four dollars a foot of ` +
-    `${first.quantities['Open span']} lf`);
+    `${first.quantities['Open span']} lf (${money(SPAN_LINE)}) with the mark-up on it`);
 
 await page.getByLabel('Your change order number').fill('CO-2');
 await page.getByLabel('Why this is happening').fill('Second thoughts about the whole thing');
@@ -858,6 +879,76 @@ check('and what is still out is the second bill and nothing else',
   `worked out ${money(SECOND)}, screen said ${/(\$[\d,]+\.\d\d) still out/.exec(w)?.[1] ?? 'nothing'}`);
 check('and the day in the calendar came back with what they need to know on it',
   /Tear-out, dining room/.test(w), w.slice(0, 1200));
+
+/* ==========================================================================
+   8. An item a signed change order already moved, moved AGAIN.
+
+   The defect this leg exists for, measured on this build before it was fixed:
+   `notYetAgreed` keyed on the item and the unit alone, so once an item was on
+   ANY signed change order it could never be reported as having moved again. The
+   Price screen showed the bigger number, the Work screen said "Nothing has
+   moved on this job that somebody has not signed for", and the invoice went on
+   billing the old figure. Silent under-billing, and no screen admitted it.
+
+   Sam: **"Compare against what was last agreed, not what was ever agreed."**
+
+   CO-1 above signed for the six standard rates going from $5 to $6. This takes
+   the same six to $7. Nothing else in the app can watch this leg: CO-2 was
+   about the contractor's own open-span line, which no signed change order ever
+   covered.
+   ========================================================================== */
+
+await setStandardRates('7.00');
+
+/** What the job is agreed at now: the baseline and the one signed change. */
+const AGREED_NOW = AGREED + MOVED;
+/** The subtotal with the six at $7 and the contractor's own line at $9. */
+const AT_SEVEN = second.subtotal + SPAN_LINE + MOVED_LINES;
+/** The lines that have moved since CO-1: the six again, and the open span. */
+const TWICE_LINES = MOVED_LINES + SPAN_LINE;
+/** What all of it is worth against what was LAST agreed, mark-up and all. */
+const TWICE = withMarkUp(AT_SEVEN) - AGREED_NOW;
+
+await section(page, 'Work');
+await page.waitForTimeout(700);
+w = await work.innerText();
+
+check('an item a signed change order already moved can move again, and is named',
+  /Floor has moved again since it was signed for/.test(w)
+  && /Baseboard has moved again since it was signed for/.test(w),
+  w.slice(0, 2500));
+check('and it is not called nothing: the screen does not claim the job is settled',
+  !/Nothing has moved on this job that somebody has not signed for/.test(w),
+  w.slice(0, 2500));
+check('all seven are named — the six on CO-1 and the one line it never covered',
+  new RegExp(`7 things moved since this was signed, worth ${re(TWICE)}`).test(w),
+  `worked out ${money(TWICE)} as ${money(TWICE_LINES)} of lines plus ` +
+    `${money(TWICE - TWICE_LINES)} of mark-up, against ${money(AGREED_NOW)} last agreed`);
+check('and it is priced from what CO-1 left them at, not from the baseline',
+  new RegExp(`Floor has moved again since it was signed for — 408.8 sq ft at ` +
+    `${re(cents(600n, second.quantities.Floor))}, now 408.8 sq ft at ` +
+    `${re(cents(700n, second.quantities.Floor))}\\.`).test(w),
+  /Floor has moved again[^\n]*/.exec(w)?.[0] ?? w.slice(0, 800));
+check('and the money beside it is the same figure, so nothing is billed twice',
+  new RegExp(`${re(TWICE)} has moved on this job that nobody has signed for`).test(w),
+  w.slice(0, 2500));
+check('the agreed figure has not moved, because nobody has signed for any of it',
+  new RegExp(`Agreed ${re(AGREED_NOW)}`).test(w),
+  `worked out ${money(AGREED_NOW)} as ${money(AGREED)} plus CO-1 at ${money(MOVED)}`);
+
+await page.getByLabel('Your change order number').fill('CO-3');
+await page.getByLabel('Why this is happening').fill('The lumber yard moved on us twice');
+await page.getByLabel('Days this adds to the finish date').fill('0');
+await press(work.getByRole('button', { name: 'Write the change order' }));
+await page.waitForTimeout(700);
+const third = await work.innerText();
+check('the second change order on the same work is raised at its own figure',
+  /Change order CO-3 — waiting to be signed/.test(third)
+  && third.includes(`${money(TWICE)} onto the job`),
+  `looking for ${money(TWICE)} onto the job`);
+check('and it says the job was agreed at the baseline PLUS CO-1, not at the baseline',
+  third.includes(`Agreed at ${money(AGREED_NOW)}, now ${money(AGREED_NOW + TWICE)}.`),
+  `looking for agreed at ${money(AGREED_NOW)}, now ${money(AGREED_NOW + TWICE)}`);
 
 check('no console or page errors across the whole run', noise().length === 0, noise().join(' | '));
 

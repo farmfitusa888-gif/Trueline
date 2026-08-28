@@ -261,10 +261,20 @@ version of it — and even a yes is reported as a rule the browser keeps rather
 than a promise it made.
 
 And then it nags. Once there is real work in a room that is in no file — a wall
-you measured, a scope, a proposal — a red line follows the screen down saying so,
-and it does not go until a file has actually been written. It is quiet before
-that, because a warning that is on screen before there is anything to lose is a
-warning nobody reads on the day it is right.
+you measured, a scope, a proposal — a red line sits at the head of the room
+saying so, with the button that answers it: **Write the job to a file**. It does
+not go until a file has actually been written, and it is quiet before there is
+anything to lose, because a warning that is on screen before it matters is a
+warning nobody reads on the day it does.
+
+It deliberately does **not** follow the screen down, which is the opposite of
+what the app does with the line about the phone refusing a room. That one is
+rare; this one is on for very nearly every browser visitor who has done
+anything, and a banner that is almost always there and follows the screen is not
+a warning, it is an obstacle. Made to follow the screen it sat on top of the
+controls under it and stopped a change order being signed — six checks in
+`a24-change`, measured. Under the room there is a panel that says the same thing
+at length, with the same button, so both ends of the screen say it.
 
 **Save the job file.** It is the only copy nothing can take back.
 
@@ -285,7 +295,7 @@ on; once it is on, this route already works.
 
 ### The job file — this needed the work
 
-*Save the job file* on any room writes the whole job — the room, the
+**Write the job to a file**, on any room, writes the whole job — the room, the
 corrections, the scope, the prices, the proposal, what was signed — to one file.
 Mail it to yourself, put it on a stick, drop it in Dropbox; open it with the
 same *Choose a file* button a scan opens with.

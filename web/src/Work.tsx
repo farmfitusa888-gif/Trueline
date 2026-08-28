@@ -25,8 +25,8 @@ import {
   agreeToChange,
   agreedDifference,
   describeChangeDocument,
-  notYetAgreed,
   raiseChange,
+  sinceLastAgreed,
 } from '../../core/src/change.ts';
 import { CONSENT, sign } from '../../core/src/signature.ts';
 import { money } from '../../core/src/price.ts';
@@ -296,14 +296,34 @@ export function Work({
       return 0n;
     }
   }, [baseline, agreedChanges]);
-  const unsigned = useMemo(
-    () => (changes ? notYetAgreed(changes, agreedChanges) : []),
-    [changes, agreedChanges]
-  );
-  const unsignedWorth = useMemo(
-    () => unsigned.reduce((sum, one) => sum + one.difference, 0n),
-    [unsigned]
-  );
+  /**
+   * The same movement, measured from what was LAST agreed.
+   *
+   * Everything on this screen that talks about unsigned work reads this, and
+   * the change order that gets raised is built from it -- both, from one place,
+   * because they were the two halves of the same defect. `changesSince` prices
+   * against the baseline, so an item a signed change order already moved was
+   * either never named again (the screen said nothing had moved, and the
+   * invoice went on billing the old figure) or, once a second change order was
+   * raised on it, carried the whole move a second time. See `sinceLastAgreed`.
+   *
+   * It refuses a change order signed against a different agreement, the same
+   * refusal `agreedExtra` above already swallows. Here the refusal is kept and
+   * shown: this one decides what gets written on an amendment.
+   */
+  const stillToAgree = useMemo((): { order: ChangeOrder | null; trouble: string | null } => {
+    if (!baseline || !changes) return { order: null, trouble: null };
+    try {
+      return { order: sinceLastAgreed(baseline, changes, agreedChanges), trouble: null };
+    } catch (error) {
+      return { order: null, trouble: error instanceof Error ? error.message : String(error) };
+    }
+  }, [baseline, changes, agreedChanges]);
+  const unsigned = stillToAgree.order?.changes ?? [];
+  // The change's own figure, not a sum of its lines: the lines are the work
+  // before mark-up and this is what the contract would move by. See
+  // `ChangeOrder.markup`.
+  const unsignedWorth = stillToAgree.order?.difference ?? 0n;
   /**
    * What is still out, with the reversals counted back in.
    *
@@ -504,9 +524,9 @@ export function Work({
       <section data-sheet="no" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="font-semibold text-slate-900">Changes to what was signed</h2>
 
-        {changesTrouble ? (
+        {changesTrouble ?? stillToAgree.trouble ? (
           <p role="alert" className="mt-2 rounded-md bg-rose-50 p-3 text-sm text-rose-900">
-            {changesTrouble}
+            {changesTrouble ?? stillToAgree.trouble}
           </p>
         ) : isWithdrawn && lastWithdrawn ? (
           /* Nothing is measured against a withdrawn agreement, and this says so
@@ -585,11 +605,18 @@ export function Work({
               </ul>
             )}
 
-            {!raisedChange && unsigned.length > 0 && (
+            {/* On `unchanged` rather than on the length of the list, because a
+                mark-up rate moved on its own changes the money and no line —
+                and that was the one change the contractor makes deliberately
+                that he could not then raise a change order for. */}
+            {!raisedChange && stillToAgree.order && !stillToAgree.order.unchanged && (
               <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3">
                 <p className="text-sm font-medium text-amber-900">
-                  {unsigned.length} thing{unsigned.length === 1 ? '' : 's'} moved since this was
-                  signed, worth {money(unsignedWorth < 0n ? -unsignedWorth : unsignedWorth)}.
+                  {unsigned.length === 0
+                    ? 'The mark-up has moved since this was signed'
+                    : `${unsigned.length} thing${unsigned.length === 1 ? '' : 's'} moved since ` +
+                      'this was signed'}
+                  , worth {money(unsignedWorth < 0n ? -unsignedWorth : unsignedWorth)}.
                   None of it is on a bill.
                 </p>
                 <ul className="mt-2 space-y-1">
@@ -598,6 +625,15 @@ export function Work({
                       {one.says}
                     </li>
                   ))}
+                  {/* The mark-up on its own line, because the lines above it are
+                      the work before mark-up and the figure in the sentence
+                      above is after it. A total the list does not add up to is
+                      the number a client stops the job over. */}
+                  {stillToAgree.order.markup !== 0n && (
+                    <li className="text-xs text-amber-900">
+                      Mark-up on this change: {money(stillToAgree.order.markup)}.
+                    </li>
+                  )}
                 </ul>
                 <div className="mt-3 space-y-3">
                   <Field label="Your change order number" value={coNumber} onChange={setCoNumber}
@@ -612,7 +648,7 @@ export function Work({
                       try {
                         setCoTrouble(null);
                         onRaisedChange(
-                          raiseChange(baseline, changes, {
+                          raiseChange(baseline, stillToAgree.order ?? changes, {
                             id: `co-${Date.now()}`,
                             number: coNumber,
                             jobName: room.name,
@@ -750,7 +786,11 @@ export function Work({
               </div>
             )}
 
-            {!raisedChange && unsigned.length === 0 && (
+            {/* Only when the model actually answered. `stillToAgree.order` is
+                null when it refused, and an empty list read off a refusal would
+                put "nothing has moved" on the screen precisely when nobody
+                knows whether anything has. */}
+            {!raisedChange && stillToAgree.order?.unchanged && (
               <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-900">
                 Nothing has moved on this job that somebody has not signed for.
               </p>

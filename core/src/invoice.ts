@@ -320,9 +320,29 @@ export function invoiceOf(request: InvoiceRequest): Invoice {
         amount: change.difference,
       });
     }
+    // The mark-up on the change, on its own line, because the lines above it
+    // are the work before mark-up and `difference` is the work after it. Without
+    // this the column adds up to less than the figure being asked for -- and an
+    // invoice a client cannot add up is the one he does not pay.
+    if (doc.markup !== 0n) {
+      lines.push({
+        what: `Change ${doc.number}: mark-up`,
+        detail:
+          `The job mark-up on change order ${doc.number}. Agreed ` +
+          `${one.agreedAt.slice(0, 10)}, signed by ` +
+          `${one.signatures.map((s) => s.who).join(' and ')}.`,
+        amount: doc.markup,
+      });
+    }
   }
 
-  const notBilled = request.moved ? notYetAgreed(request.moved, request.agreedChanges) : [];
+  // Against what was LAST agreed, not against the baseline: an item a signed
+  // change order already moved can move again, and keying on the item alone
+  // meant the second move was never named and never billed. See
+  // `sinceLastAgreed` in `change.ts`.
+  const notBilled = request.moved
+    ? notYetAgreed(request.baseline, request.moved, request.agreedChanges)
+    : [];
 
   return {
     id: request.id,

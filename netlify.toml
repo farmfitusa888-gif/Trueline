@@ -1,9 +1,27 @@
-# Deploying the web shell.
+# The app, on Netlify — the second host, kept working on purpose.
 #
-# It is a static build with no backend: a scan is a file the browser reads, and
-# corrections are kept in that browser's own storage. So there is nothing to
-# provision, nothing to pay for, and no way for one person's house to reach
-# another's.
+# **Cloudflare Pages is where this is deployed.** `docs/the-browser-version.md`
+# has the whole of it, and the one fact that decided it: static hosting on Pages
+# is unmetered for bandwidth and requests, so a link that gets passed around a
+# trade group cannot produce a bill. Netlify's free plan is a credit budget that
+# runs out, and when it runs out the site stops.
+#
+# This file stays anyway, and that is not indecision. A second host that has
+# actually been checked is a way out if the first one's terms change, and it
+# costs nothing to keep: the headers and the one redirect live in
+# `web/public/_headers` and `web/public/_redirects`, which **both** hosts read
+# out of the published directory. What is below says the same things in
+# Netlify's own syntax so that the two never quietly disagree — Netlify's config
+# takes precedence over the files, so if you change one, change the other.
+#
+# `site/netlify.toml` is a different site from the same repository: the
+# marketing website, deployed separately with its own base directory. This one
+# publishes `web/dist`, which is the product.
+#
+# It is a static build with no backend: a scan is a file the browser reads, a
+# room can travel in a URL fragment that never reaches a server, and the work is
+# kept in that browser's own storage. So there is nothing to provision, nothing
+# to pay for, and no way for one person's house to reach another's.
 [build]
   base = "."
   command = "npm install && npm run build"
@@ -26,8 +44,12 @@
     # exception this page needs is reading a file the person chose themselves,
     # which is not a network request at all.
     Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    # A room can travel in the fragment of a URL, which is never sent to any
+    # server. This makes sure the rest of the address is not sent anywhere
+    # either.
     Referrer-Policy = "no-referrer"
     X-Content-Type-Options = "nosniff"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
 
 [[headers]]
   for = "/assets/*"

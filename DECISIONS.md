@@ -2287,3 +2287,85 @@ any part of `web/audit/*.mjs` reaches for, and reports the ones nothing drives.
 
 Its own two false-green holes were found and closed before it shipped, and
 `check-the-checks.py` watches it fire and go quiet on four real mutations.
+
+## What a change order is measured against, and what it carries
+
+**2026-08-28.** Three money questions were put to Sam together. Two of them were
+defects in the same arithmetic, found by driving the money screens rather than by
+reading them, and both under-billed the contractor silently.
+
+### 1. Compare against what was LAST agreed, not what was EVER agreed
+
+`notYetAgreed` keyed on the item and the unit alone, so the moment an item
+appeared on any signed change order it was treated as settled for ever.
+
+**Measured on this build.** With CO-1 signed for the floor going from 420 to 520
+sq ft and the standard rates then taken to $7.00, the Price screen showed
+$11,144.20 while the Work screen said *"Nothing has moved on this job that
+somebody has not signed for"* and the invoice went on billing $9,479.72. Nothing
+on any screen admitted the gap.
+
+> **Sam: "Compare against what was last agreed, not what was ever agreed."**
+
+`core/src/change.ts` gained `sinceLastAgreed(baseline, order, agreed)`, and
+`notYetAgreed` is now its `.changes`. Every item with a signed change order
+behind it is restated from where that change order left it; an item sitting
+exactly where it was left drops out, with nothing to report and nothing to raise.
+
+The second half of the same defect, which nobody had hit yet only because nobody
+had raised two change orders on one item: `changesSince` prices against the
+baseline, so a second change order on an item CO-1 already moved would have
+carried the *whole* move again — 420 to 600 rather than 520 to 600 — and
+`agreedDifference` would have added both. Under-billing turning into
+double-billing the moment the contractor did the right thing.
+
+### 2. A change order carries the job's mark-up
+
+The line-by-line difference is a **pre**-mark-up figure and `baseline.agreed.total`
+is a **post**-mark-up one, and `changesSince` added the first to the second.
+
+**Measured.** On a 5% book, taking the standard rates from $5 to $6 made a fresh
+quote **$1,588.82** dearer and the change order said **$1,513.16** — $75.66 under,
+on that one change, in the contractor's own paperwork and against himself.
+
+> **Sam: "Put the mark-up on the change too."**
+
+`ChangeOrder` and `ChangeDocument` gained `markup`, and `difference` is now taken
+as the difference between the two quoted **totals** rather than by re-applying a
+percentage — so the mark-up on a change is exactly the mark-up a fresh quote
+would have carried, same rounding, no second rounding of an already-rounded
+figure. It is its own row on the change-order document, its own line on the
+invoice, and its own line in the amber panel on the Work screen, because a total
+the column does not add up to is the number a client stops the job over.
+
+One thing fell out of it: a mark-up rate moved on its own changes the money and
+no line of work, so `unchanged` now means the lines **and** the total. Otherwise
+the one change a contractor makes deliberately is the one he could not raise a
+change order for.
+
+### 3. The same confirmation for one photograph as for many
+
+`Take it off` under a thumbnail went straight to the delete and said only *"1
+photograph deleted"*, while the same photograph taken off through `Pick several`
+was warned that a claim document already sent keeps the photographs that went
+with it. The consequence was identical; only one of the two paths said so.
+
+> **Sam: "Same confirmation for one as for many."**
+
+The one-tap path now goes through `plannedDeletion`, the same model the batch
+path uses.
+
+### How each of the three was proved
+
+Every one was watched failing before it was trusted, at both layers:
+
+| break | what went red |
+| --- | --- |
+| `difference = onLines` (mark-up back off the change) | `a55` 8 checks, naming $1,513.16 against the correct $1,588.82 |
+| `notYetAgreed` back to keying on the item alone | 2 model tests, and `a55`'s new section 8 — 3 checks, including *"an item a signed change order already moved can move again, and is named"* |
+| `onDrop` back to deleting on the tap | `a54` 3 checks and the part died at the confirmation that was no longer there |
+
+`web/audit/a55-jobmoney.mjs` grew a section 8 that raises the standard rates a
+second time — the twice-moved path had no audit at all, because CO-2 in that part
+is about the contractor's own open-span line, which no signed change order ever
+covered.

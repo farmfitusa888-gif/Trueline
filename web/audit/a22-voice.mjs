@@ -318,8 +318,25 @@ check('the sheet says the marks are on it too',
 await carried.getByRole('button', { name: 'Show' }).click();
 await page.waitForTimeout(200);
 const sheet = await carried.locator('pre').innerText();
+/*
+ * The heading, as `core/src/fieldlist.ts` writes it.
+ *
+ * It was `MARKED ON THESE WALLS` and became `MARKED IN THIS ROOM — N` when the
+ * ceiling became markable, because a mark on a ceiling is not on a wall. This
+ * part was not updated with it, so it went red on the heading and then read the
+ * two checks under it off `indexOf(...) === -1` -- `slice(-1)` is the last
+ * character of the sheet, which contains no quantity and passes for ever.
+ *
+ * Named once, here, so a third rename fails one check rather than silently
+ * turning two of them off.
+ */
+const MARKS_HEAD = 'MARKED IN THIS ROOM';
 check('the condition note is on the sheet somebody carries',
-  /MARKED ON THESE WALLS/.test(sheet), sheet.slice(0, 400));
+  new RegExp(`${MARKS_HEAD} — \\d+`).test(sheet), sheet.slice(0, 400));
+check('and the heading it is filed under is really on the sheet, not missing',
+  sheet.indexOf(MARKS_HEAD) >= 0 && sheet.indexOf('SAID ABOUT THESE WALLS') >= 0,
+  `${MARKS_HEAD} at ${sheet.indexOf(MARKS_HEAD)}, ` +
+    `SAID ABOUT THESE WALLS at ${sheet.indexOf('SAID ABOUT THESE WALLS')}`);
 check('with what it is and where, in the words that were typed',
   /wall-1 — rot/.test(sheet) && /sill plate is soft here/.test(sheet),
   sheet.slice(sheet.indexOf('MARKED'), sheet.indexOf('MARKED') + 400));
@@ -327,8 +344,8 @@ check('and what was said out loud about the wall',
   /SAID ABOUT THESE WALLS/.test(sheet) && /R-13 behind it/.test(sheet),
   sheet.slice(sheet.indexOf('SAID ABOUT'), sheet.indexOf('SAID ABOUT') + 400));
 check('and no quantity anywhere on it',
-  !/sq ft/.test(sheet.slice(sheet.indexOf('MARKED ON THESE WALLS'))),
-  sheet.slice(sheet.indexOf('MARKED ON THESE WALLS'), sheet.indexOf('MARKED ON THESE WALLS') + 500));
+  sheet.indexOf(MARKS_HEAD) >= 0 && !/sq ft/.test(sheet.slice(sheet.indexOf(MARKS_HEAD))),
+  sheet.slice(sheet.indexOf(MARKS_HEAD), sheet.indexOf(MARKS_HEAD) + 500));
 
 /* ========================================================================
    6. The same room, once it becomes a claim.

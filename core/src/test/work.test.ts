@@ -423,3 +423,63 @@ test('visits come back in the order they happen, and the next one is the next on
   assert.equal(next([later, VISIT()], '2026-10-01T00:00:00Z'), undefined);
   assert.equal(icsName('Gilbert kitchen'), 'Gilbert-kitchen.ics');
 });
+
+/* ------------------------------------ the mark-up, from the change to the bill */
+
+/**
+ * Sam: **"Put the mark-up on the change too."**
+ *
+ * The column has to add up to the figure being asked for. Before this, the
+ * change-order lines on an invoice were the work BEFORE mark-up while
+ * `invoice.agreed` was the contract AFTER it, so the two disagreed by exactly
+ * the mark-up on every change ever raised.
+ */
+test('an invoice with a change order on it adds up, mark-up and all', async () => {
+  const book: PriceBook = { ...BOOK, markupBasisPoints: 1500 };
+  const p = {
+    ...proposalOf(
+      'p9',
+      'Gilbert kitchen',
+      { ...EMPTY_COMPANY, name: 'Gilbert Remodeling' },
+      { ...NOBODY, name: 'M. Alvarez', address: '14 Sycamore' },
+      [optionFrom('a', 'As measured', 'The room as measured.', quote(SHEET, book))],
+      AT,
+      '2026-09-25'
+    ),
+    chosen: 'a',
+  };
+  const signature = await sign(p, {
+    id: 's9', who: 'M. Alvarez', role: 'client', intent: CLIENT_INTENT,
+    consented: true, mark: 'data:image/png;base64,iVBORw0KGgo=', at: AT, device: 'iPhone',
+  });
+  const baseline = await freeze(p, [signature], AT);
+
+  const grown = quote([{ ...SHEET[0]!, quantity: '520.0' }, SHEET[1]!], book);
+  const document = raiseChange(baseline, changesSince(baseline, grown), {
+    id: 'c9', number: 'CO-9', jobName: 'Gilbert kitchen',
+    company: EMPTY_COMPANY, client: { ...NOBODY, name: 'M. Alvarez' },
+    raisedAt: AT, because: 'The floor runs under the island.', extraDays: 1,
+  });
+  const changeSignature = await sign(document, {
+    id: 'x9', who: 'M. Alvarez', role: 'client', intent: CHANGE_CLIENT_INTENT,
+    consented: true, mark: 'data:image/png;base64,iVBORw0KGgo=', at: AT, device: 'iPhone',
+  });
+  const agreed = await agreeToChange(document, [changeSignature], AT);
+
+  const invoice = await invoiceOfVerified({
+    id: 'i9', number: '2026-099', stage: 'final',
+    company: EMPTY_COMPANY, client: { ...NOBODY, name: 'M. Alvarez' }, jobName: 'Gilbert kitchen',
+    baseline, agreedChanges: [agreed], moved: changesSince(baseline, grown),
+    alreadyBilled: 0n, issuedAt: AT,
+  });
+
+  // The agreement, the change, and the mark-up on the change: three lines.
+  assert.equal(invoice.lines.length, 3);
+  assert.equal(invoice.lines[2]!.what, 'Change CO-9: mark-up');
+  assert.equal(invoice.lines[2]!.amount, 13125n);
+  // What the client can check with a pencil.
+  assert.equal(invoice.lines.reduce((sum, one) => sum + one.amount, 0n), invoice.agreed);
+  assert.equal(invoice.agreed, grown.total);
+  // And nothing is left unbilled, because the change order covered all of it.
+  assert.equal(invoice.notBilled.length, 0);
+});

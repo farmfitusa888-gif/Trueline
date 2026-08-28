@@ -222,3 +222,40 @@ be looked at; and there are now two doors into freezing rather than one. Nothing
 was synthesised to preserve the old shape — a fake signature kept to hold an
 invariant would be the exact lie `countersign.ts` exists to prevent. The full
 table is in `DECISIONS.md`.
+
+## 2026-08-28 — a change order is measured against what was last agreed, and carries the mark-up
+
+Three money decisions from Sam, implemented together. The full record, with the
+measured figures, is in `DECISIONS.md` → *What a change order is measured
+against, and what it carries*.
+
+1. **`notYetAgreed` compared against what was EVER agreed.** Once an item was on
+   a signed change order it could never move again, so the Work screen said
+   nothing had moved while the Price screen showed a bigger number and the
+   invoice billed the old one. Now `core/src/change.ts` has
+   `sinceLastAgreed(baseline, order, agreed)`, everything on the Work screen
+   reads it, and the change order that gets raised is built from it.
+2. **A change order carried no mark-up**, and added a pre-mark-up figure to a
+   post-mark-up agreed total — $75.66 under on one change on a 5% book.
+   `ChangeOrder.markup` and `ChangeDocument.markup` now exist, on the document,
+   the invoice and the screen.
+3. **A one-tap damage-photo delete** now goes through `plannedDeletion`, so it
+   gets the same warning as the batch path.
+
+Also fixed on the way: `web/audit/a22-voice.mjs` was asserting the field-sheet
+heading `MARKED ON THESE WALLS`, which commit `196fa1a` renamed to `MARKED IN
+THIS ROOM — N` when the ceiling became markable. It had been red on that check,
+and the two checks under it were reading off `indexOf(...) === -1` — `slice(-1)`
+is the last character of the sheet, which contains no quantity and passes for
+ever. The heading is named once now, so a third rename fails one check rather
+than silently turning two of them off.
+
+### What was measured
+
+- `npm test` — 1290 pass, 0 fail. 13 new tests: 12 in `core/src/test/change.test.ts`,
+  1 in `core/src/test/work.test.ts`.
+- `npm run typecheck` — clean, both workspaces.
+- `a55-jobmoney` 83/83 (was 74), `a54-marks` 69/69 (was 65), `a22-voice` 76/76.
+- `check-reachable`, `check-doors`, `check-bridge`, `check-scan`,
+  `check-controls`, `check-collapse`, `check-tokens`, `check-art`,
+  `check-portable`, `check-guide`, `check-the-checks` — all clean.

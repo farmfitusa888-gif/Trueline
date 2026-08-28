@@ -511,12 +511,17 @@ export function DamagePhotos({
                   return next;
                 })
               }
-              onDrop={() =>
-                remove(
-                  [name],
-                  photos.filter((x) => x !== name)
-                )
-              }
+              // Through the model, exactly like the batch path, so taking one
+              // photograph off gets the same confirmation as taking five off.
+              //
+              // Sam, asked whether one should be quicker than many: **"Same
+              // confirmation for one as for many."** Measured on one mark with
+              // two photographs, both on the claim document: the batch path
+              // warned that a claim document already sent keeps the
+              // photographs that went with it, and this path said "1 photograph
+              // deleted" while the claim went from two to one with nobody told.
+              // The consequence is identical; only the sentence was missing.
+              onDrop={() => ask([name])}
             />
           ))}
         </ul>

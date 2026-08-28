@@ -1,4 +1,4 @@
-import { type Baseline, type Change, type ChangeOrder } from './baseline.ts';
+import { type Baseline, type Change, type ChangeKind, type ChangeOrder } from './baseline.ts';
 import { type Company } from './company.ts';
 import { type Cents, money } from './price.ts';
 import { type Party } from './proposal.ts';
@@ -87,7 +87,10 @@ export interface ChangeDocument {
   /** Why this is happening, in the contractor's own words. */
   readonly because: string;
   readonly changes: readonly Change[];
+  /** What it costs, mark-up and all. This is the figure that goes on a bill. */
   readonly difference: Cents;
+  /** The job's mark-up on this change, on its own line. See `ChangeOrder`. */
+  readonly markup: Cents;
   readonly wasTotal: Cents;
   readonly nowTotal: Cents;
   /** Days this adds to the finish date. Zero is an answer; blank is not. */
@@ -158,6 +161,7 @@ export function raiseChange(
     because: request.because.trim(),
     changes: order.changes,
     difference: order.difference,
+    markup: order.markup,
     wasTotal: order.wasTotal,
     nowTotal: order.nowTotal,
     extraDays: request.extraDays,
@@ -264,22 +268,183 @@ export function agreedDifference(
 const key = (line: { item: string; unit: string }) => `${line.item} ${line.unit}`;
 
 /**
+ * Where each item stood when it was last signed for.
+ *
+ * Newest last, so the map ends up holding the most recent signed position of
+ * every item rather than the first one. Ties keep the order the list arrived
+ * in, because `sort` is stable and two change orders agreed in the same
+ * millisecond have no other way to be told apart.
+ */
+function lastAgreedPositions(agreed: readonly AgreedChange[]): Map<string, Change> {
+  const position = new Map<string, Change>();
+  for (const one of [...agreed].sort((a, b) => Date.parse(a.agreedAt) - Date.parse(b.agreedAt))) {
+    for (const change of one.document.changes) position.set(key(change), change);
+  }
+  return position;
+}
+
+/**
+ * One item, restated from where the last signed change order left it.
+ *
+ * The kind is worked out again rather than carried over, because a line that
+ * grew from the baseline can have shrunk since the change order, and calling
+ * that "more" would be a sentence the contractor reads and disbelieves.
+ */
+function sinceItWasSignedFor(was: Change, now: Change): Change {
+  const gone = now.nowQuantity === '';
+  const back = was.nowQuantity === '';
+  const kind: ChangeKind = gone
+    ? 'removed'
+    : back
+      ? 'added'
+      : now.nowQuantity === was.nowQuantity
+        ? 'repriced'
+        : Number(now.nowQuantity) > Number(was.nowQuantity)
+          ? 'more'
+          : 'less';
+  return {
+    item: now.item,
+    unit: now.unit,
+    kind,
+    wasQuantity: was.nowQuantity,
+    wasTotal: was.nowTotal,
+    nowQuantity: now.nowQuantity,
+    nowTotal: now.nowTotal,
+    difference: now.nowTotal - was.nowTotal,
+    says: gone
+      ? `${now.item} comes off — ${was.nowQuantity} ${now.unit} at ${money(was.nowTotal)} was ` +
+        'signed for on a change order.'
+      : back
+        ? `${now.item} is back on — ${now.nowQuantity} ${now.unit} at ${money(now.nowTotal)}, ` +
+          'after a change order took it off.'
+        : `${now.item} has moved again since it was signed for — ${was.nowQuantity} ${now.unit} ` +
+          `at ${money(was.nowTotal)}, now ${now.nowQuantity} ${now.unit} at ${money(now.nowTotal)}.`,
+  };
+}
+
+/**
+ * The job as it stands, measured from what was LAST agreed rather than from the
+ * baseline.
+ *
+ * ## The defect this exists to close
+ *
+ * `notYetAgreed` used to key on item and unit alone: once an item appeared on
+ * any signed change order, it was treated as settled for ever. Measured on a
+ * real job — CO-1 signed for the floor going from 420 to 520 sq ft, then the
+ * rate book taken to $7.00 — the Price screen showed $11,144.20 while the Work
+ * screen said "Nothing has moved on this job that somebody has not signed for"
+ * and the invoice went on billing $9,479.72. The contractor was under-billing
+ * himself and no screen admitted it.
+ *
+ * The other half of the same defect: `changesSince` prices everything against
+ * the baseline, so a second change order raised on an item CO-1 already moved
+ * would have carried the WHOLE move again — 420 to 600 rather than 520 to 600 —
+ * and `agreedDifference` would have added both. Under-billing turning into
+ * double-billing the moment the contractor did the right thing and raised the
+ * amendment.
+ *
+ * Sam, asked which of the two an item should be compared against:
+ *
+ * > **"Compare against what was last agreed, not what was ever agreed."**
+ *
+ * So: every item that has a signed change order behind it is restated from
+ * where that change order left it, `wasTotal` becomes the contract total as it
+ * currently stands (baseline plus everything signed), and an item sitting
+ * exactly where the last change order put it drops out — there is nothing to
+ * report and nothing to raise.
+ *
+ * `agreedDifference` does the refusing: a change order signed against a
+ * different agreement, or the same one twice, throws here before any of it is
+ * priced. That is deliberate. Restating against a change order that belongs to
+ * another job is the one arithmetic in this file nobody would ever catch.
+ */
+export function sinceLastAgreed(
+  baseline: Baseline,
+  order: ChangeOrder,
+  agreed: readonly AgreedChange[]
+): ChangeOrder {
+  const settled = agreedDifference(baseline, agreed);
+  const position = lastAgreedPositions(agreed);
+  const changes: Change[] = [];
+  for (const change of order.changes) {
+    const was = position.get(key(change));
+    if (!was) {
+      changes.push(change);
+      continue;
+    }
+    // Exactly where the last signed change order left it: nothing has happened
+    // since, so there is nothing to say and nothing to raise.
+    if (was.nowQuantity === change.nowQuantity && was.nowTotal === change.nowTotal) continue;
+    changes.push(sinceItWasSignedFor(was, change));
+  }
+  // An item a change order moved can also have gone back to exactly what the
+  // baseline said, and `changesSince` reports that as no change at all --
+  // because against the baseline it is not one. Against the change order it is.
+  // A base a change order took off, put back in the room, would otherwise sit
+  // in the job billed at nothing and named nowhere.
+  const named = new Set(order.changes.map(key));
+  for (const [k, was] of position) {
+    if (named.has(k)) continue;
+    const line = baseline.agreed.lines.find((one) => key(one) === k);
+    const now: Change = {
+      item: line?.item ?? was.item,
+      unit: line?.unit ?? was.unit,
+      kind: 'repriced',
+      wasQuantity: '',
+      wasTotal: 0n,
+      nowQuantity: line?.quantity ?? '',
+      nowTotal: line?.total ?? 0n,
+      difference: 0n,
+      says: '',
+    };
+    if (was.nowQuantity === now.nowQuantity && was.nowTotal === now.nowTotal) continue;
+    changes.push(sinceItWasSignedFor(was, now));
+  }
+
+  // Largest first, the same order `changesSince` puts them in and for the same
+  // reason: this is read by somebody deciding whether to agree to it.
+  changes.sort((a, b) => {
+    const size = (one: Change) => (one.difference < 0n ? -one.difference : one.difference);
+    return size(b) > size(a) ? 1 : size(b) < size(a) ? -1 : 0;
+  });
+
+  const onLines = changes.reduce((sum, one) => sum + one.difference, 0n);
+  // What the whole move is worth, less what has already been signed for. Taken
+  // off the totals rather than off the lines so the job's mark-up comes with
+  // it, once: `order.difference` carries the mark-up on everything that has
+  // moved since the baseline, and `settled` carries the mark-up already on the
+  // signed change orders. What is left is the mark-up on this change alone.
+  const difference = order.difference - settled;
+  const wasTotal = order.wasTotal + settled;
+  return {
+    changes,
+    difference,
+    markup: difference - onLines,
+    wasTotal,
+    nowTotal: wasTotal + difference,
+    unchanged: changes.length === 0 && difference === 0n,
+    tampered: order.tampered,
+    tamperNote: order.tamperNote,
+  };
+}
+
+/**
  * What has moved on the job that nobody has signed for.
  *
  * The honest half of the rule. The invoice bills only what was agreed, and this
  * is what it did not bill — named, priced, and on the document, so the number
  * being lower than the contractor expected has a reason he can read rather than
  * being a figure he has to trust.
+ *
+ * Priced from the last signed change order, not from the baseline, so the
+ * figure beside it is what is genuinely still unbilled. See `sinceLastAgreed`.
  */
 export function notYetAgreed(
+  baseline: Baseline,
   order: ChangeOrder,
   agreed: readonly AgreedChange[]
 ): readonly Change[] {
-  const signed = new Set<string>();
-  for (const one of agreed) {
-    for (const change of one.document.changes) signed.add(key(change));
-  }
-  return order.changes.filter((change) => !signed.has(key(change)));
+  return sinceLastAgreed(baseline, order, agreed).changes;
 }
 
 /**
@@ -296,6 +461,12 @@ export function describeChangeDocument(document: ChangeDocument): string[] {
     `Change order ${document.number} on ${document.jobName}, raised ${document.raisedAt.slice(0, 10)}.`,
     `Why: ${document.because}`,
     ...document.changes.map((change) => `• ${change.says}`),
+    // The mark-up said out loud, the same way the proposal says it. A figure
+    // on an amendment that the lines above do not add up to is the figure a
+    // client stops the job over.
+    ...(document.markup === 0n
+      ? []
+      : [`• Mark-up on this change: ${money(document.markup)}.`]),
     document.difference === 0n
       ? 'This costs nothing either way.'
       : `${money(size)} ${direction}. Agreed at ${money(document.wasTotal)}, ` +

@@ -134,8 +134,9 @@ export function Welcome() {
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
         Trueline asks the browser to exempt this site and tells you what it answered. A browser can
         say no, and a yes is a rule it keeps rather than a promise it made. So the moment you have
-        done any real work in a room, <strong>save the job file</strong> — the app will keep asking
-        until you have. A file on your own disk is the only copy nothing can take back.
+        done any real work in a room, <strong>save the job file</strong> — the button under every
+        room says <em>Write the job to a file</em>, and the app will keep asking until you have
+        pressed it. A file on your own disk is the only copy nothing can take back.
       </p>
 
       <div className="mt-5 border-t border-slate-200 pt-4">

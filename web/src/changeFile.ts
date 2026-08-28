@@ -60,7 +60,23 @@ export function changeFile({ document, agreed, at }: ChangeFileParts): string {
         }${safe(money(change.difference < 0n ? -change.difference : change.difference))}</td>
       </tr>`
     )
-    .join('');
+    .join('') +
+    // The job's mark-up, as its own row. The rows above are the work before
+    // mark-up and `document.difference` below is the work after it, so without
+    // this the client adds the column up and gets a smaller number than the one
+    // he is being asked to sign. See `ChangeOrder.markup` in `core/src`.
+    (document.markup === 0n
+      ? ''
+      : `
+      <tr>
+        <td>Mark-up</td>
+        <td>The job mark-up on this change</td>
+        <td class="n">—</td>
+        <td class="n">—</td>
+        <td class="n b ${document.markup < 0n ? 'down' : 'up'}">${
+          document.markup < 0n ? '−' : '+'
+        }${safe(money(document.markup < 0n ? -document.markup : document.markup))}</td>
+      </tr>`);
 
   const size = document.difference < 0n ? -document.difference : document.difference;
   const signed = agreed

@@ -405,9 +405,45 @@ check('closing it puts the phone back, and takes nothing off the mark',
   && JSON.stringify(await onTheMark()) === JSON.stringify(before),
   (await onTheMark()).join(', '));
 
-// The middle one off. By position in the strip, which is the only thing a thumb
-// has to go on, and checked by NAME, which is the only thing that proves it.
+/*
+ * The middle one off. By position in the strip, which is the only thing a thumb
+ * has to go on, and checked by NAME, which is the only thing that proves it.
+ *
+ * Through the confirmation, because there is now one. This path used to delete
+ * on the tap and say only "1 photograph deleted", while the same photograph
+ * taken off through `Pick several` was warned about: it named the claim
+ * document that had already gone out and keeps the photographs that went with
+ * it. The consequence was identical and only one of the two paths said so.
+ *
+ * Sam, asked whether one should be quicker than many: **"Same confirmation for
+ * one as for many."**
+ */
 await plan.getByRole('button', { name: 'Take it off' }).nth(1).click();
+await page.waitForTimeout(400);
+
+const warning = plan.getByRole('alertdialog', { name: 'Before these photographs go' });
+check('taking ONE off asks first, the same way taking several off does',
+  (await warning.count()) === 1,
+  'one photograph went on the tap, with no confirmation and no warning');
+const warned = (await warning.count()) === 1 ? await warning.innerText() : '';
+check('and the warning names the one photograph, and what stays',
+  /Delete 1 photograph\./.test(warned) && /2 photographs stay on this mark\./.test(warned),
+  warned.slice(0, 400));
+check('and it says the claim document already carries it, which is the whole point',
+  /claim document|archive/i.test(warned), warned.slice(0, 400));
+
+// Backing out has to leave the mark exactly as it was, or the confirmation is
+// worse than none: it would be a question whose answers both delete.
+await plan.getByRole('button', { name: 'Keep them' }).click();
+await page.waitForTimeout(400);
+check('backing out of it takes nothing off',
+  (await plan.getByRole('alertdialog', { name: 'Before these photographs go' }).count()) === 0
+  && JSON.stringify(await onTheMark()) === JSON.stringify(before),
+  (await onTheMark()).join(', '));
+
+await plan.getByRole('button', { name: 'Take it off' }).nth(1).click();
+await page.waitForTimeout(400);
+await plan.getByRole('button', { name: 'Delete them' }).click();
 await page.waitForTimeout(700);
 const after = await onTheMark();
 

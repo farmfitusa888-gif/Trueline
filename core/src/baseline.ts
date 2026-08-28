@@ -592,7 +592,35 @@ export interface Change {
 
 export interface ChangeOrder {
   readonly changes: readonly Change[];
+  /**
+   * What the change costs, mark-up and all.
+   *
+   * `changes` are the lines and the lines are before mark-up, exactly as they
+   * are on the quote. This is the figure the contract moves by, and it is the
+   * one that goes on the invoice.
+   */
   readonly difference: Cents;
+  /**
+   * The job's mark-up on this change, on its own line.
+   *
+   * ## Sam, asked whether a change order carries the job's mark-up
+   *
+   * > **"Put the mark-up on the change too."**
+   *
+   * It did not, and the arithmetic was worse than just leaving it off: the
+   * line-by-line difference is a PRE-mark-up figure and `baseline.agreed.total`
+   * is a POST-mark-up one, and this added the first to the second. On a 15%
+   * book, taking the rates from $5 to $6 made a fresh quote $1,588.82 dearer
+   * and the change order said $1,513.16 -- so the invoice billed $75.66 under
+   * on that one job, on every change, for ever, in the contractor's own
+   * paperwork and against himself.
+   *
+   * Kept as its own field rather than folded into the lines because it is its
+   * own line on the document. A client reading a change order can see the work
+   * and can see the mark-up, which is the same thing the original proposal
+   * showed him.
+   */
+  readonly markup: Cents;
   readonly wasTotal: Cents;
   readonly nowTotal: Cents;
   /** True when nothing has moved since it was signed. */
@@ -685,13 +713,24 @@ export function changesSince(baseline: Baseline, now: Quote): ChangeOrder {
     return size(b) > size(a) ? 1 : size(b) < size(a) ? -1 : 0;
   });
 
-  const difference = changes.reduce((sum, c) => sum + c.difference, 0n);
+  const onLines = changes.reduce((sum, c) => sum + c.difference, 0n);
+  // Taken as the difference between the two totals rather than by re-applying a
+  // percentage, so the mark-up on a change is EXACTLY the mark-up a fresh quote
+  // would have carried -- same rounding, same half-away-from-zero, no second
+  // rounding of an already-rounded figure. Unchanged lines cancel out of both
+  // subtotals, so what is left here is the mark-up and nothing else.
+  const difference = now.total - baseline.agreed.total;
   return {
     changes,
     difference,
+    markup: difference - onLines,
     wasTotal: baseline.agreed.total,
     nowTotal: baseline.agreed.total + difference,
-    unchanged: changes.length === 0,
+    // A mark-up rate moved on its own changes no line and still changes the
+    // money, so "nothing has changed" has to mean the total as well as the
+    // lines -- otherwise the one change a contractor makes deliberately is the
+    // one he cannot raise a change order for.
+    unchanged: changes.length === 0 && difference === 0n,
     tampered: false,
     tamperNote: '',
   };
@@ -782,6 +821,15 @@ export function describeChanges(order: ChangeOrder): string {
   const count = order.changes.length;
   const direction = order.difference > 0n ? 'more' : order.difference < 0n ? 'less' : 'no change';
   const amount = order.difference < 0n ? -order.difference : order.difference;
+  // No line moved and the money did: the mark-up rate itself was changed. It is
+  // its own sentence, because "0 changes since signing, $412.50 more" reads
+  // like a fault in the app rather than like something somebody did on purpose.
+  if (count === 0) {
+    return (
+      `No work has changed since signing, and the mark-up has \u2014 ${money(amount)} ` +
+      `${direction}. Signed at ${money(order.wasTotal)}, now ${money(order.nowTotal)}.`
+    );
+  }
   return (
     `${count} change${count === 1 ? '' : 's'} since signing \u2014 ` +
     (order.difference === 0n

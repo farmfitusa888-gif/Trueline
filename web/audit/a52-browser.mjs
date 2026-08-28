@@ -758,6 +758,13 @@ check('every paid feature is either on a screen this part drives, or excused by 
 check('and nothing free has been left in the paid list by mistake',
   PAID.every((f) => !FREE.includes(f)), PAID.filter((f) => FREE.includes(f)).join(', '));
 
+/** Types a code into the box, or does nothing when there is no box. */
+async function fill(page, code) {
+  const box = page.getByRole('textbox', { name: 'The code from the phone' });
+  if ((await box.count()) === 0) return;
+  await box.first().fill(code);
+}
+
 /** A browser with nothing in it: no code, no rooms, no history. */
 async function openFree() {
   const browser = await openChromium();
@@ -838,7 +845,12 @@ async function openFree() {
   const codeBox = page.locator('[data-unlock="off"]').first();
   check('a browser with no code is offered somewhere to paste one',
     (await codeBox.count()) === 1);
-  const offer = (await codeBox.count()) === 1 ? await codeBox.innerText() : '';
+  // Never `innerText` on a locator that may find nothing: it throws, and a part
+  // that throws reports nothing at all. With a `checkUnlockCode` that accepted
+  // anything, the box vanished on the first press and this part died instead of
+  // going red on the three checks that exist to catch exactly that.
+  const said_ = async () => ((await codeBox.count()) === 1 ? codeBox.innerText() : '');
+  const offer = await said_();
   check('and it is honest about what the code is: a courtesy lock, not security',
     /courtesy lock, not a security/.test(offer), offer.slice(0, 600));
   check('and says it can be forwarded and worked out',
@@ -852,23 +864,23 @@ async function openFree() {
 
   /* ------------------------------------------- a code that is not a code */
 
-  await page.getByRole('button', { name: 'Unlock this browser' }).click();
+  await press(page.getByRole('button', { name: 'Unlock this browser' }));
   await page.waitForTimeout(300);
-  let refused = await codeBox.innerText();
+  let refused = await said_();
   check('an empty box is refused, and says what it wants',
     /nothing in the box/.test(refused) && /starts TL-/.test(refused), refused.slice(0, 600));
 
-  await page.getByRole('textbox', { name: 'The code from the phone' }).fill('TL-XXXX');
-  await page.getByRole('button', { name: 'Unlock this browser' }).click();
+  await fill(page, 'TL-XXXX');
+  await press(page.getByRole('button', { name: 'Unlock this browser' }));
   await page.waitForTimeout(300);
-  refused = await codeBox.innerText();
+  refused = await said_();
   check('a code that is too short is refused, and counted rather than waved at',
     /characters long and a code is 16/.test(refused), refused.slice(0, 600));
 
-  await page.getByRole('textbox', { name: 'The code from the phone' }).fill('TL-EHS7-EW4Z-Y733-7FWY');
-  await page.getByRole('button', { name: 'Unlock this browser' }).click();
+  await fill(page, 'TL-EHS7-EW4Z-Y733-7FWY');
+  await press(page.getByRole('button', { name: 'Unlock this browser' }));
   await page.waitForTimeout(300);
-  refused = await codeBox.innerText();
+  refused = await said_();
   check('a code with one character wrong is refused, and says to check it',
     /not a code this app made/.test(refused), refused.slice(0, 600));
 
@@ -878,8 +890,8 @@ async function openFree() {
   // Measured from where a person pressing the button is actually looking: the
   // button scrolled to, pressed, and the refusal appearing under it. Measuring
   // from the top of a page nobody is at would prove nothing either way.
-  await page.getByRole('button', { name: 'Unlock this browser' })
-    .scrollIntoViewIfNeeded();
+  const presser = page.getByRole('button', { name: 'Unlock this browser' });
+  if ((await presser.count()) > 0) await presser.first().scrollIntoViewIfNeeded();
   await page.waitForTimeout(200);
   const box = (await alert.count()) === 1 ? await alert.first().boundingBox() : null;
   check('and it is on the screen at a phone height',
@@ -894,9 +906,8 @@ async function openFree() {
   // Written out rather than computed from `makeUnlockCode`, so that changing how
   // a code is made turns this red instead of quietly agreeing with itself. It is
   // `makeUnlockCode('sam')`, and it is the same one `lib.mjs` uses.
-  await page.getByRole('textbox', { name: 'The code from the phone' })
-    .fill('TL-EHS7-EW4Z-Y733-7FWX');
-  await page.getByRole('button', { name: 'Unlock this browser' }).click();
+  await fill(page, 'TL-EHS7-EW4Z-Y733-7FWX');
+  await press(page.getByRole('button', { name: 'Unlock this browser' }));
   await page.waitForTimeout(600);
 
   check('a code from the phone unlocks the browser',
@@ -937,7 +948,7 @@ async function openFree() {
   check('and the screen says the code can be cleared with everything else',
     /can be cleared along with/.test(held), held.slice(0, 500));
 
-  await page.getByRole('button', { name: 'Forget the code' }).click();
+  await press(page.getByRole('button', { name: 'Forget the code' }));
   await page.waitForTimeout(500);
   check('and it can be taken off again',
     (await page.locator('[data-unlock="off"]').count()) === 1);
