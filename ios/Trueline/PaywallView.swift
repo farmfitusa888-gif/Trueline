@@ -105,7 +105,7 @@ struct PaywallView: View {
                         Text(
                             "Scanning, walking a room, the plan, the 3D view, correcting "
                             + "anything on it, and the room's dimensions. Up to "
-                            + "\(Entitlement.freeRooms) rooms kept. No account, no card."
+                            + "\(Entitlement.roomsKept()) kept. No account, no card."
                         )
                         .font(.footnote)
                         .foregroundStyle(.secondary)

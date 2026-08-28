@@ -1,10 +1,11 @@
 # Getting the current build onto your phone, and what to test on it
 
-Everything below has been run and passes on this machine: 589 tests, both
+Everything below has been run and passes on this machine: 1,147 tests, both
 typechecks, the web build, and every screen driven end to end in a real
-browser. **None of it has been run on a phone since the plan was
-un-mirrored, and no Swift in this repository has ever been compiled** — Xcode
-is the first compiler the iOS half will meet. That is what this page is for.
+browser at 430x800 — a phone's window, not a desktop one. **None of it has
+been run on a phone, and no Swift in this repository has ever been
+compiled** — Xcode is the first compiler the iOS half will meet. That is
+what this page is for.
 
 ---
 

@@ -37,6 +37,25 @@ enum Entitlement {
     /// How many rooms are kept without a subscription.
     static let freeRooms = 1
 
+    /// That count, as a sentence somebody can read.
+    ///
+    /// The paywall interpolated the bare count into a sentence that had already
+    /// been written plural, so with the free tier at one it read as a digit
+    /// followed by a plural noun — on the one screen in the app that asks for
+    /// money, to exactly the audience being asked. `core/src/entitlement.ts`
+    /// had already solved this with `inWords`; the Swift half had no
+    /// equivalent, which is how a number reached a sentence with nothing
+    /// between them.
+    ///
+    /// Small numbers go in words, the way a person says them. Above six a digit
+    /// is what somebody reads more easily, which is the same line the
+    /// TypeScript draws.
+    static func roomsKept(_ count: Int = freeRooms) -> String {
+        let counted = ["no", "one", "two", "three", "four", "five", "six"]
+        let said = count >= 0 && count < counted.count ? counted[count] : String(count)
+        return "\(said) \(count == 1 ? "room" : "rooms")"
+    }
+
     static func isFree(_ feature: Feature) -> Bool { free.contains(feature) }
 
     static func allowed(_ feature: Feature, subscribed: Bool) -> Bool {
