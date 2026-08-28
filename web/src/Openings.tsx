@@ -176,6 +176,21 @@ export function Openings({
               <button
                 type="button"
                 onClick={() => setOpen(showing ? null : o.id)}
+                /* This row was already a disclosure and already had its way
+                   back — the same row shuts it, which is the pattern the rest
+                   of the app has now been brought round to. What it did not
+                   have was any way of SAYING so: no `aria-expanded`, so
+                   anybody listening rather than looking was told about a
+                   button with nothing behind it. That is the exact state the
+                   damage mark's row was in when Sam reported he could not
+                   attach a photograph to a mark.
+                   The words on it are deliberately left as they were.
+                   "Measure" is what this row opens and `a2-edits.mjs` finds it
+                   by that word; renaming it to Open would break the one part
+                   of the audit that proves an opening can be corrected at
+                   all. */
+                aria-expanded={showing}
+                aria-controls={`opening-${o.id}`}
                 className="flex min-h-11 w-full items-baseline justify-between gap-3 text-left"
               >
                 <span className="text-slate-800">
@@ -193,7 +208,10 @@ export function Openings({
               </button>
 
               {showing && (
-                <div className="mt-1 divide-y divide-sky-100 rounded-md bg-white/60 px-3">
+                <div
+                  id={`opening-${o.id}`}
+                  className="mt-1 divide-y divide-sky-100 rounded-md bg-white/60 px-3"
+                >
                   <Row
                     label="Width"
                     of={`${o.kind} "${o.id}"`}

@@ -68,9 +68,13 @@ export interface FieldListLine {
   readonly why: string;
 }
 
-/** One thing marked on a wall, as it reads on paper. */
+/** One thing marked in the room, as it reads on paper. */
 export interface FieldListMark {
   readonly markId: string;
+  /**
+   * The wall it is on, or `the ceiling` — the surface a person reads it
+   * standing at. A ceiling mark has no wall and is given no fake one.
+   */
   readonly wallId: string;
   /** "rot", "water damage" — the word, not a code. */
   readonly what: string;
@@ -182,7 +186,7 @@ export function fieldList(
       : [
           '',
           RULE,
-          `MARKED ON THESE WALLS — ${marks.length}`,
+          `MARKED IN THIS ROOM — ${marks.length}`,
           'What somebody found standing here. None of it is in the takeoff:',
           'noticing something is not the same as being paid to fix it.',
           RULE,
@@ -250,16 +254,40 @@ function markedOn(
   const onAWall = marks.filter(
     (mark) => mark.shape.wallId !== undefined && order.has(mark.shape.wallId)
   );
+  // And then the ceiling's, which have no place in the wall order because they
+  // have no place at all -- a ceiling has no corner to hook a tape in, so a
+  // mark on it says how much of the ceiling and never where on it. See the
+  // note at the top of `damage.ts`.
+  //
+  // They were missing entirely, and this is the one sheet where that costs
+  // something: on a claim a ceiling mark is on the claim document and on the
+  // scope, but on an ordinary remodel the field sheet is the ONLY place a
+  // condition note goes, so a note about the ceiling went nowhere at all.
+  //
+  // Last rather than interleaved, because somebody walking a room reads the
+  // walls standing at each one, and then looks up.
+  const onTheCeiling = marks.filter(
+    (mark) =>
+      (mark.shape.kind === 'surface' && mark.shape.surface === 'ceiling') ||
+      (mark.shape.kind === 'pin' && mark.shape.on === 'ceiling')
+  );
 
-  return onAWall
-    .slice()
-    .sort((a, b) => {
-      const at = (mark: Mark) => order.get(mark.shape.wallId!)!;
-      return at(a) === at(b) ? a.id.localeCompare(b.id) : at(a) - at(b);
-    })
+  const ceilingSaysSo = (mark: Mark) =>
+    (mark.shape.kind === 'surface' && mark.shape.surface === 'ceiling') ||
+    (mark.shape.kind === 'pin' && mark.shape.on === 'ceiling');
+
+  return [
+    ...onAWall
+      .slice()
+      .sort((a, b) => {
+        const at = (mark: Mark) => order.get(mark.shape.wallId!)!;
+        return at(a) === at(b) ? a.id.localeCompare(b.id) : at(a) - at(b);
+      }),
+    ...onTheCeiling.slice().sort((a, b) => a.id.localeCompare(b.id)),
+  ]
     .map((mark) => ({
       markId: mark.id,
-      wallId: mark.shape.wallId!,
+      wallId: ceilingSaysSo(mark) ? 'the ceiling' : mark.shape.wallId!,
       what: markWord(mark.kind),
       // The workings, which say where along the wall and how high — and never
       // an area. `damageQuantity` is asked rather than the geometry re-derived

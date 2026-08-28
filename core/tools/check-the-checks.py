@@ -908,44 +908,64 @@ def controls(bench: Bench) -> None:
     #    into it, still proves the rename survives a reload — and no longer
     #    proves anybody could find the box. That is the paywall's exact state:
     #    working, tested, and unreachable as far as any evidence goes.
+    #
+    #    Two parts name it now, not one -- `a39-collapse.mjs` reaches for the
+    #    same box when it proves the rename row folds. So the mutation has to
+    #    take the name out of BOTH, or the check is right to stay quiet and this
+    #    assertion is the thing that is wrong. Coverage growing is the good
+    #    outcome; a mutation that no longer isolates is stale, not a failure.
     named = '`What to call this wall`'
     rel = 'web/audit/a6-persist.mjs'
+    also = 'web/audit/a39-collapse.mjs'
 
     code, out = bench.run('check-controls.py')
     expect('the rename box is driven by name as the repository stands',
            code, out, fires=True, notSaying=named)
 
+    #    The stand-in has to match NOTHING: `check-controls.py` reads a regex
+    #    locator as well as a literal one, so a looser pattern over the same
+    #    words would still count as driving it and the mutation would prove
+    #    nothing.
+    bench.write(also, bench.read(also).replace(
+        "{ name: 'What to call this wall' }", "{ name: 'a box by no name' }"))
     bench.write(rel, bench.read(rel).replace(
         "getByRole('textbox', { name: 'What to call this wall' })",
         "getByRole('textbox').first()"))
     code, out = bench.run('check-controls.py')
-    expect('the one part that named it reaching for it positionally instead',
+    expect('both parts that named it reaching for it another way instead',
            code, out, fires=True, saying=named)
     bench.restore(rel)
+    bench.restore(also)
 
     code, out = bench.run('check-controls.py')
     expect('and quiet about it again once the name is back', code, out,
            fires=True, notSaying=named)
 
-    # 2. A whole part deleted. `a31-mark.mjs` is the only script that drives
-    #    the control that puts a mark on a wall, and the mark button is the one
-    #    Sam reported as dead. Losing the part loses the only evidence anybody
-    #    can reach it.
+    # 2. Whole parts deleted. The mark button is the one Sam reported as dead,
+    #    and the control's name is built as `Mark a spot on ${wall.id}`, so what
+    #    drives it is anything naming something that starts `Mark a spot on `.
+    #    Two parts do: `a31-mark.mjs`, and `a40-ceiling.mjs` through the
+    #    ceiling's own `Mark a spot on the ceiling` -- which begins with the
+    #    same head and therefore counts, generously and on purpose.
+    #
+    #    Both go, or the check is right to stay quiet.
     mark = '`Mark a spot on`'
-    part = 'web/audit/a31-mark.mjs'
+    parts = ['web/audit/a31-mark.mjs', 'web/audit/a40-ceiling.mjs']
 
     code, out = bench.run('check-controls.py')
     expect('the mark controls are driven as the repository stands',
            code, out, fires=True, notSaying=mark)
 
-    (bench.where / part).unlink()
+    for part in parts:
+        (bench.where / part).unlink()
     code, out = bench.run('check-controls.py')
-    expect('the only part that drives the mark controls, deleted', code, out,
+    expect('every part that drives the mark controls, deleted', code, out,
            fires=True, saying=mark)
-    bench.restore(part)
+    for part in parts:
+        bench.restore(part)
 
     code, out = bench.run('check-controls.py')
-    expect('and quiet about them again once the part is back', code, out,
+    expect('and quiet about them again once the parts are back', code, out,
            fires=True, notSaying=mark)
 
     # 3. An excuse with no argument behind it. `controls-on-purpose.json` is
@@ -973,6 +993,107 @@ def controls(bench: Bench) -> None:
     expect('an excuse for a control the audit drives anyway', code, out,
            fires=True, saying='the excuse is spent')
     bench.restore(rel)
+
+
+# ------------------------------------------------------------------ collapse
+
+def collapse(bench: Bench) -> None:
+    """A block a control opens that nothing on the screen shuts again.
+
+    Sam: "WHEN YOU DROPDOWN ANY MENU, HAVE A WAY TO COLLAPSE THEM BACK." Six
+    blocks opened together the moment "Change this wall" was tapped, the claim
+    put fourteen boxes on the screen at once, and the rate book carried an
+    eight-box form whether or not anybody was inventing an item. None of them
+    folded.
+
+    Six mutations, and every one of them is the undoing of a real fix. The
+    first two are the wall panel's own way out, taken away and then made
+    invisible; the third is the shape where a block folds only when the work
+    lands, so a refusal leaves somebody holding a panel they cannot put down;
+    the fourth is the opening row that opens and never shuts; the last two are
+    the excuse file, which has to be as hard to satisfy as the check itself.
+
+    The quiet state here IS silence -- `check-collapse.py` is green on the
+    repository as it stands -- so an exit code answers each one.
+    """
+    print('check-collapse.py — a block that opens and will not fold back')
+
+    code, out = bench.run('check-collapse.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    # 1. The Done that shuts the wall panel, doing nothing instead.
+    rel = 'web/src/Edit.tsx'
+    bench.write(rel, bench.read(rel).replace(
+        'onClick={() => setOpen(false)}', 'onClick={() => setName(name)}'))
+    code, out = bench.run('check-collapse.py')
+    expect('the way out of "Change this wall" taken away', code, out,
+           fires=True, saying='nothing sets it back')
+    bench.restore(rel)
+
+    # 2. The same way out, on a <div>: it works, and nothing says it is there.
+    bench.write(rel, bench.read(rel).replace(
+        '''        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="min-h-11 shrink-0 text-sm text-slate-500 underline underline-offset-4"
+        >
+          Done
+        </button>''',
+        '''        <div
+          onClick={() => setOpen(false)}
+          className="min-h-11 shrink-0 text-sm text-slate-500 underline underline-offset-4"
+        >
+          Done
+        </div>'''))
+    code, out = bench.run('check-collapse.py')
+    expect('that same way out turned into a div nothing announces', code, out,
+           fires=True, saying='which nothing says is pressable')
+    bench.restore(rel)
+
+    # 3. Folded by the work landing rather than by anybody pressing anything,
+    #    which is the state a refused save leaves somebody in.
+    rel = 'web/src/Scope.tsx'
+    was = bench.read(rel).replace(
+        '  const [editing, setEditing] = useState(false);',
+        '  const [editing, setEditing] = useState(false);\n'
+        '  function finish() { setEditing(false); }')
+    bench.write(rel, was.replace('onClick={() => setEditing(false)}', 'onClick={finish}'))
+    code, out = bench.run('check-collapse.py')
+    expect('the restoration rate sheet folding only inside a function', code, out,
+           fires=True, saying='Folded only by the work landing')
+    bench.restore(rel)
+
+    # 4. The row that opens a door's sizes, with the toggle taken out of it.
+    rel = 'web/src/Openings.tsx'
+    bench.write(rel, bench.read(rel).replace(
+        'setOpen(showing ? null : o.id)', 'setOpen(o.id)'))
+    code, out = bench.run('check-collapse.py')
+    expect('an opening row that opens and never shuts again', code, out,
+           fires=True, saying='nothing sets it back')
+    bench.restore(rel)
+
+    # 5. An excuse with no argument behind it.
+    rel = 'core/tools/collapse-on-purpose.json'
+    was = bench.read(rel)
+    bench.write(rel, was.rstrip().rstrip('}').rstrip()
+                + ',\n  "web/src/Edit.tsx: open": "we might need it"\n}\n')
+    code, out = bench.run('check-collapse.py')
+    expect('a block excused with four words instead of a reason', code, out,
+           fires=True, saying='too thin to be one')
+    bench.restore(rel)
+
+    # 6. A real reason, on a block that is not there any more.
+    bench.write(rel, was.rstrip().rstrip('}').rstrip()
+                + ',\n  "web/src/Nowhere.tsx: ghost": "A long and entirely '
+                  'respectable sentence, written by somebody willing to sign it, '
+                  'about a block that no longer exists anywhere in web/src."\n}\n')
+    code, out = bench.run('check-collapse.py')
+    expect('an excuse for a block nothing in web/src draws', code, out,
+           fires=True, saying='delete the entry')
+    bench.restore(rel)
+
+    code, out = bench.run('check-collapse.py')
+    expect('and quiet again once every one of them is put back', code, out, fires=False)
 
 
 # ------------------------------------------------------------------ only once
@@ -1092,6 +1213,8 @@ def main() -> int:
         bridge(bench)
         print()
         controls(bench)
+        print()
+        collapse(bench)
         print()
         pbxproj(bench)
         print()

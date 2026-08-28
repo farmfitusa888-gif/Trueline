@@ -881,6 +881,25 @@ export function App() {
                 <CeilingPanel
                   room={loaded.room}
                   onClose={() => dispatch({ type: 'select', wallId: null })}
+                  /* What is wrong with the ceiling, photographed and talked at.
+                     The same handlers the wall panel is given, because a mark
+                     on a ceiling is the same record as a mark on a wall and
+                     goes through the same five actions. */
+                  marks={{
+                    damages: loaded.damages,
+                    voice: loaded.voice,
+                    onClaim: loaded.claim.on,
+                    scanName: loaded.fileName,
+                    onMark: (damage) => dispatch({ type: 'mark', damage }),
+                    onUnmark: (damageId) => dispatch({ type: 'unmark', damageId }),
+                    onCutTo: (damageId, text) => dispatch({ type: 'cutTo', damageId, text }),
+                    onReading: (damageId, reading) =>
+                      dispatch({ type: 'reading', damageId, reading }),
+                    onPhotos: (damageId, photos) =>
+                      dispatch({ type: 'damagePhotos', damageId, photos }),
+                    onNote: (note) => dispatch({ type: 'voice', note }),
+                    onForget: (noteId) => dispatch({ type: 'unvoice', noteId }),
+                  }}
                 >
                   <WorkOnSurface {...workProps} surface={CEILING} />
                 </CeilingPanel>

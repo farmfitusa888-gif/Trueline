@@ -14,6 +14,7 @@ import {
 } from '../../core/src/work.ts';
 import { STALE_DAYS, ageInDays, howOld } from '../../core/src/vendor.ts';
 import { Catalogue } from './Vendor.tsx';
+import { Disclosure } from './Disclosure.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -354,148 +355,163 @@ function OwnItems() {
 
   return (
     <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <h3 className="text-sm font-semibold text-slate-900">Your own items</h3>
-      <p className="mt-1 text-xs leading-relaxed text-slate-600">
-        Anything you charge for that is not on the list above. Say where its quantity comes from
-        and it can be ticked on a wall, on the floor or on the ceiling — and it moves when you put
-        a tape on that wall. Everything you add here is offered on every job from now on.
-      </p>
+      {/* Sam: "WHEN YOU DROPDOWN ANY MENU, HAVE A WAY TO COLLAPSE THEM BACK."
+          Five boxes, a dropdown and a button, open on the rate book for ever
+          whether or not anybody was inventing an item — under eleven rates
+          that are what somebody actually came here to change. The heading
+          still is one, so the shape of the page has not moved and the parts of
+          the audit that reach this section through it still land. */}
+      <Disclosure
+        heading="h3"
+        title="Your own items"
+        summary={
+          mine.length === 0
+            ? 'Nothing of your own yet — open it to add what you charge for'
+            : `${mine.length} of your own — open it to add another`
+        }
+      >
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+          Anything you charge for that is not on the list above. Say where its quantity comes from
+          and it can be ticked on a wall, on the floor or on the ceiling — and it moves when you put
+          a tape on that wall. Everything you add here is offered on every job from now on.
+        </p>
 
-      {mine.length > 0 && (
-        <ul className="mt-3 divide-y divide-slate-200">
-          {mine.map((rate) => (
-            <li
-              key={`${rate.item}|${rate.unit}`}
-              className="flex items-baseline justify-between gap-3 py-2"
-            >
-              <span className="min-w-0">
-                <span className="block text-sm text-slate-800">{rate.item}</span>
-                <span className="block text-xs text-slate-500">
-                  {rateLabel(rate)} · {measureById(rate.measure as MeasureId).label}
-                  {rate.amount ? ` · ${rate.amount} each time` : ''}
+        {mine.length > 0 && (
+          <ul className="mt-3 divide-y divide-slate-200">
+            {mine.map((rate) => (
+              <li
+                key={`${rate.item}|${rate.unit}`}
+                className="flex items-baseline justify-between gap-3 py-2"
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm text-slate-800">{rate.item}</span>
+                  <span className="block text-xs text-slate-500">
+                    {rateLabel(rate)} · {measureById(rate.measure as MeasureId).label}
+                    {rate.amount ? ` · ${rate.amount} each time` : ''}
+                  </span>
                 </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => remove(rate)}
-                aria-label={`Remove ${rate.item}`}
-                className="min-h-11 shrink-0 text-xs text-slate-500 underline underline-offset-4"
-              >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="mt-3 grid gap-2">
-        <label className="block">
-          <span className="text-xs font-medium text-slate-700">What you call it</span>
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Skim coat"
-            aria-label="What you call it"
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
-                       focus:border-sky-500 focus:outline-none"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-medium text-slate-700">Where its quantity comes from</span>
-          <select
-            value={measure}
-            onChange={(event) => setMeasure(event.target.value as MeasureId)}
-            aria-label="Where its quantity comes from"
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2
-                       focus:border-sky-500 focus:outline-none"
-          >
-            {MEASURES.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
+                <button
+                  type="button"
+                  onClick={() => remove(rate)}
+                  aria-label={`Remove ${rate.item}`}
+                  className="min-h-11 shrink-0 text-xs text-slate-500 underline underline-offset-4"
+                >
+                  Remove
+                </button>
+              </li>
             ))}
-          </select>
-        </label>
-
-        {measure === 'typed' ? (
-          <div className="flex gap-2">
-            <label className="block">
-              <span className="text-xs font-medium text-slate-700">How many, each time</span>
-              <input
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                inputMode="decimal"
-                placeholder="1"
-                aria-label="How many, each time"
-                className="mt-1 min-h-11 w-24 rounded-md border border-slate-300 px-3 py-2
-                           text-right font-mono tabular-nums focus:border-sky-500 focus:outline-none"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium text-slate-700">Charged by the</span>
-              <select
-                value={unit}
-                onChange={(event) => setUnit(event.target.value as PriceUnit)}
-                aria-label="Charged by the"
-                className="mt-1 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2
-                           focus:border-sky-500 focus:outline-none"
-              >
-                <option value="ea">ea</option>
-                <option value="sq ft">sq ft</option>
-                <option value="lf">lf</option>
-              </select>
-            </label>
-          </div>
-        ) : (
-          <p className="text-xs text-slate-500">
-            Charged by the <strong>{effective}</strong>, because that is how it is measured. A rate
-            in one unit against a quantity in another is how a square foot becomes a linear foot
-            three steps later.
-          </p>
+          </ul>
         )}
 
-        <label className="block">
-          <span className="text-xs font-medium text-slate-700">What it covers</span>
-          <input
-            value={covers}
-            onChange={(event) => setCovers(event.target.value)}
-            placeholder="plaster, labour"
-            aria-label="What it covers"
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
-                       focus:border-sky-500 focus:outline-none"
-          />
-        </label>
+        <div className="mt-3 grid gap-2">
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700">What you call it</span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Skim coat"
+              aria-label="What you call it"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
+                         focus:border-sky-500 focus:outline-none"
+            />
+          </label>
 
-        <label className="block">
-          <span className="text-xs font-medium text-slate-700">
-            What you charge, per {effective}
-          </span>
-          <input
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
-            inputMode="decimal"
-            placeholder="2.10"
-            aria-label={`What you charge, per ${effective}`}
-            className="mt-1 min-h-11 w-28 rounded-md border border-slate-300 px-3 py-2 text-right
-                       font-mono tabular-nums focus:border-sky-500 focus:outline-none"
-          />
-        </label>
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700">Where its quantity comes from</span>
+            <select
+              value={measure}
+              onChange={(event) => setMeasure(event.target.value as MeasureId)}
+              aria-label="Where its quantity comes from"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2
+                         focus:border-sky-500 focus:outline-none"
+            >
+              {MEASURES.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <button
-          type="button"
-          onClick={add}
-          className="min-h-12 rounded-md bg-slate-900 px-5 font-semibold text-white active:bg-slate-700"
-        >
-          Add it to your rates
-        </button>
-      </div>
+          {measure === 'typed' ? (
+            <div className="flex gap-2">
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700">How many, each time</span>
+                <input
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  inputMode="decimal"
+                  placeholder="1"
+                  aria-label="How many, each time"
+                  className="mt-1 min-h-11 w-24 rounded-md border border-slate-300 px-3 py-2
+                             text-right font-mono tabular-nums focus:border-sky-500 focus:outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700">Charged by the</span>
+                <select
+                  value={unit}
+                  onChange={(event) => setUnit(event.target.value as PriceUnit)}
+                  aria-label="Charged by the"
+                  className="mt-1 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2
+                             focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="ea">ea</option>
+                  <option value="sq ft">sq ft</option>
+                  <option value="lf">lf</option>
+                </select>
+              </label>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">
+              Charged by the <strong>{effective}</strong>, because that is how it is measured. A rate
+              in one unit against a quantity in another is how a square foot becomes a linear foot
+              three steps later.
+            </p>
+          )}
 
-      {trouble && (
-        <p role="alert" className="mt-2 text-sm text-red-700">
-          {trouble}
-        </p>
-      )}
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700">What it covers</span>
+            <input
+              value={covers}
+              onChange={(event) => setCovers(event.target.value)}
+              placeholder="plaster, labour"
+              aria-label="What it covers"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
+                         focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700">
+              What you charge, per {effective}
+            </span>
+            <input
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              inputMode="decimal"
+              placeholder="2.10"
+              aria-label={`What you charge, per ${effective}`}
+              className="mt-1 min-h-11 w-28 rounded-md border border-slate-300 px-3 py-2 text-right
+                         font-mono tabular-nums focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={add}
+            className="min-h-12 rounded-md bg-slate-900 px-5 font-semibold text-white active:bg-slate-700"
+          >
+            Add it to your rates
+          </button>
+        </div>
+
+        {trouble && (
+          <p role="alert" className="mt-2 text-sm text-red-700">
+            {trouble}
+          </p>
+        )}
+      </Disclosure>
     </div>
   );
 }

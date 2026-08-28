@@ -54,7 +54,7 @@ check('a wall can be renamed', named.some((l) => /behind the washer/.test(l || '
 
 // Move it by hand.
 await page.getByRole('textbox', { name: 'Move this wall to' }).fill('22');
-await page.getByRole('button', { name: 'Move it' }).click();
+await page.getByRole('button', { name: 'Move it', exact: true }).click();
 await page.waitForTimeout(500);
 const moved = [];
 for (const l of await page.getByRole('button', { name: /^Wall / }).all()) moved.push(await l.getAttribute('aria-label'));

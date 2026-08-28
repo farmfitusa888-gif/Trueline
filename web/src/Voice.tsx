@@ -317,6 +317,20 @@ export function VoiceNotes({
 }: {
   /** The recordings already about this wall or this mark, oldest first. */
   readonly notes: readonly VoiceNote[];
+  /**
+   * The surface a new recording is about: a wall id, or the ceiling's own key.
+   *
+   * Named `wallId` because that is what `VoiceNote` calls the field, and that
+   * field is on every saved file on every phone. Most surfaces are walls; the
+   * ceiling is the one that is not, and it is where the water stain is. See
+   * `surfaceKey` in `work.ts` for the key, which is the same one that surface's
+   * scope and its phone readings are filed under — one ceiling, one name.
+   *
+   * A note filed against the ceiling is refused by `validateVoiceNote` until
+   * that function knows about surfaces as well as walls. Until it does, the
+   * recording is lost with a message on screen rather than saved silently
+   * against the wrong thing, which is the right way round of the two.
+   */
   readonly wallId: string;
   /** Set when these belong to a mark, so a new one is filed with it. */
   readonly markId?: string;

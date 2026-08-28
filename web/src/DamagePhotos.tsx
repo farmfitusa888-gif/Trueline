@@ -28,6 +28,12 @@ import { type Deletion, plannedDeletion } from '../../core/src/photo.ts';
  * to, the screen says the picture is on this device only. It never implies a
  * backup it did not make.
  *
+ * **Filed against the mark and never against a wall**, which is what lets this
+ * serve the ceiling with no change at all. A photograph of a water stain
+ * overhead is the most common photograph a restoration contractor takes, and
+ * the only reason it had nowhere to go was that nothing offered to mark a
+ * ceiling. `DamageOnCeiling` does; this is unchanged underneath it.
+ *
  * `capture="environment"` is what makes the button open the rear camera on a
  * phone instead of a file browser — inside the app's web view as well as in
  * Safari. On a desktop it falls back to picking a file, which is what somebody
@@ -151,9 +157,21 @@ function Shot({
           role="dialog"
           aria-label="Damage photograph, full size"
           onClick={() => setBig(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-3"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-3"
         >
           <img src={src} alt={`Damage photograph ${name}`} className="max-h-full max-w-full" />
+          {/* Tapping the picture already closed this and nothing said so --
+              Sam's "have a way to collapse them back", in the one place where
+              a person is holding a black rectangle over the whole phone. */}
+          <button
+            type="button"
+            onClick={() => setBig(false)}
+            aria-label="Close the damage photograph"
+            className="mt-3 min-h-12 shrink-0 rounded-md border border-white/60 px-4
+                       font-semibold text-white active:bg-white/20"
+          >
+            Close
+          </button>
         </div>
       )}
     </li>

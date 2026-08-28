@@ -1,4 +1,5 @@
 import { type Room, RoomError, validate } from './room.ts';
+import { surfaceKey, surfacesOf } from './work.ts';
 
 /**
  * What somebody said, standing in front of the wall, and what the phone made of it.
@@ -119,8 +120,13 @@ export interface VoiceNote {
  */
 export function validateVoiceNote(room: Room, note: VoiceNote): void {
   validate(room);
-  if (!room.walls.some((wall) => wall.id === note.wallId)) {
-    throw new VoiceError(`"${room.name}" has no wall called "${note.wallId}".`);
+  // A note is about a surface, and most surfaces are walls. The ceiling is the
+  // one that is not, and it is where the water stain is -- see `work.ts` for
+  // the key, which is the same one that surface's scope, its phone readings and
+  // its marks are filed under, so one ceiling has one name everywhere.
+  const surfaces = new Set(surfacesOf(room).map(surfaceKey));
+  if (!surfaces.has(note.wallId) && !room.walls.some((wall) => wall.id === note.wallId)) {
+    throw new VoiceError(`"${room.name}" has no wall or surface called "${note.wallId}".`);
   }
   if (note.fileName.trim() === '') {
     throw new VoiceError('That recording has no file name, so nothing could ever play it back.');

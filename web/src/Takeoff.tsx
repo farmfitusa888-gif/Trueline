@@ -273,9 +273,24 @@ export function Takeoff({
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="min-h-11 px-2 text-sm text-slate-500 underline underline-offset-4"
+          /* It already folded back — More becomes Less — and said nothing
+             about it: no `aria-expanded`, so anybody listening was told about
+             a button with nothing behind it. The two words stay as they are;
+             renaming them to Open and Close would say the sheet above
+             disappears, and it does not. */
+          aria-expanded={open}
+          aria-controls="every-wall"
+          className="inline-flex min-h-12 items-center gap-1 px-2 text-sm text-slate-500
+                     underline underline-offset-4"
         >
           {open ? 'Less' : 'More'}
+          <svg
+            viewBox="0 0 16 16" aria-hidden="true"
+            className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
+          >
+            <path d="M3 6l5 5 5-5" fill="none" stroke="currentColor"
+                  strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
 
@@ -390,8 +405,15 @@ export function Takeoff({
         </div>
       ))}
 
+      {/* The wall schedule, behind More with the workings. It is a monospaced
+          table on purpose: it is read down a column.
+
+          One of it. This block was written out twice, one immediately after
+          the other, so pressing More printed the whole schedule and then
+          printed it again — found while giving the button an `aria-controls`,
+          which cannot point at two elements with one id. */}
       {open && (
-        <div className="mt-4">
+        <div id="every-wall" className="mt-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Every wall
           </h3>
@@ -404,18 +426,6 @@ export function Takeoff({
       {/* The same numbers, split the way the space is. Below the whole rather
           than instead of it: the whole is what gets ordered, and the split is
           what gets priced and scheduled. */}
-      {/* The wall schedule, behind Show with the workings. It is a monospaced
-          table on purpose: it is read down a column. */}
-      {open && (
-        <div className="mt-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Every wall
-          </h3>
-          <div className="mt-1 overflow-x-auto rounded-md bg-slate-50 p-3">
-            <pre className="whitespace-pre text-xs leading-relaxed text-slate-800">{schedule}</pre>
-          </div>
-        </div>
-      )}
 
       {perZone?.report && (
         <div className="mt-5 rounded-md border border-violet-200 bg-violet-50 p-3">

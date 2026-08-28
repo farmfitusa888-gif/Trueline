@@ -132,7 +132,7 @@ test('a condition note reaches the sheet somebody carries', () => {
   assert.equal(list.marks.length, 1);
   assert.equal(list.marks[0]!.wallId, 'north');
   assert.equal(list.marks[0]!.what, 'rot');
-  assert.match(list.text, /MARKED ON THESE WALLS — 1/);
+  assert.match(list.text, /MARKED IN THIS ROOM — 1/);
   assert.match(list.text, /north — rot/);
   assert.match(list.text, /sill plate is soft under the window/);
 });
@@ -160,14 +160,36 @@ test('marks print in the order the plan numbers the walls, not the order they we
   assert.deepEqual(list.marks.map((m) => m.wallId), ['south', 'north', 'west']);
 });
 
-test('a mark on nothing at all — a whole ceiling — is not filed under a wall', () => {
+test('a mark on the ceiling is on the sheet, under the ceiling', () => {
   const list = fieldList(room, [], {
     marks: [mark({ id: 'ceiling', kind: 'water', shape: { kind: 'surface', surface: 'ceiling' } })],
   });
-  // It belongs on the claim document, which knows what to do with a ceiling.
-  // A sheet organised by wall has nowhere honest to put it.
-  assert.equal(list.marks.length, 0);
-  assert.doesNotMatch(list.text, /MARKED ON THESE WALLS/);
+  // This used to assert the opposite, on the grounds that a sheet organised by
+  // wall had nowhere honest to put a ceiling. That was true of the sheet and
+  // not of the room, and it cost something real: on a claim a ceiling mark is
+  // on the claim document and on the scope, but on an ordinary remodel this
+  // sheet is the ONLY place a condition note goes — so a water stain noticed on
+  // a ceiling went nowhere at all.
+  //
+  // The honest place existed all along; it just is not a wall. It is filed as
+  // `the ceiling` and given no fake wall id, and the heading names the room
+  // rather than its walls.
+  assert.equal(list.marks.length, 1);
+  assert.equal(list.marks[0]!.wallId, 'the ceiling');
+  assert.match(list.text, /MARKED IN THIS ROOM — 1/);
+  assert.match(list.text, /the ceiling — water/);
+});
+
+test('and the walls come first, because somebody reads them standing at each one', () => {
+  const list = fieldList(room, [], {
+    marks: [
+      mark({ id: 'ceiling', kind: 'water', shape: { kind: 'surface', surface: 'ceiling' } }),
+      mark(),
+    ],
+  });
+  assert.equal(list.marks.length, 2);
+  assert.equal(list.marks[0]!.wallId, 'north');
+  assert.equal(list.marks[1]!.wallId, 'the ceiling');
 });
 
 /* ------------------------------------------------------ and what was said */

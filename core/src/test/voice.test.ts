@@ -57,11 +57,15 @@ function note(over: Partial<VoiceNote> = {}): VoiceNote {
 
 /* --------------------------------------------------------------- refusing */
 
-test('a recording about a wall this room does not have is refused', () => {
-  assert.throws(() => validateVoiceNote(room, note({ wallId: 'ceiling' })), VoiceError);
+test('a recording about a wall or surface this room does not have is refused', () => {
+  assert.throws(() => validateVoiceNote(room, note({ wallId: 'the pantry' })), VoiceError);
   // Because there is nothing else to find it by. It would not be on the wall
   // panel, not on the sheet, and the only sign of it would be a file.
   assert.doesNotThrow(() => validateVoiceNote(room, note()));
+  // The ceiling is a surface of every room and it is where the water stain is.
+  // A note about it is filed under the same key its scope and its marks are.
+  assert.doesNotThrow(() => validateVoiceNote(room, note({ wallId: 'ceiling' })));
+  assert.doesNotThrow(() => validateVoiceNote(room, note({ wallId: 'floor' })));
 });
 
 test('a recording with no file name is refused, because nothing could play it', () => {

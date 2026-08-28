@@ -32,6 +32,21 @@ import { nameOf } from '../../core/src/wallLabel.ts';
  * with no app around it there is no folder and no picture, and the strip says
  * that plainly rather than showing a row of broken frames.
  *
+ * ## Why there is no strip like this on the ceiling
+ *
+ * This is the walk, and a walk is a set of frames the phone took **from**
+ * somewhere, placed by `photo.ts` in the room's own frame and matched to a wall
+ * by where the camera was pointing. A ceiling has no such answer: RoomPlan does
+ * not map ceilings, and where a ceiling photograph was taken from is a real
+ * question nobody has answered yet.
+ *
+ * That is a different thing from photographing a stain overhead, which works
+ * and is the one that matters. A photograph of damage is filed against the
+ * **mark**, by `DamagePhotos`, and a mark on the ceiling carries them exactly
+ * as a mark on a wall does. Widening this strip would mean widening
+ * `photosOfWall` on a guess about where the phone was, and a guess about a
+ * building is the one thing this app does not print.
+ *
  * ## Taking several off, and the 53 photographs
  *
  * > "BUILD IT!" — batch photo delete. Deleting photographs one at a time on a

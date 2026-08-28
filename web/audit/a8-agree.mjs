@@ -130,7 +130,7 @@ if (priced) {
   await page.getByRole('button', { name: 'Change this wall' }).click();
   await page.waitForTimeout(250);
   await page.getByRole('textbox', { name: 'Move this wall to' }).fill('26');
-  await page.getByRole('button', { name: 'Move it' }).click();
+  await page.getByRole('button', { name: 'Move it', exact: true }).click();
   await page.waitForTimeout(500);
 
   await section(page, 'Agreement');

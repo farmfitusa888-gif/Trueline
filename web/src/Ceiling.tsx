@@ -11,6 +11,7 @@ import {
   readSurfaceMeasure,
 } from '../../core/src/work.ts';
 import { Measure } from './Measure.tsx';
+import { type DamageOnCeilingProps, DamageOnCeiling } from './Damage.tsx';
 
 /**
  * How high the room is — the number that multiplies every square foot of board.
@@ -45,6 +46,19 @@ import { Measure } from './Measure.tsx';
  * ceiling coming off, a soffit and a dropped beam are all things on a surface
  * somebody works on — and the ceiling was the one surface in the room with no
  * panel of its own. `CeilingPanel` is that panel.
+ *
+ * ## And what is wrong with it
+ *
+ * The panel could say how big the ceiling was and what was being done to it,
+ * and had nowhere to put the thing a restoration contractor photographs more
+ * often than anything else in a building. `marks` is that: the same mark
+ * editor a wall has, taking the same photographs and the same recordings,
+ * built once in `Damage.tsx` and used twice.
+ *
+ * It is an optional prop and the panel says nothing at all without it — the
+ * rule `WallPhotos` keeps for the same reason. A control that is there and
+ * presses to nothing is worse than one that is absent, because absence is
+ * legible and a dead button is not.
  */
 
 const COMMON = [`8'`, `9'`, `10'`];
@@ -167,6 +181,16 @@ export interface CeilingPanelProps {
    * possible outcomes.
    */
   readonly spans?: readonly SpanFromPhone[];
+  /**
+   * What is wrong with the ceiling — marks, photographs, and what was said.
+   *
+   * The room is not in here: this panel already has it, and two of them is two
+   * chances for a mark to be checked against a different room from the one it
+   * is drawn on. Everything else is handed straight through to
+   * `DamageOnCeiling`, which is the wall's own mark editor asked for a
+   * different shape.
+   */
+  readonly marks?: Omit<DamageOnCeilingProps, 'room'>;
 }
 
 /**
@@ -184,7 +208,7 @@ export interface CeilingPanelProps {
  * ceiling that read 419.9 on the panel and 420.0 on the sheet would be two of
  * this app's own screens disagreeing about one room.
  */
-export function CeilingPanel({ room, children, spans = [], onClose }: CeilingPanelProps) {
+export function CeilingPanel({ room, children, spans = [], marks, onClose }: CeilingPanelProps) {
   const { len } = useUnits();
   const area = ceilingArea(room);
 
@@ -223,6 +247,11 @@ export function CeilingPanel({ room, children, spans = [], onClose }: CeilingPan
       </p>
 
       {children}
+
+      {/* What is wrong with it, under what is being done to it — the same order
+          a wall panel puts them in, because it is the same reading order: what
+          are we doing here, and then what did I find. */}
+      {marks && <DamageOnCeiling room={room} {...marks} />}
 
       <div className="mt-3 border-t border-sky-200 pt-3">
         <h3 className="text-sm font-semibold text-slate-900">

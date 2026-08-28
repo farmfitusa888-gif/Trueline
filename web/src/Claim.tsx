@@ -15,6 +15,7 @@ import { useUnits } from './units.tsx';
 import { ReportPhotos } from './ReportPhotos.tsx';
 import { canMarkAgain, markAgain } from './bridge.ts';
 import { DraftButton, DraftedNote } from './Draft.tsx';
+import { Disclosure } from './Disclosure.tsx';
 
 /**
  * Insurance mode: the switch, the claim's own facts, and the document.
@@ -318,142 +319,172 @@ export function Claim({
 
       {showing === 'details' ? (
         <>
-          <div className="mt-3 space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
+          {/* Sam: "WHEN YOU DROPDOWN ANY MENU, HAVE A WAY TO COLLAPSE THEM
+              BACK." Turning insurance on put fourteen boxes on the screen at
+              once and gave nothing back but "Not a claim", which throws the
+              claim away. They are two questions — what happened, and who it is
+              between — so they are two blocks, and either can be folded once it
+              is filled in. Both start open: what was missing was a way back,
+              not a screen that hides work somebody has already done. */}
+          <Disclosure
+            title="What happened, and when"
+            summary={
+              claim.cause
+                ? `${claim.cause}${claim.dateOfLoss ? ` on ${claim.dateOfLoss}` : ''}`
+                : 'The claim number, the dates, the cause and the description'
+            }
+          >
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Claim number"
+                  value={claim.claimNumber ?? ''}
+                  onChange={(v) => set('claimNumber', v)}
+                />
+                <Field
+                  label="Date of loss"
+                  type="date"
+                  value={claim.dateOfLoss ?? ''}
+                  onChange={(v) => set('dateOfLoss', v)}
+                  hint="The day it happened, not the day it was found."
+                />
+              </div>
               <Field
-                label="Claim number"
-                value={claim.claimNumber ?? ''}
-                onChange={(v) => set('claimNumber', v)}
-              />
-              <Field
-                label="Date of loss"
+                label="Found on"
                 type="date"
-                value={claim.dateOfLoss ?? ''}
-                onChange={(v) => set('dateOfLoss', v)}
-                hint="The day it happened, not the day it was found."
+                value={claim.foundOn ?? ''}
+                onChange={(v) => set('foundOn', v)}
+              />
+
+              <div>
+                <span className="text-sm font-medium text-slate-700">What caused it</span>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {CAUSES.map((cause) => (
+                    <button
+                      key={cause}
+                      type="button"
+                      onClick={() => set('cause', cause)}
+                      className={`min-h-11 rounded-md px-3 text-sm font-medium ${
+                        claim.cause === cause
+                          ? 'bg-slate-900 text-white'
+                          : 'border border-slate-300 text-slate-700 active:bg-slate-100'
+                      }`}
+                    >
+                      {cause}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Field label="Property address" value={claim.address ?? ''} onChange={(v) => set('address', v)} />
+
+              {/* The loss description. It has been on the claim document since
+                  the document was written -- `claim.ts` prints it under "Notes"
+                  -- and there has never been a box to type it in. Another
+                  finished, unreachable field. */}
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700">What happened</span>
+                <textarea
+                  value={claim.note ?? ''}
+                  onChange={(event) => { set('note', event.target.value); setDrafted(false); }}
+                  rows={4}
+                  aria-label="What happened"
+                  placeholder="The supply line under the sink let go overnight."
+                  className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2
+                             leading-relaxed focus:border-sky-500 focus:outline-none"
+                />
+              </label>
+              <p className="text-xs leading-relaxed text-slate-500">
+                The first thing an adjuster reads. It goes at the top of the claim document, in
+                your words.
+              </p>
+              <DraftedNote showing={drafted && (claim.note ?? '') !== ''} />
+              {/* What goes across is what is already on this claim: the cause,
+                  the dates, and every mark with its kind, its category and its
+                  measured area. The model writes two paragraphs out of them and
+                  is told never to touch a figure. */}
+              <DraftButton
+                job="loss"
+                label="Draft what happened"
+                notes={() =>
+                  [
+                    claim.cause ? `Cause: ${claim.cause}.` : '',
+                    claim.dateOfLoss ? `Date of loss: ${claim.dateOfLoss}.` : '',
+                    claim.foundOn ? `Found on: ${claim.foundOn}.` : '',
+                    `Room: ${room.name}.`,
+                    damages.length === 0
+                      ? 'Nothing has been marked in this room yet.'
+                      : 'Marked in this room:',
+                    ...damages.map((damage) => {
+                      const where = damage.shape.kind === 'pin' ? 'a marked spot' : 'an area';
+                      const category = damage.category ? `, category ${damage.category}` : '';
+                      return `- ${damage.kind}${category}, on ${where}: ${damage.note}`;
+                    }),
+                  ]
+                    .filter((line) => line !== '')
+                    .join('\n')
+                }
+                onWritten={(text) => { set('note', text); setDrafted(true); }}
               />
             </div>
-            <Field
-              label="Found on"
-              type="date"
-              value={claim.foundOn ?? ''}
-              onChange={(v) => set('foundOn', v)}
-            />
+          </Disclosure>
 
-            <div>
-              <span className="text-sm font-medium text-slate-700">What caused it</span>
-              <div className="mt-1 flex flex-wrap gap-2">
-                {CAUSES.map((cause) => (
-                  <button
-                    key={cause}
-                    type="button"
-                    onClick={() => set('cause', cause)}
-                    className={`min-h-11 rounded-md px-3 text-sm font-medium ${
-                      claim.cause === cause
-                        ? 'bg-slate-900 text-white'
-                        : 'border border-slate-300 text-slate-700 active:bg-slate-100'
-                    }`}
-                  >
-                    {cause}
-                  </button>
-                ))}
+          <Disclosure
+            title="Who it is between"
+            summary={
+              describeParty(claim.owner) || describeParty(claim.adjuster)
+                ? [describeParty(claim.owner), describeParty(claim.adjuster)]
+                    .filter((one) => one !== '')
+                    .join(' · ')
+                : 'The owner, the carrier and the adjuster'
+            }
+          >
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Owner"
+                  value={claim.owner?.name ?? ''}
+                  onChange={(v) => set('owner', { ...claim.owner, name: v })}
+                />
+                <Field
+                  label="Owner's phone"
+                  type="tel"
+                  value={claim.owner?.phone ?? ''}
+                  onChange={(v) => set('owner', { name: claim.owner?.name ?? '', phone: v })}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Carrier"
+                  value={claim.carrier?.name ?? ''}
+                  onChange={(v) => set('carrier', { ...claim.carrier, name: v })}
+                />
+                <Field
+                  label="Adjuster"
+                  value={claim.adjuster?.name ?? ''}
+                  onChange={(v) => set('adjuster', { ...claim.adjuster, name: v })}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Adjuster's phone"
+                  type="tel"
+                  value={claim.adjuster?.phone ?? ''}
+                  onChange={(v) =>
+                    set('adjuster', { name: claim.adjuster?.name ?? '', phone: v, email: claim.adjuster?.email })
+                  }
+                />
+                <Field
+                  label="Adjuster's email"
+                  type="email"
+                  value={claim.adjuster?.email ?? ''}
+                  onChange={(v) =>
+                    set('adjuster', { name: claim.adjuster?.name ?? '', phone: claim.adjuster?.phone, email: v })
+                  }
+                />
               </div>
             </div>
-
-            <Field label="Property address" value={claim.address ?? ''} onChange={(v) => set('address', v)} />
-
-            {/* The loss description. It has been on the claim document since
-                the document was written -- `claim.ts` prints it under "Notes"
-                -- and there has never been a box to type it in. Another
-                finished, unreachable field. */}
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">What happened</span>
-              <textarea
-                value={claim.note ?? ''}
-                onChange={(event) => { set('note', event.target.value); setDrafted(false); }}
-                rows={4}
-                aria-label="What happened"
-                placeholder="The supply line under the sink let go overnight."
-                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2
-                           leading-relaxed focus:border-sky-500 focus:outline-none"
-              />
-            </label>
-            <p className="text-xs leading-relaxed text-slate-500">
-              The first thing an adjuster reads. It goes at the top of the claim document, in
-              your words.
-            </p>
-            <DraftedNote showing={drafted && (claim.note ?? '') !== ''} />
-            {/* What goes across is what is already on this claim: the cause,
-                the dates, and every mark with its kind, its category and its
-                measured area. The model writes two paragraphs out of them and
-                is told never to touch a figure. */}
-            <DraftButton
-              job="loss"
-              label="Draft what happened"
-              notes={() =>
-                [
-                  claim.cause ? `Cause: ${claim.cause}.` : '',
-                  claim.dateOfLoss ? `Date of loss: ${claim.dateOfLoss}.` : '',
-                  claim.foundOn ? `Found on: ${claim.foundOn}.` : '',
-                  `Room: ${room.name}.`,
-                  damages.length === 0
-                    ? 'Nothing has been marked in this room yet.'
-                    : 'Marked in this room:',
-                  ...damages.map((damage) => {
-                    const where = damage.shape.kind === 'pin' ? 'a marked spot' : 'an area';
-                    const category = damage.category ? `, category ${damage.category}` : '';
-                    return `- ${damage.kind}${category}, on ${where}: ${damage.note}`;
-                  }),
-                ]
-                  .filter((line) => line !== '')
-                  .join('\n')
-              }
-              onWritten={(text) => { set('note', text); setDrafted(true); }}
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="Owner"
-                value={claim.owner?.name ?? ''}
-                onChange={(v) => set('owner', { ...claim.owner, name: v })}
-              />
-              <Field
-                label="Owner's phone"
-                type="tel"
-                value={claim.owner?.phone ?? ''}
-                onChange={(v) => set('owner', { name: claim.owner?.name ?? '', phone: v })}
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="Carrier"
-                value={claim.carrier?.name ?? ''}
-                onChange={(v) => set('carrier', { ...claim.carrier, name: v })}
-              />
-              <Field
-                label="Adjuster"
-                value={claim.adjuster?.name ?? ''}
-                onChange={(v) => set('adjuster', { ...claim.adjuster, name: v })}
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="Adjuster's phone"
-                type="tel"
-                value={claim.adjuster?.phone ?? ''}
-                onChange={(v) =>
-                  set('adjuster', { name: claim.adjuster?.name ?? '', phone: v, email: claim.adjuster?.email })
-                }
-              />
-              <Field
-                label="Adjuster's email"
-                type="email"
-                value={claim.adjuster?.email ?? ''}
-                onChange={(v) =>
-                  set('adjuster', { name: claim.adjuster?.name ?? '', phone: claim.adjuster?.phone, email: v })
-                }
-              />
-            </div>
-          </div>
+          </Disclosure>
 
           {/* Who this claim is between, in one line each, the way the claim
               document prints them. `describeParty` is what the document uses,

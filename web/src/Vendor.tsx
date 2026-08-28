@@ -26,6 +26,7 @@ import {
 import { type PriceUnit, money, parseMoney } from '../../core/src/price.ts';
 import { pricing } from '../../core/src/company.ts';
 import { fetchPhoto, forget, keep, readied } from './photoStore.ts';
+import { Disclosure } from './Disclosure.tsx';
 import { useUnits } from './units.tsx';
 
 /**
@@ -157,108 +158,124 @@ export function Stores() {
 
   return (
     <section className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-3" data-sheet="no">
-      <h3 className="text-sm font-semibold text-slate-900">The stores you buy at</h3>
-      <p className="mt-1 text-xs leading-relaxed text-slate-600">
-        One book per shop. Floor &amp; Decor and the yard down the road quote different numbers
-        for the same word, so they are kept apart — and every price in here says which shop, and
-        which day, and who wrote it down.
-      </p>
-
-      {book.stores.length > 0 && (
-        <ul className="mt-3 divide-y divide-slate-200">
-          {book.stores.map((store) => (
-            <li key={store.id} className="py-2">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="block text-sm text-slate-800">{store.name}</span>
-                  <span className="block text-xs text-slate-500">
-                    {countOf(store.id)} price{countOf(store.id) === 1 ? '' : 's'}
-                  </span>
-                </span>
-                {asking === store.id ? (
-                  <span className="flex shrink-0 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const gone = removeStore(book, store.id);
-                        // The pictures go with the prices. An orphaned JPEG in
-                        // IndexedDB is a photograph nobody can ever see again,
-                        // sitting in somebody's storage for good.
-                        for (const s of book.sightings) {
-                          if (s.storeId === store.id) void forgetTag(s);
-                        }
-                        save(gone.book);
-                        setAsking(null);
-                        setTold(
-                          `Removed ${store.name} and the ${gone.dropped} price` +
-                            `${gone.dropped === 1 ? '' : 's'} that came from it.`
-                        );
-                      }}
-                      className="min-h-11 text-xs font-semibold text-red-700 underline underline-offset-4"
-                    >
-                      Yes, remove it
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAsking(null)}
-                      className="min-h-11 text-xs text-slate-500 underline underline-offset-4"
-                    >
-                      Keep it
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setAsking(store.id)}
-                    aria-label={`Remove ${store.name}`}
-                    className="min-h-11 shrink-0 text-xs text-slate-500 underline underline-offset-4"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              {asking === store.id && (
-                <p className="mt-1 text-xs text-red-700">
-                  This takes the {countOf(store.id)} price
-                  {countOf(store.id) === 1 ? '' : 's'} from {store.name} with it. Your own rates
-                  are not touched.
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="mt-3 flex items-end gap-2">
-        <label className="block grow">
-          <span className="text-xs font-medium text-slate-700">Add a store</span>
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Floor &amp; Decor"
-            aria-label="Add a store"
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
-                       focus:border-sky-500 focus:outline-none"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={add}
-          className="min-h-11 shrink-0 rounded-md bg-slate-900 px-4 font-semibold text-white
-                     active:bg-slate-700"
-        >
-          Add it
-        </button>
-      </div>
-
-      {told && <p className="mt-2 text-sm text-slate-600">{told}</p>}
-      {trouble && (
-        <p role="alert" className="mt-2 text-sm text-red-700">
-          {trouble}
+      {/* Sam: "WHEN YOU DROPDOWN ANY MENU, HAVE A WAY TO COLLAPSE THEM BACK."
+          The shops, every price counted against each of them, the box that
+          adds one and the whole shelf-tag form underneath were all on the
+          screen at once, under a rate book somebody is usually here to change.
+          The heading is still a heading, so `a26-vendor.mjs` still reaches
+          this section by asking for it. */}
+      <Disclosure
+        heading="h3"
+        title="The stores you buy at"
+        summary={
+          book.stores.length === 0
+            ? 'No shops yet — open it to add the first one'
+            : `${book.stores.length} shop${book.stores.length === 1 ? '' : 's'}, ` +
+              `${book.sightings.length} price${book.sightings.length === 1 ? '' : 's'} between them`
+        }
+      >
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+          One book per shop. Floor &amp; Decor and the yard down the road quote different numbers
+          for the same word, so they are kept apart — and every price in here says which shop, and
+          which day, and who wrote it down.
         </p>
-      )}
 
-      <ShelfTag />
+        {book.stores.length > 0 && (
+          <ul className="mt-3 divide-y divide-slate-200">
+            {book.stores.map((store) => (
+              <li key={store.id} className="py-2">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm text-slate-800">{store.name}</span>
+                    <span className="block text-xs text-slate-500">
+                      {countOf(store.id)} price{countOf(store.id) === 1 ? '' : 's'}
+                    </span>
+                  </span>
+                  {asking === store.id ? (
+                    <span className="flex shrink-0 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const gone = removeStore(book, store.id);
+                          // The pictures go with the prices. An orphaned JPEG in
+                          // IndexedDB is a photograph nobody can ever see again,
+                          // sitting in somebody's storage for good.
+                          for (const s of book.sightings) {
+                            if (s.storeId === store.id) void forgetTag(s);
+                          }
+                          save(gone.book);
+                          setAsking(null);
+                          setTold(
+                            `Removed ${store.name} and the ${gone.dropped} price` +
+                              `${gone.dropped === 1 ? '' : 's'} that came from it.`
+                          );
+                        }}
+                        className="min-h-11 text-xs font-semibold text-red-700 underline underline-offset-4"
+                      >
+                        Yes, remove it
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAsking(null)}
+                        className="min-h-11 text-xs text-slate-500 underline underline-offset-4"
+                      >
+                        Keep it
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAsking(store.id)}
+                      aria-label={`Remove ${store.name}`}
+                      className="min-h-11 shrink-0 text-xs text-slate-500 underline underline-offset-4"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {asking === store.id && (
+                  <p className="mt-1 text-xs text-red-700">
+                    This takes the {countOf(store.id)} price
+                    {countOf(store.id) === 1 ? '' : 's'} from {store.name} with it. Your own rates
+                    are not touched.
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="mt-3 flex items-end gap-2">
+          <label className="block grow">
+            <span className="text-xs font-medium text-slate-700">Add a store</span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Floor &amp; Decor"
+              aria-label="Add a store"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
+                         focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={add}
+            className="min-h-11 shrink-0 rounded-md bg-slate-900 px-4 font-semibold text-white
+                       active:bg-slate-700"
+          >
+            Add it
+          </button>
+        </div>
+
+        {told && <p className="mt-2 text-sm text-slate-600">{told}</p>}
+        {trouble && (
+          <p role="alert" className="mt-2 text-sm text-red-700">
+            {trouble}
+          </p>
+        )}
+
+        <ShelfTag />
+      </Disclosure>
     </section>
   );
 }
@@ -366,151 +383,159 @@ function ShelfTag() {
 
   return (
     <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-      <h4 className="text-sm font-semibold text-slate-900">Write down a price</h4>
-      <p className="mt-1 text-xs leading-relaxed text-slate-600">
-        Standing in the aisle: photograph the tag and type the number on it. The photograph is
-        what proves where the figure came from — it is never what reads it. Nothing goes in this
-        book that you have not read yourself.
-      </p>
+      {/* Eight boxes, a camera and two buttons. It is the longest form in the
+          app and it sat open on the rate-book screen whether or not anybody
+          was standing in an aisle. */}
+      <Disclosure
+        heading="h4"
+        title="Write down a price"
+        summary="A store, what it is, what it costs and the day you saw it"
+      >
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+          Standing in the aisle: photograph the tag and type the number on it. The photograph is
+          what proves where the figure came from — it is never what reads it. Nothing goes in this
+          book that you have not read yourself.
+        </p>
 
-      <div className="mt-3 grid gap-2">
-        <label className="block">
-          <span className="text-xs font-medium text-slate-700">Which store</span>
-          <select
-            value={store}
-            onChange={(event) => setStore(event.target.value)}
-            aria-label="Which store"
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2
-                       focus:border-sky-500 focus:outline-none"
-          >
-            <option value="">— pick a store —</option>
-            {book.stores.map((one) => (
-              <option key={one.id} value={one.id}>
-                {one.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-medium text-slate-700">What it is</span>
-          <input
-            value={item}
-            onChange={(event) => setItem(event.target.value)}
-            placeholder="1/2 in drywall, 4x8"
-            aria-label="What it is"
-            className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
-                       focus:border-sky-500 focus:outline-none"
-          />
-        </label>
-
-        <div className="flex flex-wrap gap-2">
+        <div className="mt-3 grid gap-2">
           <label className="block">
-            <span className="text-xs font-medium text-slate-700">What it costs</span>
-            <input
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
-              inputMode="decimal"
-              placeholder="12.98"
-              aria-label="What it costs"
-              className="mt-1 min-h-11 w-28 rounded-md border border-slate-300 px-3 py-2 text-right
-                         font-mono tabular-nums focus:border-sky-500 focus:outline-none"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-medium text-slate-700">Per</span>
+            <span className="text-xs font-medium text-slate-700">Which store</span>
             <select
-              value={unit}
-              onChange={(event) => setUnit(event.target.value as PriceUnit)}
-              aria-label="Priced per"
-              className="mt-1 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2
+              value={store}
+              onChange={(event) => setStore(event.target.value)}
+              aria-label="Which store"
+              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2
                          focus:border-sky-500 focus:outline-none"
             >
-              <option value="ea">ea</option>
-              <option value="sq ft">sq ft</option>
-              <option value="lf">lf</option>
+              <option value="">— pick a store —</option>
+              {book.stores.map((one) => (
+                <option key={one.id} value={one.id}>
+                  {one.name}
+                </option>
+              ))}
             </select>
           </label>
+
           <label className="block">
-            <span className="text-xs font-medium text-slate-700">Seen on</span>
+            <span className="text-xs font-medium text-slate-700">What it is</span>
             <input
-              type="date"
-              value={seenAt}
-              onChange={(event) => setSeenAt(event.target.value)}
-              aria-label="Seen on"
-              className="mt-1 min-h-11 rounded-md border border-slate-300 px-3 py-2
-                         focus:border-sky-500 focus:outline-none"
-            />
-          </label>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <label className="block grow">
-            <span className="text-xs font-medium text-slate-700">Aisle or trade</span>
-            <input
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-              placeholder="Drywall"
-              aria-label="Aisle or trade"
+              value={item}
+              onChange={(event) => setItem(event.target.value)}
+              placeholder="1/2 in drywall, 4x8"
+              aria-label="What it is"
               className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
                          focus:border-sky-500 focus:outline-none"
             />
           </label>
-          <label className="block grow">
-            <span className="text-xs font-medium text-slate-700">Their code for it</span>
-            <input
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="206021150"
-              aria-label="Their code for it"
-              className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
-                         focus:border-sky-500 focus:outline-none"
-            />
-          </label>
-        </div>
 
-        <input
-          ref={camera}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(event) => void shoot(event.target.files?.[0])}
-          className="sr-only"
-          aria-label="Photograph the price tag"
-        />
-        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-2">
+            <label className="block">
+              <span className="text-xs font-medium text-slate-700">What it costs</span>
+              <input
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+                inputMode="decimal"
+                placeholder="12.98"
+                aria-label="What it costs"
+                className="mt-1 min-h-11 w-28 rounded-md border border-slate-300 px-3 py-2 text-right
+                           font-mono tabular-nums focus:border-sky-500 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-700">Per</span>
+              <select
+                value={unit}
+                onChange={(event) => setUnit(event.target.value as PriceUnit)}
+                aria-label="Priced per"
+                className="mt-1 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2
+                           focus:border-sky-500 focus:outline-none"
+              >
+                <option value="ea">ea</option>
+                <option value="sq ft">sq ft</option>
+                <option value="lf">lf</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-700">Seen on</span>
+              <input
+                type="date"
+                value={seenAt}
+                onChange={(event) => setSeenAt(event.target.value)}
+                aria-label="Seen on"
+                className="mt-1 min-h-11 rounded-md border border-slate-300 px-3 py-2
+                           focus:border-sky-500 focus:outline-none"
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <label className="block grow">
+              <span className="text-xs font-medium text-slate-700">Aisle or trade</span>
+              <input
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                placeholder="Drywall"
+                aria-label="Aisle or trade"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
+                           focus:border-sky-500 focus:outline-none"
+              />
+            </label>
+            <label className="block grow">
+              <span className="text-xs font-medium text-slate-700">Their code for it</span>
+              <input
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                placeholder="206021150"
+                aria-label="Their code for it"
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
+                           focus:border-sky-500 focus:outline-none"
+              />
+            </label>
+          </div>
+
+          <input
+            ref={camera}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(event) => void shoot(event.target.files?.[0])}
+            className="sr-only"
+            aria-label="Photograph the price tag"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => camera.current?.click()}
+              className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium
+                         text-slate-700 active:bg-slate-100 disabled:opacity-60"
+            >
+              {busy ? 'Keeping it…' : photo === null ? 'Photograph the tag' : 'Take it again'}
+            </button>
+            {photo !== null && (
+              <span className="text-xs text-slate-600">
+                Tag photographed. Now type the number that is on it.
+              </span>
+            )}
+          </div>
+
           <button
             type="button"
-            disabled={busy}
-            onClick={() => camera.current?.click()}
-            className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium
-                       text-slate-700 active:bg-slate-100 disabled:opacity-60"
+            onClick={write}
+            className="min-h-12 rounded-md bg-slate-900 px-5 font-semibold text-white
+                       active:bg-slate-700"
           >
-            {busy ? 'Keeping it…' : photo === null ? 'Photograph the tag' : 'Take it again'}
+            Write it down
           </button>
-          {photo !== null && (
-            <span className="text-xs text-slate-600">
-              Tag photographed. Now type the number that is on it.
-            </span>
-          )}
         </div>
 
-        <button
-          type="button"
-          onClick={write}
-          className="min-h-12 rounded-md bg-slate-900 px-5 font-semibold text-white
-                     active:bg-slate-700"
-        >
-          Write it down
-        </button>
-      </div>
-
-      {told && <p className="mt-2 text-sm text-slate-700">{told}</p>}
-      {trouble && (
-        <p role="alert" className="mt-2 text-sm text-red-700">
-          {trouble}
-        </p>
-      )}
+        {told && <p className="mt-2 text-sm text-slate-700">{told}</p>}
+        {trouble && (
+          <p role="alert" className="mt-2 text-sm text-red-700">
+            {trouble}
+          </p>
+        )}
+      </Disclosure>
     </div>
   );
 }
@@ -553,9 +578,23 @@ function Tag({ name }: { readonly name: string }) {
           role="dialog"
           aria-label="Price tag photograph, full size"
           onClick={() => setBig(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-3"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-3"
         >
           <img src={src} alt={`Price tag photograph ${name}`} className="max-h-full max-w-full" />
+          {/* Tapping the picture already closed this, and nothing on the
+              screen said so — the same complaint as every block that would not
+              fold, in the one place where a person is holding a black
+              rectangle over the whole phone. `WallPhotos.tsx` has had a real
+              button on its full-size view all along; this had none. */}
+          <button
+            type="button"
+            onClick={() => setBig(false)}
+            aria-label="Close the price tag photograph"
+            className="mt-3 min-h-12 shrink-0 rounded-md border border-white/60 px-4
+                       font-semibold text-white active:bg-white/20"
+          >
+            Close
+          </button>
         </div>
       )}
     </>
@@ -664,146 +703,155 @@ export function Catalogue({
 
   return (
     <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-sheet="no">
-      <h2 className="font-semibold text-slate-900">What the stores charge</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Your own shops, your own prices. Pick a store, search it, narrow it down — then put a
-        price into your rates on a tap. These are costs, not what you charge.
-      </p>
-
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Store</span>
-          <select
-            value={filter.store}
-            onChange={(event) => setFilter({ ...filter, store: event.target.value, chips: [] })}
-            aria-label="Store"
-            className="mt-1 min-h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2
-                       focus:border-sky-500 focus:outline-none"
-          >
-            <option value="">Every store</option>
-            {book.stores.map((one) => (
-              <option key={one.id} value={one.id}>
-                {one.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Search</span>
-          <input
-            type="search"
-            value={filter.query}
-            onChange={(event) => setFilter({ ...filter, query: event.target.value })}
-            placeholder="drywall"
-            aria-label="Search what the stores charge"
-            className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2
-                       focus:border-sky-500 focus:outline-none"
-          />
-        </label>
-      </div>
-
-      <Chips chips={chips} on={filter.chips} onToggle={toggle} />
-
-      <p className="mt-3 text-sm text-slate-600">
-        {rows.length} price{rows.length === 1 ? '' : 's'}
-        {store ? ` at ${store.name}` : ' across your stores'}
-        {filter.query.trim() === '' ? '' : ` matching “${filter.query.trim()}”`}.
-      </p>
-
-      {rows.length === 0 && (
+      {/* Every price at every shop, a dropdown, a search box and a row of
+          chips, under the rate book. A contractor with three shops and a
+          season of tags in it scrolls the length of his own buying history to
+          get past this. It folds now, and the shut row says how much is in it. */}
+      <Disclosure
+        heading="h2"
+        title="What the stores charge"
+        summary={`${rows.length} price${rows.length === 1 ? '' : 's'} across your shops`}
+      >
         <p className="mt-1 text-sm text-slate-600">
-          Nothing {store ? `at ${store.name} ` : ''}matches that. This app will not show you
-          another shop’s number in its place, or an average of the ones it has — if{' '}
-          {store ? store.name : 'a store'} has never quoted it, it has never quoted it.
+          Your own shops, your own prices. Pick a store, search it, narrow it down — then put a
+          price into your rates on a tap. These are costs, not what you charge.
         </p>
-      )}
 
-      <ul className="mt-2 divide-y divide-slate-100">
-        {rows.map((listing) => {
-          const moved = movement(listing);
-          const stale = listing.days > STALE_DAYS;
-          const fits = targets.filter((t) => t.unit === listing.price.unit);
-          return (
-            <li
-              key={`${listing.store.id}|${listing.price.item}|${listing.price.unit}`}
-              className="py-3"
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Store</span>
+            <select
+              value={filter.store}
+              onChange={(event) => setFilter({ ...filter, store: event.target.value, chips: [] })}
+              aria-label="Store"
+              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2
+                         focus:border-sky-500 focus:outline-none"
             >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="block text-sm text-slate-900">{listing.price.item}</span>
-                  <span className="block text-xs text-slate-500">
-                    {listing.store.name}
-                    {listing.price.category ? ` · ${listing.price.category}` : ''}
-                    {listing.price.code ? ` · their code ${listing.price.code}` : ''}
-                  </span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-mono tabular-nums text-slate-900">
-                    {money(listing.price.cents)}
-                  </span>
-                  <span className="block text-xs text-slate-500">/ {listing.price.unit}</span>
-                </span>
-              </div>
+              <option value="">Every store</option>
+              {book.stores.map((one) => (
+                <option key={one.id} value={one.id}>
+                  {one.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Search</span>
+            <input
+              type="search"
+              value={filter.query}
+              onChange={(event) => setFilter({ ...filter, query: event.target.value })}
+              placeholder="drywall"
+              aria-label="Search what the stores charge"
+              className="mt-1 min-h-12 w-full rounded-md border border-slate-300 px-3 py-2
+                         focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+        </div>
 
-              <p className={`mt-1 text-xs ${stale ? 'font-semibold text-red-700' : 'text-slate-500'}`}>
-                Seen {howOld(listing.days)} · {whereFrom(listing.price.evidence)}
-                {stale ? ` — nobody has checked this in over ${STALE_DAYS} days.` : ''}
-              </p>
+        <Chips chips={chips} on={filter.chips} onToggle={toggle} />
 
-              {moved && (
-                <p className="mt-1 text-xs text-slate-600">
-                  {percent(moved.basisPoints)} since you last looked — {money(moved.was)} on{' '}
-                  {moved.wasSeenAt}, {moved.days} days before this one. Both figures are yours.
-                </p>
-              )}
-
-              {listing.price.evidence.kind === 'tag' && <Tag name={listing.price.evidence.photo} />}
-
-              <Elsewhere book={book} listing={listing} now={now} />
-
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => use(listing, '')}
-                  className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium
-                             text-slate-700 active:bg-slate-100"
-                >
-                  Use it as my rate
-                </button>
-                {fits.length > 0 && (
-                  <label className="text-xs text-slate-600">
-                    <span className="sr-only">Put {listing.price.item} against one of my rates</span>
-                    <select
-                      defaultValue=""
-                      onChange={(event) => {
-                        if (event.target.value === '') return;
-                        use(listing, event.target.value);
-                        event.target.value = '';
-                      }}
-                      aria-label={`Put ${listing.price.item} against one of my rates`}
-                      className="min-h-11 rounded-md border border-slate-300 bg-white px-2 py-1
-                                 focus:border-sky-500 focus:outline-none"
-                    >
-                      <option value="">…or against one of my rates</option>
-                      {fits.map((t) => (
-                        <option key={t.item} value={t.item}>
-                          {t.item}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-
-      {told && (
-        <p role="status" className="mt-3 rounded-lg bg-slate-100 p-3 text-sm text-slate-800">
-          {told}
+        <p className="mt-3 text-sm text-slate-600">
+          {rows.length} price{rows.length === 1 ? '' : 's'}
+          {store ? ` at ${store.name}` : ' across your stores'}
+          {filter.query.trim() === '' ? '' : ` matching “${filter.query.trim()}”`}.
         </p>
-      )}
+
+        {rows.length === 0 && (
+          <p className="mt-1 text-sm text-slate-600">
+            Nothing {store ? `at ${store.name} ` : ''}matches that. This app will not show you
+            another shop’s number in its place, or an average of the ones it has — if{' '}
+            {store ? store.name : 'a store'} has never quoted it, it has never quoted it.
+          </p>
+        )}
+
+        <ul className="mt-2 divide-y divide-slate-100">
+          {rows.map((listing) => {
+            const moved = movement(listing);
+            const stale = listing.days > STALE_DAYS;
+            const fits = targets.filter((t) => t.unit === listing.price.unit);
+            return (
+              <li
+                key={`${listing.store.id}|${listing.price.item}|${listing.price.unit}`}
+                className="py-3"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm text-slate-900">{listing.price.item}</span>
+                    <span className="block text-xs text-slate-500">
+                      {listing.store.name}
+                      {listing.price.category ? ` · ${listing.price.category}` : ''}
+                      {listing.price.code ? ` · their code ${listing.price.code}` : ''}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block font-mono tabular-nums text-slate-900">
+                      {money(listing.price.cents)}
+                    </span>
+                    <span className="block text-xs text-slate-500">/ {listing.price.unit}</span>
+                  </span>
+                </div>
+
+                <p className={`mt-1 text-xs ${stale ? 'font-semibold text-red-700' : 'text-slate-500'}`}>
+                  Seen {howOld(listing.days)} · {whereFrom(listing.price.evidence)}
+                  {stale ? ` — nobody has checked this in over ${STALE_DAYS} days.` : ''}
+                </p>
+
+                {moved && (
+                  <p className="mt-1 text-xs text-slate-600">
+                    {percent(moved.basisPoints)} since you last looked — {money(moved.was)} on{' '}
+                    {moved.wasSeenAt}, {moved.days} days before this one. Both figures are yours.
+                  </p>
+                )}
+
+                {listing.price.evidence.kind === 'tag' && <Tag name={listing.price.evidence.photo} />}
+
+                <Elsewhere book={book} listing={listing} now={now} />
+
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => use(listing, '')}
+                    className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-medium
+                               text-slate-700 active:bg-slate-100"
+                  >
+                    Use it as my rate
+                  </button>
+                  {fits.length > 0 && (
+                    <label className="text-xs text-slate-600">
+                      <span className="sr-only">Put {listing.price.item} against one of my rates</span>
+                      <select
+                        defaultValue=""
+                        onChange={(event) => {
+                          if (event.target.value === '') return;
+                          use(listing, event.target.value);
+                          event.target.value = '';
+                        }}
+                        aria-label={`Put ${listing.price.item} against one of my rates`}
+                        className="min-h-11 rounded-md border border-slate-300 bg-white px-2 py-1
+                                   focus:border-sky-500 focus:outline-none"
+                      >
+                        <option value="">…or against one of my rates</option>
+                        {fits.map((t) => (
+                          <option key={t.item} value={t.item}>
+                            {t.item}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        {told && (
+          <p role="status" className="mt-3 rounded-lg bg-slate-100 p-3 text-sm text-slate-800">
+            {told}
+          </p>
+        )}
+      </Disclosure>
     </section>
   );
 }

@@ -47,6 +47,62 @@ import { roomQuantities } from './zone.ts';
  * get at. That is the same act on the same measured wall, so it is the same
  * record — see `ConditionKind` for why one model carries both, and `losses` for
  * the one line that keeps a condition note off an insurer's estimate.
+ *
+ * ## The ceiling, and why a mark on it has no position
+ *
+ * A wall mark is placed by two lengths along the wall and one height off the
+ * floor, and every one of those three is a number read straight off a tape
+ * hooked in a corner somebody can put a thumb on. **A ceiling has no corner to
+ * hook a tape in.** It has no *along*, because nothing on it runs in a
+ * direction anybody has named, and no *height*, because all of it is at one
+ * height already — which is the height the room is.
+ *
+ * Three ways of placing a ceiling mark were weighed, and two were turned down:
+ *
+ *   - **A point on the plan.** To put a stain at a point somebody has to give
+ *     it two coordinates, from a corner of the room he is not standing near,
+ *     at the top of a ladder with his head back. That is the defect the wall
+ *     form was just rid of — `from` and `to` made him add a coordinate up in
+ *     his head — and it is worse here: two coordinates instead of one, and
+ *     neither with a corner to start from.
+ *   - **An area in square feet, typed.** The shape `Part` takes in `work.ts`,
+ *     and honest about whose figure it is. But a man who has just measured a
+ *     stain is holding two tape readings and not a square footage, so typing
+ *     one means multiplying four by three on a ladder — and that is a sum
+ *     nothing afterwards can catch, because `12` is a perfectly good area and
+ *     the mark simply comes out the wrong size.
+ *   - **No position at all, and an extent instead.** Taken.
+ *
+ * So a ceiling mark says **how much of the ceiling** and never **where on it**.
+ * There are two honest answers to how much, and a third that answers neither
+ * and says so:
+ *
+ *   - all of it — the ceiling that came down, which `Surface` has carried since
+ *     this module was written;
+ *   - a patch of it — `Spread`, the two tape readings he actually took across
+ *     the stain, multiplied here in exact nanometres rather than in his head;
+ *   - a spot on it — a `Pin` with `on: 'ceiling'`, no point and no area, for
+ *     the nail pop and the hole where the light fitting was.
+ *
+ * **Nothing is lost by dropping the position**, and that is the test the
+ * decision had to pass. Position on a wall earns its keep twice over: the
+ * elevation draws the patch where it is, and the plan draws the stretch of wall
+ * that has to come out. A ceiling has no elevation, and `damageRunOnPlan` has
+ * refused to draw a ceiling on the plan since the day it was written — the
+ * ceiling *is* the room, and hatching the whole room red would hide the walls
+ * the drawing exists to show. A coordinate nothing can draw is a number
+ * somebody typed for nobody.
+ *
+ * **A patch is his tape and not the room's**, and it is held to the rule
+ * `readPart` holds a typed figure to. The room goes on measuring the ceiling it
+ * measures — `roomQuantities().ceilingArea`, which follows the floor — and a
+ * patch is recorded beside that and never over it. It is refused when it is
+ * bigger than the ceiling it claims to be part of, with both figures in the
+ * sentence. It is never called measured. And its workings say in words that it
+ * is the rectangle the damage fits inside, because water does not make
+ * rectangles and the difference is not visible anywhere else: a wall patch is
+ * drawn on an elevation where a person can see the bound for himself, and a
+ * ceiling patch has nowhere to be drawn.
  */
 
 export class DamageError extends RoomError {}
@@ -173,10 +229,31 @@ export const WATER_CATEGORY: Record<WaterCategory, { plain: string; long: string
  */
 export interface Pin {
   readonly kind: 'pin';
-  readonly at: Point;
+  /**
+   * Where in the room it is.
+   *
+   * Absent on the ceiling, and only there. A point on a wall or on the floor
+   * comes off a tap on a drawing somebody is looking down at, so it has a place
+   * and the place is real. A point on a ceiling has neither: nothing on the
+   * plan is the ceiling, and there is no corner to measure a coordinate from.
+   * So it is left out rather than filled in with the room's origin — which is a
+   * real corner of a real room, and a marker drawn there would put somebody's
+   * mark in a place he never pointed at.
+   */
+  readonly at?: Point;
   /** How far off the floor, when it is known. */
   readonly height?: Nanometres;
   readonly wallId?: string;
+  /**
+   * The ceiling, when the spot is on the ceiling.
+   *
+   * Only ever the ceiling, because it is the only surface of a room that has no
+   * other way of being named. A wall says which wall. The floor is the thing
+   * the plan draws, so a spot on it is a point like any other. The ceiling is
+   * the one with nothing to point at, so it is the one that has to say its own
+   * name.
+   */
+  readonly on?: 'ceiling';
 }
 
 /**
@@ -197,12 +274,46 @@ export interface Patch {
   readonly toHeight: Nanometres;
 }
 
-/** All of one thing: this whole wall, the ceiling, the floor. */
+/**
+ * How big a patch of the ceiling is, from the two tape readings across it.
+ *
+ * Neither of them is *along* anything. A ceiling has no corner to measure from
+ * and no direction anybody has named, so these are simply the two ways somebody
+ * ran a tape over the stain, in the order he ran them. Swapping them describes
+ * the same patch, which is the honest consequence of a surface with no
+ * orientation, and `damageQuantity` multiplies them so it cannot matter.
+ *
+ * Two lengths and not one area, deliberately. The area is the multiplication of
+ * these two, done here in exact nanometres — never four times three worked out
+ * in somebody's head at the top of a ladder, where a slip produces a number
+ * that is still a perfectly valid area and is simply wrong.
+ */
+export interface Spread {
+  readonly oneWay: Nanometres;
+  readonly theOtherWay: Nanometres;
+}
+
+/**
+ * One of the room's own surfaces: this whole wall, the floor, the ceiling — or
+ * a patch of the ceiling.
+ *
+ * The patch is the one thing here that is not all of something, and it is on
+ * the ceiling alone. See the note at the top of this file: a wall and a floor
+ * both have a place a mark can be put and drawn, and the ceiling is the one
+ * surface where extent is all there honestly is.
+ */
 export interface Surface {
   readonly kind: 'surface';
   readonly surface: 'wall' | 'ceiling' | 'floor';
   /** Which wall, when it is a wall. */
   readonly wallId?: string;
+  /**
+   * Part of the ceiling rather than all of it.
+   *
+   * Left off means the whole surface, which is what a `Surface` has always
+   * meant and what every mark recorded before this says.
+   */
+  readonly patch?: Spread;
 }
 
 export type DamageShape = Pin | Patch | Surface;
@@ -446,12 +557,66 @@ export function validateDamage(room: Room, damage: Damage): void {
     }
   }
 
-  if (shape.kind === 'surface' && shape.surface === 'wall') {
-    if (!shape.wallId) throw new DamageError('A damaged wall has to say which wall.');
-    wallOf(room, shape.wallId);
+  if (shape.kind === 'surface') {
+    if (shape.surface === 'wall') {
+      if (!shape.wallId) throw new DamageError('A damaged wall has to say which wall.');
+      wallOf(room, shape.wallId);
+    }
+    if (shape.patch !== undefined) checkCeilingPatch(room, shape);
   }
 
   if (shape.kind === 'pin' && shape.wallId !== undefined) wallOf(room, shape.wallId);
+  if (shape.kind === 'pin' && shape.on === 'ceiling' && shape.wallId !== undefined) {
+    throw new DamageError(
+      `That spot is on the ceiling and on "${shape.wallId}" at the same time. A mark is on one ` +
+        `surface, and which one decides where it is priced and which panel it appears under.`
+    );
+  }
+}
+
+/**
+ * Refuses a patch of ceiling that is not a patch of this ceiling.
+ *
+ * The same discipline `readPart` keeps over a typed quantity, for the same
+ * reason: this is the one figure on a ceiling mark that no geometry produced,
+ * so every way of getting it wrong is answered in a sentence somebody can act
+ * on rather than clamped, rounded or quietly taken as it comes.
+ */
+function checkCeilingPatch(room: Room, shape: Surface): void {
+  const patch = shape.patch!;
+  if (shape.surface !== 'ceiling') {
+    throw new DamageError(
+      `Part of ${shape.surface === 'wall' ? `"${shape.wallId ?? 'a wall'}"` : 'the floor'} is ` +
+        `marked by where it is, not only by how big it is — ${
+          shape.surface === 'wall'
+            ? 'mark the area on the wall instead, which the elevation can draw'
+            : 'put a spot on the plan instead, which is a place somebody can point at'
+        }. Only the ceiling has nowhere for a position to go.`
+    );
+  }
+  if (patch.oneWay <= 0n || patch.theOtherWay <= 0n) {
+    throw new DamageError(
+      `A patch ${formatFeetInches(patch.oneWay)} one way by ` +
+        `${formatFeetInches(patch.theOtherWay)} the other is not a size. Something with no size ` +
+        `is a spot on the ceiling — mark it as one, and it carries the photograph just the same.`
+    );
+  }
+  const whole = roomQuantities(room).ceilingArea;
+  const covered = 2n * patch.oneWay * patch.theOtherWay;
+  if (covered > whole) {
+    throw new DamageError(
+      `That patch is ${squareFeet(covered)} sq ft, and the whole ceiling of "${room.name}" is ` +
+        `${squareFeet(whole)} sq ft. A part cannot be bigger than the thing it is part of — ` +
+        `check the tape, or mark the whole ceiling.`
+    );
+  }
+}
+
+/** The doubled area unit, to square feet, to one place. For a refusal to quote. */
+function squareFeet(halves: bigint): string {
+  const half = NM_PER_FOOT * NM_PER_FOOT * 2n;
+  const tenths = (halves * 10n + half / 2n) / half;
+  return `${tenths / 10n}.${tenths % 10n}`;
 }
 
 /* ------------------------------------------------------------- quantities */
@@ -485,14 +650,20 @@ export function damageQuantity(room: Room, damage: Damage): DamageQuantity {
   const shape = damage.shape;
 
   if (shape.kind === 'pin') {
+    // A spot on the ceiling says so, because the ceiling is the one surface a
+    // spot cannot be found on the plan afterwards — there is no marker on the
+    // drawing and no wall name beside it, so the words are the whole of where.
+    const onTheCeiling = shape.on === 'ceiling';
     return {
       damageId: damage.id,
-      what: `${markWord(damage.kind)}, marked`,
+      what: `${markWord(damage.kind)}, marked${onTheCeiling ? ' on the ceiling' : ''}`,
       faceArea: 0n,
       baseboardRun: 0n,
       flatArea: 0n,
       // Said plainly rather than left as a zero somebody has to interpret.
-      workings: 'a marked point — no area, because a pin is a marker and not a measurement',
+      workings: onTheCeiling
+        ? 'a marked spot on the ceiling — no area, because a pin is a marker and not a measurement'
+        : 'a marked point — no area, because a pin is a marker and not a measurement',
       cut: false,
     };
   }
@@ -561,6 +732,27 @@ export function damageQuantity(room: Room, damage: Damage): DamageQuantity {
       baseboardRun: length - doors,
       flatArea: 0n,
       workings: `the whole of ${shape.wallId}, ${formatFeetInches(length)} by ${formatFeetInches(height)}, less every opening`,
+      cut: false,
+    };
+  }
+
+  // A patch of the ceiling. His two tape readings, multiplied here — the only
+  // arithmetic on a ceiling mark, done in exact nanometres so it is never done
+  // on a ladder. The workings name it as a rectangle round the damage rather
+  // than the damage itself, because nothing draws a ceiling patch and the words
+  // are the only place that difference can be seen.
+  if (shape.patch !== undefined) {
+    const { oneWay, theOtherWay } = shape.patch;
+    return {
+      damageId: damage.id,
+      what: `${markWord(damage.kind)} — part of the ceiling`,
+      faceArea: 0n,
+      baseboardRun: 0n,
+      flatArea: 2n * oneWay * theOtherWay,
+      workings:
+        `${formatFeetInches(oneWay)} by ${formatFeetInches(theOtherWay)} of the ceiling of ` +
+        `${room.name} — the rectangle it fits inside, taped across it rather than measured off ` +
+        `the room`,
       cut: false,
     };
   }

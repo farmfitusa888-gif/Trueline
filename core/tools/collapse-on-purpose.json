@@ -1,0 +1,3 @@
+{
+  "_why": "Blocks that a control opens and that deliberately have no way back, each with the reason it stays. Anything not in here and not foldable is on the list until somebody deals with it. A reason is required and its length is checked: an entry with a thin one is refused as loudly as a block that will not fold, because 'we will get to it' is how a list like this stops being read. Keyed 'web/src/File.tsx: theState', which is exactly how check-collapse.py prints a finding, so the key can be copied straight out of the output. The file is empty on purpose -- every block a control opens in web/src today can be folded back by something a person presses, and not one of them has yet needed arguing out."
+}

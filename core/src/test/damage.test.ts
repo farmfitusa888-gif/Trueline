@@ -17,6 +17,9 @@ import {
   suggestedCut,
   validateDamage,
 } from '../damage.ts';
+// The claim's own sheet, because the one property a new shape could have broken
+// lives there rather than here. See the test at the foot of this file.
+import { damageScope } from '../scope.ts';
 
 /**
  * Where the damage is, and what it will take to put right.
@@ -426,4 +429,320 @@ test('a pin and a floor get no stretch, because they have no length', () => {
   assert.equal(damageRunOnPlan(room, floor), undefined);
   // The pin still has a point, because a point is what it is.
   assert.deepEqual(damageOnPlan(room, pin), { x: parseLength(`4'`), y: parseLength(`5'`) });
+});
+
+/* ---------------------------------------------------------- the ceiling */
+
+/**
+ * A mark on the ceiling, which has no "along" and no height.
+ *
+ * The reasoning for the shape of these is at the top of `damage.ts`. What is
+ * checked here is what a contractor is standing under: the two tape readings he
+ * took are multiplied here rather than in his head, the answer is exact, a
+ * patch that is bigger than the ceiling is refused with both figures in the
+ * sentence, and nothing on the ceiling ever claims to have been measured off
+ * the room.
+ */
+
+/** The basement's ceiling follows its floor: 20 x 10 is 200 sq ft. */
+const CEILING_SQ_FT = 200n;
+
+const ceilingBase = {
+  ...base,
+  id: 'c-1',
+  note: 'staining round the waste pipe from the bathroom above',
+};
+
+test('a patch of ceiling is the two tape readings multiplied, exactly', () => {
+  // Six by four is twenty-four square feet, and the multiplication happens here
+  // in nanometres rather than on a ladder.
+  const stain: Damage = {
+    ...ceilingBase,
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  const q = damageQuantity(room, stain);
+  assert.equal(q.flatArea / (2n * FT2), 24n);
+  assert.equal(q.flatArea, 2n * parseLength(`6'`) * parseLength(`4'`));
+  assert.equal(q.faceArea, 0n, 'a ceiling is not wall face');
+  assert.equal(q.baseboardRun, 0n, 'nothing on a ceiling reaches the floor');
+});
+
+test('a patch of ceiling is exact on a reading that is not a round foot', () => {
+  // 3'7" by 2'5" is 8.65... sq ft and no part of it is ever a float. The whole
+  // of the arithmetic is one bigint multiply, which is the same rule every
+  // measurement in this app keeps.
+  const odd: Damage = {
+    ...ceilingBase,
+    id: 'c-odd',
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`3' 7"`), theOtherWay: parseLength(`2' 5"`) },
+    },
+  };
+  assert.equal(
+    damageQuantity(room, odd).flatArea,
+    2n * parseLength(`3' 7"`) * parseLength(`2' 5"`)
+  );
+});
+
+test('the two readings can be taken in either order, because a ceiling has no along', () => {
+  const oneRound: Damage = {
+    ...ceilingBase,
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  const theOther: Damage = {
+    ...ceilingBase,
+    id: 'c-swapped',
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`4'`), theOtherWay: parseLength(`6'`) },
+    },
+  };
+  assert.equal(
+    damageQuantity(room, oneRound).flatArea,
+    damageQuantity(room, theOther).flatArea
+  );
+});
+
+test('the workings say it is a rectangle round the damage, and never say measured', () => {
+  // Nothing draws a ceiling patch — there is no elevation and the plan will not
+  // hatch the whole room — so the words are the only place the difference
+  // between the stain and the rectangle round it can be seen.
+  const stain: Damage = {
+    ...ceilingBase,
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  const q = damageQuantity(room, stain);
+  assert.match(q.workings, /6' by 4'/);
+  assert.match(q.workings, /rectangle it fits inside/);
+  assert.match(q.workings, /taped across it rather than measured off the room/);
+  assert.doesNotMatch(q.what, /measured/);
+});
+
+test('a patch bigger than the ceiling is refused, with both figures', () => {
+  const impossible: Damage = {
+    ...ceilingBase,
+    id: 'c-too-big',
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`30'`), theOtherWay: parseLength(`30'`) },
+    },
+  };
+  assert.throws(
+    () => validateDamage(room, impossible),
+    (error: unknown) => {
+      assert.ok(error instanceof DamageError);
+      // 30 x 30 is 900, and the basement's ceiling is 200.
+      assert.match(error.message, /900\.0 sq ft/);
+      assert.match(error.message, /200\.0 sq ft/);
+      assert.match(error.message, /cannot be bigger than the thing it is part of/);
+      return true;
+    }
+  );
+});
+
+test('a patch of ceiling with no size is a spot, and is told so', () => {
+  const nothing: Damage = {
+    ...ceilingBase,
+    id: 'c-none',
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`4'`), theOtherWay: 0n },
+    },
+  };
+  assert.throws(
+    () => validateDamage(room, nothing),
+    (error: unknown) => {
+      assert.ok(error instanceof DamageError);
+      assert.match(error.message, /spot on the ceiling/);
+      return true;
+    }
+  );
+});
+
+test('a patch belongs to the ceiling alone, because everything else has a place', () => {
+  // A wall region is a `Patch`, which the elevation draws where it is. A spot
+  // on the floor is a point on the plan. The ceiling is the one surface where
+  // extent is all there honestly is, so it is the only one that takes a size
+  // with no position.
+  const onAWall: Damage = {
+    ...ceilingBase,
+    id: 'c-wall',
+    shape: {
+      kind: 'surface',
+      surface: 'wall',
+      wallId: 'north',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  const onTheFloor: Damage = {
+    ...ceilingBase,
+    id: 'c-floor',
+    shape: {
+      kind: 'surface',
+      surface: 'floor',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  assert.throws(() => validateDamage(room, onAWall), DamageError);
+  assert.throws(() => validateDamage(room, onTheFloor), DamageError);
+});
+
+test('the whole ceiling is still the room’s own area, and a patch never moves it', () => {
+  const allOfIt: Damage = {
+    ...ceilingBase,
+    id: 'c-all',
+    shape: { kind: 'surface', surface: 'ceiling' },
+  };
+  const part: Damage = {
+    ...ceilingBase,
+    id: 'c-part',
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  assert.equal(damageQuantity(room, allOfIt).flatArea / (2n * FT2), CEILING_SQ_FT);
+  // Marking part of it is recorded beside what the room measures and never over
+  // it — the same rule a typed part keeps in `work.ts`. So the whole ceiling is
+  // still 200 sq ft with a 24 sq ft patch marked on it.
+  assert.equal(damageQuantity(room, part).flatArea / (2n * FT2), 24n);
+  assert.equal(
+    damageQuantity(room, { ...allOfIt, id: 'c-all-again' }).flatArea / (2n * FT2),
+    CEILING_SQ_FT
+  );
+});
+
+test('a spot on the ceiling has no area, and says which surface it is on', () => {
+  const nailPop: Damage = {
+    ...ceilingBase,
+    id: 'c-spot',
+    kind: 'impact',
+    note: 'nail pop over the table',
+    shape: { kind: 'pin', on: 'ceiling' },
+  };
+  const q = damageQuantity(room, nailPop);
+  assert.equal(q.faceArea, 0n);
+  assert.equal(q.flatArea, 0n);
+  assert.match(q.what, /marked on the ceiling/);
+  // Both halves, and the second is the one that matters: a marker is not a
+  // measurement, and a spot that stopped saying so would read as an area
+  // somebody forgot to fill in.
+  assert.match(q.workings, /a marked spot on the ceiling/);
+  assert.match(q.workings, /no area, because a pin is a marker and not a measurement/);
+});
+
+test('a spot cannot be on the ceiling and on a wall at once', () => {
+  const both: Damage = {
+    ...ceilingBase,
+    id: 'c-both',
+    shape: { kind: 'pin', on: 'ceiling', wallId: 'north' },
+  };
+  assert.throws(() => validateDamage(room, both), DamageError);
+});
+
+test('nothing on the ceiling is drawn on the plan, because the ceiling is the room', () => {
+  // Hatching the whole room red would hide the walls the drawing exists to
+  // show, which is why a coordinate on a ceiling would be a number nothing
+  // could ever draw.
+  const part: Damage = {
+    ...ceilingBase,
+    id: 'c-plan',
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  const spot: Damage = { ...ceilingBase, id: 'c-plan-spot', shape: { kind: 'pin', on: 'ceiling' } };
+  assert.equal(damageRunOnPlan(room, part), undefined);
+  assert.equal(damageOnPlan(room, part), undefined);
+  assert.equal(damageRunOnPlan(room, spot), undefined);
+  assert.equal(damageOnPlan(room, spot), undefined);
+});
+
+test('a ceiling mark leaves the wall face where it was', () => {
+  // The figure an adjuster reaches for is a share of the room's wall face. A
+  // ceiling has none, and a mark on it must not move that number by a thousandth.
+  const part: Damage = {
+    ...ceilingBase,
+    id: 'c-share',
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  assert.equal(affectedPerMille(room, [waterline, part]), affectedPerMille(room, [waterline]));
+  const totals = damageTotals(room, [waterline, part]);
+  assert.equal(totals.faceArea / FT2, 18n);
+  assert.equal(totals.flatArea / (2n * FT2), 24n);
+  assert.equal(totals.pins, 0, 'a patch of ceiling is an area, not a marker');
+});
+
+test('a spot on the ceiling is counted as a marker rather than hidden', () => {
+  const spot: Damage = { ...ceilingBase, id: 'c-counted', shape: { kind: 'pin', on: 'ceiling' } };
+  assert.equal(damageTotals(room, [spot]).pins, 1);
+});
+
+/**
+ * The claim prices a ceiling mark the way it prices a wall mark.
+ *
+ * This is a `scope.ts` property and it is checked here on purpose: it is the
+ * one thing outside this module that a new shape could have broken, and the
+ * answer — that it needed no change at all, because `linesFor` already reads
+ * the surface off the shape and the area off `flatArea` — is only worth
+ * anything if something runs it.
+ */
+test('a patch of ceiling prices as ceiling finish, out and back, at its own area', () => {
+  const stain: Damage = {
+    ...ceilingBase,
+    id: 'c-priced',
+    shape: {
+      kind: 'surface',
+      surface: 'ceiling',
+      patch: { oneWay: parseLength(`6'`), theOtherWay: parseLength(`4'`) },
+    },
+  };
+  const scope = damageScope(room, [stain], T0);
+  const out = scope.lines.find((line) => line.what === 'Remove ceiling finish');
+  const back = scope.lines.find((line) => line.what === 'Replace ceiling finish');
+  assert.ok(out, 'the ceiling finish comes out');
+  assert.ok(back, 'and goes back');
+  assert.equal(out.quantity, '24.0');
+  assert.equal(back.quantity, '24.0');
+  assert.equal(out.unit, 'sq ft');
+  // Never a wall line: there is no board and no base on a ceiling patch.
+  assert.equal(scope.lines.some((line) => /wall board|baseboard/i.test(line.what)), false);
+});
+
+test('a spot on the ceiling is on the claim as an observation and never as work', () => {
+  const spot: Damage = {
+    ...ceilingBase,
+    id: 'c-observed',
+    kind: 'mould',
+    note: 'black spotting at the corner over the window',
+    shape: { kind: 'pin', on: 'ceiling' },
+  };
+  const scope = damageScope(room, [spot], T0);
+  assert.equal(scope.lines.length, 0, 'nobody can price a marker');
+  assert.equal(scope.noWork.length, 1);
+  assert.match(scope.noWork[0]!, /black spotting at the corner over the window/);
 });

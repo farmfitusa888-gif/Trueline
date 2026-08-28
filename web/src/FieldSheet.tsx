@@ -82,9 +82,27 @@ export function FieldSheet({ room, footprints, marks = [], voice = [] }: FieldSh
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="text-sm text-slate-500 underline underline-offset-4"
+          /* Sam asked for a way back off every menu that drops down. This one
+             had one — the same control says Hide once it is open — and had
+             none of the rest of it: no `aria-expanded`, so nothing announced
+             that it opened anything, and a target no taller than the one
+             line of small text written on it.
+             The words stay Show and Hide rather than becoming Open and Close:
+             `a22-voice.mjs` presses this button by the word Show, and that
+             part is not this one's to edit. */
+          aria-expanded={open}
+          aria-controls="the-field-list"
+          className="inline-flex min-h-12 items-center gap-1 text-sm text-slate-500
+                     underline underline-offset-4"
         >
           {open ? 'Hide' : 'Show'}
+          <svg
+            viewBox="0 0 16 16" aria-hidden="true"
+            className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
+          >
+            <path d="M3 6l5 5 5-5" fill="none" stroke="currentColor"
+                  strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 print:hidden">
@@ -132,6 +150,7 @@ export function FieldSheet({ room, footprints, marks = [], voice = [] }: FieldSh
       {/* Always in the document so printing works whether or not it is expanded
           on screen; hidden visually until asked for. */}
       <pre
+        id="the-field-list"
         className={`mt-3 overflow-x-auto whitespace-pre rounded-md bg-slate-50 p-3 font-mono text-[13px]
                     leading-snug text-slate-800 print:block print:bg-white print:p-0 print:text-black
                     ${open ? '' : 'hidden'}`}

@@ -138,6 +138,15 @@ export function Price({
                           setAmount(over ? line.quantity : '');
                           setWhy(over?.why ?? '');
                         }}
+                        /* This row already folded back — the same control
+                           opens and shuts it, which is what Sam asked for
+                           everywhere. What it never did was SAY that it opens
+                           anything, so a screen reader announced a button with
+                           nothing behind it. The words are left exactly as
+                           they were: `a19-money.mjs` and `a33-howmuch.mjs`
+                           reach this by them. */
+                        aria-expanded={changing === key}
+                        aria-controls={`price-${key}`}
                         className="min-h-11 text-xs text-slate-500 underline underline-offset-4"
                       >
                         {changing === key ? 'Done' : over ? 'Change' : 'Price a different number'}
@@ -152,7 +161,7 @@ export function Price({
                   )}
 
                   {changing === key && (
-                    <div className="mt-2 rounded-md bg-slate-50 p-3">
+                    <div id={`price-${key}`} className="mt-2 rounded-md bg-slate-50 p-3">
                       <p className="text-xs text-slate-600">
                         This room measures{' '}
                         <strong className="font-mono tabular-nums">
