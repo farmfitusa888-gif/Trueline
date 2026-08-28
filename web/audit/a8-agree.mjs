@@ -77,8 +77,15 @@ if (priced) {
 
   // A signature with no name attributes to nobody, and is refused.
   const pad = page.getByRole('img', { name: 'Sign here with your finger' });
-  const box = await pad.boundingBox();
+  // The pad is measured on EVERY stroke, and scrolled to first. On a real
+  // phone height it starts below the fold, and mouse coordinates are viewport
+  // coordinates: a box read once, before scrolling, points at empty air after
+  // the page moves, and the finger draws nothing at all.
   const draw = async () => {
+    await pad.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(100);
+    const box = await pad.boundingBox();
+    if (!box) throw new Error('the signature pad has no box on screen');
     await page.mouse.move(box.x + 40, box.y + 90);
     await page.mouse.down();
     await page.mouse.move(box.x + 120, box.y + 40, { steps: 8 });
