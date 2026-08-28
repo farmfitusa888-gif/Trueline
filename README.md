@@ -63,15 +63,14 @@ Measured on 28 August 2026, at the last commit, by running the commands named:
 
 | | |
 |---|---|
-| Tests | **1,132 passing, 0 failing** (`npm test`) |
+| Tests | **1,303 passing, 0 failing** (`npm test`) |
 | Typecheck | clean, both workspaces (`npm run typecheck`) |
-| Handbook | **73 cards, 159 quoted labels, every one of them in the app's source** (`npm run check-guide`) |
+| Browser audit | **all 56 parts pass** (`npm run audit`) — builds the app, serves it, drives it in a real browser |
+| Handbook | **77 cards, 163 quoted labels, every one of them in the app's source** (`npm run check-guide`) |
 | Every exported function reachable | yes, or excused in writing (`npm run what-is-left`) |
-| Controls nothing drives | **79, in 28 files** (`npm run what-is-untouched`) — red, and deliberately outside `npm run verify`. The number moves with every control added and every audit part written |
+| Controls nothing drives | **0, with an empty excuse file** (`npm run what-is-untouched`) — in `npm run verify` now that it is green |
+| Every checker watched failing | yes (`npm run check-the-checks`) |
 | Run against | Node 22.22.2 |
-
-`npm run audit` builds the app, serves it, and drives it in a real browser across
-38 parts. It is not in the table because it was not run here.
 
 ## What works today
 
@@ -204,10 +203,15 @@ repository cannot reach. `core/tools/check-paywall.py --release` refuses a build
 sale with the giveaway still switched on. There is no reviewer back door and there will not be
 one.
 
-**There is no server, so there is no API, no accounts and no hosted client link.** The
-self-contained client file is what exists instead: one file, opening in any browser, with
-nothing fetched. The hosted version costs a server from the day it is turned on, which is
-exactly why it is not built. `docs/v3.md` says what it would add and what it would cost.
+**There is no server, so there is no API and no accounts** — and there is not going to be a
+login, on either half. On the phone Apple says who paid; in a browser a code the phone makes
+says so. The app itself runs at a public address as a static site with no backend
+(`docs/the-browser-version.md`), gated on exactly the line `core/src/entitlement.ts` draws for
+the phone, and a self-contained client file still opens in any browser with nothing fetched.
+What is still not built is a **hosted, shared** version: rooms on a server, reachable from two
+devices without a file passing between them. That costs a server from the day it is turned on,
+which is exactly why it is not built. `docs/v3.md` says what it would add and what it would
+cost.
 
 **No AI is wired in.** `docs/AI.md` is research and says so in its opening paragraph. Nothing in
 `core/`, `web/` or `ios/` calls a model. When something does, it will write language and never
@@ -216,9 +220,12 @@ a measurement, a quantity, a rate or a total.
 **The browser audit and the film tooling need a network the first time.** Both resolve a
 Chromium build on disk and name `npx playwright install chromium` when they cannot find one.
 
-**`npm run what-is-untouched` is red: 79 control names nothing in the audit drives, in 28
-files.** It is deliberately not in `npm run verify`, because a gate that is red on arrival is a
-gate people learn to skip. It is a real backlog, not a broken checker.
+**The scan folders written before 2026-08-28 can hold another room's corrections.** A scan used
+to be filed under the name typed into the box rather than under its own folder, so two rooms of
+the same name shared one key — and a hand-drawn room ended up inside a garage scan's folder,
+where it outranked the capture. The naming is fixed and `isCorrectionOf` makes such a folder
+show its capture and say so, but the stray file is still on disk: nothing deletes somebody's
+work on one screen's judgement. Delete those folders by hand once you have looked at them.
 
 ## Running it
 
