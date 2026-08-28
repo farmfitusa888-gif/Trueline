@@ -721,3 +721,92 @@ footer .fine { font-family: var(--f-mono); font-size: .7rem; color: var(--quiet)
 }
 .ground:hover { color: var(--ink); border-color: var(--ink); }
 .ground:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+
+/* ------------------------------------------------------------ calculators */
+
+/* The instrument, as a control panel: labels in the mono face that every other
+   figure on this site uses, boxes that are boxes, and the answer set below the
+   form in the same `.spec` table the home page states the app's own
+   specification in. Nothing here is a new visual idea — a calculator that
+   looked like a different site would read as an embed from somebody else.
+
+   Two controls are `hidden` in the generated HTML and unhidden by `calc.js`:
+   the shape switch and the submit button. With no JavaScript the form cannot
+   compute, so neither of them can do anything, and a control that does nothing
+   is worse than no control. What is left is a plain form, the formula, and a
+   worked example — which is still a page worth reading. */
+
+.calc {
+  border: 1px solid var(--rule); border-radius: .25rem; background: var(--raised);
+  padding: clamp(1rem, 3vw, 1.6rem); margin: 2rem 0;
+}
+.calc-grid { display: grid; gap: .9rem 1.2rem; }
+@media (min-width: 34rem) { .calc-grid { grid-template-columns: 1fr 1fr; } }
+
+.calc-field { display: grid; gap: .3rem; margin-bottom: .9rem; align-content: start; }
+/* Without `align-content: start` the two boxes of a side-by-side pair sit at
+   different heights whenever one of their hints wraps onto a second line. */
+.calc-grid .calc-field { margin-bottom: 0; }
+.calc-field label {
+  font-family: var(--f-mono); font-size: .66rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--quiet);
+}
+.calc input[type=text], .calc input[type=number], .calc select {
+  min-height: 2.7rem; padding: .45rem .7rem; border-radius: .2rem;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+  font: inherit; font-family: var(--f-mono); font-size: .95rem;
+  font-variant-numeric: tabular-nums; width: 100%;
+}
+.calc input:focus-visible, .calc select:focus-visible {
+  outline: 2px solid var(--yellow); outline-offset: 1px;
+}
+.calc-hint { font-size: .82rem; color: var(--quiet); max-width: 52ch; }
+
+.calc-switch, .calc-openings {
+  border: 1px solid var(--rule-faint); border-radius: .25rem;
+  padding: .9rem 1rem 1rem; margin: 0 0 1.1rem;
+}
+.calc-switch[hidden] { display: none; }
+.calc-switch legend, .calc-openings legend {
+  font-family: var(--f-mono); font-size: .66rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--quiet); padding: 0 .4rem;
+}
+.calc-switch { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: center; }
+.calc-switch label, .calc-check {
+  display: flex; align-items: center; gap: .5rem; font-size: .95rem; min-height: 2.2rem;
+}
+.calc-check { margin-bottom: .9rem; }
+.calc input[type=radio], .calc input[type=checkbox] { accent-color: var(--yellow); }
+
+.open-row { display: grid; gap: .5rem .9rem; margin-top: .8rem; }
+@media (min-width: 34rem) { .open-row { grid-template-columns: 7rem 1fr 1fr; } }
+
+.walk { display: grid; gap: .5rem; margin-top: .7rem; }
+.walk-row { display: grid; grid-template-columns: 1.6rem 8rem 1fr; gap: .5rem; align-items: center; }
+.walk-n {
+  font-family: var(--f-mono); font-size: .7rem; color: var(--quiet);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+
+.calc-act { margin: 1.1rem 0 0; }
+.calc-act [hidden] { display: none; }
+.calc-out { margin-top: 1.2rem; }
+.calc-out:empty { display: none; }
+/* The answer sits on the sunk ground so it reads as output rather than as more
+   form. Its rows are the same `.spec` list the specification uses. */
+.calc-out .spec {
+  border-top: 1px solid var(--rule); background: var(--sunk);
+  padding: .2rem .9rem; border-radius: .2rem;
+}
+.calc-out .spec dd { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.calc-out .formula { margin: 1.1rem 0 0; }
+.calc-out .formula .eq + .eq { margin-top: .35rem; }
+.calc-out .note { margin-top: 1rem; }
+.calc-fine {
+  font-family: var(--f-mono); font-size: .68rem; color: var(--quiet);
+  margin: 1.1rem 0 0; max-width: none;
+}
+
+/* The templates page grew four shelves, and the blurb under a shelf heading was
+   only ever styled inside `.shelf`. */
+.blurb { color: var(--quiet); margin: .5rem 0 1.4rem; max-width: 52ch; }

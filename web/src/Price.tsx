@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Room } from '../../core/src/room.ts';
 import type { WorkScope } from '../../core/src/work.ts';
-import { money } from '../../core/src/price.ts';
+import { money, readMarkup } from '../../core/src/price.ts';
 import {
   type Override,
   type OverriddenLine,
@@ -246,7 +246,7 @@ export function Price({
                   <span className="font-mono tabular-nums">{money(priced.subtotal)}</span>
                 </div>
                 <div className="flex items-baseline justify-between gap-4 py-1 text-sm text-slate-600">
-                  <span>Mark-up {(book.marginBasisPoints ?? 0) / 100}%</span>
+                  <span>Mark-up {readMarkup(book) / 100}%</span>
                   <span className="font-mono tabular-nums">{money(priced.margin)}</span>
                 </div>
               </>

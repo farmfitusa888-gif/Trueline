@@ -81,9 +81,46 @@ export interface Rate {
   readonly amount?: string;
 }
 
+/**
+ * The mark-up on a price book, whichever name it was saved under.
+ *
+ * One place, because two readers is how a rename half-lands: a screen that
+ * reads the new name and a total that reads the old one disagree about money
+ * and neither says so.
+ */
+export function readMarkup(book: PriceBook): number {
+  return book.markupBasisPoints ?? book.marginBasisPoints ?? 0;
+}
+
 export interface PriceBook {
   readonly rates: readonly Rate[];
-  /** The mark-up applied to the whole job, in basis points. 1500 is 15%. */
+  /**
+   * The mark-up applied to the whole job, in basis points. 1500 is 15%.
+   *
+   * ## Why it is called `markup` and why the old name is still read
+   *
+   * It was `marginBasisPoints`, and it never was a margin. It is added ON TOP
+   * of the subtotal, which makes it a mark-up: 1500 here turns $1,000 of cost
+   * into $1,150, and the share of that $1,150 the contractor keeps — the
+   * margin — is 13.04%, not 15%. Its own doc comment said "mark-up" while its
+   * name said margin.
+   *
+   * That is the exact mistake the site now has a page to correct, and a
+   * contractor reading the app and the site would have found them disagreeing.
+   * Both are read on the way in, and only this one is written, so a price book
+   * saved on anybody's phone keeps working and quietly becomes the new name the
+   * next time it is saved. See `readMarkup`.
+   */
+  readonly markupBasisPoints?: number;
+  /**
+   * What it used to be called. Read, never written.
+   *
+   * Left `?: number` rather than deleted because a rename is not a migration:
+   * every price book already on a phone and inside every saved job file
+   * carries this key, and dropping it would silently take a contractor's
+   * mark-up to zero — which is money, on the quiet, which is the one thing
+   * this codebase refuses to do.
+   */
   readonly marginBasisPoints?: number;
 }
 
@@ -229,7 +266,7 @@ export function quote(lines: readonly Priceable[], book: PriceBook): Quote {
   }
 
   const subtotal = priced.reduce((sum, l) => sum + l.total, 0n);
-  const points = BigInt(book.marginBasisPoints ?? 0);
+  const points = BigInt(readMarkup(book));
   const rawMargin = subtotal * points;
   const margin = rawMargin < 0n ? (rawMargin - 5000n) / 10_000n : (rawMargin + 5000n) / 10_000n;
 

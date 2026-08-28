@@ -242,3 +242,29 @@ test('a learned rate and a typed one are different claims and say which they are
   assert.equal(learned!.source.kind, 'learned');
   assert.equal(typed('Floor', 'sq ft', 800n).source.kind, 'typed');
 });
+
+test('a price book saved under the old name still carries its mark-up', () => {
+  // `marginBasisPoints` was never a margin: it is added on top of the subtotal,
+  // which makes it a mark-up. It was renamed, and every price book already on a
+  // phone and inside every saved job file carries the old key. Dropping it
+  // would take a contractor's mark-up to zero on the quiet, which is money.
+  const sheet = takeoff(room, T0);
+  const was = quote(sheet.lines, { ...book, marginBasisPoints: 1500 });
+  const now = quote(sheet.lines, { ...book, markupBasisPoints: 1500 });
+  assert.equal(was.total, now.total);
+  assert.notEqual(was.margin, 0n);
+});
+
+test('and the new name wins where a book somehow carries both', () => {
+  // Only one is ever written, so this is a book that has been edited by hand
+  // or by a half-finished migration. The one this version writes is the one to
+  // believe; guessing between them is how a total goes wrong in silence.
+  const sheet = takeoff(room, T0);
+  const both = quote(sheet.lines, {
+    ...book,
+    marginBasisPoints: 9900,
+    markupBasisPoints: 1500,
+  });
+  const plain = quote(sheet.lines, { ...book, markupBasisPoints: 1500 });
+  assert.equal(both.total, plain.total);
+});

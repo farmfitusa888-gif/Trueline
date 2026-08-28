@@ -83,6 +83,7 @@ export const PEOPLE = {
 export const NAV = [
   { href: '/', label: 'Trueline' },
   { href: '/guides/', label: 'Guides' },
+  { href: '/calculators/', label: 'Calculators' },
   { href: '/templates/', label: 'Free templates' },
   { href: '/about/', label: 'About' },
 ];

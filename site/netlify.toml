@@ -29,7 +29,19 @@
     # the live site while working perfectly on a local server -- the worst
     # possible shape of bug. `check.mjs` fails the build if a page gains a
     # <video> and this line does not mention media-src.
-    Content-Security-Policy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+    #
+    # The sha256 in script-src is the one inline script on this site: the six
+    # lines in the <head> that apply a saved light or dark choice before the
+    # first pixel is painted. It has to be inline -- a theme applied after first
+    # paint is a white flash on every page load -- and with `script-src 'self'`
+    # and nothing else the browser refused to run it, silently, on the live site
+    # only. The site looked fine; the preference simply never applied and
+    # nothing anywhere said why. Found by loading the built pages in a real
+    # browser under this exact header (`tools/calc-browser.mjs`), and `check.mjs`
+    # now hashes every inline script in `dist` and fails the build if the hash
+    # is not named here -- so editing that script without updating this line
+    # cannot ship.
+    Content-Security-Policy = "default-src 'none'; script-src 'self' 'sha256-S43fEebIkqS9QgDIhK2Mc83s5ERU7y489FJ58sHjQZI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"

@@ -23,17 +23,20 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { SITE, PEOPLE, NAV, CLAIMS, NOT_CLAIMED } from './content/site.mjs';
-import { TEMPLATES } from './content/templates.mjs';
+import { TEMPLATES, TEMPLATE_GROUPS } from './content/templates.mjs';
 import { CONTRACTOR } from './content/guides/contractor.mjs';
 import { RESTORATION } from './content/guides/restoration.mjs';
 import { COMPARE } from './content/guides/compare.mjs';
 import { HOMEOWNER } from './content/guides/homeowner.mjs';
+import { EXPLAINERS } from './content/guides/explainers.mjs';
+import { CALCULATORS } from './content/calculators.mjs';
 import { buildPdfs } from './tools/pdfs.mjs';
+import { buildEngine, UI_FILE } from './tools/engine.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST = join(HERE, 'dist');
 
-const GUIDES = [...CONTRACTOR, ...RESTORATION, ...COMPARE, ...HOMEOWNER];
+const GUIDES = [...CONTRACTOR, ...RESTORATION, ...COMPARE, ...HOMEOWNER, ...EXPLAINERS];
 
 /** When the content last changed. Passed in so a rebuild is reproducible. */
 const UPDATED = process.env.TRUELINE_SITE_DATE ?? new Date().toISOString().slice(0, 10);
@@ -163,9 +166,17 @@ ${body}
         </ul>
       </div>
       <div>
+        <h4>Calculators</h4>
+        <ul>
+          ${CALCULATORS.map((c) =>
+            `<li><a href="/calculators/${c.slug}/">${esc(c.title)}</a></li>`).join('\n          ')}
+        </ul>
+      </div>
+      <div>
         <h4>Free templates</h4>
         <ul>
-          ${TEMPLATES.map((t) => `<li><a href="/templates/">${esc(t.title)}</a></li>`).join('\n          ')}
+          ${TEMPLATE_GROUPS.map((g) =>
+            `<li><a href="/templates/#${g.id}">${esc(g.title)}</a></li>`).join('\n          ')}
         </ul>
       </div>
     </div>
@@ -230,18 +241,32 @@ const crumbs = (trail) => ({
 
 /* ------------------------------------------------------------ guide blocks */
 
-function renderBlocks(blocks) {
+function renderBlocks(blocks, extras = {}) {
   const out = [];
   for (const b of blocks) {
+    // A calculator page says where its own form goes, so the argument for the
+    // arithmetic can come before the box and the worked example after it.
+    if (b.form) {
+      if (!extras.form) throw new Error('A { form: true } block on a page with no calculator.');
+      out.push(extras.form);
+      continue;
+    }
     if (b.h2) { out.push(`<h2 id="${slugify(b.h2)}">${b.h2}</h2>`); continue; }
     if (b.p) { out.push(`<p>${b.p}</p>`); continue; }
     if (b.ul) { out.push(`<ul class="plain">${b.ul.map((li) => `<li>${li}</li>`).join('')}</ul>`); continue; }
-    if (b.note) { out.push(`<div class="note"><p>${b.note}</p></div>`); continue; }
+    // Formula BEFORE note, and it matters. A block carrying both is a formula
+    // with its workings under it, and the note branch tested first swallowed
+    // every one of them: eleven equations across the guides rendered as bare
+    // notes with the equation itself dropped, the `.formula` rule in the
+    // stylesheet went unused on every page, and nothing anywhere said so.
+    // `tools/calc-truth.mjs` is what found it, by asking whether a figure the
+    // engine worked out was actually on the page.
     if (b.formula) {
       out.push(`<div class="formula"><div class="eq">${b.formula}</div>${
         b.note ? `<div class="why">${b.note}</div>` : ''}</div>`);
       continue;
     }
+    if (b.note) { out.push(`<div class="note"><p>${b.note}</p></div>`); continue; }
     if (b.table) {
       out.push(`<div class="scroll"><table><thead><tr>${
         b.table.head.map((h) => `<th>${h}</th>`).join('')
@@ -369,6 +394,330 @@ function guidePage(guide) {
         { name: 'Guides', path: '/guides/' },
         { name: guide.title, path },
       ])],
+    }),
+  };
+}
+
+/* ------------------------------------------------------------- calculators */
+
+/**
+ * The compass headings a run can go, in the order somebody walks them.
+ *
+ * Four rather than an angle, deliberately, and it is the engine's own choice
+ * rather than a simplification made for the web: `core/src/room.ts` stores a
+ * square wall as a heading and an angled one as an exact run, because an angle
+ * in degrees has no exact representation and every corner in the room would
+ * then depend on a rounding.
+ */
+const HEADINGS = ['north', 'east', 'south', 'west'];
+
+/**
+ * How many runs a walked room may have on this form.
+ *
+ * Ten, which takes an L, a U, a bay and most of what a remodeler measures. It
+ * is a limit of the form and not of the engine — the app itself has no cap —
+ * and the calculator page says so rather than letting somebody with an
+ * eleven-sided room conclude the arithmetic cannot do it.
+ */
+const WALK_ROWS = 10;
+
+const OPENING_KINDS = [
+  { key: 'door', plural: 'doors', label: 'Doors' },
+  { key: 'window', plural: 'windows', label: 'Windows' },
+  { key: 'cased', plural: 'cased', label: 'Cased openings' },
+];
+
+/** One labelled box, with its hint tied to it for a screen reader. */
+function box(id, name, label, { hint, value, kind = 'text', mode } = {}) {
+  const described = hint ? ` aria-describedby="${id}-hint"` : '';
+  return `<div class="calc-field">
+      <label for="${id}">${esc(label)}</label>
+      <input id="${id}" name="${name}" type="${kind}" autocomplete="off"${
+        mode ? ` inputmode="${mode}"` : ''}${
+        value === undefined ? '' : ` value="${esc(value)}"`}${described}>
+      ${hint ? `<span class="calc-hint" id="${id}-hint">${esc(hint)}</span>` : ''}
+    </div>`;
+}
+
+/**
+ * The form, from the field list on the calculator.
+ *
+ * Every control is in the HTML, filled in with the example the page works
+ * through underneath it. Nothing is drawn by script, so the page a crawler
+ * reads and the page a person reads are the same page — and the two controls
+ * that genuinely cannot work without JavaScript, the shape switch and the
+ * submit button, are `hidden` in the markup until `calc.js` has attached to
+ * them. A switch that does nothing is worse than no switch.
+ */
+function calculatorForm(calculator) {
+  const id = (name) => `${calculator.slug}-${name}`;
+  const parts = [];
+
+  for (const spec of calculator.form) {
+    if (spec.shape) {
+      const start = spec.start ?? 'rect';
+      const walk = spec.walk ?? [];
+      const rows = Array.from({ length: WALK_ROWS }, (_, i) => {
+        const step = walk[i];
+        const heading = step ? step.heading : HEADINGS[(i + 1) % HEADINGS.length];
+        return `<div class="walk-row" data-walk-row>
+            <span class="walk-n">${i + 1}</span>
+            <select name="heading" aria-label="Direction of run ${i + 1}">
+              ${HEADINGS.map((h) =>
+                `<option value="${h}"${h === heading ? ' selected' : ''}>${h}</option>`).join('')}
+            </select>
+            <input name="run" type="text" autocomplete="off"
+              aria-label="Length of run ${i + 1}"${
+              step ? ` value="${esc(step.said)}"` : ''}>
+          </div>`;
+      }).join('\n          ');
+
+      parts.push(`<fieldset class="calc-switch" data-shape-switch hidden>
+      <legend>How is this room shaped?</legend>
+      <label><input type="radio" name="shape" value="rect"${
+        start === 'rect' ? ' checked' : ''}> A rectangle</label>
+      <label><input type="radio" name="shape" value="walk"${
+        start === 'walk' ? ' checked' : ''}> Walk the walls</label>
+    </fieldset>
+    <div data-shape="rect"${start === 'rect' ? '' : ' hidden'}>
+      <div class="calc-grid">
+        ${box(id('width'), 'width', 'Room width', {
+          hint: 'Corner to corner, one way. A bare number means feet.', value: spec.width })}
+        ${box(id('depth'), 'depth', 'Room depth', {
+          hint: 'Corner to corner, the other way.', value: spec.depth })}
+      </div>
+    </div>
+    <div data-shape="walk"${start === 'walk' ? '' : ' hidden'}>
+      <p class="calc-hint">Every straight run, in order, all the way round to where you
+        started. Leave the rest blank.</p>
+      <div class="walk">
+          ${rows}
+      </div>
+    </div>`);
+      continue;
+    }
+
+    if (spec.openings) {
+      const prefill = spec.prefill ?? {};
+      parts.push(`<fieldset class="calc-openings">
+      <legend>Openings</legend>
+      <p class="calc-hint">Doors and cased openings come out of the wall face and out of the
+        baseboard. Windows come out of the wall face only — base runs under a window.</p>
+      ${OPENING_KINDS.map((kind) => `<div class="open-row">
+        ${box(id(kind.plural), kind.plural, kind.label, {
+          mode: 'numeric', value: prefill[kind.plural] ?? '0' })}
+        ${box(id(`${kind.key}Width`), `${kind.key}Width`, 'each, wide', {
+          value: prefill[`${kind.key}Width`] })}
+        ${box(id(`${kind.key}Height`), `${kind.key}Height`, 'each, high', {
+          value: prefill[`${kind.key}Height`] })}
+      </div>`).join('\n      ')}
+    </fieldset>`);
+      continue;
+    }
+
+    if (spec.select) {
+      parts.push(`<div class="calc-field">
+      <label for="${id(spec.select)}">${esc(spec.label)}</label>
+      <select id="${id(spec.select)}" name="${spec.select}">
+        ${spec.options.map((o) =>
+          `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('\n        ')}
+      </select>
+    </div>`);
+      continue;
+    }
+
+    if (spec.check) {
+      parts.push(`<div class="calc-check">
+      <input id="${id(spec.check)}" name="${spec.check}" type="checkbox"${
+        spec.on ? ' checked' : ''}>
+      <label for="${id(spec.check)}">${esc(spec.label)}</label>
+    </div>`);
+      continue;
+    }
+
+    const name = spec.text ?? spec.money;
+    parts.push(box(id(name), name, spec.label, {
+      hint: spec.hint,
+      value: spec.prefill,
+      mode: spec.money ? 'decimal' : undefined,
+    }));
+  }
+
+  return `<form class="calc" data-calc="${calculator.calc}" novalidate>
+    ${parts.join('\n    ')}
+    <p class="calc-act">
+      <button class="btn btn-solid" type="submit" data-calc-go hidden>Work it out</button>
+    </p>
+    <div class="calc-out" data-out role="status" aria-live="polite"></div>
+    <noscript><div class="note"><p>This calculator needs JavaScript, and it is switched off.
+      The formula it uses and a worked example are on this page in plain text either side of
+      this form, so the page still answers the question — it just will not do the arithmetic
+      for your room.</p></div></noscript>
+    <p class="calc-fine">Everything happens in this browser. Nothing you type is sent
+      anywhere, and there is nothing here to send it to.</p>
+  </form>`;
+}
+
+function calculatorPage(calculator) {
+  const path = `/calculators/${calculator.slug}/`;
+  const headings = calculator.blocks.filter((b) => b.h2).map((b) => b.h2);
+  const others = calculator.related.calculators
+    .map((slug) => CALCULATORS.find((c) => c.slug === slug)).filter(Boolean);
+  const guides = calculator.related.guides
+    .map((slug) => GUIDES.find((g) => g.slug === slug)).filter(Boolean);
+
+  const application = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    '@id': url(path) + '#app',
+    name: calculator.title,
+    url: url(path),
+    applicationCategory: 'BusinessApplication',
+    browserRequirements: 'Requires JavaScript.',
+    description: calculator.description,
+    inLanguage: 'en-US',
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: SITE.price.currency },
+    author: BUILDER,
+    publisher: ORGANISATION,
+    datePublished: UPDATED,
+    dateModified: UPDATED,
+    keywords: calculator.keywords.join(', '),
+  };
+
+  const faq = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: calculator.faq.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: plain(f.a) },
+    })),
+  };
+
+  const body = `
+<article class="wrap">
+  <div class="narrow guide-head">
+    <p class="eyebrow"><a href="/calculators/" style="color:inherit;text-decoration:none">Calculators</a></p>
+    <h1>${esc(calculator.title)}</h1>
+    <p class="lede" style="max-width:56ch">${calculator.standfirst}</p>
+    <div class="meta">
+      <span class="byline"><span>By <a href="/about/">${esc(PEOPLE.builder.name)}</a></span></span>
+      <span>Updated ${UPDATED}</span>
+      <span>${calculator.minutes} min</span>
+      <span>Runs the app’s own engine</span>
+    </div>
+
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <ol>${headings.map((h) => `<li><a href="#${slugify(h)}">${esc(h)}</a></li>`).join('')}</ol>
+    </nav>
+
+    ${renderBlocks(calculator.blocks, { form: calculatorForm(calculator) })}
+
+    <h2 id="questions">Questions people ask</h2>
+    <dl class="faq">
+      ${calculator.faq.map((f) => `<dt>${esc(f.q)}</dt><dd>${f.a}</dd>`).join('\n      ')}
+    </dl>
+
+    <hr class="rule">
+
+    <h2 id="the-engine">This is the app’s arithmetic, not a copy of it</h2>
+    <p>The figures above are not worked out by anything written for this page. The form hands
+      what you typed to ${esc(SITE.name)}’s own measuring engine — the same modules the iPhone
+      app runs — and prints what comes back. Lengths are held as whole nanometres and money as
+      whole cents, so there is no floating-point number anywhere in a measurement, here or in
+      the app.</p>
+    <p>The one thing a web form cannot do is know whether anybody put a tape on the wall. That
+      is the whole of the difference between this page and
+      <a href="/">the app it comes out of</a>: Trueline carries where every length came from —
+      scanned, drawn or measured — onto the drawing, the takeoff and the proposal a client
+      reads. You can also <a href="/templates/">take the blank forms</a> and use them with
+      whatever you already have.</p>
+
+    <h2 id="read-next">The rest of them</h2>
+    <div class="next">
+      ${others.map((c) => `<a href="/calculators/${c.slug}/">
+        <span class="k">Calculator · ${c.minutes} min</span>
+        <span class="t">${esc(c.title)}</span></a>`).join('\n      ')}
+    </div>
+    <h2 id="guides">And the guides behind them</h2>
+    <div class="next">
+      ${guides.map((g) => `<a href="/guides/${g.slug}/">
+        <span class="k">${esc(AUDIENCE[g.audience].label)} · ${g.minutes} min</span>
+        <span class="t">${esc(g.title)}</span></a>`).join('\n      ')}
+    </div>
+  </div>
+</article>`;
+
+  return {
+    path,
+    html: shell({
+      title: `${calculator.metaTitle} | ${SITE.name}`,
+      description: calculator.description,
+      path, body, ogType: 'article',
+      head: `<script type="module" src="/${UI_FILE}"></script>\n`,
+      jsonLd: [application, faq, crumbs([
+        { name: 'Trueline', path: '/' },
+        { name: 'Calculators', path: '/calculators/' },
+        { name: calculator.title, path },
+      ])],
+    }),
+  };
+}
+
+function calculatorsIndex() {
+  const body = `
+<div class="wrap">
+  <div class="guide-head narrow">
+    <p class="eyebrow">${CALCULATORS.length} calculators · free · nothing leaves your browser</p>
+    <h1>Calculators that run the real engine</h1>
+    <p class="lede">Not a form with some arithmetic typed into it. Each one imports
+      ${esc(SITE.name)}’s own measuring code — whole nanometres, whole cents, no floating-point
+      number in any measurement — so the answer here is the answer the app gives.</p>
+  </div>
+  <div class="cards narrow" style="margin-top:2.5rem;grid-template-columns:1fr">
+    ${CALCULATORS.map((c) => `<div class="card rise">
+      <h3><a href="/calculators/${c.slug}/">${esc(c.title)}</a></h3>
+      <p style="margin-top:.4rem">${esc(c.standfirst)}</p>
+      <p style="margin-top:.9rem"><a class="btn btn-line"
+        href="/calculators/${c.slug}/">Open it</a></p>
+    </div>`).join('\n    ')}
+  </div>
+  <div class="narrow">
+    <div class="note" style="margin-top:2.5rem"><p>Every one of these refuses to invent a
+      number. There is no assumed waste figure, no assumed paint coverage and no material
+      price anywhere on this site — those are facts about your job and your supplier, and a
+      figure made up here would end up underneath somebody’s order.
+      <a href="/guides/">The guides</a> explain the method;
+      <a href="/templates/">the blank forms</a> are free.</p></div>
+  </div>
+</div>`;
+
+  return {
+    path: '/calculators/',
+    html: shell({
+      title: `Contractor calculators | ${SITE.name}`,
+      description:
+        `${CALCULATORS.length} free calculators for takeoff and pricing — markup and margin, `
+        + 'drywall sheets, paint, baseboard and the square footage of an odd-shaped room.',
+      path: '/calculators/', body,
+      jsonLd: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'CollectionPage',
+          name: 'Trueline calculators',
+          url: url('/calculators/'),
+          publisher: ORGANISATION,
+          hasPart: CALCULATORS.map((c) => ({
+            '@type': 'WebApplication',
+            name: c.title,
+            applicationCategory: 'BusinessApplication',
+            url: url(`/calculators/${c.slug}/`),
+          })),
+        },
+        crumbs([{ name: 'Trueline', path: '/' }, { name: 'Calculators', path: '/calculators/' }]),
+      ],
     }),
   };
 }
@@ -614,6 +963,25 @@ function homePage() {
   </div>
 </section>
 
+<section class="band band--sunk" data-mark="Sums">
+  <div class="wrap duo">
+    <div>
+      <p class="eyebrow">${CALCULATORS.length} calculators · free</p>
+      <h2>Do the sum here, with the app’s own arithmetic</h2>
+      <p style="font-size:.97rem">Not a form with some arithmetic typed into it. Each one
+        imports the same measuring code the app runs — whole nanometres, whole cents, no
+        floating-point number in any measurement — so the answer on the web page is the answer
+        on the phone. None of them will invent a waste figure, a coverage rate or a price.</p>
+      <p><a href="/calculators/">All ${CALCULATORS.length} of them</a></p>
+    </div>
+    <ul class="rows">
+      ${CALCULATORS.map((c) => `<li><a href="/calculators/${c.slug}/">
+        <span class="t">${esc(c.title)}</span>
+        <span class="m">${c.minutes} min</span></a></li>`).join('\n      ')}
+    </ul>
+  </div>
+</section>
+
 <section class="band" id="get-it" data-mark="Email">
   <div class="wrap">
     <div class="signup rise">
@@ -715,6 +1083,9 @@ function guidesIndex() {
     <h1>How to measure it, price it and get paid for it</h1>
     <p class="lede">Written for people who do this work. No affiliate links, no prices invented
       for a market nobody here knows, and nothing claimed that has not been established.</p>
+    <p style="margin-top:1rem">Want the sum rather than the method?
+      <a href="/calculators/">The ${CALCULATORS.length} calculators</a> run the app’s own
+      engine on figures you type.</p>
   </div>
 
   <div class="index-grid" style="margin-top:2.75rem">
@@ -766,19 +1137,33 @@ function templatesPage() {
       blank one and a filled-in one are the same form. Take them and use them with whatever
       you already have.</p>
   </div>
-  <div class="cards narrow" style="margin-top:2.5rem;grid-template-columns:1fr">
-    ${TEMPLATES.map((t) => `<div class="card rise">
-      <h3>${esc(t.title)}</h3>
-      <p style="margin-top:.4rem">${esc(t.blurb)}</p>
-      <p style="margin-top:.9rem">
-        <a class="btn btn-line" href="/downloads/${t.file}" download>Download the PDF</a>
-        <a href="/guides/${t.guide}/" style="margin-left:1rem;font-size:.92rem">Read the guide</a>
-      </p>
-    </div>`).join('\n    ')}
-  </div>
-  <div class="narrow">
+  <div class="narrow" style="margin-top:2.5rem">
+    ${TEMPLATE_GROUPS.map((group) => {
+      const mine = TEMPLATES.filter((t) => t.group === group.id);
+      if (mine.length === 0) throw new Error(`Template group "${group.id}" is empty.`);
+      return `<section id="${group.id}">
+      <h2>${esc(group.title)}</h2>
+      <p class="blurb">${esc(group.blurb)}</p>
+      <div class="cards" style="grid-template-columns:1fr">
+        ${mine.map((t) => `<div class="card rise">
+          <h3>${esc(t.title)}</h3>
+          <p style="margin-top:.4rem">${esc(t.blurb)}</p>
+          <p style="margin-top:.9rem">
+            <a class="btn btn-line" href="/downloads/${t.file}" download>Download the PDF</a>
+            <a href="/guides/${t.guide}/" style="margin-left:1rem;font-size:.92rem">Read the guide</a>
+          </p>
+        </div>`).join('\n        ')}
+      </div>
+    </section>`;
+    }).join('\n    ')}
     <div class="note" style="margin-top:2.5rem"><p>No sign-up, no email wall. If they are
       useful, the thing that helps is linking to them.</p></div>
+    <div class="note"><p><strong>There is no blank lien waiver here, on purpose.</strong>
+      A waiver is an operative legal instrument, some states prescribe the exact wording and
+      give no effect to any other, and nobody here can check which state yours is. So what is
+      offered is the half that is not state-specific — a sheet for recording which waivers were
+      asked for and received — and the waiver itself has to come from your own state or your
+      own attorney. Printing one written from memory is how a contractor loses a lien.</p></div>
   </div>
 </div>`;
 
@@ -787,8 +1172,8 @@ function templatesPage() {
     html: shell({
       title: `Free contractor forms and templates | ${SITE.name}`,
       description:
-        'Blank estimate, proposal, change order, takeoff sheet and water damage log — real '
-        + 'PDFs, free, no email required.',
+        `${TEMPLATES.length} blank forms as real PDFs — estimate, proposal, change order, `
+        + 'takeoff, moisture log, scope sheet, photo log, punch list. Free, no email.',
       path: '/templates/', body,
       jsonLd: [
         {
@@ -924,11 +1309,13 @@ function write(page) {
 const pages = [
   homePage(),
   guidesIndex(),
+  calculatorsIndex(),
   templatesPage(),
   aboutPage(),
   thanksPage(),
   notFound(),
   ...GUIDES.map(guidePage),
+  ...CALCULATORS.map(calculatorPage),
 ];
 
 rmSync(DIST, { recursive: true, force: true });
@@ -962,6 +1349,9 @@ if (existsSync(join(HERE, '../web/public/apple-touch-icon.png'))) {
 
 const pdfs = await buildPdfs(join(DIST, 'downloads'));
 
+/* The engine the calculators run: core/src, bundled for a browser. */
+const engine = await buildEngine(DIST);
+
 /* Sitemap — every indexable page, and nothing that is not. */
 const indexable = pages.filter((p) => !['/thanks/', '/404.html'].includes(p.path));
 writeFileSync(join(DIST, 'sitemap.xml'),
@@ -975,7 +1365,9 @@ writeFileSync(join(DIST, 'sitemap.xml'),
 writeFileSync(join(DIST, 'robots.txt'),
   `User-agent: *\nAllow: /\nDisallow: /thanks/\n\nSitemap: ${url('/sitemap.xml')}\n`);
 
-console.log(`${pages.length} pages · ${GUIDES.length} guides · ${pdfs.length} PDFs · ${indexable.length} in the sitemap`);
+console.log(`${pages.length} pages · ${GUIDES.length} guides · ${CALCULATORS.length} calculators `
+  + `· ${pdfs.length} PDFs · ${indexable.length} in the sitemap`);
+console.log(`engine: ${engine.map((e) => `${e.file} ${(e.bytes / 1024).toFixed(1)}kB`).join(' · ')}`);
 // Said every time, because opening dist/index.html by double-clicking it does
 // not work and does not look like it does not work: every link and stylesheet
 // on this site is an absolute path, and under `file://` an absolute path

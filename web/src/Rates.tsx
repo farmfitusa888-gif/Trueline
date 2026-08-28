@@ -4,6 +4,7 @@ import {
   type Rate,
   parseMoney,
   rateLabel,
+  readMarkup,
 } from '../../core/src/price.ts';
 import {
   type MeasureId,
@@ -95,7 +96,7 @@ export function RateBook({
   readonly onDone?: () => void;
 }) {
   const { company, save } = useUnits();
-  const book = company.prices ?? { rates: [], marginBasisPoints: 0 };
+  const book = company.prices ?? { rates: [], markupBasisPoints: 0 };
   const [typing, setTyping] = useState<Record<string, string>>({});
   const [trouble, setTrouble] = useState<string | null>(null);
 
@@ -213,13 +214,16 @@ export function RateBook({
           <span className="text-sm font-medium text-slate-700">Mark-up on the whole job</span>
           <span className="mt-1 flex items-baseline gap-2">
             <input
-              value={String((book.marginBasisPoints ?? 0) / 100)}
+              value={String(readMarkup(book) / 100)}
               onChange={(event) => {
                 const percent = Number(event.target.value);
                 if (!Number.isFinite(percent)) return;
                 save({
                   ...company,
-                  prices: { ...book, marginBasisPoints: Math.round(percent * 100) },
+                  // Written under the new name only. The old one is still read by
+                  // `readMarkup`, so a book saved before this quietly becomes the
+                  // new name the first time somebody touches the mark-up.
+                  prices: { ...book, markupBasisPoints: Math.round(percent * 100) },
                 });
               }}
               inputMode="decimal"
