@@ -1,9 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { openChromium } from '../../core/tools/browser.mjs';
-import {
-  HEIGHT, SP, URL,
-  check, loadScan, noise, open, openAsApp, pick, report, reportEvenIfItDies, section, sentTo,
-} from './lib.mjs';
+import { check, HEIGHT, loadScan, noise, open, openAsApp, payingBrowser, pick, report, reportEvenIfItDies, section, sentTo, SP, URL } from './lib.mjs';
 
 // Say what was learned even if this part dies part way through.
 reportEvenIfItDies('A54 — what is wrong with the wall, and the evidence on it');
@@ -722,6 +719,8 @@ await browser.close();
    */
   const b = await openChromium();
   const c = await b.newContext({ viewport: { width: 430, height: HEIGHT }, acceptDownloads: true });
+  // A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+  await payingBrowser(c);
   await c.route('**/photos/**', (route) =>
     route.fulfill({ path: `${SP}/damage-photo.jpg`, contentType: 'image/jpeg' })
   );

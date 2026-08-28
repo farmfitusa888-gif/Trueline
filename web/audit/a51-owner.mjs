@@ -1,4 +1,4 @@
-import { check, contrast, HEIGHT, noise, openAsApp, report, reportEvenIfItDies, URL } from './lib.mjs';
+import { check, contrast, HEIGHT, noise, openAsApp, payingBrowser, report, reportEvenIfItDies, URL } from './lib.mjs';
 
 // Say what was learned even if this part dies part way through.
 reportEvenIfItDies('A51 — the owner’s screen, locked, and every figure out of a report');
@@ -662,6 +662,8 @@ async function walkOn({ scheme, deep, only, browser, ctx, page }) {
       viewport: { width: 430, height: HEIGHT },
       colorScheme: 'light',
     });
+    // A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+    await payingBrowser(clean);
     const stranger = await clean.newPage();
     await stranger.goto(`${URL}#business`, { waitUntil: 'load', timeout: 60000 });
     await stranger.waitForTimeout(800);

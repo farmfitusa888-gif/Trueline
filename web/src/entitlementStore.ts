@@ -22,6 +22,7 @@
  */
 import { type Keeping, mayKeepRoom } from '../../core/src/entitlement.ts';
 import { insideApp } from './bridge.ts';
+import { unlockedByCode } from './roomLink.ts';
 
 type Known = boolean | 'unknown';
 
@@ -41,12 +42,29 @@ export function entitlement(): Known {
 /**
  * Whether a paid feature should work right now.
  *
- * Outside the app there is nothing to buy and nobody to charge, so nothing is
- * gated: the drawing opened from a client file, and the development server,
- * both show everything. Inside the app, only a `true` from StoreKit opens it.
+ * ## The hole this closed
+ *
+ * This used to answer `true` for every browser, on the reasoning that outside
+ * the app there is nothing to buy and nobody to charge. That was true while the
+ * browser was a development server and a client file. It stopped being true the
+ * day the app was published at a public address: scan a room on the phone, open
+ * the same screens in Safari, and every paid document was free. Sam saw it
+ * first and said so.
+ *
+ * So the browser is gated on exactly the line the phone draws — `FREE` and
+ * `PAID` in `core/src/entitlement.ts`, one list, read by both — and a
+ * contractor who already pays says so with a code his phone makes. There is no
+ * login here and there never will be: on the phone Apple says who paid, and in
+ * a browser the code does.
+ *
+ * `unlockedByCode` is a **courtesy lock** and says so on the screen it is
+ * offered on. A code can be forwarded, and anybody determined to make one can
+ * read how in the page they have already downloaded. What it is for is narrow
+ * and worth having: a man who has paid must not meet a paywall in his own
+ * browser.
  */
 export function unlocked(): boolean {
-  if (!insideApp()) return true;
+  if (!insideApp()) return unlockedByCode();
   return paid === true;
 }
 

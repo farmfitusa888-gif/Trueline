@@ -200,9 +200,23 @@ there is no account to ask — **there is no login anywhere in Trueline and ther
 is not going to be one.** The phone asks Apple who paid. The browser asks a
 code.
 
-On the phone, under *Your business*, there is a code that looks like
-`TL-EHS7-EW4Z-Y733-7FWX`. Paste it into the box on the browser's front page,
-once. From then on that browser does what the phone does.
+On the phone, under *Your business*, at the bottom of the screen, there is a
+code that looks like `TL-EHS7-EW4Z-Y733-7FWX`, with a **Copy the browser code**
+button under it. Paste it into the box on the browser's front page, once. From
+then on that browser does what the phone does.
+
+The phone hands the web half a **seed** rather than the code — Apple's original
+transaction identifier where there is a purchase, and a UUID the app keeps to
+itself where there is not, so a free run and the two people testing this also
+get a code. The hashing is `makeUnlockCode` in `web/src/roomLink.ts` and there
+is one copy of it: the seed crosses the bridge as `unlockSeed` and the code is
+made on the web side. That is deliberate — two implementations of the same
+arithmetic would disagree silently the day one of them changed. The seed itself
+never leaves the phone.
+
+The original identifier rather than this renewal's, so the code a contractor
+pasted into his browser in March is still the code his phone shows him in
+September.
 
 **Say what this is, and do not let anybody imply more.** It is a **courtesy
 lock, not security**:

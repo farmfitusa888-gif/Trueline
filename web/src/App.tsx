@@ -27,6 +27,8 @@ import { Tags } from './Tags.tsx';
 import { Zones } from './Zones.tsx';
 import { Panel, SectionBar, type SectionFlags, type SectionKey } from './Sections.tsx';
 import { Tour, TOUR } from './Tour.tsx';
+import { KeepACopy, RoomFromLink, Welcome } from './Welcome.tsx';
+import { isJobFile } from './roomLink.ts';
 import { handBackThumbnail, insideApp } from './bridge.ts';
 import { Openings } from './Openings.tsx';
 import { Ceiling, CeilingPanel } from './Ceiling.tsx';
@@ -68,9 +70,12 @@ import { ClaimSend } from './ClaimSend.tsx';
 
 function Opener({
   onOpen,
+  onJob,
   onDraw,
 }: {
   onOpen: (json: unknown, fileName: string) => void;
+  /** A whole job — a room and everything done to it — rather than a scan. */
+  onJob: (project: string) => void;
   onDraw: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -79,7 +84,18 @@ function Opener({
     if (!file) return;
     setBusy(true);
     try {
-      onOpen(JSON.parse(await file.text()), file.name);
+      const text = await file.text();
+      // A job file this app wrote, or a scan somebody else's app wrote. Both
+      // are `.json` and there is one picker, so this has to tell them apart --
+      // and it does it by reading the file rather than by looking at the name.
+      // Handed to the scan path, a job file was answered with "The scan has no
+      // walls": the app refusing its own save, on the one screen a browser
+      // visitor has, with a sentence that says nothing about what went wrong.
+      if (isJobFile(text)) {
+        onJob(text);
+        return;
+      }
+      onOpen(JSON.parse(text), file.name);
     } catch {
       onOpen(null, file.name);
     } finally {
@@ -724,6 +740,21 @@ export function App() {
         </div>
       )}
 
+      {/* A room that arrived in the address. Mounted whatever is on screen and
+          outside every branch below, because a link has to work on a cold
+          browser where the front door is what is showing AND in a tab that
+          already has a room open — pasting one changes only the fragment, which
+          is a same-document navigation that remounts nothing. Not in the app:
+          there is no address bar on a phone and no way to paste into one. */}
+      {!native && (
+        <RoomFromLink
+          onRoom={(project) => {
+            dispatch({ type: 'openSaved', project });
+            setShowing('room');
+          }}
+        />
+      )}
+
       {openedOn === 'business' ? null : showing === 'floor' ? (
         <Floor
           onOpenRoom={(fileName) => {
@@ -777,16 +808,32 @@ export function App() {
         ) : insideApp() ? (
           <NothingHere onDraw={() => setDrawing(true)} />
         ) : (
-          <Opener
-            onOpen={(json, fileName) =>
-              dispatch({ type: 'open', json, fileName, at: new Date().toISOString() })
-            }
-            onDraw={() => setDrawing(true)}
-          />
+          <div className="space-y-5">
+            <Opener
+              onOpen={(json, fileName) =>
+                dispatch({ type: 'open', json, fileName, at: new Date().toISOString() })
+              }
+              onJob={(project) => dispatch({ type: 'openSaved', project })}
+              onDraw={() => setDrawing(true)}
+            />
+            {/* What somebody with no iPhone is told, and where they paste the
+                code if they already pay. Only in a browser: inside the app
+                Apple has already said who paid, and a page explaining what a
+                browser can do would be a page about a machine the reader is
+                not holding. */}
+            <Welcome />
+          </div>
         )
       ) : (
         derived && (
           <div className="space-y-5 sheet-root">
+            {/* The line that will not let somebody believe a browser is a
+                filing cabinet. Only in a browser: on the phone a room is in
+                the scan's own folder and in iCloud, and `SaveTrouble` in
+                `state.ts` already says what to do when it is not. It is quiet
+                until there is work in no file, and it is NOT sticky — see the
+                measurement in `KeepACopy`. */}
+            {!native && <KeepACopy fileName={loaded.fileName} at="top" />}
             <SectionBar active={section} flags={sectionFlags} onPick={setSection} />
 
             <Panel section="plan" active={section}>
@@ -1380,6 +1427,12 @@ export function App() {
                 card, the open card and the section bar with room to spare --
                 `CARD_BUDGET.open` in Tour.tsx is a fifth of the window, and
                 a21-tour measures the card against it on every run. */}
+            {/* The same panel, at the other end of the screen and at length:
+                what the browser answered when it was asked to keep this, what
+                that answer means, and the button again. Nothing while the red
+                line above is speaking. */}
+            {!native && <KeepACopy fileName={loaded.fileName} at="bottom" />}
+
             {touring && <div aria-hidden="true" className="h-48 print:hidden" />}
           </div>
         )

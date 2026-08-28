@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, noise, open, report, reportEvenIfItDies, SP, URL } from './lib.mjs';
+import { check, noise, open, payingBrowser, report, reportEvenIfItDies, SP, URL } from './lib.mjs';
 
 // Say what was learned even if this part dies part way through.
 reportEvenIfItDies('A21 — the worked example and the guided tour');
@@ -332,6 +332,8 @@ check('and leaves the room on the screen',
   const PHONE = { width: 430, height: 800 };
   const browser2 = await openChromium();
   const ctx2 = await browser2.newContext({ viewport: PHONE, acceptDownloads: true });
+  // A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+  await payingBrowser(ctx2);
   const phone = await ctx2.newPage();
   const shouted = [];
   phone.on('console', (m) => { if (m.type() === 'error') shouted.push('console: ' + m.text()); });

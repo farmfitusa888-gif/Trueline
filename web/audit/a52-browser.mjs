@@ -141,11 +141,44 @@ async function press(control) {
 /* ========================================================================== */
 
 {
-  const { browser, page } = await openAsApp({ subscribed: true });
+  const { browser, page } = await openAsApp({ subscribed: true, unlockSeed: 'sam' });
   const inside = await page.locator('body').innerText();
   check('inside the app the front door is not drawn',
     !/Trueline, in your browser/.test(inside) && !/What needs the iPhone/.test(inside),
     inside.slice(0, 400));
+
+  /* ---------------------------------- and the other half of the same line */
+
+  // The gate in a browser is worth nothing to a contractor who has paid unless
+  // his phone will tell him the code. Turning the first on without the second
+  // would have shipped a paywall in front of the man funding this, with no way
+  // past it at all.
+  // `#business` rather than a button, because inside the app the Business tab
+  // is a native tab and the web view is opened straight onto it — there is no
+  // control on this side to press. `openedAt()` in `App.tsx` reads the same
+  // fragment `WebScreen` opens with.
+  await page.goto(`${URL}#business`, { waitUntil: 'load', timeout: 60000 });
+  await page.waitForTimeout(900);
+  const business = page.locator('[data-code="browser"]').first();
+  check('the phone shows the code that opens the same screens in a browser',
+    (await business.count()) === 1,
+    'there is nowhere on this phone to get a code from');
+  const said = (await business.count()) === 1 ? await business.innerText() : '';
+  // The seed above is `sam`, and this is `makeUnlockCode('sam')` written out
+  // rather than computed, so changing how a code is made turns this red instead
+  // of quietly agreeing with itself. It is the same code `lib.mjs` seeds.
+  check('and it is the code that seed makes, character for character',
+    said.includes('TL-EHS7-EW4Z-Y733-7FWX'), said.slice(0, 400));
+  check('and it says where to paste it',
+    /app\.trueline\.tools/.test(said), said.slice(0, 400));
+  check('and it says what the code is worth, rather than implying security',
+    /courtesy lock, not security/.test(said) && /forward works/.test(said),
+    said.slice(0, 600));
+  check('and there is a way to copy it that is not reading it off the screen',
+    (await page.getByRole('button', { name: 'Copy the browser code' }).count()) === 1);
+
+  check('the phone side of the code: no console or page errors',
+    noise().length === 0, noise().join(' | '));
   await browser.close();
 }
 

@@ -29,6 +29,8 @@ import SwiftUI
 struct WebScreen: View {
     let opensOn: CorrectView.Opening
     let title: String
+    /// What the browser unlock code is made from. Only the Business tab has one.
+    var unlockSeed: String = ""
     @ObservedObject var store: ProjectStore
     @ObservedObject var backup: Backup
     /// What went wrong, for the Business tab to list. Nil on the Floor tab:
@@ -57,6 +59,7 @@ struct WebScreen: View {
             // the page does with this is decided in `entitlement.ts`, and this
             // hands it the truth rather than a convenient answer.
             subscribed: true,
+            unlockSeed: unlockSeed,
             onVisits: { _, _ in
                 // Scheduling belongs to a job, and there is no job open here.
             },

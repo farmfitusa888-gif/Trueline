@@ -105,6 +105,9 @@ struct RootTabs: View {
                 WebScreen(
                     opensOn: .business,
                     title: "Your business",
+                    // The one screen that shows the code for a browser, so the
+                    // one screen that is handed the seed it is made from.
+                    unlockSeed: subscription.unlockSeed,
                     store: store,
                     backup: backup,
                     diagnostics: diagnostics

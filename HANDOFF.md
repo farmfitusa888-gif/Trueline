@@ -259,3 +259,48 @@ than silently turning two of them off.
 - `check-reachable`, `check-doors`, `check-bridge`, `check-scan`,
   `check-controls`, `check-collapse`, `check-tokens`, `check-art`,
   `check-portable`, `check-guide`, `check-the-checks` — all clean.
+
+## 2026-08-28 — the browser front door is wired in, and the browser is gated
+
+`web/src/Welcome.tsx` held the front door, the code box, the keep-a-copy nag and
+the room-from-a-link, and was **imported by nothing**. `a52-browser.mjs` was in
+`run.mjs` asserting all of it, so the suite was red on 30 checks against four
+components no screen drew. Four wires in `web/src/App.tsx` fixed that, and two
+real defects fell out of it.
+
+1. **`unlocked()` answered `true` for every browser.** Scan on the phone, open
+   the same screens in Safari, and every paid document was free. It is
+   `unlockedByCode()` now, so the browser is gated on exactly the line in
+   `core/src/entitlement.ts` that the phone draws.
+2. **`useUnlocked` listened to StoreKit and not to the code**, so a valid code
+   left every paid screen locked until a reload.
+3. The front-door file picker handed a Trueline job file to the scan path,
+   which answered *"The scan has no walls"*. It reads the file now.
+
+Turning the gate on without a way past it would have put a paywall in front of
+the people paying, so the other half landed with it: **the code is on the phone**.
+`Subscription.unlockSeed` (Apple's original transaction identifier, or a UUID
+the app keeps) crosses the bridge as `unlockSeed`, and `Your business` shows
+`makeUnlockCode` of it with a copy button and the sentence saying it is a
+courtesy lock. One implementation of the hashing, on the web side.
+
+`web/audit/lib.mjs`'s `open()` now seeds that code, because every part that
+drives a takeoff, a price or a proposal is driving a paying contractor's
+browser. `a52` opens its own context without it, which is how the line is
+checked.
+
+### Not compiled
+
+**The Swift in this change has not been built.** There is no Mac in this
+environment. `npm run check-swift` parses it and is clean, and that is a parse,
+not a compile. What changed: `Subscription.swift` (the seed),
+`CorrectView.swift` (one payload field), `WebScreen.swift` (a pass-through) and
+`RootTabs.swift` (one argument). First thing to run on the Mac is
+`bash build.sh`.
+
+### What was measured
+
+- `npm test` 1290 pass, 0 fail. `npm run typecheck` clean.
+- `a52-browser` **124/124**, up from 88 when the wiring started and from a part
+  that could not run at all before it.
+- `check-controls` clean at 279 names with an empty excuse file.

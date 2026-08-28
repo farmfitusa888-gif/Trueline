@@ -161,7 +161,11 @@ export function mayKeepRoom(
     keep: false,
     because:
       `Keeping more than ${inWords(FREE_ROOMS)} room at once is part of the subscription. ` +
-      `The ${inWords(kept)} ${kept === 1 ? 'room' : 'rooms'} already on this phone ` +
+      // "Already here" rather than "already on this phone": these same screens
+      // run in a browser now, gated on this same list, and a browser visitor
+      // reading about a phone he is not holding would think the sentence was
+      // about somebody else's device.
+      `The ${inWords(kept)} ${kept === 1 ? 'room' : 'rooms'} already here ` +
       `${kept === 1 ? 'is' : 'are'} untouched — open, read, correct and send ` +
       `${kept === 1 ? 'it' : 'any of them'} as usual. This is about writing down a new one.`,
   };
@@ -235,8 +239,8 @@ export const WHAT_IT_DOES: Readonly<Record<Feature, string>> = {
   priceList:
     "Import a supplier's price list and price against what you actually pay.",
   unlimitedRooms:
-    `More than ${inWords(FREE_ROOMS)} room kept at once. Every room already on the ` +
-    `phone stays there and stays readable — this is about writing down a new one, ` +
+    `More than ${inWords(FREE_ROOMS)} room kept at once. Every room already kept ` +
+    `stays there and stays readable — this is about writing down a new one, ` +
     `never about taking away work somebody has already done.`,
 };
 

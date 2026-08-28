@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
+import { check, payingBrowser, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
 
 // Say what was learned even if this part dies part way through.
 reportEvenIfItDies('A38 — the record that a document left this phone');
@@ -68,6 +68,8 @@ const problems = [];
 /** A page at phone height, optionally with a share sheet on it. */
 async function phone({ share = 'none' } = {}) {
   const ctx = await browser.newContext({ viewport: PHONE, acceptDownloads: true });
+  // A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+  await payingBrowser(ctx);
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));

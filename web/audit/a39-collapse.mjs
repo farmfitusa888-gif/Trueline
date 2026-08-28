@@ -1,5 +1,5 @@
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, refuseAStaleBundle, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
+import { check, payingBrowser, refuseAStaleBundle, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
 
 
 /**
@@ -62,6 +62,8 @@ reportEvenIfItDies(`A39 — every menu folds back, at 430 by ${HEIGHT}`);
 await refuseAStaleBundle();
 const browser = await openChromium();
 const ctx = await browser.newContext({ viewport: { width: 430, height: HEIGHT }, acceptDownloads: true });
+// A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+await payingBrowser(ctx);
 const page = await ctx.newPage();
 const problems = [];
 page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });

@@ -188,6 +188,30 @@ def swiftNames(bench: Bench) -> None:
                fires=True, saying='out of order')
         bench.restore(rel)
 
+    # 2b2. The same swap again, with the property written WITHOUT its type.
+    #
+    #      `var unlockSeed = ""` is ordinary Swift and is in the memberwise
+    #      initialiser exactly as an annotated one is. `DEFAULTED` used to insist
+    #      on the `: Type`, so a property written that way was invisible, the
+    #      call passing it was written off as "some other overload", and the
+    #      ordering check went silent on it -- the same failure 2b records,
+    #      arriving by a second door. It arrived for real: `WebScreen` grew
+    #      `var unlockSeed = ""` on 2026-08-28 and 2b went green on a file
+    #      broken on purpose. This is that case, kept.
+    both = bench.read(rel).replace('    var unlockSeed: String = ""', '    var unlockSeed = ""')
+    if both == bench.read(rel):
+        failures.append('WebScreen no longer declares unlockSeed with a type')
+        print(f'  {RED}✗{OFF} a defaulted property with no type annotation (nothing to unannotate)')
+    else:
+        bench.write(rel, both.replace(
+            'reportsJSON: diagnostics?.asJSON() ?? Data(),\n            onTrouble: act,',
+            'onTrouble: act,\n            reportsJSON: diagnostics?.asJSON() ?? Data(),',
+        ))
+        code, out = bench.run('check-swift-names.py')
+        expect('out of order, with the new property written without its type', code, out,
+               fires=True, saying='out of order')
+        bench.restore(rel)
+
     # 2c. Overlapping exclusive access -- the error Xcode gave on 2026-08-26,
     #     restored exactly as it was written.
     #

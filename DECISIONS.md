@@ -2369,3 +2369,110 @@ Every one was watched failing before it was trusted, at both layers:
 second time — the twice-moved path had no audit at all, because CO-2 in that part
 is about the contractor's own open-span line, which no signed change order ever
 covered.
+
+## The browser is gated on the same line as the phone, and the front door was wired in
+
+**2026-08-28.** `web/src/Welcome.tsx` — the front door, the code box, the
+keep-a-copy nag and the room-from-a-link — was written, tested, and **imported
+by nothing**. `web/audit/a52-browser.mjs` was in `run.mjs` asserting all of it,
+so the suite was red on 30 checks against four components no screen drew.
+
+Four wires, in `web/src/App.tsx`:
+
+| component | where |
+| --- | --- |
+| `Welcome` | under `Opener`, browser only |
+| `RoomFromLink` | outside every branch, browser only, so a link works cold and in a tab that already has a room |
+| `KeepACopy at="top"` | head of the room, browser only |
+| `KeepACopy at="bottom"` | under the room, browser only |
+
+And two real defects that only appeared once they were on a screen.
+
+### `unlocked()` answered `true` for every browser
+
+```ts
+if (!insideApp()) return true;   // was
+if (!insideApp()) return unlockedByCode();   // is
+```
+
+The old line was written when a browser meant a development server and a client
+file. It stopped being true the day the app was published at a public address:
+scan a room on the phone, open the same screens in Safari, and every paid
+document was free. **Sam saw this himself and said so.** The browser is now
+gated on exactly the line the phone draws — `FREE` and `PAID` in
+`core/src/entitlement.ts`, one list read by both — and a contractor who already
+pays says so with a code his phone makes.
+
+It stays a **courtesy lock** and the screen says so. A code can be forwarded.
+What it is for is narrow and worth having: a man who has paid must not meet a
+paywall in his own browser. There is no login here and there never will be — on
+the phone Apple says who paid, and in a browser the code does.
+
+`web/audit/lib.mjs`'s `open()` now seeds that code, because every part that
+drives a takeoff, a price, a proposal or an export is driving a paying
+contractor's browser. `a52` opens its own context **without** it, which is how
+the line itself is checked: free is free, paid is shut, the code opens it.
+
+### `useUnlocked` listened to one of the two sources
+
+`onEntitlement` fires when StoreKit answers on the phone. `onUnlockChanged`
+fires when a code is pasted in a browser. Only the first was listened to, so a
+valid code left every paid screen locked until the page was reloaded — the
+answer had changed and nothing on screen had been told to look again.
+
+### One more, on the way in
+
+The file picker on the front door is the only one a browser visitor has, and it
+was handed a Trueline job file — the app's own save — straight to the scan
+path, which answered **"The scan has no walls"**. It reads the file now, through
+`isJobFile`, rather than the name.
+
+### One consequence, found by the tour
+
+With the gate on, twelve of the guided tour's stops rang nothing at all: the
+screens they point at were locked, because `a21-tour` builds its own browser
+context rather than using `open()`, and the code `open()` seeds was not in it.
+
+Ten parts do that. The seeding is `payingBrowser(ctx)` in `web/audit/lib.mjs`
+now, called by `open()` and by each of the ten, so there is one place the code
+lives and one sentence saying why a part that drives a takeoff is driving a
+paying contractor's browser. It has to be called **before** the first `goto` —
+an init script added afterwards runs on the next navigation, not on the one
+already made.
+
+`a52` still writes the code out itself and builds two contexts deliberately
+without it, so that changing how a code is made turns that part red rather than
+quietly agreeing with itself.
+
+### And one the checker could not see
+
+`check-swift-names.py` reads a struct's stored properties to work out the
+memberwise initialiser Swift generates, so it can catch a call that passes them
+in the wrong order — the error that reads as *"Incorrect argument labels in
+call"* and is nothing of the sort.
+
+Its `DEFAULTED` pattern insisted on an explicit type. `var unlockSeed = ""` is
+ordinary Swift and is in that initialiser exactly as an annotated one is, so the
+new property was invisible to it, the call passing it was written off as *"some
+other overload"*, and the ordering check went silent on `WebScreen.swift`.
+
+`check-the-checks.py` caught it — the mutation it makes to that very call went
+green on a file broken on purpose. The type annotation is optional in the
+pattern now, and there is a case in `check-the-checks.py` for the unannotated
+form so it cannot go quiet again by the same door twice.
+
+The file's own comment already recorded this failure arriving once, in 2026-08-26,
+when `CorrectView` grew three defaulted properties. This was the same failure
+through a second door.
+
+### A part that had been reporting on 15 of its 37 checks
+
+`a46-viewing` clicked `Further out` at the widest view to prove a live button
+did nothing — the complaint `check-controls.py` was written for. That button is
+disabled now, and Playwright waits thirty seconds for a disabled control to
+become actionable and then throws, so the part died at that line and the
+twenty-two checks after it never ran. Including both checks about that button.
+
+`click({ force: true })` now, and 37/37. That is the second part this session
+found to be silently under-reporting: `a22-voice` was reading two checks off
+`indexOf(...) === -1`, which is `slice(-1)`, the last character of the sheet.

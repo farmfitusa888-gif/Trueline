@@ -1,5 +1,5 @@
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, pick, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
+import { check, payingBrowser, pick, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
 
 // Say what was learned even if this part dies part way through.
 reportEvenIfItDies('A31 — the mark button, on a real scan');
@@ -32,6 +32,8 @@ reportEvenIfItDies('A31 — the mark button, on a real scan');
 // 430 by 800: an iPhone 15 Pro Max with the browser's own chrome taken off.
 const browser = await openChromium();
 const ctx = await browser.newContext({ viewport: { width: 430, height: 800 }, acceptDownloads: true });
+// A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+await payingBrowser(ctx);
 const page = await ctx.newPage();
 const problems = [];
 page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });

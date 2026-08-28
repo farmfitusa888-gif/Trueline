@@ -122,6 +122,40 @@ export function check(name, condition, detail = '') {
   results.push({ name, ok: !!condition, detail: condition ? '' : detail });
 }
 
+/**
+ * Makes a context belong to somebody who pays.
+ *
+ * The paid screens are gated in a browser exactly as they are on the phone --
+ * see `unlocked()` in `web/src/entitlementStore.ts` -- and a browser says who
+ * it is with a code the phone makes rather than with a login, because there is
+ * no login anywhere in this product. Every part that drives a takeoff, a price,
+ * a proposal or an export is driving a paying contractor's browser, so this is
+ * the state they run in.
+ *
+ * `open()` does this for you. Call it yourself in a part that builds its own
+ * context with `newContext`, BEFORE the first `goto` -- an init script added
+ * afterwards runs on the next navigation, not on the one already made. There
+ * are ten such parts and the tour was the one that found this: with the gate
+ * on and no code, twelve of its stops rang nothing at all, because the screens
+ * they point at were locked.
+ *
+ * `web/audit/a52-browser.mjs` builds two contexts WITHOUT this on purpose,
+ * which is how the line itself is checked: free is free, paid is shut, and the
+ * code opens it. It writes the same code out rather than importing this one, so
+ * that changing how a code is made turns that part red instead of quietly
+ * agreeing with itself.
+ */
+export async function payingBrowser(ctx) {
+  await ctx.addInitScript(() => {
+    try {
+      window.localStorage.setItem('trueline.unlock.v1', 'TL-EHS7-EW4Z-Y733-7FWX');
+    } catch {
+      // A browser with no storage is a browser this cannot unlock. It fails on
+      // the paid screen rather than here, which is where it reads.
+    }
+  });
+}
+
 export async function open() {
   await refuseAStaleBundle();
   const browser = await openChromium();
@@ -130,6 +164,7 @@ export async function open() {
   problems = [];
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  await payingBrowser(ctx);
   await page.goto(URL, { waitUntil: 'load', timeout: 60000 });
   await page.waitForSelector('body', { timeout: 60000 });
   return { browser, ctx, page };

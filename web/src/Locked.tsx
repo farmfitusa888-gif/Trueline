@@ -13,11 +13,24 @@
 import { useEffect, useState } from 'react';
 import { type Feature, FREE_ROOMS, TITLE, describeLock } from '../../core/src/entitlement.ts';
 import { onEntitlement, unlocked, waiting } from './entitlementStore.ts';
+import { onUnlockChanged } from './roomLink.ts';
 
-/** Re-renders whatever uses it when the app hands the answer across. */
+/**
+ * Re-renders whatever uses it when the answer changes, from either side.
+ *
+ * Two sources, because there are two ways this product learns who has paid and
+ * only one of them was listened to. On the phone it is StoreKit, handed across
+ * the bridge, and `onEntitlement` fires. In a browser it is a code the phone
+ * made, pasted into the box on the front door, and `onUnlockChanged` fires.
+ *
+ * Without the second one, pasting a valid code left every paid screen locked
+ * until the page was reloaded — the value `unlocked()` returns had changed and
+ * nothing on the screen had been told to look again.
+ */
 export function useUnlocked(): { readonly open: boolean; readonly pending: boolean } {
   const [, bump] = useState(0);
   useEffect(() => onEntitlement(() => bump((n) => n + 1)), []);
+  useEffect(() => onUnlockChanged(() => bump((n) => n + 1)), []);
   return { open: unlocked(), pending: waiting() };
 }
 
@@ -113,7 +126,7 @@ export function RoomLimit({ because }: { readonly because: string }) {
       <h2 className="font-semibold text-amber-900">This new room was not kept</h2>
       <p className="mt-1 text-sm leading-relaxed text-amber-900">{because}</p>
       <p className="mt-2 text-sm text-amber-900">
-        Nothing has been deleted. Every room already on this phone is still there, still
+        Nothing has been deleted. Every room already kept is still there, still
         opens, and still exports. What is on the screen right now is still on the screen —
         it is only the writing-down that has stopped, so send it out from Files before you
         move on if you want to keep it.

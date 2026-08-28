@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, contrast, noise, openAsApp, pick, report, reportEvenIfItDies, section, sentTo, SP, URL } from './lib.mjs';
+import { check, contrast, noise, openAsApp, payingBrowser, pick, report, reportEvenIfItDies, section, sentTo, SP, URL } from './lib.mjs';
 
 // Say what was learned even if this part dies part way through.
 reportEvenIfItDies('A29 — knowing you tapped the wall');
@@ -408,6 +408,8 @@ check('no console or page errors while picking walls', noise().length === 0, noi
     viewport: { width: 430, height: 1600 },
     reducedMotion: 'reduce',
   });
+  // A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+  await payingBrowser(stillCtx);
   const stillPage = await stillCtx.newPage();
   await stillPage.addInitScript((parked) => {
     window.truelinePayload = parked;
@@ -517,6 +519,8 @@ await browser.close();
 {
   const plain = await openChromium();
   const plainCtx = await plain.newContext({ viewport: { width: 430, height: 1600 } });
+  // A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+  await payingBrowser(plainCtx);
   const plainPage = await plainCtx.newPage();
   const trouble = [];
   plainPage.on('console', (m) => { if (m.type() === 'error') trouble.push(m.text()); });

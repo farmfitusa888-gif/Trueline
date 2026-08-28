@@ -34,6 +34,23 @@ export interface HandOver {
   /** Whether StoreKit says this person has paid. */
   subscribed?: boolean;
   /**
+   * The seed this phone's browser unlock code is made from.
+   *
+   * Not the code — the seed. The arithmetic is `makeUnlockCode` in
+   * `roomLink.ts`, one implementation, and the phone hands across the thing it
+   * owns rather than reimplementing the hashing in Swift and having the two
+   * quietly disagree the day one of them changes.
+   *
+   * It is Apple's original transaction identifier where there is a purchase,
+   * and a UUID the app keeps to itself where there is not. Either way it is
+   * hashed before anybody sees it, and nothing about the purchase can be read
+   * back out of the code.
+   *
+   * Absent in a browser, which is the whole point: a browser has no phone to
+   * ask and is offered somewhere to paste the answer instead.
+   */
+  unlockSeed?: string;
+  /**
    * Whether this phone can write a sentence for somebody.
    *
    * True only when the app was built against an SDK that has Apple's
@@ -460,6 +477,31 @@ export function tapBack(): boolean {
     // for. The wall is still selected and the screen still says so.
     return false;
   }
+}
+
+/* -------------------------------------------------- the code for a browser */
+
+/**
+ * The seed the phone handed across, or nothing.
+ *
+ * Nothing is the ordinary state: this file runs in a browser as often as it
+ * runs in the app, and a browser has no phone to ask. The screen that shows
+ * the code draws nothing at all rather than an empty box — somebody looking at
+ * `Your business` in a browser is not being told about a code his phone would
+ * have made if he had opened it on his phone.
+ */
+let seed = '';
+
+const seedListeners = new Set<() => void>();
+
+export function onUnlockSeed(listen: () => void): () => void {
+  seedListeners.add(listen);
+  return () => seedListeners.delete(listen);
+}
+
+/** What to make this phone's browser code out of, or nothing. */
+export function unlockSeed(): string {
+  return seed;
 }
 
 /* ------------------------------------------------------------ drafting */
@@ -1102,6 +1144,10 @@ export function installBridge(dispatch: (action: Action) => void): void {
     }
     if (typeof payload.subscribed === 'boolean') {
       setSubscribed(payload.subscribed);
+    }
+    if (typeof payload.unlockSeed === 'string' && payload.unlockSeed !== '') {
+      seed = payload.unlockSeed;
+      for (const listen of seedListeners) listen();
     }
     if (typeof payload.draftable === 'boolean') {
       canWrite = payload.draftable;

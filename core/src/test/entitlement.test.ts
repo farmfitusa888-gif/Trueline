@@ -133,8 +133,8 @@ test('a subscription keeps anything, including a room that has never been seen',
 test('the refusal counts the rooms that are there, and says it as a person would', () => {
   // Worked out here rather than read back from the sentence: two rooms kept,
   // so the sentence has to say two and has to say them in the plural.
-  assert.match(mayKeepRoom(['a', 'b'], 'c', false).because, /The two rooms already on this phone are/);
-  assert.match(mayKeepRoom(['a'], 'c', false).because, /The one room already on this phone is/);
+  assert.match(mayKeepRoom(['a', 'b'], 'c', false).because, /The two rooms already here are/);
+  assert.match(mayKeepRoom(['a'], 'c', false).because, /The one room already here is/);
 });
 
 test('the number in the lock is the number the gate enforces', () => {

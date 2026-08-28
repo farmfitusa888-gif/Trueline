@@ -267,13 +267,19 @@ check('and the grid is back to the width it was, to a hundredth of a pixel',
 
 /* -------------------------------------- a control that cannot do anything */
 
-// At the widest view there is nothing further out to go. `Room3D` answers that
-// by disabling both ends; the drawing board does not, so this is a live button
-// that does nothing whatever when it is pressed. That is what a dead button is,
-// and it is the complaint that started `check-controls.py`.
+// At the widest view there is nothing further out to go. `Room3D` answered that
+// by disabling both ends and the drawing board did not, so this was a live
+// button that did nothing whatever when it was pressed -- the complaint that
+// started `check-controls.py`. It is disabled now, and both halves of that are
+// checked here: that it says so, and that pressing it anyway moves nothing.
+//
+// `force: true` because a plain `click()` waits for a disabled control to
+// become actionable and then times out after thirty seconds -- which is what
+// this part did once the button was fixed and this block was not: it died here
+// having reported nothing about the two facts below.
 const beforeDead = await drawing();
 const deadSays = await further.isDisabled();
-await further.click();
+await further.click({ force: true });
 await page.waitForTimeout(250);
 const afterDead = await drawing();
 check('pressing Further out at the widest view really does change nothing',

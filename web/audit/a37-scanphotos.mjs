@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { openChromium } from '../../core/tools/browser.mjs';
-import { check, pick, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
+import { check, payingBrowser, pick, report, reportEvenIfItDies, section, SP, URL } from './lib.mjs';
 
 // Say what was learned even if this part dies part way through.
 reportEvenIfItDies('A37 — taking the walk\'s own photographs off, on a real scan');
@@ -173,6 +173,8 @@ async function openPhone(payload) {
     viewport: { width: 430, height: 800 },
     acceptDownloads: true,
   });
+  // A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+  await payingBrowser(ctx);
   await ctx.route('**/photos/**', (route) =>
     route.fulfill({ path: `${SP}/damage-photo.jpg`, contentType: 'image/jpeg' })
   );

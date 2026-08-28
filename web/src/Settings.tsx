@@ -4,6 +4,8 @@ import { type Company, addressLines, hasAddress, letterhead } from '../../core/s
 import { ASSEMBLIES } from '../../core/src/thickness.ts';
 import { useUnits } from './units.tsx';
 import { TRADES, describeTrade, tradeOf } from '../../core/src/trade.ts';
+import { onUnlockSeed, unlockSeed } from './bridge.ts';
+import { makeUnlockCode } from './roomLink.ts';
 
 /**
  * Whose business this is.
@@ -474,6 +476,83 @@ export function Settings({ onClose }: { readonly onClose?: () => void }) {
           Saved. This goes on every drawing and everything you send a client.
         </p>
       )}
+
+      <BrowserCode />
     </section>
+  );
+}
+
+/**
+ * The code that opens the same screens in a browser.
+ *
+ * ## Why there is one at all
+ *
+ * The paid screens are shut in a browser exactly as they are on the phone —
+ * `unlocked()` in `entitlementStore.ts` — and there is no login anywhere in
+ * this product to ask instead. On the phone Apple says who paid. In a browser
+ * the code does. Without this screen a man who pays would meet a paywall in his
+ * own browser and have no way at all past it, which is what turning the gate on
+ * without turning this on would have shipped.
+ *
+ * ## And it says what it is
+ *
+ * A **courtesy lock, not security.** A forwarded code works. That is written
+ * here, in these words, because a screen that implied otherwise would be this
+ * app's first outright false statement about itself. `roomLink.ts` and
+ * `docs/the-browser-version.md` say the same thing at more length.
+ *
+ * Nothing is drawn in a browser: `unlockSeed` is empty there, and telling
+ * somebody about a code his phone would have made if he were holding it is
+ * worse than saying nothing.
+ */
+function BrowserCode() {
+  // Read on every render rather than held, and re-rendered when the app speaks:
+  // the hand-over arrives after the first paint, so a value captured once would
+  // be the empty string for ever on the screen that needs it.
+  const [, bump] = useState(0);
+  useEffect(() => onUnlockSeed(() => bump((n) => n + 1)), []);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const made = unlockSeed();
+  if (made === '') return null;
+  const code = makeUnlockCode(made);
+
+  return (
+    <div data-code="browser" className="mt-6 border-t border-slate-200 pt-4">
+      <h3 className="text-sm font-semibold text-slate-900">Trueline in a browser</h3>
+      <p className="mt-1 text-sm leading-relaxed text-slate-600">
+        Everything but the scan runs at <strong>app.trueline.tools</strong> on any computer. The
+        paid screens are shut there the same way they are here. Paste this in once and that
+        browser does what this phone does.
+      </p>
+      <p className="mt-2 font-mono text-base tracking-wide text-slate-900">{code}</p>
+      <button
+        type="button"
+        onClick={() => {
+          // `writeText` is refused when the page is not the front-most one and
+          // on a phone with no clipboard permission, and the answer is said
+          // either way -- a copy button that quietly did nothing is how
+          // somebody ends up pasting an empty box into the other browser.
+          void navigator.clipboard
+            .writeText(code)
+            .then(() => setCopied('Copied. Paste it into the box on app.trueline.tools.'))
+            .catch(() => setCopied('This browser would not copy it. Read it across instead.'));
+        }}
+        className="mt-2 min-h-11 rounded-md border border-slate-400 px-4 text-sm font-medium
+                   text-slate-800 active:bg-slate-100"
+      >
+        Copy the browser code
+      </button>
+      {copied !== null && (
+        <p role="status" className="mt-2 text-sm text-slate-700">
+          {copied}
+        </p>
+      )}
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+        It is a courtesy lock, not security. A code you forward works in whoever&rsquo;s browser
+        you forward it to, and anybody determined to make one can work out how. It is here so that
+        you are not asked to pay twice, not to stop anybody.
+      </p>
+    </div>
   );
 }

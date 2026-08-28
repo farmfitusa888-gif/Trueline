@@ -130,6 +130,34 @@ final class Subscription: ObservableObject {
     /// What the free run was given for, in whatever words it was given in.
     @Published private(set) var freeRunWhy = ""
 
+    /// What this phone's browser unlock code is made from.
+    ///
+    /// The paid screens are shut in a browser exactly as they are here, and
+    /// there is no login anywhere in Trueline to ask instead. Here Apple says
+    /// who paid; in a browser a code does. This is the seed that code is made
+    /// from, and `makeUnlockCode` in `web/src/roomLink.ts` is the arithmetic --
+    /// one implementation, on the web side, so that the two halves cannot
+    /// quietly disagree the day the format changes.
+    ///
+    /// Apple's ORIGINAL transaction identifier where there is a purchase, so
+    /// the same subscription always makes the same code however many times the
+    /// app is reinstalled. A UUID this app keeps to itself where there is not,
+    /// which covers the free run and the two people testing it.
+    ///
+    /// It never leaves the phone. What leaves is two rounds of FNV-1a over it,
+    /// so nothing about the purchase can be read back out of the code.
+    @Published private(set) var unlockSeed = Subscription.keptSeed()
+
+    /// The seed for a phone with no purchase behind it, made once and kept.
+    private static func keptSeed() -> String {
+        if let kept = UserDefaults.standard.string(forKey: unlockSeedKey), !kept.isEmpty {
+            return kept
+        }
+        let made = UUID().uuidString
+        UserDefaults.standard.set(made, forKey: unlockSeedKey)
+        return made
+    }
+
     private var watcher: Task<Void, Never>?
 
     init() {
@@ -172,6 +200,10 @@ final class Subscription: ObservableObject {
             guard Plan(rawValue: transaction.productID) != nil else { continue }
             if transaction.revocationDate == nil {
                 found = true
+                // The ORIGINAL identifier rather than this renewal's, so the
+                // code a contractor pasted into his browser in March is still
+                // the code his phone shows him in September.
+                unlockSeed = String(transaction.originalID)
             }
         }
         // Four ways to be entitled and only the first is money, in the order
@@ -437,6 +469,7 @@ final class Subscription: ObservableObject {
     /// One number, changed here, and the button and its sentence both follow.
     static let freeRunOffered = 14
 
+    private static let unlockSeedKey = "trueline.unlock.seed"
     private static let freeRunEndsKey = "trueline.freeRun.endsAt"
     private static let freeRunWhyKey = "trueline.freeRun.why"
 

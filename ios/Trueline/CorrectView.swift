@@ -76,6 +76,13 @@ struct CorrectView: UIViewRepresentable {
     /// TypeScript the web screens import -- so both halves gate on one list.
     let subscribed: Bool
 
+    /// What this phone's browser unlock code is made from, or nothing.
+    ///
+    /// Empty on every screen but `Your business`, because that is the only
+    /// screen that shows it and handing it to the others would put a seed on
+    /// the page of every room for no reason. See `Subscription.unlockSeed`.
+    var unlockSeed: String = ""
+
     /// Days to put in the phone's own calendar.
     let onVisits: ([JobCalendar.Visit], String) -> Void
 
@@ -619,6 +626,12 @@ struct CorrectView: UIViewRepresentable {
                 payload["company"] = quoted(company)
             }
             payload["subscribed"] = parent.subscribed ? "true" : "false"
+            // Only where there is one. The web half draws nothing at all
+            // without it, which is the right answer for a browser and for every
+            // screen here that is not `Your business`.
+            if !parent.unlockSeed.isEmpty {
+                payload["unlockSeed"] = quoted(parent.unlockSeed)
+            }
             // Whether this phone can write a sentence for somebody. Handed
             // across rather than asked for, like the subscription and for the
             // same reason: `SystemLanguageModel` is on this side and a web view

@@ -238,9 +238,19 @@ ATTRIBUTED = re.compile(
 # out of the initialiser altogether. Nothing private and nothing carrying a
 # property wrapper: `@State private var tab: Tab = .rooms` is a SwiftUI view's
 # own state, and no call site anywhere passes one.
+#
+# The type annotation is OPTIONAL, and that is not tidiness. `var unlockSeed =
+# ""` is ordinary Swift, it is in the memberwise initialiser exactly as an
+# annotated one is, and this pattern used to require the `: Type` -- so a
+# property written that way was invisible here, the call passing it was written
+# off as "some other overload", and the ordering check went silent on it. That
+# is the same failure the paragraph above records, arriving by a second door:
+# `WebScreen` grew `var unlockSeed = ""` on 2026-08-28 and this stopped looking
+# at the call it exists for. Found by `check-the-checks.py`, which is what that
+# file is for.
 DEFAULTED = re.compile(
     r"""^\s*(?:internal\s+|public\s+)?
-        var\s+(\w+)\s*:\s*[^={\n]+=""",
+        var\s+(\w+)\s*(?::\s*[^={\n]+)?=""",
     re.X,
 )
 

@@ -1,6 +1,6 @@
 import { openChromium } from '../../core/tools/browser.mjs';
 
-import { check, HEIGHT, loadScan, report, reportEvenIfItDies, section, URL } from './lib.mjs';
+import { check, HEIGHT, loadScan, payingBrowser, report, reportEvenIfItDies, section, URL } from './lib.mjs';
 
 // Say what was learned even if this part dies part way through.
 reportEvenIfItDies('A12 — the complete click-through');
@@ -85,6 +85,8 @@ async function fresh() {
   const ctx = await SHARED.newContext({
     viewport: { width: 430, height: HEIGHT }, acceptDownloads: true,
   });
+  // A paying contractor's browser, the way `open()` makes one. See `payingBrowser`.
+  await payingBrowser(ctx);
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   // Retried, because this crawl is minutes long and the thing it is crawling is
