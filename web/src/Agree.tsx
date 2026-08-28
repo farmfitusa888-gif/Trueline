@@ -40,11 +40,18 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   type Baseline,
   type ChangeOrder,
+  type Withdrawal,
+  type Withdrawn,
   changesSinceVerified,
   describeChanges,
+  describeWithdrawal,
   freeze,
   freezeOnReturnedCopy,
+  reAgreement,
+  withdraw,
+  withdrawalOf,
 } from '../../core/src/baseline.ts';
+import { type Invoice, reversalsFor } from '../../core/src/invoice.ts';
 import { money } from '../../core/src/price.ts';
 import {
   type Party,
@@ -186,11 +193,14 @@ export function Agree({
   scope,
   proposal,
   baseline,
+  withdrawn = [],
+  invoices = [],
   proposalSent,
   saleVenue,
   returnedCopies,
   onProposal,
   onBaseline,
+  onWithdraw,
   onProposalSent,
   onSaleVenue,
   onReturnedCopies,
@@ -204,6 +214,23 @@ export function Agree({
   readonly scope: WorkScope | null;
   readonly proposal: Proposal | null;
   readonly baseline: Baseline | null;
+  /**
+   * Agreements on this job that have been withdrawn, oldest first.
+   *
+   * Kept for ever and shown for ever, each one whole with the reason beside
+   * it. Nothing is erased by a withdrawal, so nothing is dropped from here.
+   */
+  readonly withdrawn?: readonly Withdrawn[];
+  /**
+   * What has been asked for on this job, so withdrawing can reverse it.
+   *
+   * The Work screen owns invoicing and this screen owns the agreement; the
+   * reversals are worked out here because they happen in the same instant the
+   * agreement is withdrawn, and a job left withdrawn with live bills on it for
+   * as long as it takes somebody to open another screen is a job that is
+   * asking to be paid on an agreement nobody is bound by.
+   */
+  readonly invoices?: readonly Invoice[];
   /** The proposal as it went out: when, and its fingerprint then. */
   readonly proposalSent: { readonly at: string; readonly hash: string } | null;
   /** Where the agreement gets made, or `null` for not asked. Never defaulted. */
@@ -212,6 +239,25 @@ export function Agree({
   readonly returnedCopies: readonly ReturnedDocument[];
   readonly onProposal: (proposal: Proposal | null) => void;
   readonly onBaseline: (baseline: Baseline) => void;
+  /**
+   * Withdraw the agreement, and reverse every bill raised against it, in one
+   * move.
+   *
+   * Both together on purpose: a withdrawal that wrote the reason and left the
+   * invoices standing would leave money owed on an agreement that no longer
+   * exists, and there is no moment in between where that is a state anybody
+   * should be able to see.
+   *
+   * **Optional, and the control is not drawn without it.** The action and the
+   * reducer case this needs live in `web/src/state.ts`, which is not this
+   * change's to edit; until they land a contractor has no way to withdraw
+   * anything, and a button that cannot do what it says is worse than no button.
+   * The exact strings to add are in the integration note that came with this.
+   */
+  readonly onWithdraw?: (
+    withdrawal: Withdrawal,
+    reversals: readonly Invoice[]
+  ) => void;
   readonly onProposalSent: (sent: { at: string; hash: string }) => void;
   readonly onSaleVenue: (venue: SaleVenue | null) => void;
   readonly onReturnedCopies: (copies: readonly ReturnedDocument[]) => void;
@@ -250,6 +296,12 @@ export function Agree({
         proposal,
         company,
         baseline,
+        // Withdrawn agreements travel onto the document too. A proposal that
+        // was agreed, withdrawn and then sent again would otherwise reach the
+        // client saying "Not signed yet", with no sign that anything had ever
+        // been agreed or taken back -- which is the one document somebody
+        // would use to argue that it never was.
+        withdrawn,
         at: new Date().toLocaleDateString(),
         cooling: notice.ready,
         // Why it could not be completed, when it could not be. Without this the
@@ -302,6 +354,21 @@ export function Agree({
   const [consented, setConsented] = useState(false);
   const [trouble, setTrouble] = useState<string | null>(null);
   const [order, setOrder] = useState<ChangeOrder | null>(null);
+  /**
+   * What the model refused when it was asked what has changed since signing.
+   *
+   * It refuses one thing: a baseline that has been withdrawn, because there is
+   * nothing on the other side of the subtraction. That state is unreachable
+   * from this screen -- the live baseline goes to `null` the instant one is
+   * withdrawn -- and it is shown rather than swallowed, because a promise
+   * rejecting into nothing is how a screen ends up quietly drawing no change
+   * order on a job that has one.
+   */
+  const [orderTrouble, setOrderTrouble] = useState<string | null>(null);
+  /** True once the withdraw control has been pressed and is asking why. */
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawWhy, setWithdrawWhy] = useState('');
+  const [withdrawTrouble, setWithdrawTrouble] = useState<string | null>(null);
 
   /**
    * Where the client's agreement gets made. No default, ever.
@@ -350,6 +417,19 @@ export function Agree({
 
   const missing = proposal ? missingFromProposal(proposal) : [];
   const taken = proposal ? chosenOption(proposal) : undefined;
+
+  /**
+   * The withdrawal of the agreement this screen is being handed as the live
+   * one, when there is one — which there must never be.
+   *
+   * Withdrawing sets the live baseline to `null`, so a job cannot be both
+   * agreed and withdrawn. This asks the question anyway, because the screen
+   * must never present a withdrawn agreement as the one the job is running to
+   * whatever the store hands it: "Agreed — $4,030.50" over an agreement
+   * somebody withdrew is the single most expensive sentence this file could
+   * print.
+   */
+  const liveButWithdrawn = baseline ? withdrawalOf(baseline, withdrawn) : null;
 
   /**
    * What the buyer is agreeing to pay, for the rule's dollar threshold.
@@ -411,15 +491,26 @@ export function Agree({
     let live = true;
     if (!baseline || !proposal) {
       setOrder(null);
+      setOrderTrouble(null);
       return;
     }
-    void changesSinceVerified(baseline, proposal, current).then((next) => {
-      if (live) setOrder(next);
-    });
+    // `withdrawn` goes in so the refusal lives in the model rather than in a
+    // convention this screen is trusted to keep. See `changesSinceVerified`.
+    void changesSinceVerified(baseline, proposal, current, withdrawn)
+      .then((next) => {
+        if (!live) return;
+        setOrder(next);
+        setOrderTrouble(null);
+      })
+      .catch((error: unknown) => {
+        if (!live) return;
+        setOrder(null);
+        setOrderTrouble(error instanceof Error ? error.message : String(error));
+      });
     return () => {
       live = false;
     };
-  }, [baseline, proposal, current]);
+  }, [baseline, proposal, current, withdrawn]);
 
   // Every filed copy re-checked against the proposal as it stands now.
   // Asynchronous because hashing is; keyed by id so the alert sits on the copy
@@ -1107,7 +1198,7 @@ export function Agree({
 
       {/* ---------------------------------------------- signed, and after */}
 
-      {baseline && (
+      {baseline && !liveButWithdrawn && (
         <section
           data-sheet="no"
           className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 shadow-sm"
@@ -1143,6 +1234,200 @@ export function Agree({
           <p className="mt-3 text-xs text-emerald-900">
             This is the scope the job is measured against from here. It is never edited — anything
             that changes becomes a change order below.
+          </p>
+
+          {/* ------------------------------------------- the way out */}
+
+          {/*
+            Sam, asked whether there should be a way out once a job is agreed:
+            "Withdraw it, with a reason, kept on the record."
+
+            The word is **withdraw**, everywhere, and it is never "delete" and
+            never "cancel". Delete is not what happens: the agreement, the
+            signature, the bills and their reversals all stay on this job for
+            ever. And "cancel" is already taken — it is the buyer's federal
+            three-day right under 16 CFR 429, it belongs to the buyer, it runs
+            on a clock and it has forms. Two meanings of one word on one job is
+            how the wrong one gets read out in the one conversation that matters.
+
+            It is a two-step control because it is destructive, and the second
+            step is the reason rather than an "are you sure": a confirmation
+            teaches somebody to press twice, and a sentence they had to write
+            is the thing that is worth something in two years.
+          */}
+          {onWithdraw && !withdrawing && (
+            <div className="mt-4 border-t border-emerald-300 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setWithdrawing(true);
+                  setWithdrawTrouble(null);
+                  // Empty every time it is opened, and emptied HERE rather
+                  // than on the way out. A reason left in the box from a
+                  // withdrawal somebody thought better of is a sentence that
+                  // gets sent with the next one without being re-read, and
+                  // this is the one field on the screen whose whole value is
+                  // that somebody meant what it says. Clearing on the way in
+                  // covers every way of leaving it — backed out of, withdrawn,
+                  // or the screen navigated away from — with one line; clearing
+                  // on the way out covers only the ways somebody remembered.
+                  setWithdrawWhy('');
+                }}
+                className="min-h-11 w-full rounded-md border-2 border-rose-700 px-4 text-sm
+                           font-semibold text-rose-800 active:bg-rose-50"
+              >
+                Withdraw this agreement
+              </button>
+              <p className="mt-2 text-xs leading-relaxed text-emerald-900">
+                The job goes back to being a quote you can edit, and every invoice raised
+                against it is reversed so nothing is owed on it. Nothing is deleted: this
+                agreement, what it agreed, who agreed it, and every bill and its reversal all
+                stay on this job with your reason beside them.
+              </p>
+            </div>
+          )}
+
+          {onWithdraw && withdrawing && (
+            <div className="mt-4 rounded-md border-2 border-rose-400 bg-white p-3">
+              <h3 className="font-semibold text-rose-900">Withdraw this agreement</h3>
+              <p className="mt-1 text-sm leading-relaxed text-slate-700">
+                Say why. It stays on this job beside the agreement for as long as the job
+                exists, and it is the only thing that will explain this to anybody — including
+                you — in two years.
+              </p>
+              <label className="mt-3 block">
+                <span className="text-sm font-medium text-slate-700">
+                  Why you are withdrawing it
+                </span>
+                <textarea
+                  value={withdrawWhy}
+                  onChange={(event) => setWithdrawWhy(event.target.value)}
+                  aria-label="Why you are withdrawing it"
+                  rows={3}
+                  placeholder="They pulled out before the tear-out started."
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2
+                             focus:border-sky-500 focus:outline-none"
+                />
+              </label>
+
+              {/* The refusal goes HERE: under the box it is about and directly
+                  above the button that produced it. This app has already
+                  shipped a refusal 280px away from its own button once, on a
+                  430 by 800 phone, and the person never saw it. */}
+              {withdrawTrouble && (
+                <p role="alert" className="mt-2 rounded-md bg-rose-50 p-3 text-sm text-rose-900">
+                  {withdrawTrouble}
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    setWithdrawTrouble(null);
+                    const gone = withdraw(
+                      baseline,
+                      withdrawWhy,
+                      new Date().toISOString(),
+                      withdrawn
+                    );
+                    // The bills go back in the same move. Worked out here and
+                    // handed over together, so there is no instant in which
+                    // this job is withdrawn and still asking to be paid.
+                    onWithdraw(gone, reversalsFor(invoices, gone));
+                    setWithdrawing(false);
+                    setWithdrawWhy('');
+                  } catch (error) {
+                    setWithdrawTrouble(error instanceof Error ? error.message : String(error));
+                  }
+                }}
+                className="mt-3 min-h-12 w-full rounded-md bg-rose-700 px-5 font-semibold
+                           text-white active:bg-rose-800"
+              >
+                Withdraw the agreement — {money(baseline.agreed.total)}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWithdrawing(false);
+                  setWithdrawTrouble(null);
+                }}
+                className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-4 text-sm
+                           font-medium text-slate-700 active:bg-slate-100"
+              >
+                Not now
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ------------------------------------- what was withdrawn, kept */}
+
+      {/*
+        Shown whether or not there is a live agreement, and never removed. A
+        withdrawn agreement that disappears off the screen is a deleted one as
+        far as anybody using this is concerned, whatever the file underneath
+        still holds.
+
+        When the job HAS been agreed again, the two are put side by side with
+        the difference in money between them. That is the line that stops a
+        withdrawal being a way round the change-order machinery: a second
+        agreement cannot launder a price rise, because there is no door to a
+        baseline that does not take a fresh signature on the whole of the new
+        total — but a price that moved between two agreements still has to be
+        VISIBLE, and this is where it is visible. See `reAgreement` in
+        `core/src/baseline.ts`.
+      */}
+      {withdrawn.map((one) => (
+        <section
+          key={`${one.withdrawal.baselineHash}-${one.withdrawal.frozenAt}`}
+          data-sheet="no"
+          className="rounded-xl border border-slate-300 bg-slate-50 p-4 shadow-sm"
+        >
+          <h2 className="font-semibold text-slate-900">
+            Withdrawn — {one.baseline.agreed.name}, {money(one.withdrawal.wasTotal)}
+          </h2>
+          <ul className="mt-2 space-y-1 text-sm leading-relaxed text-slate-700">
+            {describeWithdrawal(one).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          {baseline && Date.parse(baseline.frozenAt) >= Date.parse(one.withdrawal.at) && (
+            <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
+              {reAgreement(one, baseline).says}
+            </p>
+          )}
+          {one.baseline.signatures.map((signature) => (
+            <div key={signature.id} className="mt-3">
+              <img
+                src={signature.mark}
+                alt={`Signature of ${signature.who} on the withdrawn agreement`}
+                className="h-20 rounded border border-slate-300 bg-white"
+              />
+              <ul className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600">
+                {describeSignature(signature).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {one.baseline.agreedBy && (
+            <p className="mt-2 text-xs leading-relaxed text-slate-600">
+              {one.baseline.agreedBy.weakness}
+            </p>
+          )}
+        </section>
+      ))}
+
+      {orderTrouble && (
+        <section
+          data-sheet="no"
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+        >
+          <h2 className="font-semibold text-slate-900">What has changed since</h2>
+          <p role="alert" className="mt-2 rounded-md bg-rose-50 p-3 text-sm text-rose-900">
+            {orderTrouble}
           </p>
         </section>
       )}

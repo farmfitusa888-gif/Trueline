@@ -14,7 +14,9 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   type Baseline,
   type ChangeOrder,
+  type Withdrawn,
   changesSinceVerified,
+  describeWithdrawal,
 } from '../../core/src/baseline.ts';
 import {
   type AgreedChange,
@@ -36,9 +38,11 @@ import {
   type Invoice,
   type Stage,
   STAGE_TITLE,
+  alreadyReversed,
   describeInvoice,
   invoiceOfVerified,
   missingFromInvoice,
+  netAsked,
   outstandingAfter,
   whyNotBilled,
 } from '../../core/src/invoice.ts';
@@ -121,6 +125,7 @@ export function Work({
   scope,
   proposal,
   baseline,
+  withdrawn = [],
   agreedChanges,
   raisedChange,
   visits,
@@ -141,6 +146,14 @@ export function Work({
   readonly scope: WorkScope | null;
   readonly proposal: Proposal | null;
   readonly baseline: Baseline | null;
+  /**
+   * Agreements on this job that have been withdrawn, oldest first.
+   *
+   * Withdrawing is done on the Agreement screen, which is where the agreement
+   * is. This screen shows what it did to the money: every bill reversed, both
+   * halves on the record, and nothing owed on a job nobody is bound by.
+   */
+  readonly withdrawn?: readonly Withdrawn[];
   /** Change orders the client has signed. The only extras an invoice may bill. */
   readonly agreedChanges: readonly AgreedChange[];
   /** A change order written down and waiting to be signed, when there is one. */
@@ -222,6 +235,15 @@ export function Work({
    * which is what `Agree.tsx` has always used. Same call, same shape, one await.
    */
   const [changes, setChanges] = useState<ChangeOrder | null>(null);
+  /**
+   * What the model refused when asked what has moved since it was signed.
+   *
+   * It refuses one thing: a baseline that has been withdrawn. Unreachable from
+   * here, because withdrawing sets the live baseline to `null` — and shown
+   * rather than swallowed, because a promise rejecting into nothing is how this
+   * screen would end up drawing a bill with no idea it had been told not to.
+   */
+  const [changesTrouble, setChangesTrouble] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
     // Both, because verifying the seal re-hashes the PROPOSAL against what the
@@ -230,19 +252,33 @@ export function Work({
     // screen cannot check is exactly what this change exists to stop.
     if (!baseline || !proposal) {
       setChanges(null);
+      setChangesTrouble(null);
       return;
     }
-    void changesSinceVerified(baseline, proposal, current).then((next) => {
-      if (live) setChanges(next);
-    });
+    void changesSinceVerified(baseline, proposal, current, withdrawn)
+      .then((next) => {
+        if (!live) return;
+        setChanges(next);
+        setChangesTrouble(null);
+      })
+      .catch((error: unknown) => {
+        if (!live) return;
+        setChanges(null);
+        setChangesTrouble(error instanceof Error ? error.message : String(error));
+      });
     return () => {
       live = false;
     };
-  }, [baseline, proposal, current]);
-  const billed = useMemo(
-    () => invoices.reduce((sum, invoice) => sum + invoice.amount, 0n),
-    [invoices]
-  );
+  }, [baseline, proposal, current, withdrawn]);
+  /**
+   * What has been asked for on this job, reversals counted.
+   *
+   * `netAsked` rather than a sum of the bills, so a reversal takes its bill's
+   * figure back off. After a withdrawal this is exactly zero, which is what
+   * lets the job be agreed again and billed from the start without the deposit
+   * on the withdrawn agreement being deducted from the new one.
+   */
+  const billed = useMemo(() => netAsked(invoices), [invoices]);
   /**
    * What the signed change orders add, and what has moved that nobody signed.
    *
@@ -268,12 +304,54 @@ export function Work({
     () => unsigned.reduce((sum, one) => sum + one.difference, 0n),
     [unsigned]
   );
-  const out = useMemo(() => totalOwed(invoices, payments), [invoices, payments]);
+  /**
+   * What is still out, with the reversals counted back in.
+   *
+   * `totalOwed` floors each invoice at zero, which is right for a bill — an
+   * overpayment owes nothing — and wrong for a reversal, which would count as
+   * nothing and leave the bill it reversed owed for ever. So the reversals are
+   * added back at their own negative figures.
+   *
+   * It can go below zero, and that is a real state worth printing rather than
+   * hiding: money that came in against a bill that has since been reversed is
+   * money the contractor is holding on a job nobody is bound by.
+   */
+  const reversed = useMemo(
+    () => netAsked(invoices.filter((invoice) => invoice.reverses)),
+    [invoices]
+  );
+  const out = useMemo(
+    () => totalOwed(invoices, payments) + reversed,
+    [invoices, payments, reversed]
+  );
   const late = useMemo(
     () => owing(invoices, payments, new Date().toISOString()),
     [invoices, payments]
   );
   const upcoming = next(visits, new Date().toISOString());
+  /**
+   * The last agreement withdrawn on this job, when there is one.
+   *
+   * The last rather than the only, because a job can be agreed, withdrawn and
+   * agreed again, and each withdrawal stays on the record for ever. What these
+   * two sections need to say is what happened to the agreement that is not
+   * there any more, which is the most recent one.
+   */
+  const lastWithdrawn = withdrawn.length > 0 ? withdrawn[withdrawn.length - 1]! : null;
+  /** True when this job has no live agreement because one was withdrawn. */
+  const isWithdrawn = !baseline && lastWithdrawn !== null;
+  /** The reversals on the job, so the screen can say how many bills went back. */
+  const reversals = useMemo(() => invoices.filter((one) => one.reverses), [invoices]);
+  /**
+   * The bills that have been taken back, by id.
+   *
+   * A reversed bill is still on the record and still says what it asked for,
+   * and it is finished: nothing is owed on it, it is not late, and money must
+   * not be recorded against it. `owedOn` cannot know that — it only sees one
+   * invoice at a time and a reversal is a different document — so the screen
+   * asks here before it offers anything.
+   */
+  const takenBack = useMemo(() => alreadyReversed(invoices), [invoices]);
 
   return (
     <div className="space-y-5">
@@ -426,7 +504,27 @@ export function Work({
       <section data-sheet="no" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="font-semibold text-slate-900">Changes to what was signed</h2>
 
-        {!baseline || !changes ? (
+        {changesTrouble ? (
+          <p role="alert" className="mt-2 rounded-md bg-rose-50 p-3 text-sm text-rose-900">
+            {changesTrouble}
+          </p>
+        ) : isWithdrawn && lastWithdrawn ? (
+          /* Nothing is measured against a withdrawn agreement, and this says so
+             rather than falling through to "nothing to change yet" — which
+             would be true of a job nobody has ever agreed and is a different
+             sentence from a job whose agreement was taken back on purpose. */
+          <div className="mt-1">
+            <ul className="space-y-1 text-sm leading-relaxed text-slate-700">
+              {describeWithdrawal(lastWithdrawn).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Nothing is measured against it any more, so there is no change order to raise on
+              it. Agree the work again under Agreement and changes are measured against that.
+            </p>
+          </div>
+        ) : !baseline || !changes ? (
           <p className="mt-1 text-sm leading-relaxed text-slate-600">
             Nothing to change yet. A change order amends something somebody signed, so there has
             to be a signed agreement first — get one under Agreement.
@@ -657,7 +755,28 @@ export function Work({
       <section data-sheet="no" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="font-semibold text-slate-900">Asking to be paid</h2>
 
-        {!baseline || !changes ? (
+        {isWithdrawn && lastWithdrawn ? (
+          <div className="mt-1">
+            <p className="text-sm leading-relaxed text-slate-700">
+              This job’s agreement was withdrawn on{' '}
+              {lastWithdrawn.withdrawal.at.slice(0, 10)}, so nothing more can be asked for on
+              it. Why: {lastWithdrawn.withdrawal.reason}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              {reversals.length === 0
+                ? 'No invoice had been raised on it, so there was nothing to take back.'
+                : `${reversals.length} invoice${reversals.length === 1 ? '' : 's'} raised ` +
+                  `against it ${reversals.length === 1 ? 'was' : 'were'} reversed, for ` +
+                  `${money(-netAsked(reversals))} in total. Nothing has been deleted: the ` +
+                  'bills and their reversals are both below and both stay on this job.'}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Agree the work again under Agreement and you can bill against that. It will be a
+              whole new agreement with its own signature on the whole of its own total, not an
+              amendment to this one.
+            </p>
+          </div>
+        ) : !baseline || !changes ? (
           <p className="mt-1 text-sm leading-relaxed text-slate-600">
             Nothing to invoice yet. An invoice is built from what somebody signed, never from
             what the room measures today — a bill for work nobody agreed to is not a mistake,
@@ -738,6 +857,10 @@ export function Work({
                         baseline,
                         agreedChanges,
                         moved: changes,
+                        // Belt and braces. The button is not on the screen at
+                        // all when the agreement has been withdrawn, and the
+                        // model refuses one anyway rather than trusting that.
+                        withdrawn,
                         alreadyBilled: billed,
                         share: {
                           depositPerCent: Number(deposit) || undefined,
@@ -767,9 +890,28 @@ export function Work({
           <>
             <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
               <p className="text-sm font-semibold text-slate-900">
-                {out === 0n ? 'Everything asked for is in.' : `${money(out)} still out.`}
+                {/* Four states, and the two new ones are the reason this is not
+                    a ternary. "Everything asked for is in" over a withdrawn job
+                    would be exactly wrong: nothing came in, everything went
+                    back. And money that came in against a bill since reversed
+                    is not nothing owed either — it is money the contractor is
+                    holding, and he needs to see it rather than have it net to
+                    a comfortable zero. */}
+                {out < 0n
+                  ? `${money(-out)} came in against invoices that have since been reversed. ` +
+                    'Nothing is owed on this job, and that money is still with you.'
+                  : reversals.length > 0 && billed === 0n
+                    ? 'Every invoice raised on this job has been reversed. Nothing is owed on ' +
+                      'it, and nothing has been deleted — the bills and their reversals are ' +
+                      'both below.'
+                    : out === 0n
+                      ? 'Everything asked for is in.'
+                      : `${money(out)} still out.`}
               </p>
-              {late.slice(0, 3).map((row) => (
+              {late
+                .filter((row) => !takenBack.has(row.invoiceId))
+                .slice(0, 3)
+                .map((row) => (
                 <p
                   key={row.invoiceId}
                   className={`mt-0.5 text-xs ${
@@ -785,14 +927,39 @@ export function Work({
               {invoices.map((invoice) => (
                 <li key={invoice.id} className="py-3">
                   <div className="flex items-baseline justify-between gap-3">
+                    {/* A reversal is named as one, and never as the bill it
+                        reverses with a minus sign in front. "Deposit 2026-014-R
+                        — -$1,209.15" reads as a deposit that went wrong; what
+                        this is, is a deposit that was taken back. */}
                     <span className="font-medium text-slate-900">
-                      {STAGE_TITLE[invoice.stage]} {invoice.number}
+                      {invoice.reverses
+                        ? `Reversal ${invoice.number}`
+                        : `${STAGE_TITLE[invoice.stage]} ${invoice.number}`}
                     </span>
-                    <span className="font-mono font-semibold tabular-nums">
+                    <span
+                      className={`font-mono font-semibold tabular-nums ${
+                        invoice.reverses ? 'text-rose-800' : ''
+                      }`}
+                    >
                       {money(invoice.amount)}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{describeInvoice(invoice)}</p>
+                  {/* A bill that has been reversed is finished. It stays on
+                      the record saying exactly what it asked for, and it says
+                      what happened to it -- and it is not chased, not settled
+                      and cannot take a payment. */}
+                  {takenBack.has(invoice.id) && (
+                    <p className="mt-1 text-xs text-rose-800">
+                      Taken back in full by reversal {invoice.number}-R. Nothing is owed on it,
+                      and it stays on this job exactly as it was sent.
+                    </p>
+                  )}
+                  {/* Everything below is about a bill that is asking to be
+                      paid. A reversal asks for nothing: nothing is due on it,
+                      nothing settles it, and money cannot come in against it. */}
+                  {!invoice.reverses && !takenBack.has(invoice.id) && (
+                  <>
                   {missingFromInvoice(invoice).length > 0 && (
                     <p className="mt-1 text-xs text-amber-800">
                       Still to fill in: {missingFromInvoice(invoice).join(', ')}
@@ -920,6 +1087,8 @@ export function Work({
                         </p>
                       )}
                     </div>
+                  )}
+                  </>
                   )}
                 </li>
               ))}

@@ -5,8 +5,19 @@ import { type PriceBook, quote } from '../price.ts';
 import { type Proposal, NOBODY, optionFrom, proposalOf } from '../proposal.ts';
 import { CLIENT_INTENT, canonical, hashOf, sign } from '../signature.ts';
 import { type FileBackRequest, fileSignedBack } from '../countersign.ts';
-import { freeze, freezeOnReturnedCopy } from '../baseline.ts';
-import { type InvoiceRequest, describeInvoice, invoiceOf } from '../invoice.ts';
+import { freeze, freezeOnReturnedCopy, withdraw } from '../baseline.ts';
+import {
+  type InvoiceRequest,
+  InvoiceError,
+  alreadyReversed,
+  describeInvoice,
+  invoiceOf,
+  missingFromInvoice,
+  netAsked,
+  outstandingAfter,
+  reversalOf,
+  reversalsFor,
+} from '../invoice.ts';
 import { quickbooksCsv, readQuickbooks } from '../quickbooks.ts';
 
 /**
@@ -186,4 +197,207 @@ test('the two paths bill exactly the same money', async () => {
   assert.equal(onPhone.agreed, onCopy.agreed);
   // What differs is what is said about the evidence, and only that.
   assert.notEqual(onPhone.lines[0]!.detail, onCopy.lines[0]!.detail);
+});
+
+/* =========================================== withdrawing what was billed */
+
+/**
+ * The bills, when the agreement under them is withdrawn.
+ *
+ * Sam, asked what happens to invoices already raised against a job he is
+ * withdrawing: **"Withdraw them too, as reversals."**
+ *
+ * So each one gets a matching reversal for exactly its own amount and the net
+ * goes to zero — and **both stay on the record**. Nothing is deleted, nothing
+ * is edited, and the QuickBooks export never tells a bookkeeper a bill vanished.
+ * That is the same rule the double-entry ledger this product is built on
+ * already holds: a reversal never erases the original.
+ *
+ * Every figure below is worked out here, in integer cents. The job agreed at
+ * $4,030.50. A 30% deposit is $1,209.15 and the final is the $2,821.35 left.
+ * The two reversals are exactly those two figures with the sign turned round,
+ * and the four together are exactly zero.
+ */
+
+const WITHDRAWN_AT = '2026-09-02T11:15:00.000Z';
+const WHY = 'They pulled out before the tear-out started.';
+
+const DEPOSIT = 120915n;   // 30% of $4,030.50, rounded to the cent.
+const FINAL = 282135n;     // what is left of it.
+
+/** The agreement, its withdrawal, and the two bills raised before it. */
+async function jobWithdrawnAfterTwoBills() {
+  const baseline = await signedOnThePhone();
+  const deposit = billFor(baseline, {
+    id: 'i-dep',
+    number: '2026-014',
+    stage: 'deposit',
+    share: { depositPerCent: 30 },
+    alreadyBilled: 0n,
+  });
+  const final = billFor(baseline, {
+    id: 'i-fin',
+    number: '2026-015',
+    stage: 'final',
+    alreadyBilled: deposit.amount,
+  });
+  return { baseline, withdrawal: withdraw(baseline, WHY, WITHDRAWN_AT), bills: [deposit, final] };
+}
+
+test('the two bills add up to the agreed job, before anything is withdrawn', async () => {
+  const { bills } = await jobWithdrawnAfterTwoBills();
+  assert.equal(bills[0]!.amount, DEPOSIT);
+  assert.equal(bills[1]!.amount, FINAL);
+  assert.equal(DEPOSIT + FINAL, AGREED);
+  assert.equal(netAsked(bills), AGREED);
+});
+
+test('every invoice gets a reversal for exactly its own amount, and the net is zero', async () => {
+  const { withdrawal, bills } = await jobWithdrawnAfterTwoBills();
+  const reversals = reversalsFor(bills, withdrawal);
+
+  assert.equal(reversals.length, 2);
+  assert.equal(reversals[0]!.amount, -DEPOSIT);
+  assert.equal(reversals[1]!.amount, -FINAL);
+
+  // The figure, not the fact that a function was called. $4,030.50 asked for,
+  // $4,030.50 taken back, and nothing left owed on the job.
+  const after = [...bills, ...reversals];
+  assert.equal(netAsked(after), 0n);
+  assert.equal(typeof netAsked(after), 'bigint');
+  // And the money that was asked for is still legible on both sides of it.
+  assert.equal(netAsked(bills), 403050n);
+  assert.equal(netAsked(reversals), -403050n);
+});
+
+test('the bill it reverses is still there, whole, and says nothing new', async () => {
+  const { withdrawal, bills } = await jobWithdrawnAfterTwoBills();
+  const before = bills.map(canonical);
+  reversalsFor(bills, withdrawal);
+  assert.deepEqual(bills.map(canonical), before);
+  assert.equal('reverses' in bills[0]!, false);
+  assert.equal(canonical(bills[0]!).includes('reverses'), false);
+});
+
+test('a reversal says what it undid, why, and that the bill has not gone', async () => {
+  const { withdrawal, bills } = await jobWithdrawnAfterTwoBills();
+  const [reversal] = reversalsFor([bills[0]!], withdrawal);
+
+  assert.equal(reversal!.id, 'i-dep-reversed');
+  assert.equal(reversal!.number, '2026-014-R');
+  assert.equal(reversal!.reverses?.of, 'i-dep');
+  assert.equal(reversal!.reverses?.ofNumber, '2026-014');
+  assert.equal(reversal!.reverses?.ofAmount, DEPOSIT);
+  assert.equal(reversal!.reverses?.because, WHY);
+  assert.equal(
+    describeInvoice(reversal!),
+    'Reverses deposit 2026-014 in full — $1,209.15 — because the agreement it was raised ' +
+      'against was withdrawn on 2026-09-02. Why: They pulled out before the tear-out ' +
+      'started. Invoice 2026-014 stays on this job exactly as it was sent. Nothing has been ' +
+      'deleted.'
+  );
+  // It asks for nothing, so there is nothing to be due, nowhere to pay, and
+  // nothing outstanding after it.
+  assert.deepEqual(missingFromInvoice(reversal!), []);
+  assert.equal(outstandingAfter(reversal!), 0n);
+  // Never the other word: "cancel" is the buyer's federal three-day right in
+  // this app, and the two must not collide on one job.
+  assert.equal(/cancel|delete[^d]/i.test(describeInvoice(reversal!)), false);
+});
+
+test('a reversal cannot itself be reversed', async () => {
+  const { withdrawal, bills } = await jobWithdrawnAfterTwoBills();
+  const [reversal] = reversalsFor([bills[0]!], withdrawal);
+  assert.throws(
+    () => reversalOf(reversal!, withdrawal),
+    (error: unknown) =>
+      error instanceof InvoiceError &&
+      /already the reversal of 2026-014/.test((error as Error).message)
+  );
+});
+
+test('reversing a job twice does not bill it to minus the deposit', async () => {
+  const { withdrawal, bills } = await jobWithdrawnAfterTwoBills();
+  const once = [...bills, ...reversalsFor(bills, withdrawal)];
+  const twice = [...once, ...reversalsFor(once, withdrawal)];
+  assert.equal(reversalsFor(once, withdrawal).length, 0);
+  // And the same list is what the screen asks before it offers to take money
+  // against a bill: both of these have been taken back.
+  assert.deepEqual([...alreadyReversed(once)].sort(), ['i-dep', 'i-fin']);
+  assert.deepEqual([...alreadyReversed(bills)], []);
+  assert.equal(twice.length, once.length);
+  assert.equal(netAsked(twice), 0n);
+});
+
+test('nothing can be invoiced against a withdrawn agreement', async () => {
+  const { baseline, withdrawal } = await jobWithdrawnAfterTwoBills();
+  assert.throws(
+    () => billFor(baseline, { withdrawn: [{ baseline, withdrawal }] }),
+    (error: unknown) =>
+      error instanceof InvoiceError &&
+      /withdrawn on 2026-09-02/.test((error as Error).message) &&
+      /They pulled out before the tear-out started/.test((error as Error).message) &&
+      /has been reversed/.test((error as Error).message)
+  );
+  // And a live agreement on the same job still bills exactly as it did.
+  assert.equal(billFor(baseline, { withdrawn: [] }).amount, AGREED);
+});
+
+/* ------------------------------------ the file a bookkeeper opens */
+
+test('the export carries the bill AND its reversal, and nets to zero', async () => {
+  const baseline = await signedOnThePhone();
+  // A final invoice on its own: its lines add up to exactly what it asks for,
+  // so the whole export can be added up and checked against zero.
+  const final = billFor(baseline, { id: 'i-fin', number: '2026-015' });
+  const withdrawal = withdraw(baseline, WHY, WITHDRAWN_AT);
+  const rows = readQuickbooks(quickbooksCsv([final, ...reversalsFor([final], withdrawal)]));
+
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]!.InvoiceNo, '2026-015');
+  assert.equal(rows[0]!.ItemAmount, '4030.50');
+  assert.equal(rows[1]!.InvoiceNo, '2026-015-R');
+  assert.equal(rows[1]!.ItemAmount, '-4030.50');
+
+  // Added up the way a bookkeeper would, in cents, on this side.
+  const asCents = (text: string) => {
+    const [whole, part = ''] = text.replace('-', '').split('.');
+    const size = BigInt(whole!) * 100n + BigInt((part + '00').slice(0, 2));
+    return text.startsWith('-') ? -size : size;
+  };
+  assert.equal(rows.reduce((sum, row) => sum + asCents(row.ItemAmount ?? '0'), 0n), 0n);
+
+  // The two rows are separate invoices, not one netted to nothing. QuickBooks
+  // groups by InvoiceNo, and sharing the number would import them as a single
+  // zero invoice -- a bill that vanished by another route.
+  assert.notEqual(rows[0]!.InvoiceNo, rows[1]!.InvoiceNo);
+});
+
+test('and the export never tells a bookkeeper the bill was deleted', async () => {
+  const baseline = await signedOnThePhone();
+  const final = billFor(baseline, { id: 'i-fin', number: '2026-015' });
+  const withdrawal = withdraw(baseline, WHY, WITHDRAWN_AT);
+  const csv = quickbooksCsv([final, ...reversalsFor([final], withdrawal)]);
+
+  // The original's own line is still in the file, word for word.
+  assert.match(csv, /Agreed 2026-08-25, signed by M\. Alvarez\./);
+  // And the reversal says what happened, on its description AND on its memo,
+  // so a bookkeeper who reads one column reads it.
+  assert.match(csv, /Reverses final payment 2026-015 in full/);
+  assert.match(csv, /Invoice 2026-015 stays on this job exactly as it was sent/);
+  assert.match(csv, /They pulled out before the tear-out started/);
+  assert.equal(/deleted[^.]/i.test(csv), false);
+  assert.equal(/cancelled|voided|removed/i.test(csv), false);
+});
+
+test('an ordinary invoice is still byte for byte what it always was', async () => {
+  const invoice = billFor(await signedOnThePhone());
+  assert.equal('reverses' in invoice, false);
+  assert.equal(invoice.reverses, undefined);
+  assert.equal(canonical(invoice).includes('reverses'), false);
+  assert.equal(canonical(invoice).includes('withdrawn'), false);
+  assert.equal(
+    describeInvoice(invoice),
+    'Final payment 2026-014 — $4,030.50, which settles the job.'
+  );
 });

@@ -3,6 +3,9 @@ import {
   type Baseline,
   type Change,
   type ChangeOrder,
+  type Withdrawal,
+  type Withdrawn,
+  withdrawalOf,
 } from './baseline.ts';
 import { AGREED_BY_SAYS } from './countersign.ts';
 import { type AgreedChange, agreedDifference, notYetAgreed, verifyChange } from './change.ts';
@@ -104,6 +107,18 @@ export interface Invoice {
    */
   readonly payTo: string;
   readonly note: string;
+  /**
+   * What this reverses, when it is a reversal rather than a bill.
+   *
+   * Absent on every invoice that asks to be paid — including every invoice
+   * already saved on somebody's phone, which reads back and canonicalises
+   * exactly as it was written. Its presence is what makes this a reversal;
+   * `amount` is then negative and nothing on the job is owed on it.
+   *
+   * See `Reversal` below for what a reversal is and why the bill it reverses
+   * is still here.
+   */
+  readonly reverses?: Reversal;
 }
 
 /**
@@ -214,6 +229,18 @@ export interface InvoiceRequest {
    */
   readonly moved?: ChangeOrder;
   readonly alreadyBilled: Cents;
+  /**
+   * Agreements on this job that have been withdrawn.
+   *
+   * Handed in so `invoiceOf` can refuse to bill one. It is a list rather than a
+   * flag because a job can be agreed, withdrawn and agreed again, and each
+   * withdrawal stays on the record for ever; what matters is whether the
+   * baseline on THIS request is one of them.
+   *
+   * Empty or absent on every job that has never had one, which is almost all of
+   * them.
+   */
+  readonly withdrawn?: readonly Withdrawn[];
   readonly share?: StageShare;
   readonly issuedAt: string;
   readonly dueAt?: string;
@@ -238,6 +265,19 @@ export interface InvoiceRequest {
 export function invoiceOf(request: InvoiceRequest): Invoice {
   if (!request.number.trim()) {
     throw new InvoiceError('An invoice needs a number, or two of them cannot be told apart.');
+  }
+  // Before anything is worked out. A bill against an agreement that has been
+  // withdrawn is the exact thing the withdrawal was for -- and it would come
+  // out looking like every other bill, with a total, a due date and somewhere
+  // to pay, against a scope nobody is bound by.
+  const gone = withdrawalOf(request.baseline, request.withdrawn ?? []);
+  if (gone) {
+    throw new InvoiceError(
+      `That agreement was withdrawn on ${gone.withdrawal.at.slice(0, 10)}, so nothing can be ` +
+        `invoiced against it. Why it was withdrawn: ${gone.withdrawal.reason} Every invoice ` +
+        'already raised on it has been reversed, and both the bills and the reversals stay on ' +
+        'this job. Agree the work again and bill against that.'
+    );
   }
   if (request.moved?.tampered) {
     throw new InvoiceError(
@@ -327,13 +367,201 @@ export async function invoiceOfVerified(request: InvoiceRequest): Promise<Invoic
   return invoiceOf(request);
 }
 
-/** What is still owed after this one is paid. */
+/* ===================================================================== */
+/*  Reversals: a bill undone without a bill disappearing                 */
+/* ===================================================================== */
+
+/**
+ * Why one invoice was reversed, carried on the reversal itself.
+ *
+ * ## Sam's answer, asked what happens to invoices already raised
+ *
+ * > **"Withdraw them too, as reversals."**
+ *
+ * Each invoice raised against a withdrawn agreement gets a matching reversal
+ * for exactly its own amount, so what is asked for on the job nets to zero.
+ * **Both stay on the record.** The bill is not edited, is not deleted, and does
+ * not quietly become smaller; a second document appears beside it saying it has
+ * been reversed and why.
+ *
+ * That is the same rule the double-entry ledger under this product already
+ * holds and the reason to hold it here: a reversal never erases the original.
+ * A bill that vanished would leave the contractor's own copy, the client's
+ * emailed copy and his bookkeeper's export all disagreeing about whether it
+ * ever existed — and the one document that can settle that argument is the one
+ * that would have been deleted.
+ *
+ * It is also what stops the withdrawal being a way to launder money out of a
+ * job. Deleting the bills would leave a job that had been invoiced $3,000 and
+ * shows no sign of it. Reversing them leaves $3,000 asked for, $3,000 taken
+ * back, and — if any of it was actually paid — money the contractor is still
+ * holding, in plain sight, on the screen and in the export.
+ */
+export interface Reversal {
+  /** The invoice this reverses, by id. */
+  readonly of: string;
+  /** Its number, so a bookkeeper reading one row can find the other. */
+  readonly ofNumber: string;
+  /** What that invoice asked for. Positive; this reversal is its negative. */
+  readonly ofAmount: Cents;
+  /** Why, in the contractor's own words: the withdrawal's own reason. */
+  readonly because: string;
+  /** When the agreement was withdrawn. */
+  readonly at: string;
+  /** The one line every screen, list and export prints. */
+  readonly says: string;
+}
+
+/**
+ * The reversal of one invoice.
+ *
+ * Refuses to reverse a reversal. Two of them against one bill would net to the
+ * bill again, so the money would come back from nowhere — and nothing on the
+ * screen would say it had.
+ *
+ * ## What is on it, and what is deliberately not
+ *
+ * **One line, for exactly what the bill asked.** Not a mirror of the original's
+ * lines: those describe the agreed scope and add up to the whole job, while a
+ * deposit invoice *asks* for a share of it. Negating the lines would reverse a
+ * figure nobody was ever billed. The reversal's single line carries
+ * `-invoice.amount`, in `bigint` cents, so bill plus reversal is exactly zero
+ * with no rounding anywhere near it.
+ *
+ * **Its own number**, the original's with `-R` on the end. QuickBooks groups
+ * rows by `InvoiceNo`: sharing the number would merge the two into one invoice
+ * of zero, which is a bill that vanished by another route.
+ *
+ * **No due date and nowhere to pay.** A reversal asks for nothing, so there is
+ * nothing to be late and nothing to send. `missingFromInvoice` knows that and
+ * does not nag for either.
+ *
+ * **No `agreedBy`.** How the agreement was reached is a fact about a bill that
+ * is asking to be paid. This one is not, and its whole content is that the
+ * agreement under the original was withdrawn — which it says, in full.
+ */
+export function reversalOf(invoice: Invoice, withdrawal: Withdrawal): Invoice {
+  if (invoice.reverses) {
+    throw new InvoiceError(
+      `Invoice ${invoice.number} is already the reversal of ${invoice.reverses.ofNumber}. ` +
+        'Reversing a reversal would put the money back on the job with nothing on the record ' +
+        'to say where it came from.'
+    );
+  }
+  const stage = STAGE_TITLE[invoice.stage].toLowerCase();
+  const says =
+    `Reverses ${stage} ${invoice.number} in full — ${money(invoice.amount)} — because the ` +
+    `agreement it was raised against was withdrawn on ${withdrawal.at.slice(0, 10)}. ` +
+    `Why: ${withdrawal.reason} Invoice ${invoice.number} stays on this job exactly as it was ` +
+    'sent. Nothing has been deleted.';
+  const reverses: Reversal = {
+    of: invoice.id,
+    ofNumber: invoice.number,
+    ofAmount: invoice.amount,
+    because: withdrawal.reason,
+    at: withdrawal.at,
+    says,
+  };
+  return {
+    // Worked out from the invoice it reverses rather than from a clock, so
+    // reversing the same bill twice would produce the same id and be caught,
+    // and so a job that is saved, reopened and reversed reads identically.
+    id: `${invoice.id}-reversed`,
+    number: `${invoice.number}-R`,
+    // The original's stage, because `Stage` names what a bill was for and this
+    // one is for that. What it IS is decided by `reverses` being there, which
+    // is the field every screen and every sentence below reads.
+    stage: invoice.stage,
+    company: invoice.company,
+    client: invoice.client,
+    jobName: invoice.jobName,
+    lines: [
+      {
+        what: `Reversal of ${stage} ${invoice.number}`,
+        detail: says,
+        amount: -invoice.amount,
+      },
+    ],
+    notBilled: [],
+    amount: -invoice.amount,
+    agreed: invoice.agreed,
+    alreadyBilled: invoice.alreadyBilled,
+    issuedAt: withdrawal.at,
+    dueAt: '',
+    payTo: '',
+    // Into the Memo column of every row of this invoice in the QuickBooks
+    // export, so a bookkeeper who reads nothing else reads this.
+    note: says,
+    reverses,
+  };
+}
+
+/**
+ * The bills on this job that already have a reversal against them, by id.
+ *
+ * One place that knows, because two places would disagree. It decides what
+ * `reversalsFor` may write and what the screen may still ask to be paid, and a
+ * screen that offered "money came in" against a bill that had been taken back
+ * would be inviting a contractor to record a payment on a bill he has told the
+ * client to ignore.
+ */
+export function alreadyReversed(invoices: readonly Invoice[]): ReadonlySet<string> {
+  return new Set(
+    invoices.flatMap((invoice) => (invoice.reverses ? [invoice.reverses.of] : []))
+  );
+}
+
+/**
+ * A reversal for every invoice on the job that does not already have one.
+ *
+ * Idempotent on purpose: run it twice and the second run produces nothing,
+ * because every bill already has its reversal beside it. A withdrawal is
+ * written once, but the safe answer to "what if this ran again" must not be a
+ * job billed to minus the deposit.
+ */
+export function reversalsFor(
+  invoices: readonly Invoice[],
+  withdrawal: Withdrawal
+): readonly Invoice[] {
+  const done = alreadyReversed(invoices);
+  return invoices
+    .filter((invoice) => !invoice.reverses && !done.has(invoice.id))
+    .map((invoice) => reversalOf(invoice, withdrawal));
+}
+
+/**
+ * What every invoice on a job adds up to asking for, reversals included.
+ *
+ * The figure a screen means by "invoiced so far" and the one that has to reach
+ * zero after a withdrawal. `totalOwed` in `payment.ts` cannot do this job: it
+ * floors each invoice at zero so an overpayment never owes a negative, which is
+ * right for a bill and wrong for a reversal — a reversal would count as nothing
+ * and the bill it reversed would go on being owed for ever.
+ */
+export function netAsked(invoices: readonly Invoice[]): Cents {
+  return invoices.reduce((sum, invoice) => sum + invoice.amount, 0n);
+}
+
+/**
+ * What is still owed after this one is paid.
+ *
+ * Zero on a reversal, and stated rather than worked out: a reversal asks for
+ * nothing, so nothing is outstanding after it. The subtraction below would run
+ * and would produce a figure — the agreed total plus the amount taken back —
+ * and a screen printing it would tell a contractor his withdrawn job still had
+ * money to bill.
+ */
 export function outstandingAfter(invoice: Invoice): Cents {
+  if (invoice.reverses) return 0n;
   return invoice.agreed - invoice.alreadyBilled - invoice.amount;
 }
 
 /** The invoice said out loud, for a list. */
 export function describeInvoice(invoice: Invoice): string {
+  // A reversal says what it is and what it undid, in its own words, and never
+  // borrows the sentence a bill uses -- "Final payment 2026-101-R -- -$4,030.50,
+  // which settles the job" is a sentence that is true of nothing.
+  if (invoice.reverses) return invoice.reverses.says;
   const left = outstandingAfter(invoice);
   // Read defensively: every invoice written before there was a second way to
   // agree a job has no `agreedBy` on it, and absent is exactly right for those
@@ -354,6 +582,10 @@ export function describeInvoice(invoice: Invoice): string {
  * somewhere else.
  */
 export function missingFromInvoice(invoice: Invoice): string[] {
+  // A reversal asks for nothing, so there is nothing to be due and nowhere to
+  // pay. Nagging for either would be asking a contractor to finish a document
+  // whose whole content is that a bill has been taken back.
+  if (invoice.reverses) return [];
   const missing: string[] = [];
   if (!invoice.company.name.trim()) missing.push('your business name');
   if (!invoice.client.name.trim()) missing.push('who it is for');

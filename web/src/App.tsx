@@ -1246,11 +1246,15 @@ export function App() {
                 scope={loaded.scope}
                 proposal={loaded.proposal}
                 baseline={loaded.baseline}
+                withdrawn={loaded.withdrawn}
+                invoices={loaded.invoices}
                 proposalSent={loaded.proposalSent}
                 saleVenue={loaded.saleVenue}
                 returnedCopies={loaded.returnedCopies}
                 onProposal={(proposal) => dispatch({ type: 'proposal', proposal })}
                 onBaseline={(baseline) => dispatch({ type: 'baseline', baseline })}
+                onWithdraw={(withdrawal, reversals) =>
+                  dispatch({ type: 'withdraw', withdrawal, reversals })}
                 onProposalSent={(sent) => dispatch({ type: 'proposalSent', sent })}
                 onSaleVenue={(venue) => dispatch({ type: 'saleVenue', venue })}
                 onReturnedCopies={(returnedCopies) =>
@@ -1282,6 +1286,7 @@ export function App() {
                   scope={loaded.scope}
                   proposal={loaded.proposal}
                   baseline={loaded.baseline}
+                  withdrawn={loaded.withdrawn}
                   agreedChanges={loaded.agreedChanges}
                   raisedChange={loaded.raisedChange}
                   visits={loaded.visits}

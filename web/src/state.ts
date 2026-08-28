@@ -54,7 +54,7 @@ import {
   pick as pickWork,
   surfaceName,
 } from '../../core/src/work.ts';
-import { type Baseline } from '../../core/src/baseline.ts';
+import { type Baseline, type Withdrawal, type Withdrawn } from '../../core/src/baseline.ts';
 import { type AgreedChange, type ChangeDocument } from '../../core/src/change.ts';
 import { type Payment } from '../../core/src/payment.ts';
 import { type Invoice } from '../../core/src/invoice.ts';
@@ -244,6 +244,28 @@ export interface Loaded {
    * is a change order, which is the entire point of keeping it.
    */
   readonly baseline: Baseline | null;
+  /**
+   * Agreements on this job that have been withdrawn, oldest first.
+   *
+   * Sam, asked whether there should be a way out once a job is agreed:
+   * **"Withdraw it, with a reason, kept on the record."**
+   *
+   * Appended, never edited and never removed, like `agreedChanges` and
+   * `returnedCopies` — and for a stronger reason than either. Withdrawing is
+   * not deleting: each entry holds the whole untouched `Baseline` beside the
+   * `Withdrawal` that took it back, so what was agreed, who agreed it, when,
+   * and the mark they made are all still on the job with the reason next to
+   * them. `agreedChanges` rides along with the agreement it amended rather
+   * than staying on the live job, because a change order signed against a
+   * withdrawn agreement must never reach a bill on the next one.
+   *
+   * A withdrawal sets `baseline` back to `null`, which is what makes the
+   * proposal editable again. Nothing is lost by that: the agreement it held is
+   * in here. See `core/src/baseline.ts`.
+   */
+  readonly withdrawn: readonly (Withdrawn & {
+    readonly agreedChanges: readonly AgreedChange[];
+  })[];
   /**
    * How the proposal was sent out, and when: the fingerprint of the document
    * at the moment it left the phone.
@@ -496,6 +518,17 @@ export type Action =
   | { type: 'claim'; claim: Claim }
   | { type: 'proposal'; proposal: Proposal | null }
   | { type: 'baseline'; baseline: Baseline }
+  /**
+   * Withdraw the agreement, and reverse every bill raised against it.
+   *
+   * One action carrying both, because they are one move. A withdrawal that
+   * wrote the reason and left the invoices standing would leave money owed on
+   * an agreement nobody is bound by, and there is no instant in which that is
+   * a state anybody should be able to see. The reversals are worked out by
+   * `reversalsFor` on the Agreement screen and handed over already made, the
+   * same way `freeze()` and `recordPayment()` hand their results over.
+   */
+  | { type: 'withdraw'; withdrawal: Withdrawal; reversals: readonly Invoice[] }
   | { type: 'agreedChanges'; agreedChanges: readonly AgreedChange[] }
   | { type: 'proposalSent'; sent: { at: string; hash: string } }
   | { type: 'saleVenue'; venue: SaleVenue | null }
@@ -550,6 +583,7 @@ function restored(saved: SavedProject, note: string): State {
     claim?: Claim;
     proposal?: Proposal;
     baseline?: Baseline;
+    withdrawn?: Loaded['withdrawn'];
     agreedChanges?: readonly AgreedChange[];
     proposalSent?: { at: string; hash: string };
     saleVenue?: SaleVenue;
@@ -594,6 +628,11 @@ function restored(saved: SavedProject, note: string): State {
       claim: extras.claim ?? NO_CLAIM,
       proposal: extras.proposal ?? null,
       baseline: extras.baseline ?? null,
+      // Absent in every job saved before there was a way out of an agreement,
+      // which is every job on anybody's phone today. An empty list is exactly
+      // right for one: nothing has been withdrawn, rather than something that
+      // could not be read.
+      withdrawn: extras.withdrawn ?? [],
       // Absent in every job saved before signed change orders existed. An empty
       // list is right for one: nobody signed anything, rather than something
       // that could not be read.
@@ -720,6 +759,7 @@ export function reduce(state: State, action: Action): State {
             claim: NO_CLAIM,
             proposal: null,
             baseline: null,
+            withdrawn: [],
             agreedChanges: [],
             raisedChange: null,
             proposalSent: null,
@@ -807,6 +847,7 @@ export function reduce(state: State, action: Action): State {
             claim: NO_CLAIM,
             proposal: null,
             baseline: null,
+            withdrawn: [],
             agreedChanges: [],
             raisedChange: null,
             proposalSent: null,
@@ -867,6 +908,7 @@ export function reduce(state: State, action: Action): State {
           claim: NO_CLAIM,
           proposal: null,
           baseline: null,
+          withdrawn: [],
           agreedChanges: [],
           raisedChange: null,
           proposalSent: null,
@@ -1776,6 +1818,42 @@ export function reduce(state: State, action: Action): State {
         ? { ...state, loaded: { ...state.loaded, baseline: action.baseline } }
         : state;
 
+    /**
+     * The one way out of an agreement, and it is not a way to lose one.
+     *
+     * The live baseline goes to `null` — which is what makes the proposal
+     * editable again — and the whole of it moves into `withdrawn` with the
+     * reason beside it, along with the change orders that were signed against
+     * it. Nothing is dropped: the agreement, its signature, its change orders,
+     * the bills raised on it and the reversals that took them back are all
+     * still on this job afterwards, and every one of them is still readable.
+     *
+     * The reversals are appended to `invoices` in the same move, so this job
+     * is never withdrawn and asking to be paid at the same time.
+     */
+    case 'withdraw': {
+      const loaded = state.loaded;
+      if (!loaded || !loaded.baseline) return state;
+      return {
+        ...state,
+        loaded: {
+          ...loaded,
+          baseline: null,
+          withdrawn: [
+            ...loaded.withdrawn,
+            {
+              baseline: loaded.baseline,
+              withdrawal: action.withdrawal,
+              agreedChanges: loaded.agreedChanges,
+            },
+          ],
+          agreedChanges: [],
+          raisedChange: null,
+          invoices: [...loaded.invoices, ...action.reversals],
+        },
+      };
+    }
+
     // Appended, never edited. A signed change order that could be quietly
     // rewritten is worth nothing, and `verifyChange` would catch it anyway.
     case 'agreedChanges':
@@ -1940,6 +2018,7 @@ export function persist(loaded: Loaded, at: string): SaveTrouble | null {
         claim: loaded.claim,
         proposal: loaded.proposal,
         baseline: loaded.baseline,
+        withdrawn: loaded.withdrawn,
         agreedChanges: loaded.agreedChanges,
         proposalSent: loaded.proposalSent,
         saleVenue: loaded.saleVenue,

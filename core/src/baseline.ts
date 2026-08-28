@@ -263,6 +263,315 @@ export async function freezeOnReturnedCopy(
   };
 }
 
+/* ===================================================================== */
+/*  Undoing an agreement, without erasing one                            */
+/* ===================================================================== */
+
+/**
+ * An agreement withdrawn, with the reason on the record.
+ *
+ * ## The question, and Sam's answer
+ *
+ * > Once a job is agreed, should there be a way out?
+ * > — **"Withdraw it, with a reason, kept on the record."**
+ *
+ * Until now there was no way out at all. `state.ts` said so in a comment: a
+ * baseline is written once and never edited, so there is no action that changes
+ * one. `Tear it up and start again` on the Work screen discards an *unsigned
+ * change order*, not the agreement. So a contractor who froze the job on the
+ * wrong photograph, or whose client walked away on the Monday, was stuck with
+ * an agreement he could not edit and could not leave.
+ *
+ * ## Why this is a record beside the baseline and not a field on it
+ *
+ * A `Withdrawal` does not touch the `Baseline` it withdraws. It carries the
+ * fingerprint of it, the moment it was frozen and what it agreed, and it is
+ * stored **beside** the whole untouched baseline in a `Withdrawn` record.
+ *
+ * Three reasons, and the third is the one that decides it:
+ *
+ * 1. **Nothing is erased.** What was agreed, who agreed it, when, and the mark
+ *    they made are all still there, byte for byte, with the reason beside them.
+ * 2. **Every baseline already saved on somebody's phone reads back exactly as
+ *    it was written.** No new key appears on the old path, so the canonical
+ *    text of every agreement in the product is unchanged and every fingerprint
+ *    still checks out. A field on `Baseline` — even an absent one — would have
+ *    put a decision about withdrawals inside the record of every job that has
+ *    never had one.
+ * 3. **A withdrawn agreement must stop being an agreement, not become a
+ *    weaker one.** A flag on the baseline invites code that reads the baseline
+ *    and forgets the flag: `invoiceOf` would happily bill it, `raiseChange`
+ *    would happily amend it. Beside it, the withdrawal has to be handed to the
+ *    functions that matter, and those functions refuse — see
+ *    `changesSinceVerified` below and `invoiceOf` in `invoice.ts`.
+ *
+ * ## What a withdrawal is not
+ *
+ * It is not a deletion and the word is never used for one. It is not the
+ * buyer's federal three-day right to **cancel** either — that is
+ * `core/src/cooling.ts`, it belongs to the buyer, it runs on a clock, and it
+ * has forms. This belongs to the contractor, has no deadline, and is a line on
+ * the record. The two words must never be swapped, on a screen or in a file.
+ */
+export interface Withdrawal {
+  readonly proposalId: string;
+  /**
+   * The fingerprint of the agreement being withdrawn.
+   *
+   * So a withdrawal cannot drift onto a different agreement — including the
+   * next one, if the job is agreed again after this.
+   */
+  readonly baselineHash: string;
+  /**
+   * The moment that agreement was frozen.
+   *
+   * Carried as well as the hash, and it has to be. A job withdrawn and then
+   * agreed again **without a word of the proposal changing** produces a second
+   * baseline with exactly the same fingerprint as the first, and the hash alone
+   * would read the fresh agreement as the withdrawn one. `frozenAt` is the only
+   * thing that tells those two apart.
+   */
+  readonly frozenAt: string;
+  /** What was agreed, in money, so the record can be read without the baseline. */
+  readonly wasTotal: Cents;
+  /** Why, in the contractor's own words. Never blank, never a label. */
+  readonly reason: string;
+  /** When it was withdrawn. The app's own clock. */
+  readonly at: string;
+  /**
+   * The one line every screen, document and list prints.
+   *
+   * Written once, here, rather than composed by each screen — the same rule
+   * `AgreedByReturnedCopy.says` follows, for the same reason: what a record
+   * says about itself must not depend on which screen is showing it.
+   */
+  readonly says: string;
+}
+
+/**
+ * A withdrawn agreement, kept whole, with the withdrawal beside it.
+ *
+ * The pair is the record. Holding only the `Withdrawal` would leave the reason
+ * on file and the agreement it withdrew gone from the job — which is the
+ * deletion this whole design exists to avoid.
+ */
+export interface Withdrawn {
+  readonly baseline: Baseline;
+  readonly withdrawal: Withdrawal;
+}
+
+/**
+ * The shortest thing this will accept as a reason, in characters.
+ *
+ * A floor, and honestly a floor rather than a judge: no check can tell whether
+ * a sentence is true. What it can do is refuse a label. "no", "n/a", "mistake",
+ * "wrong" and "test" are labels — they are what gets typed when somebody wants
+ * the box to go away, and they are worth nothing to the person reading this
+ * record in two years, who is usually the same person.
+ *
+ * Fifteen is about the shortest real sentence: "Wrong photograph" is 16,
+ * "Client pulled out" is 17, "She changed her mind" is 20. Paired with the
+ * two-word rule below, because "aaaaaaaaaaaaaaaaaa" is long and is still a
+ * label.
+ */
+const REASON_FLOOR = 15;
+
+/** Whether this withdrawal is the one that withdrew this baseline. */
+function withdrew(withdrawal: Withdrawal, baseline: Baseline): boolean {
+  return (
+    withdrawal.proposalId === baseline.proposalId &&
+    withdrawal.baselineHash === baseline.hash &&
+    withdrawal.frozenAt === baseline.frozenAt
+  );
+}
+
+/**
+ * The withdrawal of this agreement, out of everything on the job, or `null`.
+ *
+ * Asked rather than assumed by every function that must refuse a withdrawn
+ * agreement, and exported because the screens ask it too. It hands back the
+ * whole record rather than a yes or no, because everything that refuses on the
+ * strength of it has to say *when* and *why* in the same breath — a refusal
+ * that cannot name the reason sends somebody looking for it.
+ */
+export function withdrawalOf(
+  baseline: Baseline,
+  withdrawn: readonly Withdrawn[]
+): Withdrawn | null {
+  return withdrawn.find((one) => withdrew(one.withdrawal, baseline)) ?? null;
+}
+
+/**
+ * Withdraws an agreement, or refuses and says why.
+ *
+ * Returns the withdrawal. It does **not** return a changed baseline, because
+ * there is no such thing: the baseline handed in comes back out of this
+ * function untouched, and the caller keeps the two together in a `Withdrawn`.
+ *
+ * ## The four refusals
+ *
+ * **No reason.** Sam's answer was "withdraw it, *with a reason*", and the
+ * reason is the whole of what makes this a record rather than a deletion.
+ *
+ * **A reason too thin to mean anything.** See `REASON_FLOOR`.
+ *
+ * **Already withdrawn.** Withdrawing twice would put two reasons and two dates
+ * against one agreement, and the second one is always the one somebody typed to
+ * get past a screen. The refusal names the reason already on the record, so the
+ * answer to "why won't it let me" is on the screen.
+ *
+ * **A time it cannot keep** — either not a time at all, or before the agreement
+ * it withdraws was frozen. A withdrawal dated before the agreement is a record
+ * that reads as though the job was called off before it was won, and a record
+ * that cannot be true is worse than no record.
+ */
+export function withdraw(
+  baseline: Baseline,
+  reason: string,
+  at: string,
+  already: readonly Withdrawn[] = []
+): Withdrawal {
+  const said = reason.trim();
+  if (!said) {
+    throw new BaselineError(
+      'Say why this agreement is being withdrawn. Withdrawing it is not deleting it — ' +
+        'the agreement stays on this job for ever, and the reason is what makes it a record ' +
+        'rather than a hole.'
+    );
+  }
+  if (said.length < REASON_FLOOR || said.split(/\s+/).length < 2) {
+    throw new BaselineError(
+      `"${said}" is a label, not a reason. Say what happened, in a sentence — they ` +
+        'pulled out, it was frozen on the wrong photograph, the price was wrong. It is one ' +
+        'line now and the whole argument later.'
+    );
+  }
+  const before = withdrawalOf(baseline, already);
+  if (before) {
+    throw new BaselineError(
+      `This agreement was already withdrawn on ${before.withdrawal.at.slice(0, 10)}: ` +
+        `${before.withdrawal.reason} It cannot be withdrawn twice, and nothing about it has ` +
+        'changed since.'
+    );
+  }
+  if (Number.isNaN(Date.parse(at))) {
+    throw new BaselineError(`"${at}" is not a time this can record.`);
+  }
+  if (Date.parse(at) < Date.parse(baseline.frozenAt)) {
+    throw new BaselineError(
+      `This says the agreement was withdrawn on ${at.slice(0, 10)}, which is before it was ` +
+        `agreed on ${baseline.frozenAt.slice(0, 10)}. Nobody withdrew an agreement that did ` +
+        'not exist yet, so one of those two is wrong.'
+    );
+  }
+  return {
+    proposalId: baseline.proposalId,
+    baselineHash: baseline.hash,
+    frozenAt: baseline.frozenAt,
+    wasTotal: baseline.agreed.total,
+    reason: said,
+    at,
+    says:
+      `Agreed ${baseline.frozenAt.slice(0, 10)} at ${money(baseline.agreed.total)}, ` +
+      `withdrawn ${at.slice(0, 10)}. Why: ${said}`,
+  };
+}
+
+/**
+ * A withdrawn agreement said out loud, for the screen and for the document.
+ *
+ * The last line is the one that matters and it is not decoration: a contractor
+ * looking at this is looking for the thing he thinks he has destroyed, and a
+ * client reading it is entitled to see that the agreement he signed is still
+ * there.
+ */
+export function describeWithdrawal(one: Withdrawn): string[] {
+  const { baseline, withdrawal } = one;
+  return [
+    `Withdrawn on ${withdrawal.at.slice(0, 10)}.`,
+    `Why: ${withdrawal.reason}`,
+    `It was agreed on ${baseline.frozenAt.slice(0, 10)} at ${money(withdrawal.wasTotal)}` +
+      (baseline.agreedBy
+        ? `, by ${AGREED_BY_SAYS[baseline.agreedBy.cameBackBy]} from ` +
+          `${baseline.agreedBy.saysSignedBy}.`
+        : baseline.signatures.length > 0
+          ? `, signed by ${baseline.signatures.map((s) => s.who).join(' and ')}.`
+          : '.'),
+    'Nothing has been erased. What was agreed, who agreed it and when are all still on this ' +
+      'job, with the reason beside them.',
+  ];
+}
+
+/**
+ * The job agreed again after a withdrawal, and what it costs.
+ *
+ * ## The hole this closes
+ *
+ * A withdrawal that could not be followed by a second agreement would be no use
+ * to anybody: the ordinary reason to withdraw is that the job is being agreed
+ * differently. So a withdrawn job **can** be agreed again, and the second
+ * agreement is a whole agreement — a new signature on the phone, or a new
+ * signed copy filed against a newly sent proposal — never an amendment to the
+ * withdrawn one.
+ *
+ * That is what stops a second agreement laundering a price rise past the
+ * change-order machinery. There is no door to a `Baseline` that does not go
+ * through `freeze()` or `freezeOnReturnedCopy()`; `freeze()` refuses anything
+ * without a client `Signature` sealed to the document, and
+ * `freezeOnReturnedCopy()` refuses unless the proposal still hashes to the
+ * version the signed copy was taken from. So the client signs for the **whole**
+ * of the new total, not for a difference nobody itemised.
+ *
+ * What the change-order machinery would have added, and what this adds instead,
+ * is that the difference is **visible**. A contractor who withdraws at $10,000
+ * and re-agrees at $12,000 has a record that says so, in money, beside the
+ * reason he gave for withdrawing. That is the line an adjuster, a homeowner or
+ * a court reads, and it is on the screen and on the document rather than only
+ * in a diff nobody runs.
+ */
+export interface ReAgreement {
+  readonly wasTotal: Cents;
+  readonly nowTotal: Cents;
+  /** Positive when the second agreement is dearer. */
+  readonly difference: Cents;
+  readonly says: string;
+}
+
+/**
+ * The withdrawn agreement and the one that replaced it, priced against each
+ * other.
+ *
+ * Refuses a pair that is not a pair: a baseline frozen before the withdrawal
+ * did not replace it, and saying it did would put two unrelated agreements on
+ * one line with a difference between them that means nothing.
+ */
+export function reAgreement(one: Withdrawn, next: Baseline): ReAgreement {
+  if (Date.parse(next.frozenAt) < Date.parse(one.withdrawal.at)) {
+    throw new BaselineError(
+      `That agreement was frozen on ${next.frozenAt.slice(0, 10)}, before the withdrawal on ` +
+        `${one.withdrawal.at.slice(0, 10)}, so it did not replace it.`
+    );
+  }
+  const wasTotal = one.withdrawal.wasTotal;
+  const nowTotal = next.agreed.total;
+  const difference = nowTotal - wasTotal;
+  const size = difference < 0n ? -difference : difference;
+  return {
+    wasTotal,
+    nowTotal,
+    difference,
+    says:
+      `Agreed at ${money(wasTotal)} on ${one.baseline.frozenAt.slice(0, 10)}, withdrawn on ` +
+      `${one.withdrawal.at.slice(0, 10)}, agreed again at ${money(nowTotal)} on ` +
+      `${next.frozenAt.slice(0, 10)} — ` +
+      (difference === 0n
+        ? 'the same money.'
+        : `${money(size)} ${difference > 0n ? 'more' : 'less'}.`) +
+      ' The difference did not go through a change order: the whole of the new agreement was ' +
+      'agreed on its own, and this is what was withdrawn to get there.',
+  };
+}
+
 export type ChangeKind = 'added' | 'removed' | 'more' | 'less' | 'repriced';
 
 export interface Change {
@@ -394,12 +703,49 @@ export function changesSince(baseline: Baseline, now: Quote): ChangeOrder {
  * Separate from `changesSince` because checking a hash is asynchronous and
  * every screen that lists changes should not have to be. Anything that shows a
  * client a number uses this one.
+ *
+ * ## What a withdrawn agreement means here
+ *
+ * It means there is no question to answer, and this refuses to answer one.
+ *
+ * A change order is the difference between what was agreed and what the room
+ * costs now, and it is priced, raised and signed against the agreement it
+ * amends. Withdraw that agreement and there is nothing on the other side of the
+ * subtraction. Answering anyway would produce two bad outcomes and both of them
+ * are the failures this module exists to prevent:
+ *
+ * **A priced change order against nothing.** `raiseChange` would take it,
+ * `agreeToChange` would seal it to a baseline hash nobody is bound by, and
+ * `invoiceOf` would bill it. The whole defence — every later difference
+ * surfaces as a change order somebody signs — runs on the agreement being real.
+ *
+ * **A tamper alarm that is noise.** The point of a withdrawal is that the
+ * proposal becomes editable again, so the first thing that happens after one is
+ * exactly the edit that makes `verify` fail. The screen would raise "this is
+ * not the document they signed" over a document nobody is holding them to, and
+ * an alarm that cries wolf on the ordinary case is an alarm that gets ignored
+ * on the day it is right.
+ *
+ * So the answer is a refusal, in core, rather than a convention the screens are
+ * trusted to keep. The screens do keep it — the live `baseline` goes to `null`
+ * the moment one is withdrawn, so neither of them can reach this — and this is
+ * the check that would catch it if one of them stopped keeping it.
  */
 export async function changesSinceVerified(
   baseline: Baseline,
   proposal: Proposal,
-  now: Quote
+  now: Quote,
+  withdrawn: readonly Withdrawn[] = []
 ): Promise<ChangeOrder> {
+  const gone = withdrawalOf(baseline, withdrawn);
+  if (gone) {
+    throw new BaselineError(
+      `That agreement was withdrawn on ${gone.withdrawal.at.slice(0, 10)}, so nothing is ` +
+        'measured against it any more and no change order can be raised on it. ' +
+        `Why it was withdrawn: ${gone.withdrawal.reason} It stays on this job, with the ` +
+        'reason beside it. Agree the work again and changes are measured against that.'
+    );
+  }
   const order = changesSince(baseline, now);
   const client = baseline.signatures.find((s) => s.role === 'client');
   if (client) {

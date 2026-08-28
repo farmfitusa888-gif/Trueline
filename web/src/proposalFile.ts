@@ -1,4 +1,4 @@
-import { type Baseline } from '../../core/src/baseline.ts';
+import { type Baseline, type Withdrawn, describeWithdrawal } from '../../core/src/baseline.ts';
 import { type Company, letterhead } from '../../core/src/company.ts';
 import {
   type CancellationNotice,
@@ -102,6 +102,19 @@ export interface ProposalFileParts {
   readonly company: Company;
   /** The signed record, when there is one. A draft has none. */
   readonly baseline: Baseline | null;
+  /**
+   * Agreements on this job that were withdrawn, oldest first.
+   *
+   * On the document, not only on the phone, and for the same reason the
+   * weakness of a returned copy is: the record is worth keeping only if it can
+   * be produced. A proposal that went out, was agreed, was withdrawn and then
+   * went out again would otherwise reach the client saying "Not signed yet",
+   * with no sign that anything had ever been agreed or taken back — which is
+   * the one document a person would use to argue that it never was.
+   *
+   * Empty on almost every job. See `core/src/baseline.ts`.
+   */
+  readonly withdrawn?: readonly Withdrawn[];
   readonly at: string;
   /**
    * The federal three-day cancellation notice, when the sale is one the FTC's
@@ -225,6 +238,7 @@ export function proposalFile({
   proposal,
   company,
   baseline,
+  withdrawn = [],
   at,
   cooling,
   coolingTrouble = null,
@@ -331,6 +345,34 @@ export function proposalFile({
   </section>`
     : cannot;
 
+  /**
+   * What was agreed and then withdrawn, on the document, in full.
+   *
+   * The word is "withdrawn" and it is never "cancelled": on this very document
+   * "cancel" is the buyer's federal three-day right under 16 CFR 429, printed
+   * a few inches further down in ten point bold with two forms attached. Two
+   * meanings of one word on one page is how the wrong one gets relied on.
+   */
+  const withdrawnBlock = withdrawn.length
+    ? `
+  <section class="withdrawn">
+    <h2>Withdrawn agreement${withdrawn.length === 1 ? '' : 's'}</h2>
+    ${withdrawn
+      .map(
+        (one) => `
+      <div class="one">
+        <p class="who">${safe(one.baseline.agreed.name)} — ${safe(money(one.withdrawal.wasTotal))}</p>
+        <ul>${describeWithdrawal(one).map((line) => `<li>${safe(line)}</li>`).join('')}</ul>
+        <p class="fine">
+          Fingerprint of the document that was agreed:
+          <code>${safe(one.withdrawal.baselineHash)}</code>.
+        </p>
+      </div>`
+      )
+      .join('')}
+  </section>`
+    : '';
+
   const back = returned.length
     ? `
   <section class="back">
@@ -418,6 +460,9 @@ export function proposalFile({
                   font-size: .74rem; letter-spacing: .05em; text-transform: uppercase;
                   color: #56606A; }
   .back { border-top: 2px solid #16212B; margin-top: 26px; padding-top: 16px; }
+  .withdrawn { border-top: 2px solid #16212B; margin-top: 26px; padding-top: 16px; }
+  .withdrawn .one { margin: 14px 0 22px; }
+  .withdrawn li { font-size: .85rem; color: #56606A; margin: .25rem 0; }
   .back .one { margin: 14px 0 22px; }
   .back img { display: block; max-width: 320px; height: auto; border: 1px solid #D9CFBC; }
   .back li { font-size: .8rem; color: #56606A; margin: .25rem 0; }
@@ -452,6 +497,7 @@ ${proposal.options.map((o) => optionBlock(o, taken?.id === o.id)).join('')}
 
 ${statement}
 ${signed}
+${withdrawnBlock}
 ${back}
 ${notices}
 
