@@ -30,6 +30,7 @@ export function Price({
   room,
   overrides,
   scope,
+  markCount,
   onOverride,
   onClearOverride,
 }: {
@@ -40,6 +41,18 @@ export function Price({
    * scoped — which is priced exactly as this app has always priced one.
    */
   readonly scope: WorkScope | null;
+
+  /**
+   * How many marks are on this room, and nothing else about them.
+   *
+   * This screen prices the ROOM: every surface, as replaced, because that is
+   * what a takeoff is. The marked damage is a different sheet for a different
+   * payer and it is priced on Insurance. Sam went looking for the price of his
+   * mould here, found a floor and a ceiling he had never said needed doing, and
+   * had no way of knowing the other sheet existed. So the count comes in, to
+   * say where the number is -- not to price anything.
+   */
+  readonly markCount: number;
 
   readonly onOverride: (override: Override) => void;
   readonly onClearOverride: (item: string, unit: Override['unit']) => void;
@@ -246,6 +259,17 @@ export function Price({
         <p className="mt-2 text-sm text-slate-600">
           <span className="font-semibold text-slate-900">This is money resting on a scan.</span>{' '}
           Put a tape on one wall each way and every figure above moves to what is actually there.
+        </p>
+      )}
+
+      {markCount > 0 && (
+        <p className="mt-3 text-sm text-slate-600">
+          <span className="font-semibold text-slate-900">This prices the whole room.</span>{' '}
+          The {markCount === 1 ? 'mark you made is' : `${markCount} marks you made are`} priced on{' '}
+          <span className="font-semibold text-slate-900">Insurance</span>, on {markCount === 1 ? 'its' : 'their'} own
+          sheet — what it takes to put that damage right, and nothing off a surface you did not
+          mark. A remodel and a restoration go to two different payers, so they are never one
+          sheet.
         </p>
       )}
     </section>

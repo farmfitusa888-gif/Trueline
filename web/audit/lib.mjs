@@ -22,7 +22,8 @@ import { openChromium } from '../../core/tools/browser.mjs';
  * while showing the word "Close".
  */
 
-import { dirname } from 'node:path';
+import { readdir, stat } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** The fixtures live beside these scripts, so the audit needs nothing else. */
@@ -46,6 +47,62 @@ export const URL = process.env.TRUELINE_AUDIT_URL ?? 'http://127.0.0.1:4173/';
  */
 export const HEIGHT = Number(process.env.TRUELINE_AUDIT_HEIGHT ?? 1600);
 
+/**
+ * Refusing to audit a bundle older than the source it was built from.
+ *
+ * `npm run audit` builds first. Running one part by hand does not, and
+ * `web/dist` is gitignored, so a stale bundle sits there looking exactly like a
+ * fresh one. That is not a theoretical hazard: a22-voice crashed for an unknown
+ * length of time against a `Damage.tsx` whose field names had been changed,
+ * while the stale bundle kept every other part green.
+ *
+ * So the newest source file is compared against the newest built file, and a
+ * bundle that is behind stops the part instead of reporting on code nobody is
+ * running. `TRUELINE_AUDIT_STALE_OK=1` turns it off, for the one honest case:
+ * a URL served from somewhere that is not this tree.
+ */
+const REPO = dirname(dirname(SP));
+
+async function newestUnder(dir) {
+  let newest = 0;
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      newest = Math.max(newest, await newestUnder(path));
+    } else {
+      newest = Math.max(newest, (await stat(path)).mtimeMs);
+    }
+  }
+  return newest;
+}
+
+export async function refuseAStaleBundle() {
+  if (process.env.TRUELINE_AUDIT_STALE_OK === '1') return;
+  const built = await newestUnder(join(REPO, 'web', 'dist', 'assets'));
+  if (built === 0) {
+    throw new Error('There is no built bundle to audit. Run: npm run build');
+  }
+  const source = Math.max(
+    await newestUnder(join(REPO, 'web', 'src')),
+    await newestUnder(join(REPO, 'core', 'src'))
+  );
+  if (source > built) {
+    const behind = Math.round((source - built) / 1000);
+    throw new Error(
+      `The built bundle is ${behind}s older than the source it came from, so this ` +
+        'part would report on code nobody is running. Run: npm run build ' +
+        '(or set TRUELINE_AUDIT_STALE_OK=1 if the URL is served from elsewhere)'
+    );
+  }
+}
+
 export const results = [];
 let problems = [];
 
@@ -54,6 +111,7 @@ export function check(name, condition, detail = '') {
 }
 
 export async function open() {
+  await refuseAStaleBundle();
   const browser = await openChromium();
   const ctx = await browser.newContext({ viewport: { width: 430, height: HEIGHT }, acceptDownloads: true });
   const page = await ctx.newPage();
@@ -99,6 +157,7 @@ export async function sentTo(page, name) {
  * app never says. Nothing should ever be blank in it.
  */
 export async function openAsApp(payload, { scheme = 'light' } = {}) {
+  await refuseAStaleBundle();
   const browser = await openChromium();
   const ctx = await browser.newContext({
     viewport: { width: 430, height: HEIGHT },

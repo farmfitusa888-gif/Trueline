@@ -107,8 +107,13 @@ check('the claim document opens offline with nothing fetched', asks.length === 0
 check('no prices are on it', !html.includes('$'), (html.match(/\$[\d,.]+/g) || []).join(' '));
 check('the evidence is on it', /12\.0 sq ft/.test(html) && /Drying: 28 down to 14/.test(html));
 check('the photograph is full size on it', (await doc.locator('figure img').count()) === 1);
-check('the drawing carries the damage',
-  (await doc.locator('svg line[stroke="rgb(var(--c-refuse))"]').count()) >= 1);
+// Resolved, not a token. A var() cannot leave the document that declares it:
+// out here `rgb(var(--c-refuse))` is invalid at computed-value time, so `fill`
+// falls back to black and the whole drawing prints as a black rectangle. The
+// value is `--c-refuse` on the light ground, from core/src/design.ts, because
+// anything that leaves the app as a document is paper.
+check('the drawing carries the damage, in a colour that resolves outside the app',
+  (await doc.locator('svg line[stroke="rgb(163 18 18)"]').count()) >= 1);
 check('the caveat travels', /THESE ARE A SCANNER/.test(html));
 
 /* ------------------------------------------ turning it off puts it all away */

@@ -1167,6 +1167,7 @@ export function App() {
                 room={loaded.room}
                 overrides={loaded.overrides}
                 scope={loaded.scope}
+                markCount={loaded.damages.length}
                 onOverride={(override) => dispatch({ type: 'override', override })}
                 onClearOverride={(item, unit) => dispatch({ type: 'clearOverride', item, unit })}
               />

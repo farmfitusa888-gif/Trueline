@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -66,7 +67,36 @@ const parts = [
   'a29-tapped.mjs',
   'a30-ceiling.mjs',
   'a31-mark.mjs',
+  'a32-claim-money.mjs',
+  'a33-howmuch.mjs',
+  'a34-naming.mjs',
+  'a35-returned.mjs',
+  'a36-address.mjs',
+  'a37-scanphotos.mjs',
+  'a38-sent.mjs',
 ];
+
+/**
+ * A part that is on disk and not in that list is a part nobody runs.
+ *
+ * The list is written out by hand because the ORDER is deliberate — a1 walks
+ * the cold start, a8 signs what a5 priced — and a directory listing sorts
+ * a10 before a2. But a hand-written list is a list somebody forgets, and four
+ * parts had already been written and left out of it. So the list is checked
+ * against the directory before anything runs, and a missing name stops the
+ * audit rather than passing quietly with a part left out.
+ */
+const onDisk = (await readdir(here))
+  .filter((name) => /^a\d+-.*\.mjs$/.test(name))
+  .sort();
+const forgotten = onDisk.filter((name) => !parts.includes(name));
+const gone = parts.filter((name) => !onDisk.includes(name));
+if (forgotten.length > 0 || gone.length > 0) {
+  server.kill();
+  if (forgotten.length > 0) console.error(`Not in run.mjs, so never run: ${forgotten.join(', ')}`);
+  if (gone.length > 0) console.error(`In run.mjs but not on disk: ${gone.join(', ')}`);
+  process.exit(1);
+}
 
 function run(part) {
   return new Promise((resolve) => {
