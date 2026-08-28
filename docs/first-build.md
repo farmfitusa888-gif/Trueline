@@ -149,6 +149,7 @@ to hit, in the order they happen.
 | It says | What it means | What to do |
 |---|---|---|
 | `bash: build.sh: No such file or directory` | You are not in the repo folder. | `bash ~/trueline/install-command.sh` once, then `trueline` from anywhere. |
+| `bash: ~/trueline/install-command.sh: No such file or directory` | The file is in the repo but not on your Mac yet — you have not pulled since it was added. | `cd ~/trueline && bash setup-mac.sh --checks-only` first, then run it. |
 | `npm error enoent Could not read package.json` | Same thing. `npm` reads the folder you are standing in, and there is no `package.json` in your home folder. | The same fix — the installed `trueline` command carries the path inside it. |
 | `Xcode's command line tools are not on the path` | Step 1 is not finished. | Open Xcode once, then **Xcode → Settings → Locations → Command Line Tools** and pick the version in the dropdown. |
 | `No iPhone found` | Cable, lock screen, or Trust. | Unlock the phone, unplug and replug, tap **Trust**. A simulator will not do. |
@@ -173,10 +174,13 @@ doing. The full 22 are in `docs/on-the-phone.md` when you want them.
 
 ## After the first time
 
-Install the one-word command, once, from anywhere:
+Install the one-word command, once. The first half pulls, because
+`install-command.sh` arrived in a commit and a file cannot be run before it has
+been fetched — and `setup-mac.sh --checks-only` is the pull that holds your
+signing team and the built bundle out of its way:
 
 ```bash
-bash ~/trueline/install-command.sh
+cd ~/trueline && bash setup-mac.sh --checks-only && bash install-command.sh
 ```
 
 Then the whole loop, forever, from any folder:

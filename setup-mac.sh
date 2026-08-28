@@ -38,6 +38,30 @@ ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; }
 
+# `trueline` is a shell function written into ~/.trueline.zsh by
+# install-command.sh, and it is the command that makes the folder you are
+# standing in stop mattering. It is MENTIONED here rather than installed here:
+# this script pulls and checks, and writing to somebody's ~/.zshrc as a side
+# effect of a command called "checks-only" is the kind of surprise that gets
+# remembered badly. Saying the line is enough, and it is said only when the
+# command is genuinely missing.
+#
+# It is said HERE, in the script that is already on the Mac, because that is
+# exactly the gap this fills: install-command.sh arrived in a commit, and a file
+# cannot be run before it has been pulled. Whatever is already on disk has to be
+# the thing that points at whatever is new.
+sayTheOneWord() {
+  [ -f "$HOME/.trueline.zsh" ] && return 0
+  [ -f "$root/install-command.sh" ] || return 0
+  say "One word, from any folder"
+  echo "  You do not have it yet. Install it once:"
+  echo ""
+  echo "      bash \"$root/install-command.sh\""
+  echo ""
+  echo "  After that \`trueline\` builds and installs from wherever you happen"
+  echo "  to be standing, and \`trueline help\` lists the rest."
+}
+
 cd "$(dirname "${BASH_SOURCE[0]}")"
 root="$(pwd)"
 
@@ -452,6 +476,7 @@ fi
 if [ "$checks_only" = yes ]; then
   say "Checked"
   ok "up to date, signing held, bundle current, project file parses"
+  sayTheOneWord
   exit 0
 fi
 

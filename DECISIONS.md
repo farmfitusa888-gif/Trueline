@@ -2760,3 +2760,37 @@ Two details in it are the point rather than the detail:
 This is the same shape as `check-portable.py`, for the same reason: the
 container this is written in is not the machine it runs on, and anything only
 true of the container is a bug waiting for a plane ticket.
+
+### The install line had to carry the pull
+
+The command above shipped as:
+
+    bash ~/trueline/install-command.sh
+
+    bash: /Users/sunnyacres/trueline/install-command.sh: No such file or directory
+
+The folder was there. The file was not, because it had been written and pushed
+forty minutes earlier and the Mac had not pulled since. A command that names a
+file introduced in the same commit as the command cannot be run before that
+commit is fetched, and the script that would have done the fetching was the
+script that could not run.
+
+Two things came out of it.
+
+The documented install line now pulls first, and pulls the safe way --
+`setup-mac.sh --checks-only`, which lifts the signing team out of the project
+file and puts the built bundle back before it fetches, so a plain `git pull`
+cannot stop on either:
+
+    cd ~/trueline && bash setup-mac.sh --checks-only && bash install-command.sh
+
+And `setup-mac.sh` -- which was already on the Mac, months before any of this --
+now ends by naming the one word and the line that installs it, but only when
+`~/.trueline.zsh` is genuinely absent and `install-command.sh` is genuinely
+present. It says the line rather than running it: this script pulls and checks,
+and writing to somebody's `~/.zshrc` as a side effect of a command called
+"checks-only" is the kind of surprise that gets remembered badly.
+
+The general rule, which is the part worth keeping: **whatever is already on the
+Mac has to be the thing that points at whatever is new.** A new file can only be
+reached through something old.

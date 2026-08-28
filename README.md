@@ -7,10 +7,18 @@ measurement that re-solves the whole model around it.
 
 ## Put it on the phone
 
-Once, from anywhere, to install the command:
+Once, to install the command. The first half pulls — `install-command.sh`
+arrived in a commit, and a file cannot be run before it has been fetched:
 
 ```bash
-bash ~/trueline/install-command.sh
+cd ~/trueline && bash setup-mac.sh --checks-only && bash install-command.sh
+```
+
+If that stops with `cd: no such file or directory`, the repo is somewhere else.
+Find it:
+
+```bash
+find ~ -maxdepth 4 -type d -name trueline
 ```
 
 After that, one word, from any folder:

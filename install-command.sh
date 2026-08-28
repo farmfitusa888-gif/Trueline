@@ -2,9 +2,14 @@
 # Puts one word on your Mac: `trueline`. It works from any folder, so a command
 # can never again fail because you were in the wrong one.
 #
-# Run it once, from anywhere:
+# Run it once. The first half pulls, because this file arrives in a commit and
+# a file cannot be run before it has been fetched:
 #
-#   bash ~/trueline/install-command.sh
+#   cd ~/trueline && bash setup-mac.sh --checks-only && bash install-command.sh
+#
+# After the first time, `bash <wherever-the-repo-is>/install-command.sh` on its
+# own is enough -- it is only the very first run that needs the pull in front
+# of it.
 #
 # After that, from any folder at all:
 #
