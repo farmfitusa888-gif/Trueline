@@ -777,32 +777,47 @@ await second.page.getByLabel('One line on what it covers').fill('The whole room,
 await second.page.getByRole('button', { name: 'Write the proposal' }).click();
 await second.page.waitForTimeout(600);
 
-const again = second.page.getByRole('button', { name: 'Start again' });
-check('before anything is signed, one control on the Agreement screen says Start again',
-  (await again.count()) === 1, `${await again.count()} found`);
+// Two controls, one name, two outcomes that are nothing alike. This screen
+// used to carry TWO buttons whose whole accessible name was `Start again` —
+// one clearing a pen stroke, one throwing the proposal away — and the
+// destructive one was the 20px one, against the 44px every other thumb target
+// in this app carries. A person reaching for the small job could hit the big
+// one, and a screen reader announced them identically. This app has had that
+// bug twice before: three boxes called "e.g." and a toggle that said "Your
+// business" while showing the word "Close".
+//
+// The proposal's is now `Write it again`, named for what it destroys.
+const again = second.page.getByRole('button', { name: 'Start again', exact: true });
+const rewrite = second.page.getByRole('button', { name: 'Write it again', exact: true });
+
+check('before anything is signed, the proposal offers to be written again',
+  (await rewrite.count()) === 1, `${await rewrite.count()} found`);
+check('and nothing yet says Start again, because there is no pen stroke to clear',
+  (await again.count()) === 0, `${await again.count()} found`);
 
 await second.page.getByRole('button', { name: 'Take this one' }).first().click();
 await second.page.waitForTimeout(500);
 
-check('taking an option puts a second control saying Start again on the same screen',
-  (await again.count()) === 2, `${await again.count()} found`);
+check('taking an option brings out the signature pad, with its own way to start over',
+  (await again.count()) === 1, `${await again.count()} found`);
 
 /** Which section of the screen each one is in, by the heading over it. */
 const under = async (control) =>
   control.evaluate((el) => el.closest('section')?.querySelector('h2')?.textContent ?? '(nowhere)');
-const both = await again.all();
+
+const both = [rewrite.first(), again.first()];
 const places = [];
 for (const one of both) places.push(await under(one));
-check('one of them is in the proposal and the other is beside the signature pad',
+check('one is in the proposal and the other is beside the signature pad',
   places.includes('The proposal') && places.includes('Sign it'), places.join(' | '));
 
-// The bug. Two controls, one name, two outcomes that are nothing alike — and
-// this app has had exactly this twice before: three boxes called "e.g." and a
-// toggle that said "Your business" while showing the word "Close".
+// The check that would catch it coming back: two controls doing different
+// things must not answer to one name, because a name is all a screen reader
+// has and all a bug report can say.
+const names = [];
+for (const one of both) names.push((await one.getAttribute('aria-label')) ?? (await one.innerText()));
 check('and the two can be told apart by their names, which is all a screen reader has',
-  new Set(await Promise.all(both.map((one) => one.getAttribute('aria-label') ?? one.innerText())))
-    .size === 2,
-  'two controls on one screen answer to exactly "Start again" and do different things');
+  new Set(names.map((n) => n.trim())).size === 2, names.join(' | '));
 
 const proposalAgain = both[places.indexOf('The proposal')];
 const signatureAgain = both[places.indexOf('Sign it')];
@@ -813,7 +828,7 @@ for (const one of both) {
   const box = await one.boundingBox();
   sizes.push(box ? Math.round(box.height) : 0);
 }
-check(`every Start again is at least as tall as the ${THUMB}px this app gives a thumb everywhere else`,
+check(`both are at least the ${THUMB}px this app gives a thumb everywhere else`,
   sizes.every((h) => h >= THUMB), sizes.map((h, i) => `${places[i]}: ${h}px`).join(', '));
 
 /* ------------------------------------------- and each one does its own job */

@@ -660,13 +660,24 @@ export function Agree({
       >
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-semibold text-slate-900">The proposal</h2>
+          {/*
+              Named for what it destroys, and sized like a thumb target.
+
+              It said `Start again`, which is the whole accessible name of the
+              button inside the signature pad a few inches down the same
+              screen. Two controls with one name on one screen, and the one
+              that throws the proposal away was the 20px one: every other
+              target here is min-h-11, which is Apple's minimum. A person
+              reaching for "clear the pen stroke" could hit "delete the
+              document", and a screen reader announced them identically.
+          */}
           {!baseline && (
             <button
               type="button"
               onClick={() => onProposal(null)}
-              className="text-sm text-slate-500 underline underline-offset-4"
+              className="min-h-11 shrink-0 px-2 text-sm text-slate-500 underline underline-offset-4"
             >
-              Start again
+              Write it again
             </button>
           )}
         </div>

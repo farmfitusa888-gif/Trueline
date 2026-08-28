@@ -462,7 +462,7 @@ const proposalSection = panel
   .locator('section', { has: page.getByRole('heading', { name: 'The proposal' }) })
   .first();
 check('and the proposal is a quote he can edit again',
-  (await proposalSection.getByRole('button', { name: 'Start again' }).count()) === 1
+  (await proposalSection.getByRole('button', { name: 'Write it again' }).count()) === 1
   && (await panel.getByLabel('Address of the work').count()) === 1,
   'the proposal is still frozen after the agreement was withdrawn');
 
@@ -588,7 +588,7 @@ check('and it still fetches nothing and runs nothing',
    ========================================================================== */
 
 await section(page, 'Agreement');
-await press(proposalSection.getByRole('button', { name: 'Start again' }));
+await press(proposalSection.getByRole('button', { name: 'Write it again' }));
 await page.waitForTimeout(400);
 await setEveryRate('6.00');
 const second = await pricedHere(AT_SIX);

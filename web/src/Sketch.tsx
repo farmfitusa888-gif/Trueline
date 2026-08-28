@@ -440,19 +440,32 @@ export function Sketch({
       </svg>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/*
+            Disabled at the ends, because a button that presses and changes
+            nothing is a button somebody presses again harder.
+
+            `Math.min(8, ...)` and `Math.max(1, ...)` already clamped the zoom,
+            so at the widest view `Further out` was live and did nothing at all
+            -- every corner coordinate, every wall length and the grid spacing
+            byte-identical before and after the press. `Room3D.tsx` disables
+            both ends of its own zoom; this board did not, and that difference
+            was the bug rather than a matter of taste.
+        */}
         <button
           type="button"
           onClick={() => setZoom((z) => Math.min(8, z * 1.6))}
+          disabled={zoom >= 8}
           className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700
-                     active:bg-slate-100"
+                     active:bg-slate-100 disabled:opacity-40"
         >
           Closer
         </button>
         <button
           type="button"
           onClick={() => setZoom((z) => Math.max(1, z / 1.6))}
+          disabled={zoom <= 1}
           className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700
-                     active:bg-slate-100"
+                     active:bg-slate-100 disabled:opacity-40"
         >
           Further out
         </button>
