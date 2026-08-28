@@ -103,6 +103,19 @@ function shell({ title, description, path, body, jsonLd, ogType = 'website', hea
 <meta name="theme-color" content="#E7E9EA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14181B" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="dark light">
+<script>
+  /*
+    Before a pixel is painted. A theme applied after first paint is a white
+    flash on a dark site, on every page load, on the slowest connection -- and
+    this site is read on a phone in a truck.
+  */
+  try {
+    var chose = localStorage.getItem('trueline.ground');
+    if (chose === 'light' || chose === 'dark') {
+      document.documentElement.setAttribute('data-theme', chose);
+    }
+  } catch (e) { /* private browsing has no store, and dark is the default */ }
+</script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -160,6 +173,17 @@ ${body}
       ${esc(SITE.name)} · built for one remodeling contractor and now in testing with him ·
       no server, no account, nothing uploaded
     </p>
+    <!--
+      The light palette's only door. The site is dark, deliberately, and no
+      longer follows the visitor's operating system into light -- but somebody
+      reading a guide in a bright cab should be able to have it, and a palette
+      with no route to it is a palette nobody maintains. It is hidden until the
+      script takes it, because a control that cannot work without JavaScript
+      should not be drawn to somebody who has none.
+    -->
+    <button type="button" class="ground" data-ground hidden aria-pressed="false">
+      <span data-ground-says>Light background</span>
+    </button>
   </div>
 </footer>
 <script type="module" src="/site.js"></script>

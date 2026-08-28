@@ -101,8 +101,20 @@
   --page: 68rem;
 }
 
+/*
+ * Dark unless somebody asks for light, and only if they ask ON THIS SITE.
+ *
+ * This used to follow the visitor's operating system, which meant most people
+ * arrived on the light layout — and the dark one is the site. Sam, looking at
+ * both: *"i like the look, but i like the dark layout better as a default."*
+ *
+ * So the OS preference no longer flips it. `[data-theme='light']` below is the
+ * only route to the light palette, and the control in the footer is the only
+ * thing that sets it. The palette is not deleted: somebody reading a guide in a
+ * bright cab should be able to have it, and the choice is remembered.
+ */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
+  :root[data-theme='ask-the-system'] {
     --paper: var(--lt-paper);
     --sunk: var(--lt-sunk);
     --raised: var(--lt-raised);
@@ -693,3 +705,19 @@ footer .fine { font-family: var(--f-mono); font-size: .7rem; color: var(--quiet)
 .rise { opacity: 0; transform: translateY(12px); transition: opacity .5s ease, transform .5s ease; }
 .rise.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .rise { opacity: 1; transform: none; } }
+
+/* The ground control, in the footer. Quiet: it is a preference, not a feature. */
+.ground {
+  margin-top: 1rem;
+  min-height: 44px;
+  padding: .5rem 1rem;
+  font: inherit;
+  font-size: .8rem;
+  color: var(--quiet);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ground:hover { color: var(--ink); border-color: var(--ink); }
+.ground:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }

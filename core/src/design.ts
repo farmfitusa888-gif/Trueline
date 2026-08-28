@@ -64,8 +64,21 @@ export const NEUTRAL = {
   /** Inset INTO a surface: a tab strip, a well, a read-only row. */
   sunk: { light: '#EDF0F2', dark: '#171C20' },
   ink: { light: '#14181B', dark: '#E4E7E9' },
-  /** Secondary text: a caption, a unit, a label. */
-  quiet: { light: '#4B545B', dark: '#A9B3BA' },
+  /**
+   * Secondary text: a caption, a unit, a label.
+   *
+   * The dark value is nearly white on purpose, and that is Sam's call from
+   * using it: *"for all written text in the app, instead of it being dull/grey
+   * that has to change to white cause its hard to read with that dark
+   * background."* It was #A9B3BA, which clears WCAG AA comfortably at 7.62:1
+   * and still reads as grey to a person holding the phone in a basement — the
+   * contrast bar is a floor, not a description of what is comfortable to read.
+   *
+   * There is still a step between this and `ink`, and it is deliberate: two
+   * tones a hair apart keep a caption a caption without making anybody squint
+   * at it. 11.88:1 on a card, against `ink`'s 13.08:1.
+   */
+  quiet: { light: '#4B545B', dark: '#D8DDE1' },
   /**
    * Tertiary: present, but not what is being read right now.
    *
@@ -76,9 +89,16 @@ export const NEUTRAL = {
    * that is not a technicality. `a50-readable.mjs` measures every word on every
    * screen against the colour actually behind it and fails under the bar, so
    * moving either of these without checking is a failing audit rather than a
-   * quiet regression. These measure 4.63:1 and 4.62:1.
+   * quiet regression.
+   *
+   * The light value measures 4.63:1 and stays a true tertiary grey: it is read
+   * on white, in daylight, and there it is comfortable. The dark value went
+   * much further than the bar for the reason written on `quiet` above — a floor
+   * of 4.5:1 is not the same as being easy to read at arm's length on a job.
+   * #808A92 met the bar at 4.62:1 and was still the dull grey Sam could not
+   * read; this is 9.70:1 on a card.
    */
-  faint: { light: '#687178', dark: '#808A92' },
+  faint: { light: '#687178', dark: '#C2C9CE' },
   /** A hairline between rows or around a control. */
   rule: { light: '#DFE3E6', dark: '#2B3238' },
   /** A quieter hairline, inside a group. */

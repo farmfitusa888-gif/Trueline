@@ -47,17 +47,17 @@ enum Ink {
             : UIColor(red: 20/255, green: 24/255, blue: 27/255, alpha: 1)
     })
 
-    /// #4B545B in the light, #A9B3BA in the dark.
+    /// #4B545B in the light, #D8DDE1 in the dark.
     static let quiet = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
-            ? UIColor(red: 169/255, green: 179/255, blue: 186/255, alpha: 1)
+            ? UIColor(red: 216/255, green: 221/255, blue: 225/255, alpha: 1)
             : UIColor(red: 75/255, green: 84/255, blue: 91/255, alpha: 1)
     })
 
-    /// #687178 in the light, #808A92 in the dark.
+    /// #687178 in the light, #C2C9CE in the dark.
     static let faint = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
-            ? UIColor(red: 128/255, green: 138/255, blue: 146/255, alpha: 1)
+            ? UIColor(red: 194/255, green: 201/255, blue: 206/255, alpha: 1)
             : UIColor(red: 104/255, green: 113/255, blue: 120/255, alpha: 1)
     })
 

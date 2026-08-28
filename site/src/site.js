@@ -909,3 +909,39 @@ if (rising.length) {
   }, { rootMargin: '0px 0px -8% 0px' });
   for (const el of rising) seen.observe(el);
 }
+
+/**
+ * Which ground the site is read on.
+ *
+ * Dark is the site and is what somebody gets with no choice made — the CSS no
+ * longer follows the operating system into light, because that is how most
+ * visitors were landing on the wrong one. This is the only route to the light
+ * palette, and the choice is remembered.
+ *
+ * The theme itself is applied by a small script in the `<head>`, before
+ * anything is painted; this only draws the control and writes the choice down.
+ * A theme applied from here would be a white flash on every page load.
+ */
+const ground = document.querySelector('[data-ground]');
+if (ground) {
+  const says = ground.querySelector('[data-ground-says]');
+  const now = () => document.documentElement.getAttribute('data-theme') === 'light';
+
+  const show = () => {
+    const light = now();
+    ground.setAttribute('aria-pressed', String(light));
+    // What pressing it DOES, not what is currently true. A control labelled
+    // with its own state reads as a claim about the page and gets pressed by
+    // somebody trying to get the thing it names.
+    if (says) says.textContent = light ? 'Dark background' : 'Light background';
+  };
+
+  ground.hidden = false;
+  show();
+  ground.addEventListener('click', () => {
+    const want = now() ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', want);
+    try { localStorage.setItem('trueline.ground', want); } catch { /* nothing to remember it with */ }
+    show();
+  });
+}
