@@ -199,6 +199,29 @@ else
 fi
 
 say "Getting the latest code"
+
+# The built web bundle, put back before the pull looks at it.
+#
+# `ios/Trueline/Web` is a TRACKED BUILD ARTIFACT. Xcode ships that folder as it
+# stands, so it has to be in the repository -- and `npm run ship-web` rewrites
+# it on this Mac every time anything is built. So the ordinary loop leaves it
+# modified, and the next pull refuses:
+#
+#     error: Your local changes to the following files would be overwritten
+#     by merge:  ios/Trueline/Web/index.html
+#
+# That stopped Sam twice on 2026-08-28 and the answer both times was a second
+# command to remember. It is not somebody's work: it is output, it is
+# regenerated further down this same script, and throwing it away costs nothing
+# and surprises nobody. So it goes back before the pull, the same way Xcode's
+# own edits to the project file do a few lines above.
+#
+# Anything else you have changed still stops the pull, and still should.
+if ! git diff --quiet -- ios/Trueline/Web 2>/dev/null; then
+  git checkout -- ios/Trueline/Web
+  ok "the built bundle put back — it is output, and it is rebuilt below"
+fi
+
 # It used to stash whatever it found and pull over the top. That is a script
 # quietly moving somebody's unfinished work somewhere they did not ask for and
 # may not think to look -- it swallowed two files during this project's own
@@ -410,7 +433,11 @@ if command -v node >/dev/null 2>&1; then
     ok "the bundle matches the source"
   else
     warn "the bundle was stale — rebuilding it"
-    npm run ship-web >/dev/null 2>&1 && ok "rebuilt. Commit it: git add ios/Trueline/Web"
+    # No "commit it" instruction any more: telling somebody to commit output is
+    # telling them to create the conflict handled above. Whoever changes
+    # `web/src` commits the bundle with the change; a build on another Mac does
+    # not.
+    npm run ship-web >/dev/null 2>&1 && ok "rebuilt from web/src — the phone gets today's screens"
   fi
 else
   warn "No Node on this Mac, so the bundle cannot be checked here."

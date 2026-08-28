@@ -2625,3 +2625,62 @@ predicted, `DamagePhotos.tsx` and `Vendor.tsx`, and both are fixed.
    trap that function's own docstring already records, arriving in a second
    place. Fixing it took the harvest from **277 controls to 281** — four the
    tool had never seen at all, and all four already driven.
+
+## One command to put it on the phone
+
+**2026-08-28.** Sam: *"SETUP A BUILD FOR ME IN TERMINAL FOR XCODE, ALWAYS.
+DONT GIVE ME RANDOM LETTERS, ALWAYS JUST HAVE THE SETUP PROMPT READY."*
+
+```bash
+cd ~/trueline && npm run phone
+```
+
+That is the whole loop and there is no second command any more.
+
+### What was actually wrong
+
+`build.sh` already did nearly all of it. What it did not do was survive its own
+output. `ios/Trueline/Web` is a **tracked build artifact** — Xcode ships the
+folder as it stands, so it must be in the repository, and `npm run ship-web`
+rewrites it on the Mac every time anything is built. So the ordinary loop left
+it modified and the next pull refused:
+
+```
+error: Your local changes to the following files would be overwritten by merge:
+        ios/Trueline/Web/index.html
+```
+
+**That stopped Sam twice**, and both times the answer he got was a second
+command to remember — which is the thing he is objecting to, and he is right.
+
+`setup-mac.sh` already held Xcode's own edits to `project.pbxproj` out of the
+way before pulling, for exactly this reason. The bundle goes back the same way
+now, a few lines above where the project file does. It is output, it is
+regenerated further down the same script, and discarding it costs nothing.
+**Anything else uncommitted still stops the pull, and still should** — that rule
+is about somebody's work, and output is not work.
+
+Reproduced before and after, in a throwaway clone: with the bundle modified and
+an incoming commit that also touches it, a plain `git pull --ff-only` aborts on
+`ios/Trueline/Web/index.html`; with the one new line, the same state pulls
+clean.
+
+Two smaller things went with it:
+
+- The stale-bundle branch used to end `ok "rebuilt. Commit it: git add
+  ios/Trueline/Web"`. Telling somebody to commit output is telling them to
+  create the conflict above.
+- `npm run catch-up` is `bash setup-mac.sh --checks-only` now — get up to date
+  and check, without building — and `npm run phone` and `npm run sim` are the
+  two that build.
+
+### What this cost, recorded because it was mine
+
+Proving the fix, I made a throwaway commit in the working repository and then
+ran `git reset --hard HEAD~1` to clean it up. That destroyed every tracked file
+I had edited and not committed: the barcode channel, the Vendor button, the
+Swift handler, the audit, and this section. `BarcodeReader.swift` survived only
+because it was untracked, and the rest came back by hand.
+
+The test belonged in the throwaway clone, which already existed two lines above.
+A `reset --hard` in a tree with uncommitted work is not a cleanup.

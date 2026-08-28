@@ -76,6 +76,15 @@ struct CorrectView: UIViewRepresentable {
     /// TypeScript the web screens import -- so both halves gate on one list.
     let subscribed: Bool
 
+    /// Reads a barcode off a shelf tag and hands back what it says.
+    ///
+    /// Handed in rather than done here, the same way `onVisits` is: this view
+    /// does not own the stack it sits in, and a camera has to be presented on
+    /// one. Answers nothing when there is nowhere to present it, which the far
+    /// side reads as "nobody scanned anything" and leaves the box to be typed
+    /// in — exactly as it was before this existed.
+    var onBarcode: () async -> String? = { nil }
+
     /// What this phone's browser unlock code is made from, or nothing.
     ///
     /// Empty on every screen but `Your business`, because that is the only
@@ -209,6 +218,13 @@ struct CorrectView: UIViewRepresentable {
         // that could write anywhere on the phone. This one runs whatever HTML
         // it is given.
         configuration.userContentController.add(context.coordinator, name: "voice")
+        // Read the barcode off a shelf tag. An id on the wire and nothing else:
+        // the page does not get to say which camera, what to look for, or how
+        // long to look. The answer goes back through `window.trueline.scanned`
+        // as a string, and a string is all it ever is -- a barcode is the
+        // store's name for a thing, never a price and never a quantity. See
+        // `BarcodeReader` for why this exists and a price feed does not.
+        configuration.userContentController.add(context.coordinator, name: "barcode")
         // "Tap the finger that just did that." The capture screens have had
         // haptics from the start and the correction screens had none, which is
         // why picking a wall felt like nothing had happened. No payload and no
@@ -322,6 +338,24 @@ struct CorrectView: UIViewRepresentable {
                 // guard against.
                 Task { @MainActor in
                     UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                }
+
+            case "barcode":
+                guard
+                    let id = body["id"] as? String,
+                    let webView = message.webView
+                else { return }
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    let read = await self.parent.onBarcode()
+                    let answer = read.map { self.quoted($0) } ?? "null"
+                    // `try? await` for the same reason the draft answer does:
+                    // the page having gone away before a scan came back is an
+                    // ordinary thing and there is nothing to do about it.
+                    _ = try? await webView.evaluateJavaScript(
+                        "window.trueline && window.trueline.scanned"
+                        + "(\(self.quoted(id)), \(answer))"
+                    )
                 }
 
             case "draft":

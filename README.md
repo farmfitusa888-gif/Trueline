@@ -5,6 +5,24 @@ Scan a building, correct it by hand, get a blueprint.
 LiDAR capture on iOS, 2D and 3D on the web, and — the part nobody else does — a typed
 measurement that re-solves the whole model around it.
 
+## Put it on the phone
+
+One command, every time. It pulls, puts the built bundle back if a build left it
+modified, installs what is missing, rebuilds the web screens, checks the things that
+have gone wrong before, finds the phone, compiles, installs and launches. It stops at
+the first thing that is actually wrong and says what to do about it.
+
+```bash
+cd ~/trueline && npm run phone
+```
+
+No cable, no signing team, no device — the simulator instead, which runs every screen
+but the ones that need a sensor:
+
+```bash
+cd ~/trueline && npm run sim
+```
+
 ## Why this exists
 
 A remodeler still spends 8 to 24 hours measuring one house by hand. Six scanning apps

@@ -543,6 +543,60 @@ check('and the shop’s own record keeps the sum that turned a box price into a 
 check('the catalogue says which shop and which file, on every row it shows',
   /Seen today · from their price list, ashby-august\.csv/.test(rows), rows.slice(0, 800));
 
+/* --------------------------------------- the tag read rather than typed */
+
+/*
+ * Sam: *"WHY ARE THERE NO LIVE VENDOR PRICES? HOME DEPOT? FLOOR AND DECOR?
+ * JUST PULL THEM LIVE FROM THE SITE AND HAVE THEM LIVE WITH THE SKUS."*
+ *
+ * Checked rather than assumed on 2026-08-28: Home Depot publishes no official
+ * public API. What is on sale is third-party scraping, which costs per request,
+ * breaks when the site changes, and returns the RETAIL price — not what a
+ * contractor with a Pro account pays. So the phone reads the store's own code
+ * off the tag exactly, and the price beside it is the one he can see.
+ *
+ * `openAsApp` installs a fake `barcode` handler, so this proves the page ASKS.
+ * What the app does with the ask is Swift and only a device can answer it.
+ */
+const scan = stores.getByRole('button', { name: 'Scan the barcode on the tag' });
+check('there is a way to read the code off the tag rather than type it',
+  (await scan.count()) === 1,
+  'the only way to get a store code in is to type it off a shelf in an aisle');
+
+await scan.click();
+await page.waitForTimeout(300);
+const asked = await sentTo(page, 'barcode');
+check('pressing it asks the app to read one, and asks for nothing else',
+  asked.length === 1 && typeof asked[0].id === 'string' && asked[0].id.startsWith('barcode-'),
+  JSON.stringify(asked));
+check('and the page does not get to say which camera, or what to look for',
+  Object.keys(asked[0] ?? {}).sort().join(',') === 'id,version',
+  Object.keys(asked[0] ?? {}).join(', '));
+
+// The answer, the way the app sends it back.
+const SCANNED = '0074983401017';
+await page.evaluate(([id, code]) => {
+  window.trueline.scanned(id, code);
+}, [asked[0].id, SCANNED]);
+await page.waitForTimeout(300);
+check('what the phone read lands in the box, character for character',
+  (await stores.getByLabel('Their code for it').inputValue()) === SCANNED,
+  await stores.getByLabel('Their code for it').inputValue());
+
+// And a scan somebody backed out of leaves the box alone rather than emptying
+// it — the box was there to type in before this button existed.
+await stores.getByLabel('Their code for it').fill('typed-by-hand');
+await scan.click();
+await page.waitForTimeout(300);
+const again = await sentTo(page, 'barcode');
+await page.evaluate((id) => {
+  window.trueline.scanned(id, null);
+}, again[again.length - 1].id);
+await page.waitForTimeout(300);
+check('a scan nobody finished leaves what was typed exactly where it was',
+  (await stores.getByLabel('Their code for it').inputValue()) === 'typed-by-hand',
+  await stores.getByLabel('Their code for it').inputValue());
+
 // The tag, in the aisle, with a code typed on it. The shop already exists,
 // because importing the list made it.
 await stores.getByLabel('Which store').selectOption({ label: SHOP });

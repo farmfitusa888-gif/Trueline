@@ -28,6 +28,7 @@ import { pricing } from '../../core/src/company.ts';
 import { fetchPhoto, forget, keep, readied } from './photoStore.ts';
 import { Disclosure } from './Disclosure.tsx';
 import { useUnits } from './units.tsx';
+import { askForBarcode, canReadBarcodes } from './bridge.ts';
 
 /**
  * The stores you buy at, on the screen.
@@ -305,6 +306,7 @@ function ShelfTag() {
   const [unit, setUnit] = useState<PriceUnit>('ea');
   const [category, setCategory] = useState('');
   const [code, setCode] = useState('');
+  const [scanning, setScanning] = useState(false);
   const [price, setPrice] = useState('');
   const [seenAt, setSeenAt] = useState(today());
   const [photo, setPhoto] = useState<string | null>(null);
@@ -482,14 +484,47 @@ function ShelfTag() {
             </label>
             <label className="block grow">
               <span className="text-xs font-medium text-slate-700">Their code for it</span>
-              <input
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                placeholder="206021150"
-                aria-label="Their code for it"
-                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
-                           focus:border-sky-500 focus:outline-none"
-              />
+              <div className="mt-1 flex gap-2">
+                <input
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="206021150"
+                  aria-label="Their code for it"
+                  className="min-h-11 w-full rounded-md border border-slate-300 px-3 py-2
+                             focus:border-sky-500 focus:outline-none"
+                />
+                {/* The honest half of "just pull the prices live".
+                    Home Depot publishes no public API — checked, not assumed —
+                    and what is for sale is a scraper returning the RETAIL
+                    price, which is not what a contractor with a Pro account
+                    pays. So the phone reads the store's own code off the tag
+                    exactly, and the price beside it is the one he can see.
+                    Absent, not greyed, where there is no camera to ask: on a
+                    desk browser this button would be a control that cannot
+                    work. See `askForBarcode` in `bridge.ts`. */}
+                {canReadBarcodes() && (
+                  <button
+                    type="button"
+                    disabled={scanning}
+                    onClick={() => {
+                      setScanning(true);
+                      void askForBarcode()
+                        .then((read) => {
+                          // Null is an ordinary answer — somebody backed out,
+                          // or there was no camera. The box was there to type
+                          // in before this button existed and it still is.
+                          if (read !== null) setCode(read);
+                        })
+                        .finally(() => setScanning(false));
+                    }}
+                    aria-label="Scan the barcode on the tag"
+                    className="min-h-11 shrink-0 rounded-md border border-slate-400 px-3 text-sm
+                               font-medium text-slate-800 active:bg-slate-100 disabled:opacity-40"
+                  >
+                    {scanning ? 'Scanning…' : 'Scan the tag'}
+                  </button>
+                )}
+              </div>
             </label>
           </div>
 

@@ -210,6 +210,8 @@ export interface TruelineBridge {
    * not an error.
    */
   drafted(id: string, text: string | null): void;
+  /** A barcode the phone read off a shelf tag, or nothing when it was given up on. */
+  scanned(id: string, code: string | null): void;
   /**
    * How a recording is going, and how it ended.
    *
@@ -575,6 +577,66 @@ let nextDraft = 0;
  * the model would not answer. Every caller treats that the same way: the box
  * somebody types in was already there and is still there.
  */
+let nextBarcode = 0;
+const waitingForBarcode = new Map<string, (code: string | null) => void>();
+
+/**
+ * Asks the phone to read the barcode on a shelf tag.
+ *
+ * ## Why this exists rather than a price feed
+ *
+ * Sam: *"WHY ARE THERE NO LIVE VENDOR PRICES? HOME DEPOT? FLOOR AND DECOR?
+ * JUST PULL THEM LIVE FROM THE SITE."*
+ *
+ * Checked on 2026-08-28 rather than remembered: **Home Depot publishes no
+ * official public API.** What exists is third-party scraping services, which
+ * cost money per request, break when the site changes, and hand back the
+ * *retail catalogue* price — which is not what a contractor with a Pro account
+ * pays, and quoting off it is either giving margin away or charging a client a
+ * number he can look up and undercut.
+ *
+ * The barcode is the honest version of the same wish. He is standing at the
+ * shelf anyway; the phone reads the store's own code off the tag exactly, with
+ * no typing and nothing to get wrong, and he enters the price he can actually
+ * see. It costs nothing, breaks nothing, and the number is his.
+ *
+ * Resolves to `null` when there is no app, no camera, or nobody scanned
+ * anything. Every caller treats that the same way: the box was already there to
+ * type into and it still is. A barcode is never a price and never a quantity —
+ * it is a name for a thing, and `vendor.ts` files it as `code`.
+ */
+export function askForBarcode(): Promise<string | null> {
+  const post = handler('barcode');
+  if (!post) return Promise.resolve(null);
+  nextBarcode += 1;
+  const id = `barcode-${nextBarcode}`;
+  return new Promise((resolve) => {
+    // No deadline on the read itself — somebody lining a phone up with a tag on
+    // a bottom shelf is not on a clock — but the app must answer eventually,
+    // even to say it was cancelled. Two minutes, and then the box is just a box
+    // again rather than a control that says "Scanning…" for ever.
+    const timer = window.setTimeout(() => {
+      if (waitingForBarcode.delete(id)) resolve(null);
+    }, 120_000);
+    waitingForBarcode.set(id, (code) => {
+      window.clearTimeout(timer);
+      resolve(code);
+    });
+    try {
+      post.postMessage({ id, version: BRIDGE_VERSION });
+    } catch {
+      window.clearTimeout(timer);
+      waitingForBarcode.delete(id);
+      resolve(null);
+    }
+  });
+}
+
+/** Whether this device can read a barcode at all. */
+export function canReadBarcodes(): boolean {
+  return handler('barcode') !== undefined;
+}
+
 export function askForDraft(
   job: 'scope' | 'loss' | 'mark' | 'columns',
   notes: string
@@ -1097,6 +1159,16 @@ export function installBridge(dispatch: (action: Action) => void): void {
     setEntitlement(paid === true);
   };
 
+  const scanned = (id: string, code: string | null) => {
+    const waiting = waitingForBarcode.get(id);
+    if (!waiting) return;
+    waitingForBarcode.delete(id);
+    // An empty string is not a barcode. It is what a cancelled scan looks like
+    // if the far side is careless, and filing it would put an item in the price
+    // book under a code of `''`.
+    waiting(typeof code === 'string' && code.trim() !== '' ? code.trim() : null);
+  };
+
   const drafted = (id: string, text: string | null) => {
     const waiting = waitingForDraft.get(id);
     if (!waiting) return;
@@ -1269,6 +1341,7 @@ export function installBridge(dispatch: (action: Action) => void): void {
     putRooms,
     setSubscribed,
     drafted,
+    scanned,
     heard,
     take,
     version: BRIDGE_VERSION,
