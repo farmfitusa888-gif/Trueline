@@ -1,6 +1,6 @@
 import { openChromium } from '../../core/tools/browser.mjs';
 
-import { URL, check, loadScan, report, section } from './lib.mjs';
+import { HEIGHT, URL, check, loadScan, report, section } from './lib.mjs';
 
 
 /**
@@ -60,15 +60,52 @@ const CONTROLS = 'button,a[href],input,select,textarea,[role="button"],summary';
  */
 let SHARED;
 const errors = [];
+let opened = 0;
 
+/**
+ * `load`, not `networkidle`, and why.
+ *
+ * This part opens a fresh context per control — two hundred of them — and every
+ * one used to wait for the network to go quiet for half a second. That is a
+ * clock, not a signal: on a machine doing anything else at the same time it
+ * simply never settles, and the part died at `page.goto` reporting nothing at
+ * all about how far it had got. It failed four different ways in one afternoon
+ * and every one of them read as "the app is broken" when it meant "the box is
+ * busy".
+ *
+ * So it waits for the document, and then for the app's own first screen to be
+ * on it, which is the thing the next line actually needs. The timeout is
+ * generous for the same reason: a slow load is a slow load, not a failure.
+ */
 async function fresh() {
   SHARED ??= await openChromium();
   const ctx = await SHARED.newContext({
-    viewport: { width: 430, height: 1600 }, acceptDownloads: true,
+    viewport: { width: 430, height: HEIGHT }, acceptDownloads: true,
   });
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-  await page.goto(URL, { waitUntil: 'networkidle' });
+  // Retried, because this crawl is minutes long and the thing it is crawling is
+  // a directory of files. A `vite preview` server hands back a 404 for the
+  // fraction of a second while a build rewrites `dist` underneath it, and a
+  // whole two-hundred-control crawl thrown away over one of those tells you
+  // nothing about the app. Three tries, then it is real and it throws.
+  let landed = null;
+  for (let go = 0; go < 3; go += 1) {
+    try {
+      await page.goto(URL, { waitUntil: 'load', timeout: 60000 });
+      await page.waitForSelector('body', { timeout: 60000 });
+      landed = null;
+      break;
+    } catch (error) {
+      landed = error;
+      await page.waitForTimeout(1500);
+    }
+  }
+  if (landed) throw landed;
+  opened += 1;
+  // A line every twenty-five, so a long crawl says where it has got to rather
+  // than sitting silent for twenty minutes.
+  if (opened % 25 === 0) console.log(`  ... ${opened} screens opened`);
   await loadScan(page);
   await page.evaluate(() => {
     window.webkit = { messageHandlers: { saved: { postMessage() {} } } };

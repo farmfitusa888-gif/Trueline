@@ -48,6 +48,10 @@ Full research: [`MARKET-RESEARCH.md`](./MARKET-RESEARCH.md). Decisions: [`DECISI
    closure reported rather than smoothed away.
 3. **Out the door** — takeoff, price book, priced quote, one self-contained file a
    homeowner opens with no app and no login. **Done.**
+4. **From a quote to a job that pays** — proposal, signature, the scope that freezes
+   when somebody signs it, change orders against it, a calendar, invoices, money
+   written down against them, and the insurance mode beside all of it. **Done in the
+   web half, never once compiled for the phone** — see *What is not built* below.
 
 Next, in `docs/v3.md`: scan → priced scope, the hosted client link, re-scan and diff,
 exteriors. Then multiple floors with stairs, site and lot. Android once the data format
@@ -55,11 +59,21 @@ is proven.
 
 ## Status
 
+Measured on 28 August 2026, at the last commit, by running the commands named:
+
 | | |
 |---|---|
-| Tests | **904 passing, 0 failing** (`npm test`) |
-| Typecheck | clean (`npm run typecheck`) |
-| Verified against | Node 22.22 |
+| Tests | **1,132 passing, 0 failing** (`npm test`) |
+| Typecheck | clean, both workspaces (`npm run typecheck`) |
+| Handbook | **73 cards, 159 quoted labels, every one of them in the app's source** (`npm run check-guide`) |
+| Every exported function reachable | yes, or excused in writing (`npm run what-is-left`) |
+| Controls nothing drives | **79, in 28 files** (`npm run what-is-untouched`) — red, and deliberately outside `npm run verify`. The number moves with every control added and every audit part written |
+| Run against | Node 22.22.2 |
+
+`npm run audit` builds the app, serves it, and drives it in a real browser across
+38 parts. It is not in the table because it was not run here.
+
+## What works today
 
 Built so far: `core/` — the measurement layer and the geometry on top of it. Exact lengths in bigint nanometres,
 feet-inches-fractions parsing and formatting, metric, and the provenance model that marks
@@ -115,8 +129,7 @@ deploys the whole thing as a static site with no backend.
 live while you walk, photographs the room every two seconds and on a shutter press with the
 camera's exact pose attached to each shot, and hands the finished scan straight to the
 correction screens running in a web view inside the same app. One measurement engine, not two.
-**It has not been compiled** — this repository is developed on Linux, where there is no Xcode —
-so it needs a first build on a Mac. `ios/README.md` has the steps.
+**It has never been compiled** — see *What is not built* below.
 
 **AR measure is built too** — for a phone with no LiDAR: tap each corner, walk to the next, and
 finish by tapping the first corner again. That closing tap is not part of the room; it is the
@@ -129,17 +142,98 @@ was captured changes nothing about how it is corrected.**
 
 `ios/Trueline.xcodeproj` is checked in: open it, set your signing team, press Run.
 
+**And a job runs end to end in the web half.** The takeoff, the contractor's own rate book, a
+proposal with options, a signature taken on the phone with the evidence written out beside it,
+the scope that freezes when somebody signs, change orders priced against that frozen scope, days
+in the iPhone's own calendar, invoices built from what was signed rather than from what the room
+measures today, and the money that came in written down against them. Insurance is a second mode
+beside all of it: mark the damage on the wall, log the cut heights and moisture readings, price
+the marks at restoration rates kept apart from the remodel book, and send an adjuster one
+document with the drawings, the areas, the photographs and the total on it.
+
+Three of the newer pieces are worth naming because they are the kind of thing that is normally
+left out:
+
+- **The FTC three-day notice.** A proposal signed at a kitchen table is a sale under 16 CFR
+  Part 429. The app asks one question — where does this get signed — refuses to guess the
+  answer, works the deadline out in the rule's own business days (Saturday counts; Sunday and
+  federal holidays do not), and prints the notice and two completed cancellation forms on the
+  document. With no business address on the profile it prints a block saying the notice could
+  not be completed, rather than a form with a blank where the address goes.
+- **A signed copy that came back can agree the job**, and the weakness travels with it: the
+  agreement, the proposal document, every invoice and the QuickBooks export all say it was
+  agreed on a photograph rather than signed on the phone, that nobody watched them sign, and
+  that no identity was checked. Both fingerprints — of what went out and of what came back —
+  are kept, so neither can be swapped for another.
+- **A record of what left this phone**, and it never says "sent". The app hands a file to the
+  share sheet and is blind after that, so it records what it can stand behind: which document,
+  what it was called, how many bytes, when, and a SHA-256 of the exact bytes that went. Backing
+  out of the share sheet records nothing at all.
+
 **There is a handbook.** `docs/handbook.html` — every screen and every button in the app, in
-64 cards, with a search box that filters them live and a card for each that says where it is,
+73 cards, with a search box that filters them live and a card for each that says where it is,
 what it does, the steps, and how you know it worked. `docs/handbook.pdf` is the same thing
-printed. `docs/build/check-guide.py` holds it honest: every button the handbook quotes has to
+printed. `docs/build/check-guide.py` holds it honest: all 159 labels the handbook quotes have to
 exist in the app's own source, so renaming a control fails the check rather than silently
 leaving somebody hunting for a button that is not there.
 
-Not built yet: the API, accounts, and the hosted client link — the last of which needs a
-server, which is exactly why it is not built. `docs/v3.md` says what comes after.
+**There is a website.** `site/` builds to static HTML with 28 guides, a real room rendered in
+WebGL, and a checker that gates the deploy.
+
+## What is not built
+
+Said plainly, because the alternative is somebody finding out at the wrong moment.
+
+**The scanner has never compiled.** This repository is developed on Linux and there is no Swift
+compiler on it. Sixteen Python checkers stand in for one — they parse 32 of the 33 Swift files
+(`Backup.swift` is excused against a recorded hash and read by hand), read the Xcode project,
+prove every route the app can push has a screen behind it, check every synthesised conformance
+against the types actually held, and are themselves broken on purpose by `check-the-checks.py`
+— and none of that is a compiler and none of it is claimed to be. **It needs a Mac.** `ios/README.md`
+and `build.sh` have the steps; `setup-mac.sh` prepares the machine.
+
+**Nothing has ever run on a phone.** `docs/on-the-phone.md` sets out 22 tests. None has been
+run on an iPhone. Everything above about the scanner, AR measure, the camera poses, the
+calendar, the share sheet and the paywall is written, checked and unproven on the device it is
+for.
+
+**The subscription cannot be bought.** `Subscription.onSale` is `false`, so everything is on
+for everybody. Going on sale needs an Apple Developer Program membership, a signing team, and
+in-app purchase products approved in App Store Connect — a paid agreement and a console this
+repository cannot reach. `core/tools/check-paywall.py --release` refuses a build that goes on
+sale with the giveaway still switched on. There is no reviewer back door and there will not be
+one.
+
+**There is no server, so there is no API, no accounts and no hosted client link.** The
+self-contained client file is what exists instead: one file, opening in any browser, with
+nothing fetched. The hosted version costs a server from the day it is turned on, which is
+exactly why it is not built. `docs/v3.md` says what it would add and what it would cost.
+
+**No AI is wired in.** `docs/AI.md` is research and says so in its opening paragraph. Nothing in
+`core/`, `web/` or `ios/` calls a model. When something does, it will write language and never
+a measurement, a quantity, a rate or a total.
+
+**The browser audit and the film tooling need a network the first time.** Both resolve a
+Chromium build on disk and name `npx playwright install chromium` when they cannot find one.
+
+**`npm run what-is-untouched` is red: 79 control names nothing in the audit drives, in 28
+files.** It is deliberately not in `npm run verify`, because a gate that is red on arrival is a
+gate people learn to skip. It is a real backlog, not a broken checker.
+
+## Running it
 
 ```bash
 cd trueline && npm install && npm test && npm run typecheck
-npm run dev          # then drop a room.json on the page
+npm run dev              # then drop a room.json on the page
+npm run verify           # everything that has to be green before a build
+npm run check-guide      # the handbook against the app's own source
+npm run what-is-untouched   # the 79 findings above; red on purpose
+npm run audit            # builds, serves and drives the app in a browser
 ```
+
+On a Mac, with a phone plugged in:
+
+```bash
+cd ~/trueline && git pull && bash build.sh
+```
+

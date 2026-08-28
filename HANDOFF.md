@@ -1,11 +1,83 @@
 # HANDOFF — Trueline
 
-> This file did not exist in this repository before 2026-08-28. `DECISIONS.md`
-> is still the long record of every decision taken on Trueline and stays that
-> way; this file exists because `CLAUDE.md` requires that **a change to anything
-> in the locked set is recorded in `HANDOFF.md`, with the reason**, and one has
-> now been made. It records that change. It is not a summary of the whole
-> project and should not be read as one.
+Cold start. Read this, then `README.md` for what the product is, then
+`DECISIONS.md` for why anything is the way it is. `DECISIONS.md` remains the
+long record of every decision; this file is where the project stands today and
+where a change to anything in the locked set is written down with its reason,
+as `CLAUDE.md` requires.
+
+Last brought current: **2026-08-28.**
+
+---
+
+## Where it stands
+
+Measured on 2026-08-28, at the last commit, by running the commands named:
+
+| | |
+|---|---|
+| `npm test` | **1,132 passing, 0 failing** |
+| `npm run typecheck` | clean, both workspaces |
+| `npm run check-guide` | **159 quoted labels, every one of them in the app's source**, across 73 handbook cards |
+| `npm run what-is-left` | clean — every exported function is called by something that is not a test, or excused in writing |
+| `npm run what-is-untouched` | **79 control names nothing drives, in 28 files.** Red, and outside `verify` on purpose |
+
+`npm run audit` drives the built app in a real browser across 38 parts. It was
+not run here, so no pass count is claimed for it.
+
+## What is done
+
+A job now runs end to end **in the web half**: scan or walk or draw a room,
+correct it, take it off, price it against the contractor's own rate book, write
+a proposal, get it agreed, freeze that scope, raise change orders against the
+frozen version, put days in the phone's calendar, invoice from what was signed,
+and write down the money that came in. Insurance is a second mode beside all of
+it, with its own restoration rate book and its own document for an adjuster.
+
+Landed in the last day, and now documented in `docs/handbook.html`:
+
+- **The claim document carries money** — the restoration scope only, priced at
+  the contractor's own restoration rates, per mark and per sheet. This reverses
+  a documented decision; both halves are in `DECISIONS.md` under *Reversed: the
+  claim document carries money*.
+- **A returned signed copy can freeze a job**, with the weakness printed on the
+  agreement, on the proposal, on every invoice and in the QuickBooks export.
+  That is a change to the locked set and it is recorded below.
+- **The FTC three-day cancellation notice** — 16 CFR Part 429 — with the
+  business address it needs moved onto the profile, and the deadline computed in
+  the rule's own business days rather than typed.
+- **A record of what left this phone**, which never says "sent", because the app
+  is blind after the share sheet takes the file.
+- **The walk's own photographs can be deleted in a batch**, with what each frame
+  is doing named before it goes.
+- **Vendor and store prices** — what a named shop charged, on a stated day, typed
+  by somebody who saw it, kept in a different book from what the contractor
+  charges.
+- **The free tier is one room**, and the limit only ever stops a *new* room being
+  written down.
+- **Every drawing resolves to the paper palette before it leaves the app.** Four
+  export paths were black rectangles.
+
+## What is genuinely next
+
+In this order, and the first two are not build work:
+
+1. **Compile the scanner.** It has never once reached the end of a build. Sixteen
+   Python checkers stand in for a compiler and none of them is one. This is still
+   the largest unverified surface in the repository, and it needs a Mac.
+2. **Run `docs/on-the-phone.md`.** Twenty-two tests, none of them ever run on an
+   iPhone. Gilbert's actual kitchen is the first one that matters.
+3. **Close `npm run what-is-untouched`.** 79 controls no part of the audit has
+   ever named. Every one of the four controls this project shipped broken and
+   unreachable was in exactly that state first. Settings and Claim are whole
+   forms nothing fills in; FieldSheet has no audit part at all.
+4. **Then `docs/v3.md`:** scan → priced scope, the hosted client link, re-scan
+   and diff.
+
+Not built, and said plainly in `README.md`: the API, accounts, the hosted client
+link (all need a server), the subscription actually being purchasable (needs an
+Apple Developer agreement and App Store Connect), and any AI at all
+(`docs/AI.md` is research and nothing calls a model).
 
 ---
 
@@ -111,7 +183,7 @@ The proposal document's heading over that block changes from **Signed** to
 "a photograph of the signed page" becomes "a signed PDF that came back" or "a
 signed sheet handed over on paper" according to how the copy actually arrived.
 
-### What was measured
+### What was measured, at the time this was written
 
 1123 core tests pass, including 21 new ones — 11 in `core/src/test/baseline.test.ts`,
 8 in `core/src/test/invoice.test.ts`, 2 added to `core/src/test/countersign.test.ts`.
@@ -123,21 +195,30 @@ deliberately introduced mistake before it was trusted.
 all worked out on the audit's own side from the quantities the app printed on
 its own takeoff and the mark-up it named. 36 of 36 pass.
 
-### What is not done
+(The figure above is what this piece of work measured on the day, and is left
+as it was written. The suite as a whole stands at 1,132 at the last commit.)
 
-The core is built, tested and green. **The app half is not applied**, because
-the session that did this work did not own `web/src/Agree.tsx`,
-`web/src/proposalFile.ts` or `web/src/state.ts`. The five exact edits are
-written out, old and new, in the session's integration note, and until they land
-`python3 core/tools/check-reachable.py` reports:
+### The app half, which was outstanding when this was written
 
-```
-core/src/baseline.ts: freezeOnReturnedCopy — tested, and nothing else calls it
-```
+It landed the same day. `web/src/Agree.tsx` grew the **A signed copy came back**
+section — the file, *Who signed it*, *The day they say they signed it*, *How it
+got back to you*, and the button **Agree the job on this signed copy**;
+`web/src/proposalFile.ts` swapped the heading over that block from **Signed** to
+**Agreed on a signed copy that came back** and prints the weakness under it; and
+`web/src/state.ts` keeps the filed copies on the job.
 
-That is the check doing exactly its job: a feature nothing reaches is not built.
+`npm run what-is-left` is clean again — `freezeOnReturnedCopy` is no longer
+proven and unreachable, which is the one thing that could be said against it
+while the wiring was outstanding.
 
-They were applied to a throwaway copy of the repository, built, served and
-driven, and `web/audit/a35-returned.mjs` passed **36 of 36** checks through the
-real app in Chromium on `dining.json` — so what is outstanding is the wiring,
-not the design.
+### What this cost
+
+Recorded because a change to the locked set that lists only what was gained is
+not a record. The signing rules rested on one sentence — *a baseline is a
+document somebody signed on this phone* — and that sentence is now false.
+Anything holding a `Baseline` has to read `agreedBy` as well; `signatures` can
+be empty on a frozen job, so every screen and document that iterates it had to
+be looked at; and there are now two doors into freezing rather than one. Nothing
+was synthesised to preserve the old shape — a fake signature kept to hold an
+invariant would be the exact lie `countersign.ts` exists to prevent. The full
+table is in `DECISIONS.md`.

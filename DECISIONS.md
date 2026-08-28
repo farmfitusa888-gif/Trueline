@@ -1852,7 +1852,7 @@ Written down because none of it was run here, and none of it can be:
 
 ## Still open
 
-Updated 2026-08-25, after the first compiler this project has ever met.
+Updated 2026-08-28.
 
 - **The scanner has never finished compiling.** Xcode on Sam's Mac has now
   refused it five times, and every refusal was real: a signing placeholder
@@ -1878,9 +1878,37 @@ Updated 2026-08-25, after the first compiler this project has ever met.
   perspective, measuring anything after leaving it, tags pinned in space, and
   the whole floor with the roof off.
 
-- **The batch photo delete spec** — checkboxes, select-all, and the warning when
-  the photo being deleted is the only one showing a wall. Decided (gap 3 above),
-  not written.
+- ~~The batch photo delete spec.~~ **Built 2026-08-28.** Both kinds: the
+  photographs somebody takes of a damage mark (`plannedDeletion`) and the fifty
+  the walk itself takes (`plannedScanDeletion`), which had no delete anywhere in
+  the app at all. Checkboxes, select-all, the count said in words off the set
+  that is actually going, every frame showing its own file name while picking,
+  and the warning naming — by wall — what nothing would show afterwards. The
+  picker, the confirmation and the undo were green for a day with nothing in the
+  app wired to them; `scanPhotos` is a real action now, and the strip says so in
+  words if it is ever handed a handler that does not actually take the frames
+  off.
+
+- **The hand-over log does not travel.** `web/src/sheet.ts` keeps it in
+  `localStorage`, keyed by file name, because `sendFile` is handed a blob and a
+  name and has no idea which job is open. So a second phone has no record of
+  what the first one sent. `core/src/sent.ts` is written so it can move into the
+  job's `extras` without a word changing, and `sayHandovers` never says "not
+  sent" for exactly this reason — a phone with no record is not a phone from
+  which nothing went out.
+
+- **The cooling-off notice is the federal rule and nothing else.**
+  `core/src/cooling.ts` implements 16 CFR Part 429 and names no state's own
+  home-solicitation statute. Several states give a buyer longer than three days
+  and some require wording of their own. A list of them assembled from memory is
+  exactly the invented fact this project refuses, so the notice says which
+  question it has not answered and sends the contractor to find out. Real
+  research into state rules, with sources, is open work.
+
+- **79 control names nothing in the audit drives, in 28 files.**
+  `npm run what-is-untouched`. It is a backlog of audit parts, not a broken
+  checker — see the section on `check-controls.py` at the foot of this file for
+  why it is deliberately outside `npm run verify`.
 
 - **`docs/on-the-phone.md` describes 22 tests and none have been run on a
   phone.** Gilbert's actual kitchen is the first one that matters.
@@ -2123,8 +2151,139 @@ Verified: 1123 core tests including 21 new ones (11 in `baseline.test.ts`, 8 in
 quantities the app printed on its own takeoff. Every new check was watched
 failing on a deliberately introduced mistake before it was trusted.
 
-The app half — five edits to `web/src/Agree.tsx`, `web/src/proposalFile.ts` and
-`web/src/state.ts` — is written out but **not applied**, because the session
-that built this did not own those files. Until it lands,
-`check-reachable.py` correctly reports `freezeOnReturnedCopy` as proven and
-unreachable.
+**The app half landed on 2026-08-28.** `web/src/Agree.tsx` grew the *A signed
+copy came back* section — the file, who signed it, the day they say they signed
+it, how it got back, and the button *Agree the job on this signed copy* —
+`web/src/proposalFile.ts` swapped the heading over the block from **Signed** to
+**Agreed on a signed copy that came back** and prints the weakness underneath
+it, and `web/src/state.ts` keeps the filed copies on the job.
+`npm run what-is-left` is clean again: nothing in the measurement layer is
+proven and unreachable.
+
+### What this cost, and it is not nothing
+
+The signing rules were built on one sentence — *a baseline is a document
+somebody signed on this phone* — and that sentence is now false. Three things
+were given up to make it false in a controlled way rather than an accidental
+one:
+
+| Given up | What replaced it |
+|---|---|
+| **`Baseline` meant "signed here".** Anything holding one could stop reading. | It has to read `agreedBy` as well. Absent means the strongest evidence the app can take, so every reader written before this is still correct — but "still correct" is now a thing that had to be checked rather than a thing that could not be otherwise. |
+| **`signatures` was never empty on a frozen job.** | It can be, and every screen and document that iterates it had to be looked at. Nothing is synthesised to keep the old shape: a fake signature to preserve an invariant would be the exact lie `countersign.ts` exists to prevent. |
+| **One door into freezing.** | Two, and the second is named `freezeOnReturnedCopy` precisely so nothing arrives at it by accident. The cost of a second door is that there is now a second door; the cost of one door was that a contractor holding a signed page could not invoice. |
+
+What was *not* given up: `freeze()` is byte for byte what it was, a
+`ReturnedDocument` still has no field a `Signature` has, and the test that
+asserts that field by field still passes.
+
+
+## Reversed: the claim document carries money
+
+Decided 2026-08-24, reversed 2026-08-28. Both halves are here because a record
+that only lists what was decided, and not what was given up, is not a record.
+
+### What was decided, and the argument for it
+
+`core/src/claim-file.ts`, as it was written:
+
+> **No money in it, on purpose.** This is what was measured and what was found;
+> the priced scope is a separate sheet the contractor sends when they choose to.
+> An adjuster who reads a number before the scope is agreed negotiates against
+> that number, and the contractor has handed away the first move for no reason.
+> The two documents exist to be sent in that order.
+
+That is a good argument and it is still true as far as it goes. An adjuster who
+opens on your number opens on your number. Sending the measurements first and
+the price second is how an experienced restoration contractor actually works.
+
+### What it missed
+
+**Where the number then lived: nowhere.** There was no second sheet. The damage
+was measured to the square foot and priced on no document anybody could find, so
+the only figure in the app was the room's *remodel* takeoff — a whole floor and a
+whole ceiling nobody had said needed doing. Sam went to Price on a job with one
+marked wall and found it.
+
+The gap is measurable, and it was measured on `web/audit/dining.json`: mould on
+wall-1, 15.0 sq ft of face and 10.00 lf of base, **$420.65**. The same room
+priced as a remodel is **$8,317.76**. A contractor reaching for a number on a
+claim had one figure available to him and it was nineteen times the right one.
+
+The original decision was a decision about *sequencing*. What shipped was a
+decision about *existence*, and those are not the same thing. Withholding a
+number you have is a negotiating position; not having it is a hole.
+
+### What was decided instead
+
+| Decision | Answer |
+|---|---|
+| What money appears | The **restoration scope only**: what it takes to put the marked damage right, at this contractor's own restoration rates. Per mark, and for the sheet. |
+| Where it comes from | The same `quote()` the takeoff uses, over `damageScope` — so a claim total and a takeoff total are one derivation, not two that can disagree. |
+| What can never appear | The room's remodel takeoff. Two payers, two sheets, and nothing on the claim comes off a surface nobody marked. |
+| A contractor who has set no restoration rates | Sends **exactly the document he sent before**. No money block, no total, and no line announcing that nothing is priced — a claim that says "none of this is priced" is not a document anybody sends. |
+| The unpriced item | Named, and left **out** of the total. Never priced at nothing. A sheet that adds up perfectly and is short by a tear-out is the worst thing this could hand anybody. |
+| A pin | Produces no work and no money. It is a marker, and the sheet says so rather than letting it quietly contribute nothing. |
+| The sequencing argument | Not discarded — moved. The restoration rates are their own book, kept apart from the remodel book on the same screen, so choosing what to send and when is still the contractor's; he now has both numbers to choose between. |
+
+Verified on `dining.json` through the real app: `web/audit/a32-claim-money.mjs`,
+with every figure worked out on the audit's own side from the quantities the app
+printed beside its own tick boxes.
+
+## Every drawing resolves to the paper palette before it leaves
+
+The plan paints with `fill="rgb(var(--c-raise))"` and
+`stroke="rgb(var(--c-ink))"`, and those custom properties are declared once, on
+the app's own `:root`. Serialise the drawing out of that document and nothing
+declares them any more — and CSS then does the worst available thing. A `var()`
+that resolves to nothing is not ignored: it makes the whole declaration invalid
+at computed-value time, so `fill` falls back to its initial value, which is
+solid black, and `stroke` falls back to none. The full-bleed background
+rectangle paints black across the viewBox and every line on top of it
+disappears.
+
+Measured two ways rather than reasoned about:
+
+- **99.72%** of the audit's own claim document was `rgb(0,0,0)` — three distinct
+  colours in the whole picture.
+- An SVG painted this way, loaded through a `data:` URL into an `<img>` **from a
+  page that does declare the tokens**, comes back **10,000 pixels out of 10,000
+  black**. An SVG loaded as an image is its own isolated document and cannot see
+  the host page's `:root`.
+
+| Decision | Answer |
+|---|---|
+| Where the resolver lives | `core/src/design.ts`, as `onPaper`, **beside the palette it reads**. It was written in `claim-file.ts` first, and that was wrong: the identical bug was live on `planPng`, `planThumbnail` and the client file at the same moment. One copy is the only way four paths stay fixed together. |
+| Which values | The **light** ones, always. Anything that leaves the app as a document is paper, and a claim printed out of the dark palette is a sheet of black ink arriving at an adjuster. |
+| Where the table comes from | `TONES`, the same object `web/src/tokens.css` is generated from. A second table of hexes typed out beside it would be a palette maintained twice, which is the failure `design.ts` exists to prevent. |
+| An unknown `--c-` token | **Throws, by name.** Left in, it puts the black square back on the one document somebody pays off. A loud failure here is a black rectangle nobody notices there. |
+| Non-colour `var()`s | Left alone. A `var()` holding a stroke width comes from an inline style on the element itself and travels perfectly well; resolving those too would be this function knowing about things that are not its business. |
+| Where it is applied | `planSvg` — the one place a plan is serialised — so every path out of the app goes through it. |
+
+Resolving twice is safe, and there is a test that says so.
+
+## `check-controls.py` is not in `npm run verify`, and that is the decision
+
+Four controls in this app existed, worked, were tested, and could not be found
+by the person who needed them: the paywall nothing ever presented, the mark
+button that refused 280 pixels above the button being pressed, "Photograph it"
+inside a collapsed row whose only hint was the word "Open" in 12px grey, and a
+tapped wall with 73% of its highlight painted out by its own doorways. Every one
+of them was in the same state before it was found: **no part of the audit had
+ever named that control.**
+
+`check-doors.py` proves every *screen* has something that opens it.
+`check-controls.py` is the other half of that sentence one level down: it
+compares every accessible control name in `web/src/**.tsx` against every name
+any part of `web/audit/*.mjs` reaches for, and reports the ones nothing drives.
+
+| Decision | Answer |
+|---|---|
+| Is it in `verify` | **No.** Run as `npm run what-is-untouched`. |
+| Why not | It is **red on arrival**: 79 control names nothing drives, in 28 files. Settings and Claim are whole forms no part fills in; FieldSheet has no part at all. A gate that is red the day it ships is a gate people learn to skip, and then it is worse than not having one — because the next real finding arrives inside a wall of noise somebody has already trained themselves to scroll past. |
+| When it goes in | When it is green. That is a backlog of audit parts, not a change to the checker. |
+| How it avoids crying wolf | Three ways, all deliberate. A name built entirely at runtime is **counted and never reported**, because a checker that fails on what it cannot know teaches people to ignore it. A regular expression in an audit counts as driving. And an excuse in `controls-on-purpose.json` costs a written sentence, with a reason under forty characters refused as loudly as an undriven control. |
+| What it does **not** prove | That a person can reach the control. Naming it in an audit is proof somebody thought about it; the audit part itself, run at a real phone height, is what proves the second thing. |
+
+Its own two false-green holes were found and closed before it shipped, and
+`check-the-checks.py` watches it fire and go quiet on four real mutations.

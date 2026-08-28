@@ -41,11 +41,18 @@ export const URL = process.env.TRUELINE_AUDIT_URL ?? 'http://127.0.0.1:4173/';
  * the button that caused it, a photograph control hidden inside a row that gave
  * no sign it opened, and a tour card covering half the screen.
  *
- * `TRUELINE_AUDIT_HEIGHT=800` runs the whole suite at a real phone height. The
- * default stays 1600 only until every part has been through it once; moving it
- * without looking would turn a real finding into thirty red lines nobody reads.
+ * So the default is 800, and every part has been through it. The move was made
+ * one part at a time, not in one go: at 800 `a8-agree` dropped 18/18 to 10/18,
+ * all eight failures on one root -- the signature pad starts below the fold and
+ * the audit drew on it by absolute mouse coordinates without scrolling first,
+ * so nothing got signed and everything downstream collapsed. That is the class
+ * of bug this height exists to find, and it was invisible at 1600.
+ *
+ * `TRUELINE_AUDIT_HEIGHT=1600` puts the old window back, for the one honest
+ * case: reading a whole long screen in a screenshot while working out what is
+ * on it. It is not a way to make a failing check pass.
  */
-export const HEIGHT = Number(process.env.TRUELINE_AUDIT_HEIGHT ?? 1600);
+export const HEIGHT = Number(process.env.TRUELINE_AUDIT_HEIGHT ?? 800);
 
 /**
  * Refusing to audit a bundle older than the source it was built from.
