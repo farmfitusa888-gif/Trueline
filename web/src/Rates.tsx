@@ -14,6 +14,7 @@ import {
 } from '../../core/src/work.ts';
 import { STALE_DAYS, ageInDays, howOld } from '../../core/src/vendor.ts';
 import { Catalogue } from './Vendor.tsx';
+import { Gate } from './Locked.tsx';
 import { Disclosure } from './Disclosure.tsx';
 import { useUnits } from './units.tsx';
 
@@ -273,7 +274,25 @@ export function RateBook({
           numbers: above is what he charges, below is what the shop charges him.
           A screen that put them in one list would be inviting somebody to work
           a season at cost. */}
-      <Catalogue targets={KNOWN} />
+      {/*
+          Behind the same gate the price list itself is behind. Sam, asked what
+          happens to a contractor's store prices when a subscription lapses:
+          **"Locked with the rest of it."**
+
+          Writing a store price down was already paid (`Stores`, inside
+          `<Gate feature="priceList">` in PriceList.tsx) and reading them back —
+          including "Use it as my rate", which puts one INTO the rate book —
+          was not. That is one feature straddling its own gate: everything
+          needed to get a shop price onto a quote was reachable without paying,
+          as long as somebody had subscribed once.
+
+          Nothing is deleted by the gate. His prices are his and they are still
+          on the phone; the gate stops them being read, not kept, and they are
+          all there again the moment a subscription is.
+      */}
+      <Gate feature="priceList">
+        <Catalogue targets={KNOWN} />
+      </Gate>
     </>
   );
 
