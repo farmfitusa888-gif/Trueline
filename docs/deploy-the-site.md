@@ -39,23 +39,21 @@ You do not need to add any DNS records by hand. Step 4 below does it.
 
 1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** →
    **Upload assets**.
-2. Project name: `trueline` (this gives you `trueline.pages.dev` for free, which
-   is a working address before the domain is attached — useful).
+2. Project name: `trueline`.
 3. Drag the **`dist` folder itself** from the Finder window step 1 opened onto
-   the upload area. Not the files inside it, the folder.
+   the upload area. Not the files inside it — the folder.
 4. **Deploy site.**
 
-It is live at `https://trueline.pages.dev` within about a minute. Open it on
-your phone before you go any further.
-
-## 4. Attach the real domain
+## 4. Attach trueline.tools
 
 1. In the Pages project → **Custom domains** → **Set up a custom domain**.
 2. Enter `trueline.tools`. Cloudflare creates the DNS record itself and issues
-   the certificate. Wait until it says **Active**.
+   the certificate. Wait until it says **Active** — usually a minute or two.
 3. Do it a second time for `www.trueline.tools`. The `_redirects` file already
-   in the build sends `www` to the bare domain with a 301, so both addresses
-   work and only one is ever indexed.
+   in the build 301s `www` to the bare domain, so both addresses work and only
+   one is ever indexed.
+
+Open `https://trueline.tools` on your phone. That is the site.
 
 ## 5. Tell Google it exists
 
@@ -96,12 +94,10 @@ rollback.
 | Open Graph + Twitter cards | on every page, with an image |
 | structured data | Article, FAQPage, BreadcrumbList, SoftwareApplication, Organization |
 | the typefaces | served from this domain, so no third party sees your visitors and no page waits on one |
+| Content-Security-Policy | `script-src 'self'` with no `unsafe-inline` and no `eval`, plus the sha256 of the one inline script, computed by the build. Enforced against all 42 pages at seven widths before it shipped. |
 
 ## What is NOT set up, and is yours to decide
 
-- **A Content-Security-Policy header.** Worth adding, easy to get wrong, and a
-  wrong one silently breaks the calculators. It needs testing against the live
-  host rather than guessing, so it is deliberately not in `_headers` yet.
 - **Analytics.** Cloudflare Web Analytics is free and needs no cookie banner
   because it sets no cookie. One toggle in the Pages project.
 - **hstspreload.org.** The header claims `preload`; the claim only counts once

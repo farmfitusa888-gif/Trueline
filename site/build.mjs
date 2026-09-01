@@ -19,6 +19,7 @@
  * Writes to `site/dist/`. Netlify runs exactly this.
  */
 import { mkdirSync, writeFileSync, readFileSync, cpSync, rmSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -69,6 +70,35 @@ const url = (path) => SITE.origin + path;
  */
 const REVIEWER = PEOPLE.trade.name.trim() === '' ? null : PEOPLE.trade;
 
+/**
+ * The one inline script on the site, and the only reason `script-src` cannot
+ * simply be 'self'.
+ *
+ * It has to be inline and it has to be synchronous: a theme applied after the
+ * first paint is a white flash on a dark site, on every page load, and this
+ * site is read on a phone in a truck. An external file would still block, but
+ * it would put a round trip in front of 476 bytes on the critical path.
+ *
+ * So it stays inline and the Content-Security-Policy carries its sha256
+ * instead of 'unsafe-inline'. The hash is computed from THIS string at build
+ * time and written into `_headers`, so editing the script cannot leave the
+ * header describing the old one -- which is the failure mode of every
+ * hand-copied CSP hash.
+ */
+const NO_FLASH = `
+  /*
+    Before a pixel is painted. A theme applied after first paint is a white
+    flash on a dark site, on every page load, on the slowest connection -- and
+    this site is read on a phone in a truck.
+  */
+  try {
+    var chose = localStorage.getItem('trueline.ground');
+    if (chose === 'light' || chose === 'dark') {
+      document.documentElement.setAttribute('data-theme', chose);
+    }
+  } catch (e) { /* private browsing has no store, and dark is the default */ }
+`;
+
 /* ---------------------------------------------------------------- the shell */
 
 function shell({ title, description, path, body, jsonLd, ogType = 'website', head = '' }) {
@@ -110,19 +140,7 @@ function shell({ title, description, path, body, jsonLd, ogType = 'website', hea
 <meta name="theme-color" content="#E7E9EA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14181B" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="dark light">
-<script>
-  /*
-    Before a pixel is painted. A theme applied after first paint is a white
-    flash on a dark site, on every page load, on the slowest connection -- and
-    this site is read on a phone in a truck.
-  */
-  try {
-    var chose = localStorage.getItem('trueline.ground');
-    if (chose === 'light' || chose === 'dark') {
-      document.documentElement.setAttribute('data-theme', chose);
-    }
-  } catch (e) { /* private browsing has no store, and dark is the default */ }
-</script>
+<script>${NO_FLASH}</script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <!-- The typefaces are ours, on this origin. A third-party stylesheet here
@@ -1339,7 +1357,19 @@ cpSync(join(HERE, 'src/fonts'), join(DIST, 'fonts'), { recursive: true });
 // folder is dropped on it, so they are files in the output rather than
 // settings in a dashboard -- which means they are in git, reviewed, and they
 // travel with the build that needs them.
-cpSync(join(HERE, 'src/host/_headers'), join(DIST, '_headers'));
+{
+  // The hash of the inline script above, written into the policy as the build
+  // emits it. `@NO_FLASH_HASH@` in src/host/_headers is replaced here; if the
+  // placeholder is ever removed the build stops rather than shipping a policy
+  // that blocks its own script.
+  const digest = createHash('sha256').update(NO_FLASH, 'utf8').digest('base64');
+  const headers = readFileSync(join(HERE, 'src/host/_headers'), 'utf8');
+  if (!headers.includes('@NO_FLASH_HASH@')) {
+    throw new Error('src/host/_headers no longer has @NO_FLASH_HASH@ in its '
+      + 'Content-Security-Policy, so the inline theme script would be blocked');
+  }
+  writeFileSync(join(DIST, '_headers'), headers.replaceAll('@NO_FLASH_HASH@', `sha256-${digest}`));
+}
 cpSync(join(HERE, 'src/host/_redirects'), join(DIST, '_redirects'));
 cpSync(join(HERE, 'src/style.css'), join(DIST, 'style.css'));
 cpSync(join(HERE, 'src/site.js'), join(DIST, 'site.js'));

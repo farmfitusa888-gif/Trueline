@@ -164,6 +164,12 @@ export async function open() {
   problems = [];
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  page.on('response', (r) => {
+    if (r.status() >= 400) problems.push(`http ${r.status()}: ${r.url()}`);
+  });
+  page.on('requestfailed', (r) => {
+    problems.push(`request failed: ${r.url()} — ${r.failure()?.errorText ?? 'no reason given'}`);
+  });
   await payingBrowser(ctx);
   await page.goto(URL, { waitUntil: 'load', timeout: 60000 });
   await page.waitForSelector('body', { timeout: 60000 });
@@ -216,6 +222,12 @@ export async function openAsApp(payload, { scheme = 'light', refuses = [] } = {}
   problems = [];
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  page.on('response', (r) => {
+    if (r.status() >= 400) problems.push(`http ${r.status()}: ${r.url()}`);
+  });
+  page.on('requestfailed', (r) => {
+    problems.push(`request failed: ${r.url()} — ${r.failure()?.errorText ?? 'no reason given'}`);
+  });
   await page.addInitScript(({ parked, refuses }) => {
     // The handlers `insideApp()` looks for. Present before a line of the
     // bundle runs, which is how it is on the phone.

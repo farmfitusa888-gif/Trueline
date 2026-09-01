@@ -122,14 +122,40 @@ Processing takes 5 to 30 minutes. You get an email.
 App Store Connect → the app → **TestFlight**.
 
 - **Internal Testing** — up to 100 people who are in your team. No review, live
-  in minutes. Add Gilbert as a user (**Users and Access** → **+** → role
-  *Developer* or *Marketing*) and he is testing today. **This is the one you
-  want.**
+  in minutes. **This is the one you want.**
 - **External Testing** — up to 10,000 people, needs a light Beta App Review
-  (usually a day) and a public link. For later.
+  (usually a day) and gives you a public link. For later.
 
-Gilbert installs **TestFlight** from the App Store, opens the invite email on
-the phone, and taps **Install**.
+### What you need from Gilbert
+
+**One thing: the email address on his Apple ID.** Nothing else. Not his phone,
+not his device UDID, not his name as it appears anywhere — TestFlight is not
+provisioning-profile territory, and internal testers are invited by Apple ID.
+
+Two things worth telling him before you ask:
+
+- **It must be the Apple ID he actually signs into his iPhone with.** If he
+  gives you a work address and his phone is signed in with a personal one, the
+  invite lands in a mailbox the phone cannot redeem it from. When in doubt he
+  can read it off the phone: **Settings → tap his name at the top**.
+- **He will get an Apple invitation to join your team as a user, and he has to
+  accept it.** It arrives as "You have been invited to join Sunny Acres on App
+  Store Connect". Until he clicks through, he is not a tester.
+
+Then, in App Store Connect:
+
+1. **Users and Access** → **+** → his Apple ID email, first and last name.
+2. Role: **Developer** if you want him to see builds and crash logs, or
+   **Marketing** if you would rather he saw nothing but the app. Either can
+   test. Leave everything else unticked.
+3. **Invite.** He accepts the email.
+4. The app → **TestFlight** → **Internal Testing** → **+** on the tester list →
+   tick him → **Add**.
+5. He installs **TestFlight** from the App Store, opens the invite on the phone,
+   taps **Install**.
+
+Every build you upload after that reaches him automatically. He does not get
+re-invited and you do not repeat any of this.
 
 ## 6. What to hand him with it
 

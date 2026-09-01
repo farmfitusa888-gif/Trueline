@@ -2888,3 +2888,72 @@ now carry "Founding rate", because `Subscription.founding` reads that word off
 the product name — without it the founding terms on the paywall could not be
 seen until the App Store was involved, which is the one place their absence
 would be expensive.
+
+---
+
+## The CSP, and the grep that lied about it
+
+The Content-Security-Policy was left out of `_headers` first time round on the
+grounds that a wrong one silently breaks the calculators and it needed testing
+against a real host. Sam: *"OK!"* — so it was done properly.
+
+The inventory said there were no inline scripts. It was wrong, and the way it
+was wrong is worth keeping:
+
+    grep -ohE '<script(?![^>]*application/ld)[^>]*>' site/dist/*.html
+
+`(?!...)` is a Perl-style negative lookahead. `grep -E` does not have one; it
+matched nothing and printed nothing, and **nothing printed reads exactly like
+nothing found**. A policy written on the strength of that would have shipped
+`script-src 'self'` over a site with an inline script in every page, and the
+first thing anybody would have noticed is the calculators not running.
+
+What caught it: the click-through now parses `site/dist/_headers` and serves
+those headers, so the sweep runs against the same policy Cloudflare will apply.
+294 page loads later it had produced 294 identical console errors naming the
+directive and the exact sha256 Chromium wanted. The header is now tested the way
+every other claim in this repository is — by being run.
+
+### The inline script stays inline
+
+It is the no-flash theme script: four lines that read `localStorage` and set
+`data-theme` before the first paint. A theme applied after first paint is a
+white flash on a dark site, on every page load, and this site is read on a phone
+in a truck. An external file would still block, but it would put a round trip in
+front of 476 bytes on the critical path.
+
+So the policy carries its **sha256 instead of `'unsafe-inline'`**, and the hash
+is computed by the build from the same string it emits into the page —
+`@NO_FLASH_HASH@` in `src/host/_headers` is substituted at build time, and the
+build throws if the placeholder is gone. A hand-copied CSP hash is a number that
+goes stale the first time somebody edits the script; this one cannot.
+
+`style-src` keeps `'unsafe-inline'`, stated rather than hidden: the build emits
+136 `style="..."` attributes from 30 places, rewriting them all as classes is a
+change with real visual risk, and inline style cannot execute code. Everything
+else is `'self'`, with `object-src 'none'`, `base-uri 'self'`, `form-action
+'self'` and `frame-ancestors 'none'`.
+
+## A35, and a test with an expiry date on it
+
+Two full sweeps failed nine assertions in A35 and then died on a click that
+timed out. `git diff f61ce1f..HEAD -- web/ core/src/` was **empty**: not one
+line of the app had changed since the sweep that passed all 56 parts.
+
+    const SIGNED_ON = '2026-08-28';   // and today was 2026-09-01
+
+A cooling-off period is counted from the day of signing, so a signing date
+receding into the past changes what the screen offers. The date is computed from
+today now, and the one other copy of it — hardcoded a second time inside a
+regular expression, which the constant did not cover — follows it. 36/36.
+
+The rest of the suite was checked for the same shape rather than assumed clean:
+one other literal signing date, `2020-01-01` in a27, deliberately ancient and
+therefore stable. Fixture dates elsewhere are inputs, not clocks.
+
+### And a run that reported failures while exiting 0
+
+The first of those sweeps was invalidated by me: `npm run verify` rebuilds
+`web/dist`, and it was run twice while the audit was serving pages out of that
+exact folder. That is the same mistake as editing files under a running sweep,
+which this file already records once. A sweep gets the tree to itself.

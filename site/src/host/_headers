@@ -17,6 +17,25 @@
   # claim that qualifies it for the browsers' built-in list; submit the domain
   # at hstspreload.org once it has served https for a while.
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  # What this page is allowed to load, and from where. Everything comes from
+  # this origin now that the typefaces are vendored, so the answer is 'self'
+  # almost everywhere and the list is short enough to read.
+  #
+  # `script-src 'self'` with no 'unsafe-inline' and no 'unsafe-eval' is the
+  # directive that matters: it is where cross-site scripting lives. It was
+  # checked rather than hoped for -- there is no inline <script> in the built
+  # site except JSON-LD, which is data and is not executed, and no eval or
+  # `new Function` anywhere in calc.js, calc-engine.js or site.js.
+  #
+  # `style-src` keeps 'unsafe-inline' and that is a deliberate, stated
+  # compromise: the build emits 136 `style="..."` attributes from 30 places,
+  # and rewriting all of them as classes is a change with real visual risk for
+  # the weakest of the directives. Inline STYLE cannot execute code.
+  #
+  # frame-ancestors repeats X-Frame-Options for browsers that prefer it;
+  # base-uri stops an injected <base> retargeting every relative URL; and
+  # form-action means a form can only ever post back here.
+  Content-Security-Policy: default-src 'self'; script-src 'self' '@NO_FLASH_HASH@'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; media-src 'self'; frame-src 'none'; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
 
 # The typefaces never change under a given name, so they are cached for a year
 # and never revalidated. This is the single biggest repeat-visit win on the

@@ -17,7 +17,7 @@
  * midline within a few pixels of the others), every link must be visible, and
  * it must still be at the top of the screen after scrolling to the bottom.
  */
-import { readdirSync, statSync, mkdirSync, existsSync } from 'node:fs';
+import { readdirSync, statSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
@@ -52,6 +52,47 @@ function walk(dir, out = []) {
   return out;
 }
 
+/**
+ * The `_headers` file Cloudflare will serve, parsed and applied here.
+ *
+ * Without this the sweep tests a site with no Content-Security-Policy and the
+ * live site has one -- so the run that matters is the one nobody does. A CSP
+ * that blocks a stylesheet, a font or a script shows up as a console error,
+ * and a console error already fails this part; enforcing the real header is
+ * what turns "the CSP looks right" into "the CSP was run against every page".
+ */
+function readHeaderRules() {
+  const file = join(DIST, '_headers');
+  if (!existsSync(file)) return [];
+  const rules = [];
+  let current = null;
+  for (const raw of readFileSync(file, 'utf8').split('\n')) {
+    if (!raw.trim() || raw.trimStart().startsWith('#')) continue;
+    if (!raw.startsWith(' ') && !raw.startsWith('\t')) {
+      current = { pattern: raw.trim(), headers: [] };
+      rules.push(current);
+      continue;
+    }
+    const at = raw.indexOf(':');
+    if (at > 0 && current) current.headers.push([raw.slice(0, at).trim(), raw.slice(at + 1).trim()]);
+  }
+  return rules;
+}
+const HEADER_RULES = readHeaderRules();
+
+function headersFor(path) {
+  const out = {};
+  for (const rule of HEADER_RULES) {
+    // Cloudflare's matching, as far as this site uses it: a trailing /* is a
+    // prefix, anything else is exact.
+    const hit = rule.pattern.endsWith('/*')
+      ? path.startsWith(rule.pattern.slice(0, -1))
+      : rule.pattern === '/*' || rule.pattern === path;
+    if (hit) for (const [k, v] of rule.headers) out[k] = v;
+  }
+  return out;
+}
+
 const server = createServer(async (req, res) => {
   const path = decodeURIComponent(req.url.split('?')[0]);
   const candidates = path.endsWith('/') ? [join(DIST, path, 'index.html')] : [join(DIST, path)];
@@ -59,7 +100,8 @@ const server = createServer(async (req, res) => {
     try {
       const body = await readFile(file);
       const ext = file.slice(file.lastIndexOf('.'));
-      res.writeHead(200, { 'content-type': TYPES[ext] ?? 'application/octet-stream' });
+      res.writeHead(200, { 'content-type': TYPES[ext] ?? 'application/octet-stream',
+                           ...headersFor(path) });
       return res.end(body);
     } catch { /* fall through */ }
   }

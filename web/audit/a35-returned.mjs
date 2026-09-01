@@ -105,7 +105,16 @@ if (money(796656n) !== '$7,966.56') throw new Error('the audit cannot spell mone
 /* ==================================================================== */
 
 const RATE = 500n;              // $5.00 a unit, typed into every rate below.
-const SIGNED_ON = '2026-08-28'; // the day the client says they signed the paper.
+// The day the client says they signed the paper. TODAY, computed, not a date
+// typed into the file.
+//
+// It was '2026-08-28'. On 2026-09-01 this part failed nine assertions and then
+// died on a click that timed out, and `git diff f61ce1f..HEAD -- web/ core/src/`
+// was EMPTY: not one line of the app had changed since the sweep that passed.
+// The calendar had moved past the test. A cooling-off period is counted from
+// the day of signing, so a signing date receding into the past changes what the
+// screen offers, and a test that hardcodes one has an expiry date on it.
+const SIGNED_ON = new Date().toISOString().slice(0, 10);
 const PHOTO = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64'
@@ -257,7 +266,8 @@ await page.waitForTimeout(900);
 t = await panel.innerText();
 
 check('a proposal edited after the copy came back is caught, and said out loud',
-  /is not the proposal M\. Alvarez signed and sent back on 2026-08-28/.test(t), t.slice(0, 3000));
+  new RegExp(`is not the proposal M\\. Alvarez signed and sent back on ${SIGNED_ON}`)
+    .test(t), t.slice(0, 3000));
 check('and it names the change order as where the change belongs',
   /belongs in a change order/.test(t), t.slice(0, 3000));
 check('and the job cannot be agreed on the copy while that is true',
