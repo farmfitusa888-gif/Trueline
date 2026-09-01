@@ -28,7 +28,7 @@ export const EXPLAINERS = [
   slug: 'three-day-right-to-cancel',
   audience: 'contractor',
   title: 'The three-day right to cancel, and the day almost everyone counts wrong',
-  metaTitle: 'The 3-Day Right to Cancel: 16 CFR 429 for Builders',
+  metaTitle: '3-Day Right to Cancel: 16 CFR 429 for Builders',
   description:
     'When the federal cooling-off rule bites on a home improvement contract, what '
     + 'you have to hand over at the table, and why Saturday counts as a business day.',

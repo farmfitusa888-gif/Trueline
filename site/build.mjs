@@ -73,10 +73,14 @@ const REVIEWER = PEOPLE.trade.name.trim() === '' ? null : PEOPLE.trade;
 
 function shell({ title, description, path, body, jsonLd, ogType = 'website', head = '' }) {
   const canonical = url(path);
-  const nav = NAV.map((item) => {
+  // The wordmark to the left of this bar is itself the link home, so a "Trueline"
+  // entry here is the same destination twice in one row -- a self-referencing
+  // duplicate that costs the width four real sections need on a 320px screen and
+  // gives a crawler nothing. It is dropped rather than hidden: hiding it was what
+  // made the bar look like it had lost links on a phone.
+  const nav = NAV.filter((item) => item.href !== '/').map((item) => {
     const here = item.href === path || (item.href !== '/' && path.startsWith(item.href));
-    return `<a href="${item.href}"${here ? ' aria-current="page"' : ''}${
-      item.href === '/' ? ' class="hide-sm"' : ''}>${esc(item.label)}</a>`;
+    return `<a href="${item.href}"${here ? ' aria-current="page"' : ''}>${esc(item.label)}</a>`;
   }).join('\n        ');
 
   const structured = (Array.isArray(jsonLd) ? jsonLd : [jsonLd]).filter(Boolean)
@@ -121,9 +125,15 @@ function shell({ title, description, path, body, jsonLd, ogType = 'website', hea
 </script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@600;700&display=swap">
+<!-- The typefaces are ours, on this origin. A third-party stylesheet here
+     costs a DNS lookup, a TLS handshake and a round trip BEFORE the browser
+     learns which font files it needs -- and the page cannot be read on a job
+     with no signal. Vendored by site/tools/fonts.mjs; the two faces the first
+     screen is drawn in are preloaded so they start with the stylesheet rather
+     than after it. -->
+<link rel="preload" href="/fonts/saira-condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/plex-sans-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/style.css">
 ${head}${structured}
 </head>
@@ -151,30 +161,30 @@ ${body}
   <div class="wrap">
     <div class="cols">
       <div>
-        <h4>Trueline</h4>
-        <ul>
+        <p class="foot-h" id="foot-trueline">Trueline</p>
+        <ul aria-labelledby="foot-trueline">
           <li><a href="/">What it is</a></li>
           <li><a href="/about/">About</a></li>
           <li><a href="mailto:${SITE.email}">${SITE.email}</a></li>
         </ul>
       </div>
       <div>
-        <h4>Guides</h4>
-        <ul>
+        <p class="foot-h" id="foot-guides">Guides</p>
+        <ul aria-labelledby="foot-guides">
           ${Object.entries(AUDIENCE).map(([k, a]) =>
             `<li><a href="/guides/#${k}">${esc(a.label)}</a></li>`).join('\n          ')}
         </ul>
       </div>
       <div>
-        <h4>Calculators</h4>
-        <ul>
+        <p class="foot-h" id="foot-calculators">Calculators</p>
+        <ul aria-labelledby="foot-calculators">
           ${CALCULATORS.map((c) =>
             `<li><a href="/calculators/${c.slug}/">${esc(c.title)}</a></li>`).join('\n          ')}
         </ul>
       </div>
       <div>
-        <h4>Free templates</h4>
-        <ul>
+        <p class="foot-h" id="foot-free">Free templates</p>
+        <ul aria-labelledby="foot-free">
           ${TEMPLATE_GROUPS.map((g) =>
             `<li><a href="/templates/#${g.id}">${esc(g.title)}</a></li>`).join('\n          ')}
         </ul>
@@ -678,7 +688,7 @@ function calculatorsIndex() {
   </div>
   <div class="cards narrow" style="margin-top:2.5rem;grid-template-columns:1fr">
     ${CALCULATORS.map((c) => `<div class="card rise">
-      <h3><a href="/calculators/${c.slug}/">${esc(c.title)}</a></h3>
+      <h2><a href="/calculators/${c.slug}/">${esc(c.title)}</a></h2>
       <p style="margin-top:.4rem">${esc(c.standfirst)}</p>
       <p style="margin-top:.9rem"><a class="btn btn-line"
         href="/calculators/${c.slug}/">Open it</a></p>
@@ -818,7 +828,7 @@ function homePage() {
       </div>
       <div class="split">
         <div>
-          <h4>Free, and staying free</h4>
+          <h3>Free, and staying free</h3>
           <ul>
             <li>Measuring the room</li>
             <li>The drawing</li>
@@ -826,7 +836,7 @@ function homePage() {
           </ul>
         </div>
         <div>
-          <h4>The subscription</h4>
+          <h3>The subscription</h3>
           <ul>
             <li>The takeoff</li>
             <li>The pricing</li>
@@ -1237,7 +1247,7 @@ function aboutPage() {
   return {
     path: '/about/',
     html: shell({
-      title: `About Trueline`,
+      title: `About Trueline: Built With One Contractor`,
       description:
         'Who builds Trueline, what this site claims, how each claim can be checked, and what '
         + 'it deliberately does not claim.',
@@ -1324,6 +1334,7 @@ mkdirSync(DIST, { recursive: true });
 for (const page of pages) write(page);
 
 /* Assets. */
+cpSync(join(HERE, 'src/fonts'), join(DIST, 'fonts'), { recursive: true });
 cpSync(join(HERE, 'src/style.css'), join(DIST, 'style.css'));
 cpSync(join(HERE, 'src/site.js'), join(DIST, 'site.js'));
 // The films, if they have been shot. `node site/tools/film.mjs` makes them,

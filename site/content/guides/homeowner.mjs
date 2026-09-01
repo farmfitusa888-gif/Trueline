@@ -211,7 +211,7 @@ export const HOMEOWNER = [
   slug: 'kitchen-remodel-cost-drivers',
   audience: 'homeowner',
   title: 'What actually drives the cost of a kitchen remodel',
-  metaTitle: 'What Drives Kitchen Remodel Cost (Not Square Feet)',
+  metaTitle: 'What Really Drives Kitchen Remodel Cost',
   description:
     'Why a per-square-foot figure is useless for kitchens, the five decisions that '
     + 'move the number most, and what to ask before you commit to any of them.',

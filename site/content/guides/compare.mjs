@@ -23,7 +23,7 @@ export const COMPARE = [
   metaTitle: 'magicplan Alternative: What to Actually Compare',
   description:
     'The six questions worth asking of any room-measuring and estimating app, and '
-    + 'why "does it say when a number is a guess" is the one most people never ask.',
+    + 'why "does it flag a guess" is the one most people never ask.',
   keywords: ['magicplan alternative', 'alternative to magicplan', 'room measuring app comparison',
              'floor plan app for contractors'],
   minutes: 9,
@@ -102,7 +102,7 @@ export const COMPARE = [
   slug: 'best-room-measuring-apps',
   audience: 'compare',
   title: 'Room measuring apps for contractors: the four kinds',
-  metaTitle: 'Room Measuring Apps for Contractors: The Four Kinds',
+  metaTitle: 'Room Measuring Apps for Contractors: 4 Kinds',
   description:
     'LiDAR scanners, photogrammetry, AR point-to-point and manual sketch tools — what '
     + 'each is structurally good at, and which one belongs on your phone.',

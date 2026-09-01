@@ -119,7 +119,7 @@ for (const [path, html] of pages) {
     // that was never built is worse than no link, because it looks like the
     // thing works.
     if (target.startsWith('/downloads/') || target.startsWith('/img/')
-        || target.startsWith('/film/')) {
+        || target.startsWith('/film/') || target.startsWith('/fonts/')) {
       if (!files.includes(target.slice(1))) say(path, `dead asset link ${target}`);
       continue;
     }
@@ -402,6 +402,16 @@ console.log(`${pages.size} pages · ${guidePages.length} guides · `
 console.log(`${listed.size} in the sitemap · ${orphans.length} orphans · `
   + `${problems.filter((p) => p.includes('dead internal link')).length} dead links · `
   + `${problems.filter((p) => p.includes('does not parse')).length} broken JSON-LD`);
+
+// The SEO rules that are about the whole set rather than one page -- a title
+// that is the same as another page's, a description over the length Google
+// shows, a heading level skipped. They live in seo-report.mjs so they can be
+// read as a report while they are being fixed; imported here they become the
+// same kind of failure as a dead link, so a fixed one cannot quietly come back.
+const { findings: seo } = await import('./seo-report.mjs');
+for (const f of seo) problems.push(f);
+console.log(`${seo.length} SEO finding(s) across titles, descriptions, headings, `
+  + `canonicals, social cards and structured data`);
 
 if (problems.length) {
   console.log('');

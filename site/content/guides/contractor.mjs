@@ -630,7 +630,7 @@ export const CONTRACTOR = [
   slug: 'remodeling-proposal',
   audience: 'contractor',
   title: 'How to write a remodeling proposal a homeowner will sign',
-  metaTitle: 'How to Write a Remodeling Proposal That Gets Signed',
+  metaTitle: 'Write a Remodeling Proposal That Gets Signed',
   description:
     'Structure, language and the exclusions paragraph. Why options beat a single '
     + 'price, and what has to be on the page before you ask for a signature.',
@@ -883,7 +883,7 @@ export const CONTRACTOR = [
   slug: 'price-a-kitchen-remodel',
   audience: 'contractor',
   title: 'How to price a kitchen remodel, line by line',
-  metaTitle: 'How to Price a Kitchen Remodel (Method, Not Guesses)',
+  metaTitle: 'How to Price a Kitchen Remodel: The Method',
   description:
     'Break the room into quantities, apply your own rates, and price the unknowns '
     + 'behind the cabinets honestly. Why per-square-foot is the wrong unit.',

@@ -243,19 +243,31 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
 .mark .b { color: var(--quiet); font-weight: 500; }
 .bar nav { margin-left: auto; display: flex; gap: 1.3rem; align-items: center; }
 .bar nav a {
+  white-space: nowrap;
   font-family: var(--f-mono); font-size: .74rem; letter-spacing: .1em;
   text-transform: uppercase; color: var(--quiet); text-decoration: none;
   padding-block: .35rem; border-bottom: 2px solid transparent;
 }
 .bar nav a:hover { color: var(--ink); }
 .bar nav a[aria-current] { color: var(--ink); border-bottom-color: var(--yellow); }
-@media (max-width: 46rem) { .bar nav a.hide-sm { display: none; } .bar nav { gap: 1rem; } }
-/* Below about 26rem the three remaining links plus the wordmark are wider than
-   the screen, and a title bar is the last place to introduce a sideways scroll.
-   The bar takes a second row instead: no link is hidden and nothing overflows. */
-@media (max-width: 26rem) {
-  .bar .wrap { flex-wrap: wrap; gap: .2rem 1rem; padding-block: .45rem; min-height: 0; }
-  .bar nav { margin-left: 0; width: 100%; gap: .9rem; }
+/* One row, every link, at every width, and never a sideways scroll.
+   Nothing is hidden and nothing wraps: the type and the wordmark shrink until
+   four sections and the mark fit the narrowest phone sold. The width this has
+   to survive is 320px -- the iPhone SE and the old SE before it -- measured in
+   the browser at 320, 360, 390 and 430 rather than worked out on paper. */
+@media (max-width: 46rem) {
+  .bar .wrap { gap: .7rem; }
+  .bar nav { gap: .62rem; }
+  .bar nav a { font-size: .64rem; letter-spacing: .03em; }
+  .mark { font-size: 1.02rem; gap: .42rem; }
+  .mark svg { width: 1.18rem; height: 1.18rem; }
+}
+@media (max-width: 23.5rem) {
+  .bar .wrap { gap: .5rem; }
+  .bar nav { gap: .45rem; }
+  .bar nav a { font-size: .58rem; letter-spacing: .008em; }
+  .mark { font-size: .92rem; gap: .34rem; }
+  .mark svg { width: 1.02rem; height: 1.02rem; }
 }
 
 /* ------------------------------------------------- the scale down the edge */
@@ -461,7 +473,8 @@ code, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; fon
   background: var(--raised);
 }
 .cards { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
-.card h3 { margin-bottom: .35rem; }
+.card h3, .card h2 { margin-bottom: .35rem; }
+.card h2 { font-size: 1.18rem; font-weight: 600; letter-spacing: .005em; }
 .card p { font-size: .95rem; color: var(--quiet); margin: 0; }
 
 figure { margin: 2rem 0; }
@@ -563,7 +576,7 @@ hr.rule { border: 0; border-top: 1px solid var(--rule); margin: clamp(2.5rem, 6v
 .plate .fig .alt { display: block; font-size: .8rem; color: var(--quiet); margin-top: .4rem; }
 .plate .split { display: grid; gap: 1rem 2rem; }
 @media (min-width: 34rem) { .plate .split { grid-template-columns: 1fr 1fr; } }
-.plate h4 {
+.plate h3 {
   font-family: var(--f-mono); font-size: .66rem; letter-spacing: .14em; text-transform: uppercase;
   color: var(--quiet); font-weight: 500; margin-bottom: .5rem;
 }
@@ -682,8 +695,12 @@ ul.rows .m { font-family: var(--f-mono); font-size: .68rem; letter-spacing: .08e
 
 footer { border-top: 1px solid var(--rule); margin-top: clamp(3rem, 8vw, 5rem); padding: 2.5rem 0 4rem; }
 footer .cols { display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
-footer h4 { font-family: var(--f-mono); font-size: .66rem; letter-spacing: .14em;
-            text-transform: uppercase; color: var(--quiet); font-weight: 500; margin-bottom: .7rem; }
+/* Not an <h4>. These four label the footer's link lists, and as headings they
+   put a skipped level -- h2 straight to h4 -- into the outline of every page on
+   the site. As a <p> naming its own <ul> through aria-labelledby, a screen
+   reader still announces the list by name and no outline is touched. */
+footer .foot-h { font-family: var(--f-mono); font-size: .66rem; letter-spacing: .14em;
+            text-transform: uppercase; color: var(--quiet); font-weight: 500; margin: 0 0 .7rem; }
 footer ul { list-style: none; margin: 0; padding: 0; font-size: .92rem; }
 footer li { margin-bottom: .4rem; }
 footer a { color: var(--quiet); text-decoration: none; }

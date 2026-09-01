@@ -20,7 +20,7 @@ export const RESTORATION = [
   slug: 'document-water-damage',
   audience: 'restoration',
   title: 'How to document water damage for an insurance claim',
-  metaTitle: 'How to Document Water Damage for an Insurance Claim',
+  metaTitle: 'Document Water Damage for an Insurance Claim',
   description:
     'What to photograph, what to measure, what to log and in what order — on the '
     + 'first visit, before anything gets cut out or dried.',
@@ -497,7 +497,7 @@ export const RESTORATION = [
   slug: 'moisture-readings-log',
   audience: 'restoration',
   title: 'Keeping a moisture log that proves the building dried',
-  metaTitle: 'Moisture Reading Log: How to Keep a Defensible One',
+  metaTitle: 'Moisture Reading Log: Keeping It Defensible',
   description:
     'Same points, same meter, same scale. Why a dry standard is required, what to '
     + 'record at each visit, and the one mistake that makes a log unusable.',
@@ -579,8 +579,8 @@ export const RESTORATION = [
   title: 'Flood cuts: choosing a height and defending it',
   metaTitle: 'Flood Cut Height: How to Choose and Justify It',
   description:
-    'Why cuts go to a convenient height rather than following the water line, how '
-    + 'category changes the decision, and recording what was seen versus what was decided.',
+    'Why cuts go to a convenient height rather than the water line, how category '
+    + 'changes it, and recording what was seen against what was decided.',
   keywords: ['flood cut', 'flood cut height', 'drywall flood cut 2 foot 4 foot',
              'water damage drywall removal height'],
   minutes: 7,

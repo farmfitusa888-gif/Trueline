@@ -94,7 +94,7 @@ export const NAV = [
   { href: '/', label: 'Trueline' },
   { href: '/guides/', label: 'Guides' },
   { href: '/calculators/', label: 'Calculators' },
-  { href: '/templates/', label: 'Free templates' },
+  { href: '/templates/', label: 'Templates' },
   { href: '/about/', label: 'About' },
 ];
 
