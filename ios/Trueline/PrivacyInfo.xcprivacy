@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Apple has required this file since 1 May 2024. Without it an upload to
+	  App Store Connect comes back as an email: "ITMS-91053: Missing API
+	  declaration". It is not a privacy policy and it is not the App Privacy
+	  answers in App Store Connect; it is a machine-readable statement of which
+	  "required reason" APIs the binary calls and why.
+
+	  Every entry below was found by reading this app's own source, not copied
+	  from a template. If an API is not called here, it is not declared here.
+	-->
+
+	<!-- Trueline has no server, no account and no analytics. Nothing is sent
+	     anywhere, so there is nothing to track and nothing collected. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<!--
+		  UserDefaults. Subscription.swift keeps the unlock seed and the founding
+		  free-run dates; Calendar.swift remembers which days it has already
+		  written so it cannot write one twice. Both are this app's own settings,
+		  read back by this app only, and neither leaves the device.
+		-->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<!--
+		  File timestamps. ProjectStore.swift sorts the room list by when each
+		  capture was written and shows the date on the row; Diagnostics.swift
+		  orders the report files the same way; VoiceRecorder.swift reads a
+		  recording's size before offering it. All of it is displayed to the
+		  person holding the phone, about files that person's own scan created.
+		-->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -2794,3 +2794,97 @@ and writing to somebody's `~/.zshrc` as a side effect of a command called
 The general rule, which is the part worth keeping: **whatever is already on the
 Mac has to be the thing that points at whatever is new.** A new file can only be
 reached through something old.
+
+---
+
+## SEO measured, the fonts brought home, one row on every phone
+
+43 pages read rather than assumed. `site/tools/seo-report.mjs` prints what it
+finds; `check.mjs` imports its findings so a fixed one is a build failure if it
+returns. It was watched failing on a deliberately duplicated title before it was
+trusted.
+
+Fixed: seven titles over 60 characters, one under 15, two descriptions over 158,
+and a heading skip on **every page of the site** — the footer's four column
+labels were `<h4>` sitting after the page's `<h2>`s. They are labels for link
+lists, not sections; as a `<p>` naming its own `<ul>` through `aria-labelledby`
+a screen reader still announces the list and the outline is untouched.
+
+### The typefaces
+
+The `<head>` linked `fonts.googleapis.com`: a render-blocking stylesheet on
+another origin, so a DNS lookup, a TLS handshake and a round trip before the
+browser even learns which font files it needs — and nothing readable on a job
+with no signal. `site/tools/fonts.mjs` vendors them, latin and latin-ext only,
+14 files and 274kB, with the two faces the first screen uses preloaded. The
+click-through aborts every off-machine request, so a third party creeping back
+in is a failure rather than a slowdown nobody notices.
+
+### One row, no sideways scroll
+
+Sam: *"SHOULD ALL FIT ON ONE BAR AND NO HORIZONTAL DRIFT/SCROLL FOR THE ENTIRE
+WEBSITE"*. `site/tools/clickthrough.mjs` drives all 42 pages at 320, 360, 390,
+430, 768, 1280 and 1920 in parallel — 2073 checks. Widest horizontal overflow is
+0px at every width.
+
+The `Trueline` entry was dropped from the bar. The wordmark beside it is already
+the link home, so it was the same destination twice in one row: a self-
+referencing duplicate costing the width the four real sections need at 320px.
+Dropped rather than hidden — hiding it was what made the bar look like it had
+lost links on a phone in the first place.
+
+**Three of the test's own assertions were wrong before the site was**, and all
+three are the same mistake in different clothes: measuring something adjacent to
+the claim instead of the claim.
+
+- Rows were found by bucketing link tops into six-pixel bands, which split a bar
+  whose links sat at 18 and 21 — failing at 390 and passing at 360, which is the
+  shape of a measurement bug rather than a layout one.
+- The pinned-bar check required 200px of scroll first. On a 1080-tall desktop
+  viewport the chosen page does not scroll that far, so a pinned bar was reported
+  as broken. It now tries pages until one actually scrolls.
+- And it measured link **tops**, which are identical even when a link's **text**
+  wraps. "FREE TEMPLATES" sat on two lines inside its own box and passed a
+  one-row check. It was caught by looking at the screenshot, which is the only
+  reason it was caught at all. An inline element that wraps has more than one
+  client rect; that is what is counted now, the label is "Templates", and no bar
+  link may wrap.
+
+## Everything App Store Connect refuses a build for
+
+None of these stop a build. Xcode compiles, the app runs, the archive uploads —
+and then an email arrives and the build never reaches a tester. All of them were
+visible in the repository the whole time.
+
+- **`ITMS-91053: Missing API declaration`.** There was no `PrivacyInfo.xcprivacy`,
+  required since 1 May 2024. Written from this app's own source rather than a
+  template: `UserDefaults` (CA92.1) for the unlock seed and the calendar's
+  written-days set, and file timestamps (C617.1) for the room list's dates. Two
+  categories, because two are what the code calls.
+- **Missing Compliance.** No `ITSAppUsesNonExemptEncryption`, so every upload
+  waited on somebody answering the export questions by hand. `false` is the
+  honest answer and it was checked: no CryptoKit, no CommonCrypto, no Security
+  framework, no server.
+- A resource on disk and outside the target ships nothing, and unlike a missing
+  Swift file it says nothing at all. `core/tools/add-resource.py` puts it in the
+  Resources build phase; `add-swift-file.py` is the same idea for code.
+
+`core/tools/check-testflight.py` reads all of it, and two more things nobody
+checks: that the manifest does not **overclaim** — a declared category nothing
+calls is a false statement about the binary — and that the product ids in
+`Trueline.storekit` and the `Plan` enum have not drifted apart, which looks fine
+until a real purchase returns nothing. Seven rules, each watched failing.
+
+### Subscriptions on TestFlight
+
+A TestFlight tester cannot be charged. Not by configuration — by Apple: every
+in-app purchase in a TestFlight build runs against the StoreKit sandbox, which
+has no payment method attached. On top of that `Subscription.onSale` is `false`,
+so `subscribed` is true for everybody and no purchase code runs at all.
+
+The purchase path is still exercisable without money, through the StoreKit
+configuration file the scheme already points at. Its local product display names
+now carry "Founding rate", because `Subscription.founding` reads that word off
+the product name — without it the founding terms on the paywall could not be
+seen until the App Store was involved, which is the one place their absence
+would be expensive.

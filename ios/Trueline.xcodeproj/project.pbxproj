@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FFF05461C44C4159CE6D50C1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 961A49FD9669BC5B253D0076 /* PrivacyInfo.xcprivacy */; };
 		5EFCD879FC5E0518BCB40AEF /* BarcodeReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4A6AFEA7B3635BE4085DE9 /* BarcodeReader.swift */; };
 		89B128B1B7DC1695F13E5F7E /* VoiceRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA3CB69F6F2B7111ECDB82F1 /* VoiceRecorder.swift */; };
 		636BC546D48C8AD2147E3EA2 /* Draftsman.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC48A9F7B40767D61D502C94 /* Draftsman.swift */; };
@@ -46,6 +47,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		961A49FD9669BC5B253D0076 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB4A6AFEA7B3635BE4085DE9 /* BarcodeReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeReader.swift; sourceTree = "<group>"; };
 		CA3CB69F6F2B7111ECDB82F1 /* VoiceRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecorder.swift; sourceTree = "<group>"; };
 		AC48A9F7B40767D61D502C94 /* Draftsman.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draftsman.swift; sourceTree = "<group>"; };
@@ -145,6 +147,7 @@
 				AC48A9F7B40767D61D502C94 /* Draftsman.swift */,
 				CA3CB69F6F2B7111ECDB82F1 /* VoiceRecorder.swift */,
 				BB4A6AFEA7B3635BE4085DE9 /* BarcodeReader.swift */,
+				961A49FD9669BC5B253D0076 /* PrivacyInfo.xcprivacy */,
 				E4E6D7EFB44C842A7A9609C6 /* Info.plist */,
 				6B90D3E7215C4A8FA0C7E4D9 /* Trueline.entitlements */,
 				DA1B9D64EFC2ED4C64672F34 /* Web */,
@@ -222,6 +225,7 @@
 			files = (
 				037B80EBAC15037FEE5F7325 /* Web in Resources */,
 				B1202C7A8238826DC782F5A0 /* Assets.xcassets in Resources */,
+				FFF05461C44C4159CE6D50C1 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

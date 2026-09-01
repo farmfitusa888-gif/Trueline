@@ -1,76 +1,115 @@
 {
-  "identifier" : "3B1A5F2C-TRUELINE-LOCAL",
-  "nonRenewingSubscriptions" : [],
-  "products" : [],
-  "settings" : {
-    "_applicationInternalID" : "",
-    "_developerTeamID" : "",
-    "_failTransactionsEnabled" : false,
-    "_lastSynchronizedDate" : 0,
-    "_locale" : "en_US",
-    "_storefront" : "USA",
-    "_storeKitErrors" : [
-      { "current" : null, "enabled" : false, "name" : "Load Products" },
-      { "current" : null, "enabled" : false, "name" : "Purchase" },
-      { "current" : null, "enabled" : false, "name" : "Verification" },
-      { "current" : null, "enabled" : false, "name" : "App Store Sync" },
-      { "current" : null, "enabled" : false, "name" : "Subscription Status" },
-      { "current" : null, "enabled" : false, "name" : "App Transaction" },
-      { "current" : null, "enabled" : false, "name" : "Manage Subscriptions Sheet" },
-      { "current" : null, "enabled" : false, "name" : "Refund Request Sheet" },
-      { "current" : null, "enabled" : false, "name" : "Offer Code Redeem Sheet" }
+  "identifier": "3B1A5F2C-TRUELINE-LOCAL",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_applicationInternalID": "",
+    "_developerTeamID": "",
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 0,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": [
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Load Products"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Purchase"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Verification"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "App Store Sync"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Subscription Status"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "App Transaction"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Manage Subscriptions Sheet"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Refund Request Sheet"
+      },
+      {
+        "current": null,
+        "enabled": false,
+        "name": "Offer Code Redeem Sheet"
+      }
     ]
   },
-  "subscriptionGroups" : [
+  "subscriptionGroups": [
     {
-      "id" : "21578318",
-      "localizations" : [],
-      "name" : "Trueline Pro",
-      "subscriptions" : [
+      "id": "21578318",
+      "localizations": [],
+      "name": "Trueline Pro",
+      "subscriptions": [
         {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "78.00",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "21578319",
-          "introductoryOffer" : null,
-          "localizations" : [
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "78.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "21578319",
+          "introductoryOffer": null,
+          "localizations": [
             {
-              "description" : "The takeoff, the price, the proposal, the change orders, the claim document and every export. Measuring, the drawing and the 3D view stay free.",
-              "displayName" : "Trueline Pro, monthly",
-              "locale" : "en_US"
+              "description": "The takeoff, the price, the proposal, the change orders, the claim document and every export. Measuring, the drawing and the 3D view stay free.",
+              "displayName": "Trueline Pro, monthly (Founding rate)",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.sunnyacres.trueline.pro.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Trueline Pro monthly",
-          "subscriptionGroupID" : "21578318",
-          "type" : "RecurringSubscription"
+          "productID": "com.sunnyacres.trueline.pro.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Trueline Pro monthly",
+          "subscriptionGroupID": "21578318",
+          "type": "RecurringSubscription"
         },
         {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "780.00",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "21578320",
-          "introductoryOffer" : null,
-          "localizations" : [
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "780.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "21578320",
+          "introductoryOffer": null,
+          "localizations": [
             {
-              "description" : "The takeoff, the price, the proposal, the change orders, the claim document and every export. Two months off against the monthly rate.",
-              "displayName" : "Trueline Pro, yearly",
-              "locale" : "en_US"
+              "description": "The takeoff, the price, the proposal, the change orders, the claim document and every export. Two months off against the monthly rate.",
+              "displayName": "Trueline Pro, yearly (Founding rate)",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.sunnyacres.trueline.pro.yearly",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Trueline Pro yearly",
-          "subscriptionGroupID" : "21578318",
-          "type" : "RecurringSubscription"
+          "productID": "com.sunnyacres.trueline.pro.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Trueline Pro yearly",
+          "subscriptionGroupID": "21578318",
+          "type": "RecurringSubscription"
         }
       ]
     }
   ],
-  "version" : { "major" : 4, "minor" : 0 }
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
 }

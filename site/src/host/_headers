@@ -1,0 +1,45 @@
+# Cloudflare Pages reads this file from the root of the deployed folder.
+# One rule per path pattern, two spaces in front of each header.
+
+/*
+  # A browser must not guess a file's type from its bytes. Guessing is how a
+  # text file gets executed as a script.
+  X-Content-Type-Options: nosniff
+  # Nobody may put this site in a frame. There is no reason to, and it is how
+  # a click gets stolen.
+  X-Frame-Options: DENY
+  # A referrer goes out with the origin only, and only to another https site.
+  Referrer-Policy: strict-origin-when-cross-origin
+  # Nothing on this site needs a camera, a microphone or a location. Saying so
+  # means an injected script cannot ask for one either.
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
+  # https from now on, for this host and every subdomain. `preload` is the
+  # claim that qualifies it for the browsers' built-in list; submit the domain
+  # at hstspreload.org once it has served https for a while.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# The typefaces never change under a given name, so they are cached for a year
+# and never revalidated. This is the single biggest repeat-visit win on the
+# site: 274kB that is fetched once and then never again.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The PDFs and the films are the same: written once, replaced by name.
+/downloads/*
+  Cache-Control: public, max-age=604800
+/film/*
+  Cache-Control: public, max-age=604800
+/img/*
+  Cache-Control: public, max-age=604800
+
+# The stylesheet and the script are NOT content-hashed, so a year would mean a
+# visitor keeps a broken pairing until they clear their cache. An hour is long
+# enough to help and short enough to fix.
+/style.css
+  Cache-Control: public, max-age=3600
+/site.js
+  Cache-Control: public, max-age=3600
+/calc.js
+  Cache-Control: public, max-age=3600
+/calc-engine.js
+  Cache-Control: public, max-age=3600

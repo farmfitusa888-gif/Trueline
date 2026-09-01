@@ -1335,6 +1335,12 @@ for (const page of pages) write(page);
 
 /* Assets. */
 cpSync(join(HERE, 'src/fonts'), join(DIST, 'fonts'), { recursive: true });
+// Cloudflare Pages reads _headers and _redirects from the root of whatever
+// folder is dropped on it, so they are files in the output rather than
+// settings in a dashboard -- which means they are in git, reviewed, and they
+// travel with the build that needs them.
+cpSync(join(HERE, 'src/host/_headers'), join(DIST, '_headers'));
+cpSync(join(HERE, 'src/host/_redirects'), join(DIST, '_redirects'));
 cpSync(join(HERE, 'src/style.css'), join(DIST, 'style.css'));
 cpSync(join(HERE, 'src/site.js'), join(DIST, 'site.js'));
 // The films, if they have been shot. `node site/tools/film.mjs` makes them,

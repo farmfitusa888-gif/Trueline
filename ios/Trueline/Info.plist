@@ -57,6 +57,21 @@
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<!--
+	  Export compliance, answered once here instead of by hand on every upload.
+	  Without this key every build stops in App Store Connect on "Missing
+	  Compliance" and reaches no TestFlight tester until somebody clicks through
+	  the encryption questions again.
+
+	  `false` is the honest answer, and it was checked rather than assumed: there
+	  is no CryptoKit, no CommonCrypto and no Security framework anywhere in
+	  ios/Trueline, and the app has no server to talk to. If that ever changes (a
+	  sync service, a signed licence, anything that encrypts) this key has to be
+	  revisited, because getting it wrong is a false statement to a customs
+	  regulator rather than a settings mistake.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>UISupportedInterfaceOrientations</key>
