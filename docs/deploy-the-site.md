@@ -9,7 +9,21 @@ static site, with unlimited bandwidth and 500 builds a month.
 ## 1. Build it, and open the folder so you can drag it
 
 ```bash
-cd ~/trueline && npm run site && open -R site/dist
+trueline site
+```
+
+That pulls first, then builds, then reveals the folder. **The pull is not
+optional and it is not tidiness.** The website is deployed by dragging the
+folder this produces, so a checkout that is four commits behind ships a site
+that is four commits behind — with no error, no warning, and nothing on the
+screen to say so. It happened: the CSP, the self-hosted typefaces, the one-row
+mobile bar and the shortened titles all landed after a working copy was last
+brought up to date.
+
+If `trueline` is not installed yet, the long way is the same thing:
+
+```bash
+cd ~/trueline && bash setup-mac.sh --checks-only && npm run site && open -R site/dist
 ```
 
 `open -R` reveals `dist` **selected inside its parent window**, which is the
@@ -150,7 +164,7 @@ Indexing takes days, not minutes. Coverage appears under **Pages**.
 ## 6. Every time after that
 
 ```bash
-cd ~/trueline && npm run site && open -R site/dist
+trueline site
 ```
 
 Then Cloudflare → the `trueline` project → **Create deployment** → drag `dist`
