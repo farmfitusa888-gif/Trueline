@@ -35,6 +35,54 @@ This is a nameserver change at whoever you bought `trueline.tools` from.
 
 You do not need to add any DNS records by hand. Step 4 below does it.
 
+## 2a. The imported records: grey out everything that is not the website
+
+When Cloudflare imports the existing DNS it turns the orange proxy cloud ON for
+every A and CNAME record it finds. That is right for the website and **wrong for
+every mail record**, because the proxy only carries HTTP and HTTPS. Anything to
+do with mail or Teams goes through it and dies. Cloudflare marks them with a
+warning triangle; this is what the triangle means.
+
+Click the orange cloud on each of these so it reads **DNS only**:
+
+| Record | What breaks if it stays proxied |
+|---|---|
+| `selector1._domainkey` | **DKIM signing** — outbound mail fails DMARC and lands in spam |
+| `selector2._domainkey` | same |
+| `autodiscover` | Outlook cannot configure the account by itself |
+| `sip` | Teams / Skype for Business sign-in |
+| `lyncdiscover` | same |
+| `msoid` | Microsoft account sign-in |
+| `email` | webmail access |
+| `_domainconnect` | the registrar's own auto-setup hooks |
+
+**Keep `www` proxied.** That one is the website and belongs behind the proxy.
+
+**Leave the MX, SRV and TXT records exactly as they are** — they are already
+DNS only, which is correct, and they are the mail routing, the SPF record, the
+DMARC policy and the Microsoft 365 domain verification. Deleting any of them
+stops mail.
+
+The DKIM pair is the one worth double-checking, because it fails quietly:
+mail keeps sending and recipients simply stop trusting it.
+
+The two **A records on the bare domain** are whatever the domain pointed at
+before. They are not the website. Cloudflare Pages creates its own record when
+the custom domain is attached in step 4 and will offer to replace them — say
+yes, or delete them here.
+
+### Check it after the nameservers have taken
+
+```bash
+dig +short MX trueline.tools
+dig +short CNAME selector1._domainkey.trueline.tools
+dig +short TXT trueline.tools
+```
+
+The MX must still name your mail host, and the DKIM selector must return a
+CNAME to a mail host. If the selector returns a Cloudflare IP instead, it is
+still proxied — go back and grey it out.
+
 ## 3. Create the Pages project and drop the folder on it
 
 1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** →
