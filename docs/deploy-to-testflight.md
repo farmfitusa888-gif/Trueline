@@ -71,11 +71,55 @@ App Store Connect → **My Apps** → **+** → **New App**.
 | Field | Value |
 |---|---|
 | Platform | iOS |
-| Name | Trueline |
+| Name | see **The name is taken** below — not bare `Trueline` |
 | Primary language | English (U.S.) |
 | Bundle ID | `com.sunnyacres.trueline` |
 | SKU | `trueline-ios` (any unique string; never shown) |
 | User access | Full Access |
+
+### The name is taken
+
+App Store Connect refuses bare `Trueline`:
+
+> The app name you entered is already being used.
+
+App Store display names are unique across the whole store and first come,
+first served. Somebody has it.
+
+**Nothing in the app changes.** That field is the store listing's name and
+nothing else:
+
+| | |
+|---|---|
+| Bundle ID `com.sunnyacres.trueline` | unaffected — it is an identifier, not a name |
+| `CFBundleDisplayName` = `Trueline` | unaffected — this is the name under the icon on the phone, and Gilbert still sees "Trueline" |
+| trueline.tools, the site, the logo, the repo | all unaffected |
+
+Only the store listing needs a longer, unique string. It is capped at **30
+characters**, and it is the single heaviest factor in App Store search — so the
+words after the brand should be the ones a remodeler actually types.
+
+The **subtitle** is a separate 30-character field, also indexed. Between them
+there are 60 characters of ranking-weighted text, so do not waste either.
+
+Suggested, all inside 30:
+
+| Name | Subtitle |
+|---|---|
+| `Trueline: Scan & Estimate` | `LiDAR room takeoff and bids` |
+| `Trueline: Room Takeoff` | `Scan, price and get it signed` |
+| `Trueline Room Measure` | `LiDAR takeoff, proposal, claim` |
+
+The only reliable availability test is typing it into that same field. If it is
+accepted, the name is reserved from that moment — but the reservation lapses if
+no build is submitted, so do not create the record months before uploading.
+
+**Worth two minutes first:** search the App Store for "Trueline" and see what
+already holds it. If it is unrelated — a fishing app, a design tool — a longer
+name alongside it is ordinary. If it is another construction or measuring app,
+that is a genuine confusion problem for customers as well as a naming one, and
+worth knowing before the listing, the icon and the screenshots are all built
+around it.
 
 If the bundle ID is not in the dropdown, create it first at
 <https://developer.apple.com/account/resources/identifiers> with the same string,
