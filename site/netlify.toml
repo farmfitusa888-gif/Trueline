@@ -21,9 +21,12 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    # Google Fonts is the only outside host this site touches, and it is named
-    # rather than allowed by category. Everything else — scripts, images, styles
-    # — is our own origin.
+    # This is a VERBATIM COPY of the policy in site/src/host/_headers, which is
+    # what Cloudflare serves. check.mjs fails the build if the two differ by one
+    # character, because they did: this file went on naming fonts.googleapis.com
+    # and setting font-src to gstatic long after the typefaces were vendored, so
+    # a deploy to this fallback host would have blocked every font on the site.
+    # Nobody would have noticed until the day the fallback was needed.
     # `media-src` is not decoration. A <video> is governed by it, and with
     # `default-src 'none'` and no media-src the two films would be blocked on
     # the live site while working perfectly on a local server -- the worst
@@ -41,7 +44,7 @@
     # now hashes every inline script in `dist` and fails the build if the hash
     # is not named here -- so editing that script without updating this line
     # cannot ship.
-    Content-Security-Policy = "default-src 'none'; script-src 'self' 'sha256-S43fEebIkqS9QgDIhK2Mc83s5ERU7y489FJ58sHjQZI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'sha256-S43fEebIkqS9QgDIhK2Mc83s5ERU7y489FJ58sHjQZI='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; media-src 'self'; frame-src 'none'; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"

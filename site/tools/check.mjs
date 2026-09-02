@@ -204,6 +204,30 @@ for (const p of pages.keys()) {
   const policy = existsSync(toml)
     ? (/Content-Security-Policy = "([^"]*)"/.exec(readFileSync(toml, 'utf8'))?.[1] ?? '')
     : '';
+
+  /* The two hosts must state the same policy, character for character.
+
+     Everything below this reads `netlify.toml`, and Cloudflare -- the host this
+     is actually deployed to -- reads `_headers`. So the whole of this section
+     was checking a file the live site does not use, and it went green while the
+     two drifted: netlify.toml went on naming fonts.googleapis.com and setting
+     `font-src` to gstatic long after the typefaces were vendored onto this
+     origin. A deploy to the fallback host would have blocked every font on the
+     site, and the only moment anybody would have found out is the moment the
+     fallback was needed.
+
+     A second host that has not been checked is not a way out. */
+  const headersFile = join(DIST, '_headers');
+  const served = existsSync(headersFile)
+    ? (/Content-Security-Policy:\s*(.+)/.exec(readFileSync(headersFile, 'utf8'))?.[1]?.trim() ?? '')
+    : '';
+  if (!served) {
+    problems.push('site/dist/_headers has no Content-Security-Policy, so the deployed site has none');
+  } else if (served !== policy) {
+    problems.push('the two hosts disagree about the Content-Security-Policy.\n'
+      + `      _headers (Cloudflare, live): ${served}\n`
+      + `      netlify.toml (the fallback): ${policy}`);
+  }
   if (!policy) {
     problems.push('site/netlify.toml has no Content-Security-Policy to check');
   } else {
