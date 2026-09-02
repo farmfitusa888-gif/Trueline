@@ -71,6 +71,35 @@ before. They are not the website. Cloudflare Pages creates its own record when
 the custom domain is attached in step 4 and will offer to replace them — say
 yes, or delete them here.
 
+### One thing in that list that is not about Cloudflare
+
+The SPF record reads:
+
+    v=spf1 include:secureserver.net -all
+
+That is what GoDaddy tells you to use for Microsoft 365 bought through them, and
+it works: `secureserver.net` chains through to `spf.protection.outlook.com`, so
+mail sent through Microsoft 365 passes SPF. Nothing is broken.
+
+But `secureserver.net` authorises more than Microsoft. It also covers GoDaddy's
+outbound webmail servers and the unauthenticated gateways their shared-hosting
+customers send through — so anybody on GoDaddy shared hosting can send mail that
+passes SPF **for this domain**. With DMARC set to `p=quarantine` and relaxed
+alignment, that is a real path to somebody spoofing an estimate or an invoice
+from an address a client already trusts.
+
+The tighter record, which is what Microsoft themselves publish, is:
+
+    v=spf1 include:spf.protection.outlook.com -all
+
+**Check before changing it.** That value authorises Microsoft 365 and nothing
+else. If any mail is ever sent from GoDaddy's own webmail rather than through
+Microsoft 365 — the `email.secureserver.net` record in the list suggests such a
+mailbox may exist — that mail would start failing. Confirm every address that
+sends as `@trueline.tools` goes through Microsoft 365 first, then change it.
+
+It is one TXT record, edited in Cloudflare, and reversible in a minute.
+
 ### Check it after the nameservers have taken
 
 ```bash
