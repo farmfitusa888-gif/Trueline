@@ -153,7 +153,7 @@ export function drawClaim(pen: Pen, parts: ClaimPdfParts): number {
   /* ------------------------------------------------------------ letterhead */
 
   const head = letterhead(company);
-  say(head[0] ?? 'Trueline', 13, { bold: true, gap: 2 });
+  say(head[0] ?? 'ScanToBid', 13, { bold: true, gap: 2 });
   for (const line of head.slice(1)) say(line, 9, { grey: true, gap: 2 });
   rule();
 
@@ -291,7 +291,7 @@ export function drawClaim(pen: Pen, parts: ClaimPdfParts): number {
   room(20);
   y -= 12;
   pen.text(
-    company.name ? `${company.name} · made with Trueline` : 'Made with Trueline',
+    company.name ? `${company.name} · made with ScanToBid` : 'Made with ScanToBid',
     { x: MARGIN, y },
     { size: 8, grey: true }
   );

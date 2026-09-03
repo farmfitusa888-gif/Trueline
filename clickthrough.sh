@@ -75,7 +75,7 @@ step() {
   shot "$n" "$name"
 }
 
-say "A click-through of Trueline"
+say "A click-through of ScanToBid"
 echo "  Press Return at each step once the screen is showing. Screenshots are"
 echo "  automatic. Ctrl-C to stop -- what you have so far is already saved."
 

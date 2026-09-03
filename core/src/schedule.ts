@@ -164,7 +164,7 @@ function fold(line: string): string {
 export function icsOf(
   visits: readonly Visit[],
   at: string,
-  company = 'Trueline'
+  company = 'ScanToBid'
 ): string {
   if (visits.length === 0) {
     throw new ScheduleError('There is nothing in the calendar to send.');
@@ -172,7 +172,7 @@ export function icsOf(
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    `PRODID:-//${escape(company)}//Trueline//EN`,
+    `PRODID:-//${escape(company)}//ScanToBid//EN`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
   ];

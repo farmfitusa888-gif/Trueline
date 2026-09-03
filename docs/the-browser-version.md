@@ -1,8 +1,8 @@
-# Putting the app on the web, at app.trueline.tools
+# Putting the app on the web, at app.scantobid.app
 
 The same screens that run on your phone also run in an ordinary browser. They
 always have — the whole audit drives them there — and this page is about turning
-that into a thing anybody can open, at `app.trueline.tools`, for nothing.
+that into a thing anybody can open, at `app.scantobid.app`, for nothing.
 
 **What it costs: nothing.** Not "nothing for now" and not "nothing until it gets
 popular". The real limits are in Part 5, and they were checked rather than
@@ -82,13 +82,13 @@ reviewed.
 
 ## Part 3 — the name
 
-`app.trueline.tools`, so it sits beside the marketing site without colliding
+`app.scantobid.app`, so it sits beside the marketing site without colliding
 with it.
 
 1. In the Pages project → **Custom domains** → **Set up a custom domain**.
-2. Type `app.trueline.tools` → **Continue** → **Activate domain**.
+2. Type `app.scantobid.app` → **Continue** → **Activate domain**.
 
-If `trueline.tools` is already on Cloudflare's DNS, that is the whole of it —
+If `scantobid.app` is already on Cloudflare's DNS, that is the whole of it —
 Cloudflare adds the record itself and the certificate is issued automatically,
 free, and renewed without being asked. HTTPS is not optional and not extra.
 
@@ -107,8 +107,8 @@ domain or a deploy.
 
 Three things, in this order, and the first two take a minute.
 
-1. **Open it on a machine with no Trueline on it.** You should get a page headed
-   *"Trueline, in your browser. All of it but the scan."* If you get a blank
+1. **Open it on a machine with no ScanToBid on it.** You should get a page headed
+   *"ScanToBid, in your browser. All of it but the scan."* If you get a blank
    page, the build output directory is wrong — it must be `web/dist`, not
    `dist`.
 
@@ -119,7 +119,7 @@ Three things, in this order, and the first two take a minute.
    looking:
 
    ```bash
-   curl -sI https://app.trueline.tools | grep -i "content-security-policy\|referrer-policy"
+   curl -sI https://app.scantobid.app | grep -i "content-security-policy\|referrer-policy"
    ```
 
    Both lines should come back. If they do not, `_headers` did not reach the
@@ -196,7 +196,7 @@ takeoff and the proposal were free.
 ### The code, and exactly what it is worth
 
 A contractor who already pays must not meet a paywall in his own browser, and
-there is no account to ask — **there is no login anywhere in Trueline and there
+there is no account to ask — **there is no login anywhere in ScanToBid and there
 is not going to be one.** The phone asks Apple who paid. The browser asks a
 code.
 

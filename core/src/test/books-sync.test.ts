@@ -196,7 +196,7 @@ test('a remote written by a newer format is refused, not read for the parts it r
     () => planSync(books(), { text: newer, version: 'sha' }, AT, 'the office Mac'),
     (error: unknown) =>
       error instanceof BooksSyncError &&
-      /newer version of Trueline \(format 2; this one reads 1\)/.test(error.message) &&
+      /newer version of ScanToBid \(format 2; this one reads 1\)/.test(error.message) &&
       /Update this device instead/.test(error.message)
   );
 });
@@ -211,7 +211,7 @@ test('a remote written by an older format is refused too, because no conversion 
   assert.throws(
     () => readBooksFile(older),
     (error: unknown) =>
-      error instanceof BooksSyncError && /older version of Trueline \(format 0/.test(error.message)
+      error instanceof BooksSyncError && /older version of ScanToBid \(format 0/.test(error.message)
   );
 });
 

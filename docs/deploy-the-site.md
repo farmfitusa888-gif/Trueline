@@ -1,4 +1,4 @@
-# Putting trueline.tools on Cloudflare
+# Putting scantobid.app on Cloudflare
 
 The domain is registered and not connected. This is the whole path from that to
 a live site, in order. Nothing here costs money: Cloudflare Pages is free for a
@@ -36,9 +36,9 @@ prints a problem, it does not deploy until that is fixed.
 
 ## 2. Point the domain at Cloudflare
 
-This is a nameserver change at whoever you bought `trueline.tools` from.
+This is a nameserver change at whoever you bought `scantobid.app` from.
 
-1. <https://dash.cloudflare.com> → **Add a site** → type `trueline.tools`
+1. <https://dash.cloudflare.com> → **Add a site** → type `scantobid.app`
 2. Choose the **Free** plan.
 3. Cloudflare shows you **two nameservers**, something like
    `ana.ns.cloudflare.com` and `rick.ns.cloudflare.com`. Copy both.
@@ -110,16 +110,16 @@ The tighter record, which is what Microsoft themselves publish, is:
 else. If any mail is ever sent from GoDaddy's own webmail rather than through
 Microsoft 365 — the `email.secureserver.net` record in the list suggests such a
 mailbox may exist — that mail would start failing. Confirm every address that
-sends as `@trueline.tools` goes through Microsoft 365 first, then change it.
+sends as `@scantobid.app` goes through Microsoft 365 first, then change it.
 
 It is one TXT record, edited in Cloudflare, and reversible in a minute.
 
 ### Check it after the nameservers have taken
 
 ```bash
-dig +short MX trueline.tools
-dig +short CNAME selector1._domainkey.trueline.tools
-dig +short TXT trueline.tools
+dig +short MX scantobid.app
+dig +short CNAME selector1._domainkey.scantobid.app
+dig +short TXT scantobid.app
 ```
 
 The MX must still name your mail host, and the DKIM selector must return a
@@ -135,28 +135,28 @@ still proxied — go back and grey it out.
    the upload area. Not the files inside it — the folder.
 4. **Deploy site.**
 
-## 4. Attach trueline.tools
+## 4. Attach scantobid.app
 
 1. In the Pages project → **Custom domains** → **Set up a custom domain**.
-2. Enter `trueline.tools`. Cloudflare creates the DNS record itself and issues
+2. Enter `scantobid.app`. Cloudflare creates the DNS record itself and issues
    the certificate. Wait until it says **Active** — usually a minute or two.
-3. Do it a second time for `www.trueline.tools`. The `_redirects` file already
+3. Do it a second time for `www.scantobid.app`. The `_redirects` file already
    in the build 301s `www` to the bare domain, so both addresses work and only
    one is ever indexed.
 
-Open `https://trueline.tools` on your phone. That is the site.
+Open `https://scantobid.app` on your phone. That is the site.
 
 ## 5. Tell Google it exists
 
 Until you do this, nothing is indexed no matter how good the pages are.
 
 1. <https://search.google.com/search-console> → **Add property** → **Domain** →
-   `trueline.tools`.
+   `scantobid.app`.
 2. It asks for a **TXT record** to prove you own it. In Cloudflare: the site →
    **DNS** → **Add record** → type `TXT`, name `@`, content = the string Google
    gave you. Save, then **Verify** in Search Console.
 3. Search Console → **Sitemaps** → enter `sitemap.xml` → **Submit**.
-4. Search Console → **URL Inspection** → paste `https://trueline.tools/` →
+4. Search Console → **URL Inspection** → paste `https://scantobid.app/` →
    **Request indexing**. Do the same for `/guides/`.
 
 Indexing takes days, not minutes. Coverage appears under **Pages**.

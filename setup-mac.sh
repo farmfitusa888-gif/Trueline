@@ -38,7 +38,7 @@ ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; }
 
-# `trueline` is a shell function written into ~/.trueline.zsh by
+# `scantobid` is a shell function written into ~/.scantobid.zsh by
 # install-command.sh, and it is the command that makes the folder you are
 # standing in stop mattering. It is MENTIONED here rather than installed here:
 # this script pulls and checks, and writing to somebody's ~/.zshrc as a side
@@ -51,7 +51,7 @@ bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; }
 # cannot be run before it has been pulled. Whatever is already on disk has to be
 # the thing that points at whatever is new.
 sayTheOneWord() {
-  [ -f "$HOME/.trueline.zsh" ] && return 0
+  [ -f "$HOME/.scantobid.zsh" ] && return 0
   [ -f "$root/install-command.sh" ] || return 0
   say "One word, from any folder"
   echo "  You do not have it yet. Install it once:"
@@ -59,7 +59,7 @@ sayTheOneWord() {
   echo "      bash \"$root/install-command.sh\""
   echo ""
   echo "  After that \`trueline\` builds and installs from wherever you happen"
-  echo "  to be standing, and \`trueline help\` lists the rest."
+  echo "  to be standing, and \`scantobid help\` lists the rest."
 }
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -75,7 +75,7 @@ checks_only=no
 say "Where you are"
 ok "$root"
 if [ ! -d ios/Trueline.xcodeproj ]; then
-  bad "There is no ios/Trueline.xcodeproj here, so this is not the Trueline repo."
+  bad "There is no ios/Trueline.xcodeproj here, so this is not the ScanToBid repo."
   echo "     Find it with:  find ~ -maxdepth 5 -type d -name trueline 2>/dev/null"
   exit 1
 fi
@@ -368,7 +368,7 @@ elif [ "$count" -gt 1 ] 2>/dev/null; then
   echo "     with the one you want, then run this again."
 else
   warn "No team set, and none found on this Mac."
-  echo "     Open Xcode once: Trueline → Signing & Capabilities → tick"
+  echo "     Open Xcode once: ScanToBid → Signing & Capabilities → tick"
   echo "     Automatically manage signing → Team. That creates the certificate"
   echo "     this script reads. Run it again afterwards and it will pick the"
   echo "     team up on its own from then on."
@@ -503,14 +503,14 @@ fi
 
 say "What to do next"
 cat <<'NEXT'
-  1. Xcode opens now. Top of the window, next to "Trueline", click the
+  1. Xcode opens now. Top of the window, next to "ScanToBid", click the
      destination dropdown and pick YOUR IPHONE BY NAME — not a simulator.
   2. Press ⌘R.
   3. First time only, on the phone:
      Settings → General → VPN & Device Management → your Apple ID → Trust
      Then ⌘R again.
 
-  If Xcode complains about signing: click the blue "Trueline" at the top of
+  If Xcode complains about signing: click the blue "ScanToBid" at the top of
   the left sidebar → Signing & Capabilities → tick "Automatically manage
   signing" and pick your team. Bundle ID stays com.sunnyacres.trueline.
 

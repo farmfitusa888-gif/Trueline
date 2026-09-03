@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Puts one word on your Mac: `trueline`. It works from any folder, so a command
+# Puts one word on your Mac: `scantobid`. It works from any folder, so a command
 # can never again fail because you were in the wrong one.
 #
 # Run it once. The first half pulls, because this file arrives in a commit and
@@ -14,11 +14,11 @@
 # After that, from any folder at all:
 #
 #   trueline          build it and put it on the phone
-#   trueline sim      run it in the simulator, no cable and no phone
-#   trueline open     open the project in Xcode
-#   trueline site     build the website and show you the folder to drag
-#   trueline check    run every test and check, without building
-#   trueline here     move this Terminal into the repo
+#   scantobid sim      run it in the simulator, no cable and no phone
+#   scantobid open     open the project in Xcode
+#   scantobid site     build the website and show you the folder to drag
+#   scantobid check    run every test and check, without building
+#   scantobid here     move this Terminal into the repo
 #
 # ## The bug this is the answer to
 #
@@ -62,13 +62,13 @@ done
 say "The repo"
 if [ ! -d "$root/ios/Trueline.xcodeproj" ]; then
   bad "There is no ios/Trueline.xcodeproj next to this script, so this is not"
-  echo "     the Trueline repo. Find it with:"
+  echo "     the ScanToBid repo. Find it with:"
   echo "       find ~ -maxdepth 5 -type d -name trueline 2>/dev/null"
   exit 1
 fi
 ok "$root"
 
-command_file="$HOME/.trueline.zsh"
+command_file="$HOME/.scantobid.zsh"
 
 # Single-quote the path the portable way. ${root@Q} would be shorter and it is
 # what this said first -- but that is bash 4.4, and the bash macOS ships is
@@ -82,12 +82,12 @@ say "Writing the command"
 # being broken loudly. If the repo ever moves, run this script again from its
 # new home and the path is rewritten.
 {
-  printf '%s\n' "# Written by install-command.sh in the Trueline repo. Re-run that"
+  printf '%s\n' "# Written by install-command.sh in the ScanToBid repo. Re-run that"
   printf '%s\n' "# script to update this file; editing it by hand will be overwritten."
-  printf '%s\n' "trueline() {"
+  printf '%s\n' "scantobid() {"
   printf '%s\n' "  local root=$quoted_root"
   printf '%s\n' "  if [ ! -d \"\$root\" ]; then"
-  printf '%s\n' "    printf 'The Trueline repo is not at %s any more.\\n' \"\$root\" >&2"
+  printf '%s\n' "    printf 'The ScanToBid repo is not at %s any more.\\n' \"\$root\" >&2"
   printf '%s\n' "    printf 'Find it, then run: bash <where-it-is>/install-command.sh\\n' >&2"
   printf '%s\n' "    return 1"
   printf '%s\n' "  fi"
@@ -100,21 +100,21 @@ say "Writing the command"
   printf '%s\n' "                      && ( cd \"\$root\" && npm run site ) \\"
   printf '%s\n' "                      && open -R \"\$root/site/dist\" ;;"
   printf '%s\n' "    here|cd)        cd \"\$root\" ;;"
-  printf '%s\n' "    help|-h|--help) trueline--say-what-it-does ;;"
+  printf '%s\n' "    help|-h|--help) scantobid--say-what-it-does ;;"
   printf '%s\n' "    *)"
-  printf '%s\n' "      printf 'trueline: I do not know \"%s\".\\n\\n' \"\$1\" >&2"
-  printf '%s\n' "      trueline--say-what-it-does >&2"
+  printf '%s\n' "      printf 'scantobid: I do not know \"%s\".\\n\\n' \"\$1\" >&2"
+  printf '%s\n' "      scantobid--say-what-it-does >&2"
   printf '%s\n' "      return 2 ;;"
   printf '%s\n' "  esac"
   printf '%s\n' "}"
   printf '%s\n' ""
-  printf '%s\n' "trueline--say-what-it-does() {"
-  printf '%s\n' "  printf 'trueline          build it and put it on the phone\\n'"
-  printf '%s\n' "  printf 'trueline sim      run it in the simulator, no cable and no phone\\n'"
-  printf '%s\n' "  printf 'trueline open     open the project in Xcode\\n'"
-  printf '%s\n' "  printf 'trueline site     build the website and show you the folder to drag\\n'"
-  printf '%s\n' "  printf 'trueline check    run every test and check, without building\\n'"
-  printf '%s\n' "  printf 'trueline here     move this Terminal into the repo\\n'"
+  printf '%s\n' "scantobid--say-what-it-does() {"
+  printf '%s\n' "  printf 'scantobid          build it and put it on the phone\\n'"
+  printf '%s\n' "  printf 'scantobid sim      run it in the simulator, no cable and no phone\\n'"
+  printf '%s\n' "  printf 'scantobid open     open the project in Xcode\\n'"
+  printf '%s\n' "  printf 'scantobid site     build the website and show you the folder to drag\\n'"
+  printf '%s\n' "  printf 'scantobid check    run every test and check, without building\\n'"
+  printf '%s\n' "  printf 'scantobid here     move this Terminal into the repo\\n'"
   printf '%s\n' "}"
 } > "$command_file"
 ok "$command_file"
@@ -124,8 +124,8 @@ say "Wiring it into your shell"
 # one copy, not two -- a second `source` line is harmless but it is the kind of
 # mess that makes a file nobody wants to open.
 rc="$HOME/.zshrc"
-top='# >>> trueline >>>'
-end='# <<< trueline <<<'
+top='# >>> scantobid >>>'
+end='# <<< scantobid <<<'
 touch "$rc"
 if grep -qF "$top" "$rc" 2>/dev/null; then
   # Cut the old block out, keep everything else exactly as it was.
@@ -138,7 +138,7 @@ if grep -qF "$top" "$rc" 2>/dev/null; then
 fi
 {
   printf '%s\n' "$top"
-  printf '%s\n' '[ -f "$HOME/.trueline.zsh" ] && source "$HOME/.trueline.zsh"'
+  printf '%s\n' '[ -f "$HOME/.scantobid.zsh" ] && source "$HOME/.scantobid.zsh"'
   printf '%s\n' "$end"
 } >> "$rc"
 ok "~/.zshrc sources it"
@@ -146,7 +146,7 @@ ok "~/.zshrc sources it"
 say "Use it"
 echo "  In THIS window, once:"
 echo ""
-echo "      source ~/.trueline.zsh"
+echo "      source ~/.scantobid.zsh"
 echo ""
 echo "  Every new Terminal window has it already. Then, from any folder:"
 echo ""

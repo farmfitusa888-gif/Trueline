@@ -80,7 +80,7 @@ struct HandbookScreen: UIViewRepresentable {
                 <body style="font:16px -apple-system;padding:24px;color:#0f172a">
                 <h2>The handbook is missing from this build.</h2>
                 <p>Xcode's build step copies <code>web/dist</code> into
-                <code>Trueline/Web</code>, and the handbook is copied in beside it.
+                <code>ScanToBid/Web</code>, and the handbook is copied in beside it.
                 Run <code>npm run ship-web</code> and build again.</p>
                 </body>
                 """,

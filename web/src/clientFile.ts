@@ -202,7 +202,7 @@ export function clientFile(parts: ClientFileParts): string {
 <main>
   <header>
     <div class="who">
-      ${head[0] ? safeLines(head[0]) : 'Trueline'}
+      ${head[0] ? safeLines(head[0]) : 'ScanToBid'}
       ${head.slice(1).map((line) => `<span>${safeLines(line)}</span>`).join('')}
     </div>
     ${company.logo ? `<img src="${company.logo}" alt="" style="height:44px;width:auto">` : ''}
@@ -241,7 +241,7 @@ export function clientFile(parts: ClientFileParts): string {
   </section>
 
   <footer>${
-    company.name ? `${safe(company.name)} · made with Trueline` : 'Made with Trueline'
+    company.name ? `${safe(company.name)} · made with ScanToBid` : 'Made with ScanToBid'
   }</footer>
 </main>
 </html>`;

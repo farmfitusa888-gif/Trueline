@@ -11,7 +11,7 @@
  */
 export function Mark({ className = '' }: { className?: string }) {
   return (
-    <svg viewBox="214 226 596 582" className={className} role="img" aria-label="Trueline">
+    <svg viewBox="214 226 596 582" className={className} role="img" aria-label="ScanToBid">
       <g stroke="currentColor" strokeLinecap="butt">
         <line x1="224" y1="300" x2="800" y2="300" strokeWidth="46" />
         <line x1="234" y1="234" x2="234" y2="366" strokeWidth="24" />

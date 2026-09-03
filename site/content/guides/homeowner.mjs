@@ -66,7 +66,7 @@ export const HOMEOWNER = [
        + 'question, it is not rude, and the answer tells you a lot about how the job will be '
        + 'run. A contractor who says "those came off a scan, I will confirm them with a tape '
        + 'before we start" is being more careful than one who says "they are accurate".' },
-    { p: 'Some tools now put this on the document itself. Trueline prints the word '
+    { p: 'Some tools now put this on the document itself. ScanToBid prints the word '
        + '<strong>SCANNED</strong> across a drawing until somebody has actually put a tape on '
        + 'the walls — which is unusual, and worth knowing exists so you can ask for it.' },
     { shot: 'plan', caption:
@@ -367,7 +367,7 @@ export const HOMEOWNER = [
     { p: 'The only reliable move is to ask. "Were these measured or estimated?" is a normal, '
        + 'polite question, and a careful contractor has a ready answer. The uncomfortable '
        + 'answer is not "estimated" — it is a contractor who cannot say which.' },
-    { note: 'Some tools now put this on the document. Trueline prints SCANNED across a drawing '
+    { note: 'Some tools now put this on the document. ScanToBid prints SCANNED across a drawing '
           + 'until a tape has actually been on the walls, so the honest answer is on the page '
           + 'rather than in a conversation. It is worth knowing that exists.' },
 

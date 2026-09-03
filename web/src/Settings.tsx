@@ -12,7 +12,7 @@ import { makeUnlockCode } from './roomLink.ts';
  *
  * A homeowner handed a drawing with somebody else's brand on it is being handed
  * a tool their contractor is borrowing. With his name, his number and his
- * licence on it, it is his drawing, made by his business, and Trueline is a
+ * licence on it, it is his drawing, made by his business, and ScanToBid is a
  * line at the bottom. That is most of why a contractor pays for a thing like
  * this, and it costs one screen.
  *
@@ -519,9 +519,9 @@ function BrowserCode() {
 
   return (
     <div data-code="browser" className="mt-6 border-t border-slate-200 pt-4">
-      <h3 className="text-sm font-semibold text-slate-900">Trueline in a browser</h3>
+      <h3 className="text-sm font-semibold text-slate-900">ScanToBid in a browser</h3>
       <p className="mt-1 text-sm leading-relaxed text-slate-600">
-        Everything but the scan runs at <strong>app.trueline.tools</strong> on any computer. The
+        Everything but the scan runs at <strong>app.scantobid.app</strong> on any computer. The
         paid screens are shut there the same way they are here. Paste this in once and that
         browser does what this phone does.
       </p>
@@ -535,7 +535,7 @@ function BrowserCode() {
           // somebody ends up pasting an empty box into the other browser.
           void navigator.clipboard
             .writeText(code)
-            .then(() => setCopied('Copied. Paste it into the box on app.trueline.tools.'))
+            .then(() => setCopied('Copied. Paste it into the box on app.scantobid.app.'))
             .catch(() => setCopied('This browser would not copy it. Read it across instead.'));
         }}
         className="mt-2 min-h-11 rounded-md border border-slate-400 px-4 text-sm font-medium

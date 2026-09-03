@@ -511,8 +511,8 @@ export function takeoff(room: Room, at: string, options: TakeoffOptions = {}): T
     `${caveat}\n` +
     thicknessNote +
     (options.company && options.company.trim() !== ''
-      ? `${options.company.trim()} — taken off ${at} with Trueline.`
-      : `Taken off ${at} by Trueline.`);
+      ? `${options.company.trim()} — taken off ${at} with ScanToBid.`
+      : `Taken off ${at} by ScanToBid.`);
 
   const header = 'item,quantity,unit,prices,workings,provenance,room,taken_off';
   const csv = [

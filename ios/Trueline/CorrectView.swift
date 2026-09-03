@@ -267,7 +267,7 @@ struct CorrectView: UIViewRepresentable {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <body style="font:16px -apple-system;padding:24px;color:#0f172a">
         <h2>The web bundle is missing from this build.</h2>
-        <p>Xcode's build step copies <code>web/dist</code> into <code>Trueline/Web</code>.
+        <p>Xcode's build step copies <code>web/dist</code> into <code>ScanToBid/Web</code>.
         Run <code>npm run build</code> at the top of the repository and build again.</p>
         </body>
         """
@@ -766,7 +766,7 @@ struct CorrectView: UIViewRepresentable {
                 if let error {
                     // Worth a line in the console: a capture that does not
                     // arrive looks exactly like one that produced nothing.
-                    print("Trueline: the capture did not reach the web view — \(error)")
+                    print("ScanToBid: the capture did not reach the web view — \(error)")
                 }
             }
         }

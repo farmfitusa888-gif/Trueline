@@ -6,7 +6,7 @@ import Foundation
 /// A folder each, in the app's Documents directory, which means two useful
 /// things without any code: they survive the app being killed, and they show up
 /// in the Files app where somebody can get at them, copy them off, or send one
-/// to a client without Trueline having a server at all.
+/// to a client without ScanToBid having a server at all.
 @MainActor
 final class ProjectStore: ObservableObject {
 
@@ -426,7 +426,7 @@ final class ProjectStore: ObservableObject {
     /// A scan is a folder, which is what makes it possible to AirDrop one, text
     /// one to yourself, or copy one out of the Files app. Getting one BACK had
     /// no path at all: the only way was to move a folder into
-    /// `On My iPhone → Trueline → Scans` by hand, and iOS will not let you open
+    /// `On My iPhone → ScanToBid → Scans` by hand, and iOS will not let you open
     /// a zip straight out of Messages, so the actual sequence was save to
     /// Files, tap to unzip, long-press, move, and get the nesting exactly
     /// right. Sam ended up with `room.json` loose in `Scans` and no room.

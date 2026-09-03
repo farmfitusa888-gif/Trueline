@@ -43,7 +43,7 @@ All figures from `MARKET-RESEARCH.md`.
 | CubiCasa | Walk-through to floor plan | $22.99–$29.99/scan, up to $460–600/scan [review] | Real-estate volume |
 | Matterport | Hosted 3D tour, AI floor plan | $65–$309/mo + $350–1,000/home [review] | Marketing tours |
 | Hover | Photos to exterior model + takeoff | $99/mo + $29–139/project [review] | Roofing, siding |
-| **Trueline** | Measured interior + takeoff + proposal + claim, one seat | $78/mo · $780/yr (not yet configured) | Restoration, then remodelers |
+| **ScanToBid** | Measured interior + takeoff + proposal + claim, one seat | $78/mo · $780/yr (not yet configured) | Restoration, then remodelers |
 
 **The one thing the research proves is unoccupied:** nobody sells *interiors +
 accuracy + estimating in one product*. Hover owns exteriors. magicplan owns
@@ -60,7 +60,7 @@ case.
 
 **The hard version.** magicplan is ~$33.33/mo flat and already does LiDAR
 scanning, floor plans, estimates and ESX export to Xactimate, with years of
-restoration contractors using it. Trueline is asking **2.4× that** with zero
+restoration contractors using it. ScanToBid is asking **2.4× that** with zero
 customers and no name. If the pitch is "a better scanner", the argument is lost
 on the first call — nobody pays 2.4× for a better version of the thing they
 already have.
@@ -153,7 +153,7 @@ Ranked by likelihood, not by severity.
 4. **You are half blind.** *(Was certain. Now half of it is fixed.)* As of
    2026-08-26 the app subscribes to Apple's MetricKit for crashes and hangs, and
    catches everything the web screens throw — both written to a folder on the
-   phone with one tap to send them (`ios/Trueline/Diagnostics.swift`,
+   phone with one tap to send them (`ios/ScanToBid/Diagnostics.swift`,
    `web/src/Trouble.tsx`). So when it **breaks** you will hear about it.
    When somebody **stops using it** you still will not: there is no analytics and
    deliberately never will be, because that is what "nothing leaves the device"
@@ -173,7 +173,7 @@ Each gate blocks the next. Several are waiting rather than work.
 1. **Walk a real kitchen.** `docs/on-the-phone.md` has 22 tests and not one has
    run on a phone. `docs/first-six-tests.md` is the short version. If the scan is
    wrong in a real room, nothing below matters.
-2. **Two web pages on trueline.tools.** Apple's listing requires a support URL
+2. **Two web pages on scantobid.app.** Apple's listing requires a support URL
    and a privacy policy URL, both live before submission. Changing them later
    means a new review.
 3. **Set the products in App Store Connect.** The prices are **not in the code** —
@@ -188,14 +188,14 @@ Each gate blocks the next. Several are waiting rather than work.
    saying *these are the scanner's numbers, not measurements*.
 7. **Submit, and expect one rejection.** Subscription apps are commonly rejected
    first time over paywall clarity — price, period, and what auto-renews must be
-   visible on the paywall itself. Trueline's already says the founding terms out
+   visible on the paywall itself. ScanToBid's already says the founding terms out
    loud, which helps.
 
 ## 8. What breaks as it grows
 
 | At | What breaks | What it costs to fix |
 |---|---|---|
-| 1 | **You cannot see anything.** ~~No analytics, no crash reporting. A scan that fails on a customer's phone is invisible.~~ | **Done, 2026-08-26.** MetricKit for native crashes and hangs, `window.onerror` for the web half that MetricKit cannot see, both written to `Documents/Reports` and sent only on a tap. `ios/Trueline/Diagnostics.swift`, `web/src/Trouble.tsx`. |
+| 1 | **You cannot see anything.** ~~No analytics, no crash reporting. A scan that fails on a customer's phone is invisible.~~ | **Done, 2026-08-26.** MetricKit for native crashes and hangs, `window.onerror` for the web half that MetricKit cannot see, both written to `Documents/Reports` and sent only on a tap. `ios/ScanToBid/Diagnostics.swift`, `web/src/Trouble.tsx`. |
 | 10 | **Support is your inbox.** | Nothing. Do it by hand on purpose — the first fifty conversations are the product research. |
 | 50 | **No way to help somebody whose data is wrong.** Everything is on their phone in their iCloud. You cannot look, cannot repair, cannot restore. | A one-tap "send me this scan" that shares the folder. The share sheet is already built; this is a button and a mail template. |
 | 500 | **One person cannot answer the email.** Every hour on support is an hour not building. | The handbook is already written and ships inside the app. Point at it, and add the three questions everyone asks to a real FAQ. |
@@ -224,7 +224,7 @@ worth doing.
 | Days | What |
 |---|---|
 | 1–2 | Build to the phone, walk a real room, run the six tests in `docs/first-six-tests.md`. Fix whatever the real room breaks. |
-| 3–5 | Support and privacy pages on trueline.tools. They gate the submission and they take an afternoon. |
+| 3–5 | Support and privacy pages on scantobid.app. They gate the submission and they take an afternoon. |
 | 6–10 | App Store Connect: products at $78 and $780, screenshots, privacy label, TestFlight to Gilbert. |
 | 10–20 | Five restoration contractors. Not a launch — five conversations, in person, with the change-order demo. Ask each of them to pay. Write down the exact words they use when they say no. |
 | 20–30 | Act on what they said. If three of five said the same thing, that is the roadmap, and it beats everything guessed in this document. |

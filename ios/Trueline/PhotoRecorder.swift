@@ -8,7 +8,7 @@ import simd
 /// The pose is the whole point. A photograph on its own is a photograph of a
 /// kitchen; a photograph with the camera's transform and intrinsics attached is
 /// a photograph that knows which walls are in it, because the room and the
-/// camera are then in the same coordinate system. Every claim Trueline makes
+/// camera are then in the same coordinate system. Every claim ScanToBid makes
 /// about what the scanner could and could not see rests on this file writing
 /// down the right sixteen numbers at the right instant.
 ///

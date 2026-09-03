@@ -105,7 +105,7 @@ export interface HandOver {
   fileName?: string;
 }
 
-export interface TruelineBridge {
+export interface ScanToBidBridge {
   /**
    * Called by the native scanner when a capture is finished.
    *
@@ -811,7 +811,7 @@ export function startRecording(hear: (answer: VoiceAnswer) => void): boolean {
     timer: giveUp(WAITING_TO_START, {
       refused:
         'The app did not answer. Nothing has been recorded — try again, and if it keeps ' +
-        'happening, close Trueline and open it back up.',
+        'happening, close ScanToBid and open it back up.',
     }),
   };
   try {
@@ -885,7 +885,7 @@ export function handBack(fileName: string, project: string): string | null {
 
 declare global {
   interface Window {
-    trueline?: TruelineBridge;
+    trueline?: ScanToBidBridge;
     /**
      * What the app had to say before this page was ready to hear it.
      *

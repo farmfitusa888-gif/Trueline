@@ -7,7 +7,7 @@ There are three ways and only two of them are worth doing.
 ## The one to use: TestFlight
 
 Gilbert installs Apple's **TestFlight** app from the App Store, taps a link you
-send him, and Trueline appears on his phone. No cable, no Xcode, no Mac. When
+send him, and ScanToBid appears on his phone. No cable, no Xcode, no Mac. When
 you push a new build he gets a notification. This is what Apple built for
 exactly this.
 
@@ -30,10 +30,10 @@ Source: [Apple's TestFlight page](https://developer.apple.com/testflight/)
      `com.sunnyacres.trueline`, both of which the project already has.
    - The build number has to go up every time. `CURRENT_PROJECT_VERSION` in the
      project settings; bump it before each archive.
-2. Go to **appstoreconnect.apple.com** → **My Apps**. If Trueline is not there
+2. Go to **appstoreconnect.apple.com** → **My Apps**. If ScanToBid is not there
    yet, **+ → New App**, and give it the same bundle ID.
 3. **TestFlight** tab. The build appears after processing — a few minutes.
-4. Apple asks **"does this app use encryption?"** Answer **no**: Trueline makes
+4. Apple asks **"does this app use encryption?"** Answer **no**: ScanToBid makes
    no network connections of its own. Answering it once sets it for good.
 5. **External Testing → + → New Group** → call it something like "Gilbert and
    the crew" → add the build → add Gilbert's email → submit.

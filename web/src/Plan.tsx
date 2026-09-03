@@ -1174,7 +1174,7 @@ export function Plan({
         {/* Whose drawing this is. A homeowner handed a drawing with somebody
             else's brand on it is being handed a tool their contractor is
             borrowing; with his name and his licence on it, it is his drawing,
-            and Trueline is the line underneath. */}
+            and ScanToBid is the line underneath. */}
         <line
           x1={PAD / 2}
           y1={118}
@@ -1202,7 +1202,7 @@ export function Plan({
           fontSize={17}
           fill="rgb(var(--c-faint))"
         >
-          Trueline
+          ScanToBid
         </text>
       </g>
     </svg>

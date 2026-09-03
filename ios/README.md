@@ -122,7 +122,7 @@ are in the app now, because the app put the file there.
 ## The icon
 
 `Trueline/Assets.xcassets/AppIcon.appiconset/icon-1024.png`, rendered from
-`assets/logo/trueline-mark.svg`. It is opaque RGB with no alpha channel, which
+`assets/logo/scantobid-mark.svg`. It is opaque RGB with no alpha channel, which
 is what the App Store requires and what Xcode will otherwise reject at upload
 time. To change it, edit the SVG and rasterise — never touch the PNG by hand.
 

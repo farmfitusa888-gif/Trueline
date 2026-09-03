@@ -203,7 +203,7 @@ async function unsqueeze(mark: string, bytes: Uint8Array): Promise<string> {
   if (mark === '0') return new TextDecoder().decode(bytes);
   if (mark !== '1') {
     throw new RoomLinkError(
-      `This link was made by a newer version of Trueline than this one — it is marked "${mark}" ` +
+      `This link was made by a newer version of ScanToBid than this one — it is marked "${mark}" ` +
         'and this build only reads 0 and 1. Ask for the job file instead.'
     );
   }
@@ -337,7 +337,7 @@ export async function roomFromLink(
   // rather than about a file nobody chose.
   if (!isJobFile(text)) {
     throw new RoomLinkError(
-      'This link carries something this build of Trueline cannot read as a room. It may have ' +
+      'This link carries something this build of ScanToBid cannot read as a room. It may have ' +
         'been made by a newer version. Ask for the job file instead.'
     );
   }

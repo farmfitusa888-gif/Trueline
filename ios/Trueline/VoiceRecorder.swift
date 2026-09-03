@@ -122,8 +122,8 @@ final class VoiceRecorder {
 
         guard await Self.mayListen() else {
             return .refused(
-                "Trueline is not allowed to use the microphone, so nothing was recorded. "
-                + "Settings › Trueline › Microphone turns it back on. Everything else on this "
+                "ScanToBid is not allowed to use the microphone, so nothing was recorded. "
+                + "Settings › ScanToBid › Microphone turns it back on. Everything else on this "
                 + "screen works either way."
             )
         }
@@ -236,7 +236,7 @@ final class VoiceRecorder {
         }
         guard await Self.mayWriteDown() else {
             return .cannot(
-                "Trueline is not allowed to use speech recognition. Settings › Trueline › "
+                "ScanToBid is not allowed to use speech recognition. Settings › ScanToBid › "
                 + "Speech Recognition turns it back on."
             )
         }

@@ -164,7 +164,7 @@ export const EXPLAINERS = [
        + 'a date that does not depend on anybody remembering that Saturday counts.' },
 
     { h2: 'Why it is in the app rather than on a checklist' },
-    { p: 'Trueline works the deadline out rather than asking for it. The proposal knows where '
+    { p: 'ScanToBid works the deadline out rather than asking for it. The proposal knows where '
        + 'it was signed and what it is for, so it knows whether the rule bites; it counts the '
        + 'business days the federal way, Saturdays in and Sundays and federal holidays out; and '
        + 'it prints the notice and both cancellation forms with your name, your business '
@@ -210,7 +210,7 @@ export const EXPLAINERS = [
   slug: 'esx-file-format',
   audience: 'restoration',
   title: 'What an ESX file actually is, and why nothing writes you one',
-  metaTitle: 'ESX File Format: What It Is and Who Can Write One',
+  metaTitle: 'ESX File Format: What It Is, Who Writes One',
   description:
     'What an ESX carries, what it has no field for, and why a room-measuring app '
     + 'cannot simply write you one. Plus what to send an adjuster instead.',
@@ -233,7 +233,7 @@ export const EXPLAINERS = [
     { h2: 'Why an app you use cannot simply write one' },
     { p: 'Being a zip is not the same as being open. What is inside the zip is Verisk’s own '
        + 'schema, and that is where a "just export an ESX" feature request stops.' },
-    { p: 'Trueline’s own source records the position it took, in the file that builds the job '
+    { p: 'ScanToBid’s own source records the position it took, in the file that builds the job '
        + 'archive, and the sentence it prints inside every archive it makes is this:' },
     { note: 'This is not an .esx and Xactimate will not open it. ESX is Verisk’s own format; '
           + 'its schema is not published, and every tool that writes one has a partnership '
@@ -244,7 +244,7 @@ export const EXPLAINERS = [
        + 'quietly is not an ESX is a file somebody emails to an adjuster expecting Xactimate to '
        + 'open it. Writing a speculative one and calling it an export would ship a file nobody '
        + 'can verify opens, which is worse than not having the button.' },
-    { note: '<strong>What has not been verified here, said plainly.</strong> Nobody at Trueline '
+    { note: '<strong>What has not been verified here, said plainly.</strong> Nobody at ScanToBid '
           + 'has been shown a schema document by Verisk, and "there is no public schema" is a '
           + 'negative that cannot be proved from outside. What can be seen from outside is that '
           + 'tools which do write ESX describe the arrangement as a partnership — Roofr’s own '
@@ -468,7 +468,7 @@ export const EXPLAINERS = [
     { p: 'It does nothing at all about the other one. A perfectly derived quantity from a wall '
        + 'nobody measured is a perfectly derived guess, and by the time it is a line on a '
        + 'client’s proposal nothing on the paper says which it was. Which is why every length '
-       + 'in Trueline carries how it was arrived at — scanned, drawn, or measured with a tape — '
+       + 'in ScanToBid carries how it was arrived at — scanned, drawn, or measured with a tape — '
        + 'right through onto the document somebody signs.' },
     { p: 'Run any of these on your own room: <a href="/calculators/">the calculators</a> '
        + 'use this exact code, in your browser, on figures you type.' },

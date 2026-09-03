@@ -16,15 +16,15 @@
  */
 
 export const SITE = {
-  name: 'Trueline',
+  name: 'ScanToBid',
   /** No trailing slash. Every canonical, sitemap entry and OG url is built off it. */
-  origin: 'https://trueline.tools',
+  origin: 'https://scantobid.app',
   tagline: 'Measure a room. Price it. Get it signed.',
   /** Under 155 characters — this is the meta description on the home page. */
   description:
     'Scan a room with an iPhone, tape one wall each way, and the takeoff, price, '
     + 'proposal and claim all come off the same measurements. No server, no account.',
-  email: 'support@trueline.tools',
+  email: 'support@scantobid.app',
   /** The subscription, as decided in docs/BUSINESS.md. Nothing is on sale yet. */
   price: { monthly: 78, yearly: 780, currency: 'USD', onSale: false },
   founded: 2026,
@@ -48,7 +48,7 @@ export const SITE = {
 export const PEOPLE = {
   builder: {
     name: 'Sam',
-    role: 'Built Trueline',
+    role: 'Built ScanToBid',
     /**
      * Two sentences, and only what is true. He writes software; he is not a
      * contractor and the site never implies he is. The product came out of a
@@ -56,7 +56,7 @@ export const PEOPLE = {
      * bio.
      */
     bio:
-      'Sam builds software. Trueline came out of a remodeler’s problem rather than '
+      'Sam builds software. ScanToBid came out of a remodeler’s problem rather than '
       + 'a product plan — watching a contractor price a kitchen off a number he could '
       + 'not defend, and deciding the app should say so on the drawing instead of '
       + 'hiding it.',
@@ -77,21 +77,21 @@ export const PEOPLE = {
     /**
      * What Sam gave, and nothing beyond it.
      *
-     * He sent four things: the name, the trade, the years, and that Trueline
+     * He sent four things: the name, the trade, the years, and that ScanToBid
      * was built for a problem of his. That is what is here. No town, no
      * speciality, no anecdote and no adjective has been added — a bio is a
      * claim about a real person, and the parts nobody said are the parts that
      * would be invented.
      */
     bio:
-      'Gilbert Rios has been a remodeling contractor for fifteen years. Trueline '
+      'Gilbert Rios has been a remodeling contractor for fifteen years. ScanToBid '
       + 'was built for the way he works, and he is the one testing it on real jobs.',
   },
 };
 
 /** The top-level pages, in the order they appear in the nav. */
 export const NAV = [
-  { href: '/', label: 'Trueline' },
+  { href: '/', label: 'ScanToBid' },
   { href: '/guides/', label: 'Guides' },
   { href: '/calculators/', label: 'Calculators' },
   { href: '/templates/', label: 'Templates' },
@@ -108,7 +108,7 @@ export const CLAIMS = [
   {
     id: 'own-icloud',
     say: 'Nothing leaves the phone except into your own iCloud.',
-    how: 'There is no Trueline server. The backup writes to the user’s own CloudKit '
+    how: 'There is no ScanToBid server. The backup writes to the user’s own CloudKit '
        + 'private database and nothing else opens a socket — the app’s content '
        + 'security policy allows no outside origin at all.',
   },
@@ -127,7 +127,7 @@ export const CLAIMS = [
   },
   {
     id: 'in-testing',
-    say: 'Trueline is in testing with a working remodeling contractor.',
+    say: 'ScanToBid is in testing with a working remodeling contractor.',
     how: 'One contractor, in the field, on his own jobs. No figure is attached to '
        + 'this and none is implied.',
   },

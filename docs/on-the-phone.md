@@ -39,7 +39,7 @@ weeks ago and nothing says so. The script checks it and rebuilds it if it can.
 ```bash
 cd ~/trueline
 git pull
-open ios/Trueline.xcodeproj
+open ios/ScanToBid.xcodeproj
 ```
 </details>
 
@@ -53,13 +53,13 @@ That prints the path. Use it in place of `~/trueline` and run the three
 commands again.
 
 **If `git pull` says you have local changes** and names
-`ios/Trueline.xcodeproj/project.pbxproj`, that is Xcode having written your
+`ios/ScanToBid.xcodeproj/project.pbxproj`, that is Xcode having written your
 signing team into a tracked file. Throw that one line away and pull again —
 from then on `setup-mac.sh` lifts it out before every pull and puts it back
 after, so this cannot happen twice:
 
 ```bash
-git checkout -- ios/Trueline.xcodeproj/project.pbxproj
+git checkout -- ios/ScanToBid.xcodeproj/project.pbxproj
 git pull
 ```
 
@@ -77,7 +77,7 @@ by itself if it finds Node on your machine.
 ## Part 2 — Xcode
 
 1. Plug the iPhone in with a cable. Unlock it and leave it unlocked.
-2. Top of the Xcode window, next to **Trueline**, there is a dropdown showing
+2. Top of the Xcode window, next to **ScanToBid**, there is a dropdown showing
    the run destination. Click it and pick **your iPhone by name** — not a
    simulator. A simulator has no LiDAR and no compass; nothing on the test list
    below works there.
@@ -85,7 +85,7 @@ by itself if it finds Node on your machine.
 4. First time only, on the phone: **Settings → General → VPN & Device
    Management → your Apple ID → Trust**. Then ⌘R again.
 
-If Xcode complains about signing: click the blue **Trueline** at the top of the
+If Xcode complains about signing: click the blue **ScanToBid** at the top of the
 left sidebar → **Signing & Capabilities** → tick **Automatically manage
 signing** and pick your team. Bundle ID stays `com.sunnyacres.trueline`.
 
@@ -448,7 +448,7 @@ exteriors, a hosted client link, and accounts that join two phones to one job.
 
 Tell me **which numbered test**, what you saw, and which room. If it is a scan,
 send the folder — the app writes every scan into its own folder in **Files → On
-My iPhone → Trueline**, which you can AirDrop to yourself.
+My iPhone → ScanToBid**, which you can AirDrop to yourself.
 
 ---
 

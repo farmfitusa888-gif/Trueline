@@ -60,7 +60,7 @@ import { Scope } from './Scope.tsx';
 import { ClaimSend } from './ClaimSend.tsx';
 
 /**
- * The first screen of Trueline: correct an imported scan.
+ * The first screen of ScanToBid: correct an imported scan.
  *
  * It is deliberately the first one. A scan closes perfectly whether it is right
  * or wrong, so the moment that decides whether the whole product is worth

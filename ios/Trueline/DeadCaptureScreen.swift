@@ -131,7 +131,7 @@ struct DeadCaptureScreen: View {
             Section {
                 Text(
                     "Saved \(entry.modified.formatted(date: .abbreviated, time: .shortened)). "
-                    + "The folder is in the Files app under Trueline if you want to look at it "
+                    + "The folder is in the Files app under ScanToBid if you want to look at it "
                     + "before it goes."
                 )
                 .font(.footnote)

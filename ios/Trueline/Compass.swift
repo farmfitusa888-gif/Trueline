@@ -5,7 +5,7 @@ import Foundation
 /// Which way the room faces.
 ///
 /// A plan without north on it is not a construction drawing, and until now
-/// Trueline had none — the "north" in the model is a name for one axis of a
+/// ScanToBid had none — the "north" in the model is a name for one axis of a
 /// datum the importer picked, which is the longest wall. Sam looked at a plan of
 /// a kitchen, compared it to his memory of the room, and could not line the two
 /// up. That is what a compass rose is for.

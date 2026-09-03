@@ -502,7 +502,7 @@ ${back}
 ${notices}
 
 <footer>
-  ${safe(proposal.roomName)} · measured and priced in Trueline · this document contains
+  ${safe(proposal.roomName)} · measured and priced in ScanToBid · this document contains
   everything it needs and works with no internet connection.
 </footer>
 </html>`;

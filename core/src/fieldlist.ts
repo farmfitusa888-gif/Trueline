@@ -174,7 +174,7 @@ export function fieldList(
 
   const footer = [
     RULE,
-    'Type these back into Trueline and the room re-solves around them.',
+    'Type these back into ScanToBid and the room re-solves around them.',
     'A wall you measure never moves again.',
   ];
 

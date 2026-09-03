@@ -12,13 +12,13 @@ import Foundation
 /// whoever he has already shared it with, backed up by somebody else, and it
 /// still works when this app is deleted.
 ///
-/// So Trueline writes into it and gets out of the way. No server, no account,
+/// So ScanToBid writes into it and gets out of the way. No server, no account,
 /// no monthly bill, and nothing of his held hostage.
 ///
 /// ## Write-only, deliberately
 ///
 /// iOS 17 added a permission for exactly this: an app that adds events without
-/// reading what is already there. Trueline has no business knowing about
+/// reading what is already there. ScanToBid has no business knowing about
 /// somebody's doctor's appointments, so it asks for the narrower one. On older
 /// systems there is only the full permission, and the app says what it is for
 /// in `Info.plist` either way.
@@ -51,7 +51,7 @@ final class JobCalendar: ObservableObject {
     /// gets two calendars rather than one confusing one.
     private func calendarName(for company: String) -> String {
         let trimmed = company.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Trueline" : trimmed
+        return trimmed.isEmpty ? "ScanToBid" : trimmed
     }
 
     /// Asks, once, and remembers what was said.
@@ -68,8 +68,8 @@ final class JobCalendar: ObservableObject {
             standing = granted
                 ? .allowed
                 : .refused(
-                    why: "Trueline cannot add to your calendar until you allow it: "
-                        + "Settings → Privacy & Security → Calendars → Trueline. "
+                    why: "ScanToBid cannot add to your calendar until you allow it: "
+                        + "Settings → Privacy & Security → Calendars → ScanToBid. "
                         + "Everything else in the app works without this."
                 )
         } catch {
@@ -89,7 +89,7 @@ final class JobCalendar: ObservableObject {
 
         guard let source = writableSource() else {
             throw NSError(
-                domain: "Trueline", code: 1,
+                domain: "ScanToBid", code: 1,
                 userInfo: [
                     NSLocalizedDescriptionKey:
                         "This phone has no calendar that can be written to. Adding an iCloud "
@@ -143,8 +143,8 @@ final class JobCalendar: ObservableObject {
     /// doctor's appointments, and that trade is the right way round.
     ///
     /// What it costs, said plainly rather than papered over: if a visit is
-    /// deleted in the Calendar app, Trueline does not know and will not put it
-    /// back. Taking it off the list in Trueline and adding it again does.
+    /// deleted in the Calendar app, ScanToBid does not know and will not put it
+    /// back. Taking it off the list in ScanToBid and adding it again does.
     private static let writtenKey = "trueline.calendar.written"
 
     private var written: Set<String> {
@@ -154,7 +154,7 @@ final class JobCalendar: ObservableObject {
 
     /// Forgets what has been written, so everything is put in again.
     ///
-    /// For the person who deleted the Trueline calendar and wants it back.
+    /// For the person who deleted the ScanToBid calendar and wants it back.
     func forget() {
         UserDefaults.standard.removeObject(forKey: Self.writtenKey)
     }
@@ -193,8 +193,8 @@ final class JobCalendar: ObservableObject {
                 // wondering where it came from. It is not used to find the
                 // event again -- write-only access means it cannot be.
                 event.notes = visit.note.isEmpty
-                    ? "Added by Trueline [\(visit.id)]"
-                    : "\(visit.note)\n\nAdded by Trueline [\(visit.id)]"
+                    ? "Added by ScanToBid [\(visit.id)]"
+                    : "\(visit.note)\n\nAdded by ScanToBid [\(visit.id)]"
                 try store.save(event, span: .thisEvent, commit: false)
                 done.insert(visit.id)
                 added += 1

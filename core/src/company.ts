@@ -16,7 +16,7 @@ import { NO_TRADE } from './trade.ts';
  * The details are not decoration. A homeowner handed a drawing with somebody
  * else's brand on it is being handed a tool their contractor is borrowing. With
  * his name, his number and his licence on it, it is his drawing, made by his
- * business, and Trueline is a line at the bottom. That difference is the whole
+ * business, and ScanToBid is a line at the bottom. That difference is the whole
  * reason a contractor pays for a thing like this.
  *
  * Nothing here is ever a measurement. A default ceiling height is a starting

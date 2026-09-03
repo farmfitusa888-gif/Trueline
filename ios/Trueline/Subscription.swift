@@ -38,7 +38,7 @@ final class Subscription: ObservableObject {
         case yearly = "com.sunnyacres.trueline.pro.yearly"
     }
 
-    /// Whether Trueline is on sale on the App Store yet.
+    /// Whether ScanToBid is on sale on the App Store yet.
     ///
     /// # This is the switch. There is one, and it is this line.
     ///
@@ -49,7 +49,7 @@ final class Subscription: ObservableObject {
     /// nothing is withheld -- charging for a subscription that cannot be bought
     /// is the app taking something away for no reason at all.
     ///
-    /// **Flip it to `true` the day Trueline goes on sale.** One word, in one
+    /// **Flip it to `true` the day ScanToBid goes on sale.** One word, in one
     /// file, done once. It is `let` and not `var` on purpose: nothing at
     /// runtime -- no setting, no gesture, no debug menu, no message from the
     /// web view -- can move it, so what a build does about money is decided
@@ -133,7 +133,7 @@ final class Subscription: ObservableObject {
     /// What this phone's browser unlock code is made from.
     ///
     /// The paid screens are shut in a browser exactly as they are here, and
-    /// there is no login anywhere in Trueline to ask instead. Here Apple says
+    /// there is no login anywhere in ScanToBid to ask instead. Here Apple says
     /// who paid; in a browser a code does. This is the seed that code is made
     /// from, and `makeUnlockCode` in `web/src/roomLink.ts` is the arithmetic --
     /// one implementation, on the web side, so that the two halves cannot

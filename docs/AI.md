@@ -1,4 +1,4 @@
-# Free AI for Trueline — what is actually available, and what is worth using
+# Free AI for ScanToBid — what is actually available, and what is worth using
 
 Researched 2026-08-27. Every figure here has a source at the bottom. Nothing in
 this file has been built. It exists so the decision is made once, on the facts,
@@ -12,7 +12,7 @@ From `CLAUDE.md`, unchanged:
 > SQL; a provider orders and phrases them. Prices come from the company's own
 > accepted-estimate history. Nothing AI produces writes to the ledger or posts.
 
-For Trueline that reads: **an AI may never produce a measurement, a quantity, a
+For ScanToBid that reads: **an AI may never produce a measurement, a quantity, a
 rate or a total.** Those come from `core/`, out of `bigint` nanometres and cents,
 and they are what the product is. An AI may write the sentences around them.
 
@@ -28,10 +28,10 @@ model that powers Apple Intelligence, running **entirely on the phone**: no API
 key, no per-token bill, no network round trip, and it works with no signal.
 
 For this app specifically, that last part is not a nice-to-have. The person using
-Trueline is standing in an unfinished basement. Every other option on this page
+ScanToBid is standing in an unfinished basement. Every other option on this page
 needs bars.
 
-**What it costs Trueline:** nothing. No account, no key, no quota, no vendor.
+**What it costs ScanToBid:** nothing. No account, no key, no quota, no vendor.
 
 **What it costs the user:** nothing, and none of their client's data leaves the
 phone — which is the same promise the rest of the app already makes about

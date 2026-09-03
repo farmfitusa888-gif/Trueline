@@ -40,7 +40,7 @@ const DIST = join(HERE, 'dist');
 const GUIDES = [...CONTRACTOR, ...RESTORATION, ...COMPARE, ...HOMEOWNER, ...EXPLAINERS];
 
 /** When the content last changed. Passed in so a rebuild is reproducible. */
-const UPDATED = process.env.TRUELINE_SITE_DATE ?? new Date().toISOString().slice(0, 10);
+const UPDATED = process.env.SCANTOBID_SITE_DATE ?? new Date().toISOString().slice(0, 10);
 
 const AUDIENCE = {
   contractor:  { label: 'Contractors', blurb: 'Takeoff, estimating, proposals and getting paid.' },
@@ -103,7 +103,7 @@ const NO_FLASH = `
 
 function shell({ title, description, path, body, jsonLd, ogType = 'website', head = '' }) {
   const canonical = url(path);
-  // The wordmark to the left of this bar is itself the link home, so a "Trueline"
+  // The wordmark to the left of this bar is itself the link home, so a "ScanToBid"
   // entry here is the same destination twice in one row -- a self-referencing
   // duplicate that costs the width four real sections need on a 320px screen and
   // gives a crawler nothing. It is dropped rather than hidden: hiding it was what
@@ -164,7 +164,7 @@ ${head}${structured}
         <path d="M7 24v-5M12 24v-8M17 24v-5M27 24v-5" stroke="currentColor" stroke-width="1.6"/>
         <path d="M22 24V11" stroke="var(--yellow)" stroke-width="2.6"/>
       </svg>
-      <span>True<span class="b">line</span></span>
+      <span>Scan<span class="b">ToBid</span></span>
     </a>
     <nav aria-label="Sections">
         ${nav}
@@ -179,7 +179,7 @@ ${body}
   <div class="wrap">
     <div class="cols">
       <div>
-        <p class="foot-h" id="foot-trueline">Trueline</p>
+        <p class="foot-h" id="foot-trueline">ScanToBid</p>
         <ul aria-labelledby="foot-trueline">
           <li><a href="/">What it is</a></li>
           <li><a href="/about/">About</a></li>
@@ -394,7 +394,7 @@ function guidePage(guide) {
 
     <hr class="rule">
 
-    <h2 id="the-app">Where this fits with Trueline</h2>
+    <h2 id="the-app">Where this fits with ScanToBid</h2>
     <p>${esc(SITE.name)} is an iPhone app that measures a room, takes it off, prices it from
       your own rate book and turns it into a proposal — with every length carrying whether it
       was scanned, drawn or measured, right onto the document a client reads.
@@ -418,7 +418,7 @@ function guidePage(guide) {
       description: guide.description,
       path, body, ogType: 'article',
       jsonLd: [article, faq, crumbs([
-        { name: 'Trueline', path: '/' },
+        { name: 'ScanToBid', path: '/' },
         { name: 'Guides', path: '/guides/' },
         { name: guide.title, path },
       ])],
@@ -658,7 +658,7 @@ function calculatorPage(calculator) {
       the app.</p>
     <p>The one thing a web form cannot do is know whether anybody put a tape on the wall. That
       is the whole of the difference between this page and
-      <a href="/">the app it comes out of</a>: Trueline carries where every length came from —
+      <a href="/">the app it comes out of</a>: ScanToBid carries where every length came from —
       scanned, drawn or measured — onto the drawing, the takeoff and the proposal a client
       reads. You can also <a href="/templates/">take the blank forms</a> and use them with
       whatever you already have.</p>
@@ -686,7 +686,7 @@ function calculatorPage(calculator) {
       path, body, ogType: 'article',
       head: `<script type="module" src="/${UI_FILE}"></script>\n`,
       jsonLd: [application, faq, crumbs([
-        { name: 'Trueline', path: '/' },
+        { name: 'ScanToBid', path: '/' },
         { name: 'Calculators', path: '/calculators/' },
         { name: calculator.title, path },
       ])],
@@ -734,7 +734,7 @@ function calculatorsIndex() {
         {
           '@context': 'https://schema.org',
           '@type': 'CollectionPage',
-          name: 'Trueline calculators',
+          name: 'ScanToBid calculators',
           url: url('/calculators/'),
           publisher: ORGANISATION,
           hasPart: CALCULATORS.map((c) => ({
@@ -744,7 +744,7 @@ function calculatorsIndex() {
             url: url(`/calculators/${c.slug}/`),
           })),
         },
-        crumbs([{ name: 'Trueline', path: '/' }, { name: 'Calculators', path: '/calculators/' }]),
+        crumbs([{ name: 'ScanToBid', path: '/' }, { name: 'Calculators', path: '/calculators/' }]),
       ],
     }),
   };
@@ -865,7 +865,7 @@ function homePage() {
         </div>
       </div>
     </div>
-    <div class="note"><p><strong>Not on the App Store yet.</strong> Trueline is in testing with
+    <div class="note"><p><strong>Not on the App Store yet.</strong> ScanToBid is in testing with
       a working remodeling contractor. The prices above are what it will be sold for; nothing is
       on sale today, and this page will say so until it is.
       <a href="#get-it">Leave an email for the TestFlight link.</a></p></div>
@@ -949,7 +949,7 @@ function homePage() {
     <div>
       <p class="eyebrow">Specification</p>
       <h2>What is in it, and where it lives</h2>
-      <p style="font-size:.97rem">There is no Trueline server. Nothing is
+      <p style="font-size:.97rem">There is no ScanToBid server. Nothing is
         uploaded, nothing is analysed, and there is no way for one person’s house to reach
         another’s.</p>
       <p><a href="/templates/">Take the blank forms, free</a></p>
@@ -1140,7 +1140,7 @@ function guidesIndex() {
         {
           '@context': 'https://schema.org',
           '@type': 'CollectionPage',
-          name: 'Trueline guides',
+          name: 'ScanToBid guides',
           url: url('/guides/'),
           publisher: ORGANISATION,
           hasPart: GUIDES.map((g) => ({
@@ -1149,7 +1149,7 @@ function guidesIndex() {
             url: url(`/guides/${g.slug}/`),
           })),
         },
-        crumbs([{ name: 'Trueline', path: '/' }, { name: 'Guides', path: '/guides/' }]),
+        crumbs([{ name: 'ScanToBid', path: '/' }, { name: 'Guides', path: '/guides/' }]),
       ],
     }),
   };
@@ -1213,7 +1213,7 @@ function templatesPage() {
             url: url(`/downloads/${t.file}`),
           })),
         },
-        crumbs([{ name: 'Trueline', path: '/' }, { name: 'Free templates', path: '/templates/' }]),
+        crumbs([{ name: 'ScanToBid', path: '/' }, { name: 'Free templates', path: '/templates/' }]),
       ],
     }),
   };
@@ -1265,15 +1265,15 @@ function aboutPage() {
   return {
     path: '/about/',
     html: shell({
-      title: `About Trueline: Built With One Contractor`,
+      title: `About ScanToBid: Built With One Contractor`,
       description:
-        'Who builds Trueline, what this site claims, how each claim can be checked, and what '
+        'Who builds ScanToBid, what this site claims, how each claim can be checked, and what '
         + 'it deliberately does not claim.',
       path: '/about/', body,
       jsonLd: [
         { '@context': 'https://schema.org', '@type': 'AboutPage', url: url('/about/'),
           publisher: ORGANISATION, mainEntity: BUILDER },
-        crumbs([{ name: 'Trueline', path: '/' }, { name: 'About', path: '/about/' }]),
+        crumbs([{ name: 'ScanToBid', path: '/' }, { name: 'About', path: '/about/' }]),
       ],
     }),
   };

@@ -388,7 +388,7 @@ export function claimFile(parts: ClaimFileParts): string {
 <main>
   <header>
     <div class="who">
-      ${head[0] ? safe(head[0]) : 'Trueline'}
+      ${head[0] ? safe(head[0]) : 'ScanToBid'}
       ${head.slice(1).map((line) => `<span>${safe(line)}</span>`).join('')}
     </div>
     ${company.logo ? `<img src="${company.logo}" alt="" style="height:44px;width:auto">` : ''}
@@ -450,7 +450,7 @@ export function claimFile(parts: ClaimFileParts): string {
   </section>
 
   <footer>${
-    company.name ? `${safe(company.name)} · made with Trueline` : 'Made with Trueline'
+    company.name ? `${safe(company.name)} · made with ScanToBid` : 'Made with ScanToBid'
   }</footer>
 </main>
 </html>`;

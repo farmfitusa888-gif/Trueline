@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Trueline</string>
+	<string>ScanToBid</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -19,17 +19,17 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Trueline uses the camera to measure the room and to photograph it while you walk, so every dimension has a picture behind it. Nothing leaves this device.</string>
+	<string>ScanToBid uses the camera to measure the room and to photograph it while you walk, so every dimension has a picture behind it. Nothing leaves this device.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Trueline records what you say about a wall, so you can talk instead of typing while you are holding a tape. Each recording is kept in that scan's own folder on this device, alongside its photographs, and is never sent anywhere. You can play it back, and delete it, from the wall it is about.</string>
+	<string>ScanToBid records what you say about a wall, so you can talk instead of typing while you are holding a tape. Each recording is kept in that scan's own folder on this device, alongside its photographs, and is never sent anywhere. You can play it back, and delete it, from the wall it is about.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Trueline writes down what you said about a wall so the words can go on a field sheet. The transcription runs on this iPhone and nothing you record is sent to Apple or to anyone else. If you say no, recording still works — you just get the audio without a transcript.</string>
+	<string>ScanToBid writes down what you said about a wall so the words can go on a field sheet. The transcription runs on this iPhone and nothing you record is sent to Apple or to anyone else. If you say no, recording still works — you just get the audio without a transcript.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
-	<string>Trueline puts the days you have scheduled into your own calendar, in a calendar of its own that you can switch off. It only adds — it never reads what else is in there.</string>
+	<string>ScanToBid puts the days you have scheduled into your own calendar, in a calendar of its own that you can switch off. It only adds — it never reads what else is in there.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Trueline puts the days you have scheduled into your own calendar, in a calendar of its own that you can switch off. It only adds — it never reads what else is in there.</string>
+	<string>ScanToBid puts the days you have scheduled into your own calendar, in a calendar of its own that you can switch off. It only adds — it never reads what else is in there.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Trueline reads the compass so it can put north on your drawing. Your position is never used, never stored and never sent anywhere.</string>
+	<string>ScanToBid reads the compass so it can put north on your drawing. Your position is never used, never stored and never sent anywhere.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -65,7 +65,7 @@
 
 	  `false` is the honest answer, and it was checked rather than assumed: there
 	  is no CryptoKit, no CommonCrypto and no Security framework anywhere in
-	  ios/Trueline, and the app has no server to talk to. If that ever changes (a
+	  ios/ScanToBid, and the app has no server to talk to. If that ever changes (a
 	  sync service, a signed licence, anything that encrypts) this key has to be
 	  revisited, because getting it wrong is a false statement to a customs
 	  regulator rather than a settings mistake.

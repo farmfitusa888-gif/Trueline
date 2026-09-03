@@ -76,13 +76,13 @@ This is the one step that has to happen in the Xcode window, and it happens
 exactly once on this Mac. Every build after it is Terminal only.
 
 ```bash
-cd ~/trueline && open ios/Trueline.xcodeproj
+cd ~/trueline && open ios/ScanToBid.xcodeproj
 ```
 
 In the window that opens:
 
-1. Click the blue **Trueline** at the very top of the left sidebar.
-2. Middle column, pick the **Trueline** target (under TARGETS, not PROJECT).
+1. Click the blue **ScanToBid** at the very top of the left sidebar.
+2. Middle column, pick the **ScanToBid** target (under TARGETS, not PROJECT).
 3. Click the **Signing & Capabilities** tab.
 4. Tick **Automatically manage signing**.
 5. **Team** → pick yours. If the list is empty: **Xcode → Settings → Accounts →
@@ -137,7 +137,7 @@ certificate from your Apple ID before.
 On the **phone**: **Settings → General → VPN & Device Management → your Apple
 ID → Trust**.
 
-Then run `bash build.sh` again, or just tap Trueline on the home screen.
+Then run `bash build.sh` again, or just tap ScanToBid on the home screen.
 
 ---
 

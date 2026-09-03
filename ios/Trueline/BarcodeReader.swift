@@ -64,8 +64,8 @@ final class BarcodeReader: NSObject, ObservableObject {
                     // Said plainly, and it names the setting rather than the
                     // API: somebody standing in an aisle needs to know where to
                     // go, not which permission was refused.
-                    self.trouble = "Trueline cannot use the camera. Turn it on in "
-                        + "Settings › Trueline › Camera, or type the code from the tag instead."
+                    self.trouble = "ScanToBid cannot use the camera. Turn it on in "
+                        + "Settings › ScanToBid › Camera, or type the code from the tag instead."
                     return
                 }
                 self.build()
@@ -88,7 +88,7 @@ final class BarcodeReader: NSObject, ObservableObject {
             let input = try? AVCaptureDeviceInput(device: camera),
             session.canAddInput(input)
         else {
-            trouble = "This phone will not give Trueline its camera, so there is nothing to read "
+            trouble = "This phone will not give ScanToBid its camera, so there is nothing to read "
                 + "a tag with. Type the code from the tag instead."
             return
         }

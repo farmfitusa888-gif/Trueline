@@ -1,4 +1,4 @@
-<img src="./assets/logo/trueline-wordmark.svg" alt="Trueline" width="380">
+<img src="./assets/logo/scantobid-wordmark.svg" alt="ScanToBid" width="380">
 
 Scan a building, correct it by hand, get a blueprint.
 
@@ -188,7 +188,7 @@ figure, the app asks you to produce one.
 Either way the room is corrected identically — same plan, same solver, same words. **How a room
 was captured changes nothing about how it is corrected.**
 
-`ios/Trueline.xcodeproj` is checked in: open it, set your signing team, press Run.
+`ios/ScanToBid.xcodeproj` is checked in: open it, set your signing team, press Run.
 
 **And a job runs end to end in the web half.** The takeoff, the contractor's own rate book, a
 proposal with options, a signature taken on the phone with the evidence written out beside it,

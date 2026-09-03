@@ -16,7 +16,7 @@ import {
 } from './room.ts';
 
 /**
- * Turning a RoomPlan scan into a Trueline room.
+ * Turning a RoomPlan scan into a ScanToBid room.
  *
  * Written against two real exports off Sam's phone — a kitchen and a garage —
  * rather than against Apple's documentation, because the two disagree in ways
@@ -142,7 +142,7 @@ function at(m: RoomPlanTransform, column: number, row: number): number {
   return value;
 }
 
-/** RoomPlan is y-up, so the plan lives in x and z. Trueline's plan is x and y. */
+/** RoomPlan is y-up, so the plan lives in x and z. ScanToBid's plan is x and y. */
 interface PlanPoint {
   readonly x: number;
   readonly y: number;

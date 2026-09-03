@@ -146,7 +146,7 @@ export function Trouble() {
             setSaid(
               askAbout('send')
                 ? null
-                : 'This build has no way to send them. Open Trueline on the phone.'
+                : 'This build has no way to send them. Open ScanToBid on the phone.'
             );
           }}
           className="min-h-12 flex-1 rounded-md bg-slate-900 px-4 font-semibold text-white active:bg-slate-700"
@@ -181,7 +181,7 @@ export function Trouble() {
 
       <p className="mt-2 text-xs text-slate-500">
         They go to{' '}
-        <span className="font-mono">support@trueline.tools</span> as one attached
+        <span className="font-mono">support@scantobid.app</span> as one attached
         file. Nothing is sent until you tap it, and nothing leaves this phone on
         its own — there is no server in this app.
       </p>

@@ -207,7 +207,7 @@ test('a room with nothing marked on it says so rather than looking complete', ()
   assert.match(html, /No damage is marked on this document/);
 });
 
-test('the contractor’s own name is on it, and Trueline is the line underneath', () => {
+test('the contractor’s own name is on it, and ScanToBid is the line underneath', () => {
   const html = claimFile({
     rooms: [{ room, damages: [waterline], plan: '', photos: shots }],
     claim: full,
@@ -216,7 +216,7 @@ test('the contractor’s own name is on it, and Trueline is the line underneath'
   });
   assert.match(html, /Gilbert Remodeling/);
   assert.match(html, /Licence RC-4412/);
-  assert.match(html, /Gilbert Remodeling · made with Trueline/);
+  assert.match(html, /Gilbert Remodeling · made with ScanToBid/);
 });
 
 test('the drawing that was handed in is the drawing on the document', () => {

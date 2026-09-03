@@ -30,7 +30,7 @@
  *
  * ## Free until launch — and where that switch is NOT
  *
- * Everything is on for everybody until Trueline goes on sale on the App Store.
+ * Everything is on for everybody until ScanToBid goes on sale on the App Store.
  * That switch is deliberately **not** in this file. It is one `let` in
  * `ios/Trueline/Subscription.swift` — `Subscription.onSale` — because that is
  * the one place in this app where the question "is this person entitled?" is

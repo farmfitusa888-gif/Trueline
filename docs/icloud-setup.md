@@ -10,7 +10,7 @@ the backup not working at all.
 Every time you type a measurement, the corrected room is written into that
 scan's own folder on the phone **and** copied into **your own iCloud** — the
 private database, which Apple describes as storing *"private data securely in
-your users' iCloud accounts"*. There is no Trueline server. Nobody is billed
+your users' iCloud accounts"*. There is no ScanToBid server. Nobody is billed
 for it. It is your iCloud, not ours, and the app says so on the list.
 
 **Measured sizes, from your own scans:**
@@ -28,8 +28,8 @@ reason the drawings go up and the photographs stay on the phone.
 
 ## 1. Xcode — the capability
 
-Open `ios/Trueline.xcodeproj`, click the blue **Trueline** at the top of the
-sidebar, then the **Trueline** target → **Signing & Capabilities**.
+Open `ios/ScanToBid.xcodeproj`, click the blue **ScanToBid** at the top of the
+sidebar, then the **ScanToBid** target → **Signing & Capabilities**.
 
 The entitlements file is already committed and already wired into the project,
 so the iCloud capability should already be listed with **CloudKit** ticked and
@@ -58,7 +58,7 @@ it asks "what is in here?". Here is exactly what to click.
 CloudKit invents its schema the first time the app saves something, so there is
 nothing to index until the app has saved. On the phone, with iCloud signed in:
 
-1. Open Trueline, open a room, and **type one tape reading**. That writes a
+1. Open ScanToBid, open a room, and **type one tape reading**. That writes a
    `Scan` record.
 2. If you use insurance mode, **take one damage photograph** as well. That
    writes a `DamagePhoto` record. If you skip this, `DamagePhoto` will not be in
@@ -104,7 +104,7 @@ rather than searching for it.
 | "every scan in this account" | `CKQuery(recordType: "Scan", predicate: NSPredicate(value: true))` | `recordName` QUERYABLE on **Scan** |
 | "the damage photographs belonging to this scan" | `CKQuery(recordType: "DamagePhoto", predicate: NSPredicate(format: "scan == %@", name))` | the **`scan`** field QUERYABLE on **DamagePhoto** |
 
-Both are in `ios/Trueline/Backup.swift`. If either index is missing, the query
+Both are in `ios/ScanToBid/Backup.swift`. If either index is missing, the query
 comes back refused rather than empty — which is why the app can print that
 sentence at all instead of quietly showing you nothing.
 

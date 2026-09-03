@@ -54,13 +54,13 @@ export const COMPARE = [
           p: 'PDF, CSV, CAD, ESX. And can the client open what you send without an account?' },
       ] },
 
-    { h2: 'Where Trueline sits, plainly' },
+    { h2: 'Where ScanToBid sits, plainly' },
     { p: 'It is built around the first question. Every length carries how it was arrived at — '
        + 'scanned by the phone, drawn on a grid, or measured with a tape — and that travels '
        + 'onto the drawing, the takeoff, the proposal and the claim. Until a tape has been on '
        + 'one wall running each way, the sheet says <strong>SCANNED</strong> across its face '
        + 'where a client reads it.' },
-    { p: 'On the others: there is no Trueline server. Rooms are folders on your phone, backed '
+    { p: 'On the others: there is no ScanToBid server. Rooms are folders on your phone, backed '
        + 'up to your own iCloud, and the whole app works with no signal. Measuring, the '
        + 'drawing and the 3D view are free; the takeoff, the pricing, the proposal and the '
        + 'claim documents are the subscription.' },
@@ -86,7 +86,7 @@ export const COMPARE = [
        + 'the drawing, and whether it works with no signal. Feature lists across these tools '
        + 'are broadly similar; those four are where they genuinely differ.' },
     { q: 'Is there a free alternative to magicplan?',
-      a: 'Several tools including Trueline have a free tier — usually the measuring and the '
+      a: 'Several tools including ScanToBid have a free tier — usually the measuring and the '
        + 'drawing, with estimating and documents paid. Compare the total annual cost including '
        + 'any per-project or per-export fees rather than the headline monthly figure.' },
     { q: 'Do these apps need internet?',
@@ -139,7 +139,7 @@ export const COMPARE = [
        + 'one plan, and by the time it is a PDF in an email there is usually nothing on the '
        + 'page saying that the north wall was scanned, the south wall was taped, and the '
        + 'closet was drawn from memory.' },
-    { p: 'That is the gap Trueline was built into. Provenance travels with each length all '
+    { p: 'That is the gap ScanToBid was built into. Provenance travels with each length all '
        + 'the way to the client’s document, and the app will not call a room measured until a '
        + 'tape has been on one wall running each way.' },
     { shot: 'grid', caption:
@@ -183,7 +183,7 @@ export const COMPARE = [
        + 'reasonable split — the measuring is the part that gets you to try it, and the '
        + 'estimating is the part that saves you a morning.' },
     { p: 'What varies is where the line sits. Some put the export behind the paywall, some the '
-       + 'plan itself, some the number of projects. Trueline puts measuring, the drawing and '
+       + 'plan itself, some the number of projects. ScanToBid puts measuring, the drawing and '
        + 'the 3D view on the free side and keeps them there; the takeoff, the pricing, the '
        + 'proposal and the claim documents are the subscription.' },
   ],
@@ -263,7 +263,7 @@ export const COMPARE = [
            + 'cannot get back into — an old drawing, a rental you have seen once, a house that '
            + 'is not built yet.' },
       ] },
-    { p: 'Both are free in Trueline. Measuring, the drawing and the 3D view are not part of '
+    { p: 'Both are free in ScanToBid. Measuring, the drawing and the 3D view are not part of '
        + 'the subscription and never will be.' },
 
     { h2: 'The honest recommendation' },
@@ -372,7 +372,7 @@ export const COMPARE = [
           p: 'Once two walls running different ways are measured, the app can reconcile the '
            + 'outline around them — and every quantity moves with it.' },
       ] },
-    { p: 'That is the sequence Trueline is built around. It will tell you which walls are '
+    { p: 'That is the sequence ScanToBid is built around. It will tell you which walls are '
        + 'worth measuring and why — the longest wall first, because an error there costs the '
        + 'most floor area — and every document says which walls have been done until they all '
        + 'have.' },
@@ -420,7 +420,7 @@ export const COMPARE = [
        + 'wall running each way.' },
     { q: 'Can I type laser readings into a measuring app?',
       a: 'That is the intended workflow: scan the room for its shape, then type your laser '
-       + 'readings against the walls that matter. In Trueline a typed reading is recorded as '
+       + 'readings against the walls that matter. In ScanToBid a typed reading is recorded as '
        + 'measured and changes every quantity that depends on it.' },
     { q: 'How do you check whether a room is square?',
       a: 'Measure both diagonals. In a true rectangle they are equal; if they differ, the room '
@@ -487,7 +487,7 @@ export const COMPARE = [
     { h2: 'And the caveat both share' },
     { p: 'Both produce geometry that looks authoritative and neither one measured your wall '
        + 'with a tape. Whatever the capture method, the number you put on a contract should '
-       + 'have had a physical measurement behind it — which is why Trueline records the method '
+       + 'have had a physical measurement behind it — which is why ScanToBid records the method '
        + 'against every length and says so on the page.' },
     { h2: 'Capture time, and what that does to a job' },
     { p: 'This is the practical difference more often than the technical one. A RoomPlan-style '
@@ -509,7 +509,7 @@ export const COMPARE = [
            + 'locate six weeks later.' },
       ] },
     { p: 'That last step is the one that gets skipped, and it is why so many claim files are '
-       + 'an email with thirty attachments. Trueline attaches each photograph to the damage it '
+       + 'an email with thirty attachments. ScanToBid attaches each photograph to the damage it '
        + 'belongs to and prints them beside the measurements on one document.' },
   ],
   faq: [

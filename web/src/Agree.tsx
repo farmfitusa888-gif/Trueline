@@ -854,7 +854,7 @@ export function Agree({
           {venue
             ? 'This decides whether federal law puts a three-day cancellation notice on the ' +
               'document. Your premises means your own permanent shop, yard or office.'
-            : 'Not answered, and Trueline will not guess it. Until you say, the proposal goes ' +
+            : 'Not answered, and ScanToBid will not guess it. Until you say, the proposal goes ' +
               'out with no cancellation notice on it. Your premises means your own permanent ' +
               'shop, yard or office.'}
         </p>

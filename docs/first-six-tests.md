@@ -66,7 +66,7 @@ relocalizing — and that sentence is the whole diagnosis.
 ## 3 · Does a tape reading actually re-solve the room?
 
 **Why it gates everything: this is the product.** No other scanning app does
-this. If it does not work, Trueline is a worse magicplan.
+this. If it does not work, ScanToBid is a worse magicplan.
 
 - Open a scan. Tap a wall.
 - Put a real tape on that wall. Type what the tape says.
@@ -149,7 +149,7 @@ Two things make a failure fixable in one round instead of four:
    refusal in this app is written to be a diagnosis.
 2. **Business tab → bottom → When something goes wrong.** If the app crashed or
    a screen went blank, there is a report in there. Tap **Send them** and it goes
-   to support@trueline.tools with the report attached. Nothing is sent unless
+   to support@scantobid.app with the report attached. Nothing is sent unless
    you tap it.
 
 Then keep going down the list. A failure in test 5 does not stop you running

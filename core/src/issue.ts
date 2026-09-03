@@ -120,7 +120,7 @@ export function axisReadiness(room: Room): AxisReadiness[] {
  * and the room closes to the nanometre anyway.
  *
  * That combination is not evidence of accuracy. It is evidence that something
- * upstream closed the polygon before Trueline ever saw it, which is exactly what
+ * upstream closed the polygon before ScanToBid ever saw it, which is exactly what
  * RoomPlan does. A room drawn by hand also closes exactly, and that *is*
  * meaningful — hence the requirement that nothing in it be verified.
  */

@@ -1,7 +1,7 @@
 import Foundation
 import RoomPlan
 
-/// Writing a finished scan to disk, in the format the rest of Trueline reads.
+/// Writing a finished scan to disk, in the format the rest of ScanToBid reads.
 ///
 /// The room goes out as `CapturedRoom` encoded by `JSONEncoder` — which is to
 /// say, the exact same shape RoomPlan's own exports have. That is deliberate and

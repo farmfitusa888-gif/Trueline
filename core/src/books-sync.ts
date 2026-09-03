@@ -257,7 +257,7 @@ function onlyKnown(one: Record<string, unknown>, known: readonly string[], where
     if (known.includes(key)) continue;
     throw new BooksSyncError(
       `The books in the repository carry "${key}" on ${where}, which this version of ` +
-        `Trueline does not know about. Nothing has been read and nothing written — a field ` +
+        `ScanToBid does not know about. Nothing has been read and nothing written — a field ` +
         `this app cannot account for is not something to quietly step over in a business record.`
     );
   }
@@ -481,7 +481,7 @@ export function readBooksFile(raw: string): BooksFile {
   }
   if (format > BOOKS_FORMAT) {
     throw new BooksSyncError(
-      `Those books were written by a newer version of Trueline (format ${format}; this one ` +
+      `Those books were written by a newer version of ScanToBid (format ${format}; this one ` +
         `reads ${BOOKS_FORMAT}). Nothing has been read and nothing written. Reading what this ` +
         `version happens to recognise would drop whatever the newer one added, and writing the ` +
         `result back would delete it from the other device with a clean commit saying nothing ` +
@@ -490,7 +490,7 @@ export function readBooksFile(raw: string): BooksFile {
   }
   if (format < BOOKS_FORMAT) {
     throw new BooksSyncError(
-      `Those books were written by an older version of Trueline (format ${format}; this one ` +
+      `Those books were written by an older version of ScanToBid (format ${format}; this one ` +
         `reads ${BOOKS_FORMAT}), and there is no conversion written between the two. It is ` +
         `being refused rather than guessed at.`
     );
@@ -733,7 +733,7 @@ function mergeList<T>(of: Kind<T>, here: readonly T[], there: readonly T[]): Mer
     if (kept.length !== expected || mine.size + theirs.size !== expected + both) {
       throw new BooksSyncError(
         `Merging the ${of.kind}s would have ended with ${kept.length} records where ` +
-          `${expected} went in. Nothing has been written. This is a fault in Trueline itself, ` +
+          `${expected} went in. Nothing has been written. This is a fault in ScanToBid itself, ` +
           `not in the books.`
       );
     }

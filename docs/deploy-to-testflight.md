@@ -1,4 +1,4 @@
-# Getting Trueline onto TestFlight
+# Getting ScanToBid onto TestFlight
 
 Your Apple Developer membership is paid and active, so everything below is
 possible today. Nothing here costs anything further.
@@ -13,7 +13,7 @@ sandbox transactions involve no payment method and no money, and a sandbox
 subscription renews on a compressed clock and cancels itself. There is no
 setting that could make a TestFlight build take a real payment.
 
-On top of that, Trueline is not even asking:
+On top of that, ScanToBid is not even asking:
 
 ```swift
 static let onSale = false            // Subscription.swift
@@ -30,7 +30,7 @@ already true**, and they are true for two independent reasons.
 
 ### Proving the purchase path still works, without charging anyone
 
-`ios/Trueline/Trueline.storekit` is a StoreKit configuration file and the scheme
+`ios/ScanToBid/ScanToBid.storekit` is a StoreKit configuration file and the scheme
 already points at it. Running the app from Xcode uses it instead of the App
 Store: real StoreKit 2 code, real `Product.products(for:)`, real transaction
 verification, local fake products, no account, no money.
@@ -71,7 +71,7 @@ App Store Connect → **My Apps** → **+** → **New App**.
 | Field | Value |
 |---|---|
 | Platform | iOS |
-| Name | see **The name is taken** below — not bare `Trueline` |
+| Name | see **The name is taken** below — not bare `ScanToBid` |
 | Primary language | English (U.S.) |
 | Bundle ID | `com.sunnyacres.trueline` |
 | SKU | `trueline-ios` (any unique string; never shown) |
@@ -79,7 +79,7 @@ App Store Connect → **My Apps** → **+** → **New App**.
 
 ### The name is taken
 
-App Store Connect refuses bare `Trueline`:
+App Store Connect refuses bare `ScanToBid`:
 
 > The app name you entered is already being used.
 
@@ -92,8 +92,8 @@ nothing else:
 | | |
 |---|---|
 | Bundle ID `com.sunnyacres.trueline` | unaffected — it is an identifier, not a name |
-| `CFBundleDisplayName` = `Trueline` | unaffected — this is the name under the icon on the phone, and Gilbert still sees "Trueline" |
-| trueline.tools, the site, the logo, the repo | all unaffected |
+| `CFBundleDisplayName` = `ScanToBid` | unaffected — this is the name under the icon on the phone, and Gilbert still sees "ScanToBid" |
+| scantobid.app, the site, the logo, the repo | all unaffected |
 
 Only the store listing needs a longer, unique string. It is capped at **30
 characters**, and it is the single heaviest factor in App Store search — so the
@@ -106,15 +106,15 @@ Suggested, all inside 30:
 
 | Name | Subtitle |
 |---|---|
-| `Trueline: Scan & Estimate` | `LiDAR room takeoff and bids` |
-| `Trueline: Room Takeoff` | `Scan, price and get it signed` |
-| `Trueline Room Measure` | `LiDAR takeoff, proposal, claim` |
+| `ScanToBid: Scan & Estimate` | `LiDAR room takeoff and bids` |
+| `ScanToBid: Room Takeoff` | `Scan, price and get it signed` |
+| `ScanToBid Room Measure` | `LiDAR takeoff, proposal, claim` |
 
 The only reliable availability test is typing it into that same field. If it is
 accepted, the name is reserved from that moment — but the reservation lapses if
 no build is submitted, so do not create the record months before uploading.
 
-**Worth two minutes first:** search the App Store for "Trueline" and see what
+**Worth two minutes first:** search the App Store for "ScanToBid" and see what
 already holds it. If it is unrelated — a fishing app, a design tool — a longer
 name alongside it is ordinary. If it is another construction or measuring app,
 that is a genuine confusion problem for customers as well as a naming one, and
@@ -131,12 +131,12 @@ Not needed for TestFlight to work — needed before you can ever charge, and
 needed for `Product.products(for:)` to return anything on a real device.
 
 App Store Connect → the app → **Subscriptions** → create a group called
-`Trueline Pro`, then two subscriptions inside it:
+`ScanToBid Pro`, then two subscriptions inside it:
 
 | Product ID | Reference name | Duration | Price |
 |---|---|---|---|
-| `com.sunnyacres.trueline.pro.monthly` | Trueline Pro monthly (Founding rate) | 1 month | $78 |
-| `com.sunnyacres.trueline.pro.yearly` | Trueline Pro yearly (Founding rate) | 1 year | $780 |
+| `com.sunnyacres.trueline.pro.monthly` | ScanToBid Pro monthly (Founding rate) | 1 month | $78 |
+| `com.sunnyacres.trueline.pro.yearly` | ScanToBid Pro yearly (Founding rate) | 1 year | $780 |
 
 The product IDs must match `Subscription.Plan` **exactly** — that is what the
 checker guards. Keep "Founding rate" in the display name while the founding

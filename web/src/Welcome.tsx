@@ -54,7 +54,7 @@ export function Welcome() {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5">
       <h2 className="text-lg font-semibold text-slate-900">
-        Trueline, in your browser. All of it but the scan.
+        ScanToBid, in your browser. All of it but the scan.
       </h2>
 
       <h3 className="mt-4 text-sm font-semibold text-slate-900">
@@ -64,7 +64,7 @@ export function Welcome() {
         <strong>Draw a room by hand</strong> — tap its corners the way you would walk round it, or
         type it in wall by wall from the tape readings you already have. Or{' '}
         <strong>open a scan you already have</strong>: the <code>room.json</code> from a RoomPlan
-        export, or a Trueline job file somebody sent you.
+        export, or a ScanToBid job file somebody sent you.
       </p>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
         That much is <strong>free, with no account and no card</strong>, and it is the same line
@@ -94,7 +94,7 @@ export function Welcome() {
         ))}
       </ul>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        <strong>If you already pay for Trueline, none of that applies to you here.</strong> The
+        <strong>If you already pay for ScanToBid, none of that applies to you here.</strong> The
         phone makes a code; paste it in below, once, and this browser behaves exactly as your
         phone does.
       </p>
@@ -116,7 +116,7 @@ export function Welcome() {
 
       <h3 className="mt-4 text-sm font-semibold text-slate-900">Nothing is uploaded</h3>
       <p className="mt-1 text-sm leading-relaxed text-slate-600">
-        The room is read in this browser and kept in this browser. There is no Trueline server, no
+        The room is read in this browser and kept in this browser. There is no ScanToBid server, no
         account, nothing to sign into and nowhere for one person&rsquo;s house to reach
         another&rsquo;s.
       </p>
@@ -132,7 +132,7 @@ export function Welcome() {
         machine runs short of space, oldest site first.
       </p>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        Trueline asks the browser to exempt this site and tells you what it answered. A browser can
+        ScanToBid asks the browser to exempt this site and tells you what it answered. A browser can
         say no, and a yes is a rule it keeps rather than a promise it made. So the moment you have
         done any real work in a room, <strong>save the job file</strong> — the button under every
         room says <em>Write the job to a file</em>, and the app will keep asking until you have
@@ -226,7 +226,7 @@ export function UnlockCode() {
       <p className="mt-1 text-sm leading-relaxed text-slate-600">
         On the phone, under <em>Your business</em>, there is a code. Paste it here once and this
         browser stops asking you to pay for what you have already paid for. There is no account
-        and no password anywhere in Trueline, and there is not going to be one.
+        and no password anywhere in ScanToBid, and there is not going to be one.
       </p>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
         <strong>Being straight about what this is:</strong> it is a courtesy lock, not a security
@@ -639,7 +639,7 @@ export function KeepACopy({
     {!unlockedByCode() && (
       <details className="mb-4 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4">
         <summary className="min-h-11 cursor-pointer text-sm font-medium text-slate-700">
-          Already paying for Trueline? Unlock this browser
+          Already paying for ScanToBid? Unlock this browser
         </summary>
         <div className="mt-2">
           <UnlockCode />

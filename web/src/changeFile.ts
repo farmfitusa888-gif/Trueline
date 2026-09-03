@@ -211,7 +211,7 @@ export function changeFile({ document, agreed, at }: ChangeFileParts): string {
 ${signed}
 
 <footer>
-  ${safe(document.jobName)} · change order ${safe(document.number)} · written in Trueline · this
+  ${safe(document.jobName)} · change order ${safe(document.number)} · written in ScanToBid · this
   document contains everything it needs and works with no internet connection.
 </footer>
 </html>`;

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 874 300" width="874" height="300"
-     role="img" aria-label="Trueline">
+     role="img" aria-label="ScanToBid">
   <!--
-    The horizontal lockup: the mark, then the name, with `line` in the amber
+    The horizontal lockup: the mark, then the name, with `ToBid` in the amber
     that means "measured" everywhere else in this product — on the plan, on the
     field card, in the app.
   -->
@@ -17,5 +17,5 @@
     </g>
   </g>
   <text x="285" y="205" font-family="Liberation Sans, Arial, Helvetica, sans-serif"
-        font-size="152" font-weight="bold" letter-spacing="-4" fill="#14181B">True<tspan fill="#B8590A">line</tspan></text>
+        font-size="152" font-weight="bold" letter-spacing="-4" fill="#14181B">Scan<tspan fill="#B8590A">ToBid</tspan></text>
 </svg>

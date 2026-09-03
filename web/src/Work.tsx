@@ -497,7 +497,7 @@ export function Work({
               onClick={() =>
                 void sendFile(
                   new Blob(
-                    [icsOf(visits, new Date().toISOString(), company.name || 'Trueline')],
+                    [icsOf(visits, new Date().toISOString(), company.name || 'ScanToBid')],
                     { type: 'text/calendar' }
                   ),
                   icsName(room.name),

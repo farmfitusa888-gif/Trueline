@@ -207,7 +207,7 @@ export const TEMPLATES = [
       { note: 'THIS SHEET IS NOT A LIEN WAIVER AND WAIVES NOTHING. It is a record of which '
             + 'waivers were asked for and received.' },
       { note: 'Some states require a specific statutory form of waiver and give no effect to '
-            + 'any other wording. Trueline does not know which state this job is in and has '
+            + 'any other wording. ScanToBid does not know which state this job is in and has '
             + 'not checked. Get the form from your own state or your own attorney.' },
       'Job', 'Address of the work', 'Owner', 'General contractor',
       'Payment application no.', 'Period covered — from', 'to',

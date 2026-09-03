@@ -78,7 +78,7 @@ function filler(column: string): string {
   if (column === 'Units' || column === 'Quantity') return '1';
   if (column === 'Customer Price' || column === 'Developer Proceeds') return '0.00';
   if (column === 'Customer Currency' || column === 'Proceeds Currency') return 'USD';
-  if (column === 'App Name') return 'Trueline';
+  if (column === 'App Name') return 'ScanToBid';
   if (column === 'Refund') return '';
   return '';
 }
@@ -291,7 +291,7 @@ test('a column inserted in the middle stops, which is the case that matters most
 
 test('a file a spreadsheet saved as commas is named for what is wrong with it', () => {
   assert.throws(
-    () => readMoneyReport('Event Date,App Name,App Apple ID\n2026-07-02,Trueline,1', 'USD'),
+    () => readMoneyReport('Event Date,App Name,App Apple ID\n2026-07-02,ScanToBid,1', 'USD'),
     (error: unknown) =>
       error instanceof OwnerError && /tab-separated and that file is not/.test((error as Error).message)
   );

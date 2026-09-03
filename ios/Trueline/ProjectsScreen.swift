@@ -5,7 +5,7 @@ import UIKit
 ///
 /// No account, no server, no monthly bill. A scan is a folder in this app's
 /// Documents directory, which also means it is visible in the Files app — so a
-/// scan can be copied off, backed up or sent to somebody without Trueline
+/// scan can be copied off, backed up or sent to somebody without ScanToBid
 /// running any infrastructure at all.
 ///
 /// It also means losing the phone loses the work, and the screen says so rather
@@ -126,7 +126,7 @@ struct ProjectsScreen: View {
                 // Bringing one back in. A scan is a folder, which is what makes
                 // it possible to AirDrop one or text one to yourself -- and
                 // until this row there was no way to get one BACK except moving
-                // a folder into On My iPhone → Trueline → Scans by hand, with
+                // a folder into On My iPhone → ScanToBid → Scans by hand, with
                 // the nesting exactly right. An export with no import is half a
                 // feature.
                 Button {
@@ -438,14 +438,14 @@ struct ProjectsScreen: View {
                     // would be untrue in two.
                     if Subscription.freeUntilLaunch {
                         Label(
-                            "Everything is on, free, until Trueline reaches the App Store. "
+                            "Everything is on, free, until ScanToBid reaches the App Store. "
                             + "See what it will cost.",
                             systemImage: "gift"
                         )
                     } else if subscription.subscribed {
                         Label("Your subscription", systemImage: "checkmark.seal")
                     } else {
-                        Label("Subscribe to Trueline", systemImage: "lock.open")
+                        Label("Subscribe to ScanToBid", systemImage: "lock.open")
                     }
                 }
                 .font(.footnote)
@@ -486,7 +486,7 @@ struct ProjectsScreen: View {
                     "Photographs stay on this phone. A scan's pictures are about 26 MB and a "
                     + "free iCloud account is 5 GB, so sending them up would fill somebody's "
                     + "iCloud with your job — that is a decision per job, not a default. "
-                    + "Every scan is in the Files app under Trueline if you want to copy one off."
+                    + "Every scan is in the Files app under ScanToBid if you want to copy one off."
                 )
                 .font(.footnote)
                 .foregroundStyle(Ink.quiet)
@@ -521,7 +521,7 @@ struct ProjectsScreen: View {
         // Twenty rooms in one scrolling list, newest first, was the only order
         // there had ever been.
         .searchable(text: $looking, prompt: "Find a room or a job")
-        .navigationTitle("Trueline")
+        .navigationTitle("ScanToBid")
         // One tap from the first screen of the app. It used to be a text link
         // at the top of a ROOM's page, so reading how to use the app required
         // already having scanned something with it.

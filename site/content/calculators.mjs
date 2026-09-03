@@ -70,7 +70,7 @@ export const CALCULATORS = [
   slug: 'markup-vs-margin',
   calc: 'markup',
   title: 'Markup and margin are not the same number',
-  metaTitle: 'Markup vs Margin Calculator (With the Arithmetic)',
+  metaTitle: 'Markup vs Margin Calculator, With the Sums',
   description:
     `A ${MARKUP.markup}% markup leaves a ${MARKUP.margin}% margin, not ${MARKUP.markup}%. `
     + 'Convert either way, see the division each figure is, and find the markup a target '
@@ -127,7 +127,7 @@ export const CALCULATORS = [
        + 'labour rate, your own material prices, the quantities the room actually measures — '
        + 'and the markup goes on top of that. A margin applied to a cost nobody worked out is '
        + 'a percentage of a guess.' },
-    { p: 'That is the order Trueline works in and the reason it holds a rate book rather than '
+    { p: 'That is the order ScanToBid works in and the reason it holds a rate book rather than '
        + 'a price list: quantities come off the room, rates come off the book you typed, and '
        + 'the job markup is one number applied at the end where you can see it. There is no '
        + 'market data in it, because a national average is not what anybody here charges.' },
@@ -231,7 +231,7 @@ export const CALCULATORS = [
     { p: 'Everything above rests on the perimeter and the ceiling height being right. Four '
        + 'inches out over four walls moves the wall face by more than ten square feet, and '
        + 'nobody notices, because a wrong number looks exactly as authoritative as a right one.' },
-    { p: 'That is what Trueline is for. The phone finds the shape of the room in about ninety '
+    { p: 'That is what ScanToBid is for. The phone finds the shape of the room in about ninety '
        + 'seconds; a tape on one wall running each way is what turns that shape into numbers '
        + 'you can put on a document. Until it has, every sheet the app prints says SCANNED '
        + 'across it, where the client will read it.' },
@@ -341,7 +341,7 @@ export const CALCULATORS = [
 
     { h2: 'Where the wall face comes from' },
     { p: 'Painting is priced off the same wall face as drywall, which means it is only as good '
-       + 'as the perimeter and the ceiling height behind it. Trueline takes both off the room '
+       + 'as the perimeter and the ceiling height behind it. ScanToBid takes both off the room '
        + 'itself and keeps every length’s provenance visible — scanned, drawn or measured — '
        + 'right onto the document a client reads, so a paint number nobody has taped says so on '
        + 'its face.' },
@@ -369,7 +369,7 @@ export const CALCULATORS = [
     ...ROOM_FIELDS,
     { text: 'coats', label: 'Coats', hint: 'A whole number.', prefill: '2' },
     { text: 'coverage', label: 'Coverage, square feet per gallon',
-      hint: 'Off the can. Trueline does not know what you are painting with, so this box '
+      hint: 'Off the can. ScanToBid does not know what you are painting with, so this box '
           + 'starts empty.' },
     { check: 'ceiling', label: 'Paint the ceiling with the same product' },
   ],
@@ -383,7 +383,7 @@ export const CALCULATORS = [
   slug: 'baseboard-trim',
   calc: 'trim',
   title: 'Baseboard and trim, in linear feet',
-  metaTitle: 'Baseboard Calculator: Linear Feet, Doors Deducted',
+  metaTitle: 'Baseboard Calculator: Linear Feet, Doors Off',
   description:
     'The run of base in a room: perimeter less every door and cased opening, with '
     + 'windows left in because base runs under them, and a stick count if you want one.',
@@ -436,7 +436,7 @@ export const CALCULATORS = [
 
     { h2: 'Getting the perimeter honestly' },
     { p: 'A perimeter four inches out over four walls moves the base run by a third of a stick, '
-       + 'which nobody notices until the last wall. Trueline measures the room and then says, on '
+       + 'which nobody notices until the last wall. ScanToBid measures the room and then says, on '
        + 'every document, whether a tape has been on the walls the number came from — which is '
        + 'the only part of this that a calculator cannot do for you.' },
   ],
@@ -546,7 +546,7 @@ export const CALCULATORS = [
        + `${ODD_ROOM.floorArea} sq ft of floor, ${ODD_ROOM.perimeter} lf of perimeter, `
        + `${ODD_ROOM.wallFace} sq ft of wall face, ${ODD_ROOM.baseboard} lf of base — before any `
        + 'opening is taken out, which the form above will do if you tell it about them.' },
-    { p: 'That is the same order the app works in, because it is the same code. Trueline walks '
+    { p: 'That is the same order the app works in, because it is the same code. ScanToBid walks '
        + 'the room off the scan, lets you correct any run by hand, and then every quantity — '
        + 'floor, ceiling, wall face, base — falls out of the corrected walk rather than being '
        + 'measured again.' },

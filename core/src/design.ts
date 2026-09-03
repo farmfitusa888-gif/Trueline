@@ -3,7 +3,7 @@
  *
  * ## Why this file exists
  *
- * Trueline is two programs. The screens where the work happens are TypeScript in
+ * ScanToBid is two programs. The screens where the work happens are TypeScript in
  * a web view; the tab bar, the room list and the two capture screens are Swift.
  * A person holding the phone cannot tell and must not be able to. Before this,
  * the web half was Tailwind's stock slate and the native half was whatever iOS

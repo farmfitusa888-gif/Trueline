@@ -15,7 +15,7 @@ import { outwardOf } from './section.ts';
  * from an angle and there is nothing to read: it is the house, with the walls
  * you would be standing behind taken away so you can see in.
  *
- * Every scanner in this field has one. Trueline has had the geometry for it
+ * Every scanner in this field has one. ScanToBid has had the geometry for it
  * since `section.ts` was written — `dollhouse()` takes the ceiling off and
  * drops the walls standing between the eye and the room — and it has only ever
  * been able to do it to **one room at a time**. `Floor.tsx` has placed every

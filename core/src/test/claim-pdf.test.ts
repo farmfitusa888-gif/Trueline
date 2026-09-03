@@ -213,21 +213,21 @@ test('a photograph that will not fit starts a new page rather than hanging off',
 
 /* ---------------------------------------------------------- the letterhead */
 
-test('the contractor’s own name heads it, and Trueline is the line underneath', () => {
+test('the contractor’s own name heads it, and ScanToBid is the line underneath', () => {
   const { drawn } = draw({
     company: { ...EMPTY_COMPANY, name: 'Gilbert Remodeling', licence: 'RC-4412' },
   });
   const all = drawn.text.map((t) => t.value);
   assert.equal(all[0], 'Gilbert Remodeling', 'first thing on the page');
   assert.ok(all.some((t) => /Licence RC-4412/.test(t)));
-  assert.equal(all[all.length - 1], 'Gilbert Remodeling · made with Trueline');
+  assert.equal(all[all.length - 1], 'Gilbert Remodeling · made with ScanToBid');
 });
 
 test('with no profile it still signs itself honestly', () => {
   const { drawn } = draw();
   const all = drawn.text.map((t) => t.value);
-  assert.equal(all[0], 'Trueline');
-  assert.equal(all[all.length - 1], 'Made with Trueline');
+  assert.equal(all[0], 'ScanToBid');
+  assert.equal(all[all.length - 1], 'Made with ScanToBid');
 });
 
 test('a room with nothing marked says so rather than looking finished', () => {

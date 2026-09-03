@@ -98,7 +98,7 @@ export function loadProject(text: string): SavedProject {
 
   if (project.formatVersion !== SAVE_FORMAT) {
     throw new PersistError(
-      `That room was saved by a different version of Trueline (format ` +
+      `That room was saved by a different version of ScanToBid (format ` +
         `${String(project.formatVersion)}, this one reads ${SAVE_FORMAT}). Rather than guess at ` +
         `what changed, it is being refused — open the scan again.`
     );

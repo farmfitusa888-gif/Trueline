@@ -14,7 +14,7 @@ import { type Camera, DEFAULT_CAMERA } from '../../core/src/project.ts';
  * off, look down into the rooms from an angle, and there is nothing to read: it
  * is the house.
  *
- * Every scanner in this field ships one. Trueline has had the geometry since
+ * Every scanner in this field ships one. ScanToBid has had the geometry since
  * `section.ts` was written and could only ever do it to **one room at a time**,
  * while `Floor.tsx` placed every room the phone holds and drew them flat.
  * Nothing joined the two. `floor3d.ts` is that join, and this is the screen for

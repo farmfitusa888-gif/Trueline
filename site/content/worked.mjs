@@ -200,7 +200,7 @@ export const DRYWALL = {
  *
  * Written as an assumption in the sentence beside it rather than presented as
  * a fact about paint: coverage is printed on the tin, it is different for a
- * primer, and it is different again over bare board. Trueline does not know
+ * primer, and it is different again over bare board. ScanToBid does not know
  * what anybody is painting with and will not pick a number for them.
  */
 export const ASSUMED_COVERAGE = 350n;

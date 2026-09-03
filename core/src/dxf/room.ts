@@ -253,8 +253,8 @@ export function roomToDxf(
     `Ceiling ${units === 'mm' ? formatMetric(room.ceilingHeight.value, 'mm') : formatFeetInches(room.ceilingHeight.value)}`,
     'Green dimensions were measured. Yellow ones are the scanner’s.',
     options.company && options.company.trim() !== ''
-      ? `${options.company.trim()} — with Trueline${options.at ? `, ${options.at}` : ''}`
-      : `Trueline${options.at ? `, ${options.at}` : ''}`,
+      ? `${options.company.trim()} — with ScanToBid${options.at ? `, ${options.at}` : ''}`
+      : `ScanToBid${options.at ? `, ${options.at}` : ''}`,
   ].filter((line) => line !== '');
 
   for (const [i, line] of lines.entries()) {

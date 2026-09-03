@@ -75,7 +75,7 @@ export const RESTORATION = [
        + 'floor the damage was seen, and how far along the wall it runs. Everything else — '
        + 'square feet of face, feet of base, whether the ceiling is involved — comes out of '
        + 'those three plus the room.' },
-    { p: 'This is what Trueline does with a mark: you point the phone at the damage and tap '
+    { p: 'This is what ScanToBid does with a mark: you point the phone at the damage and tap '
        + 'it while you are standing there, and because the app already knows how long that '
        + 'wall is, the area works itself out. The photograph is taken at the instant of the '
        + 'tap rather than afterwards, from where you were standing.' },
@@ -166,7 +166,7 @@ export const RESTORATION = [
        + 'needs, and what happens to porous materials. Class drives how much equipment, for '
        + 'how long. An estimate that names both, with the date the water arrived and the date '
        + 'it was found, is answering the adjuster’s first two questions before they are asked.' },
-    { p: 'Trueline records the category on the damage itself rather than on a note, so it '
+    { p: 'ScanToBid records the category on the damage itself rather than on a note, so it '
        + 'travels onto the claim document beside the area it applies to.' },
   ],
   faq: [
@@ -238,7 +238,7 @@ export const RESTORATION = [
     { p: 'A log that satisfies all of that can be shown as a falling curve, and a falling '
        + 'curve is the single most persuasive object in a water file. A log that switches '
        + 'scales halfway cannot be drawn at all.' },
-    { p: 'Trueline logs readings against the damage they belong to, keeps the scale with each '
+    { p: 'ScanToBid logs readings against the damage they belong to, keeps the scale with each '
        + 'reading, and refuses to draw a curve across a scale change — it lists them instead '
        + 'and says why. A curve drawn across two different scales is not a curve.' },
 
@@ -316,7 +316,7 @@ export const RESTORATION = [
     { h2: 'Writing it while you are standing there' },
     { p: 'The best version of this paragraph is written in the room, not at a desk three days '
        + 'later from memory and a phone full of photographs.' },
-    { p: 'On an iPhone that supports Apple Intelligence, Trueline will draft this for you from '
+    { p: 'On an iPhone that supports Apple Intelligence, ScanToBid will draft this for you from '
        + 'what it already holds — the cause, the dates, and every mark with its kind, its '
        + 'category and its measured area — running entirely on the phone with nothing sent '
        + 'anywhere. It writes sentences; every figure in them came off the room. You read it '
@@ -432,7 +432,7 @@ export const RESTORATION = [
     { p: 'An ESX will carry whatever geometry you give it, including geometry a phone guessed '
        + 'at. Once it is inside an estimating package it looks exactly like geometry somebody '
        + 'measured, because the format has nowhere to record the difference.' },
-    { p: 'That is the argument for settling it before export. Trueline keeps each wall’s '
+    { p: 'That is the argument for settling it before export. ScanToBid keeps each wall’s '
        + 'provenance visible right up to the moment you export — and the app will tell you '
        + 'which walls have never had a tape on them, so the decision to export anyway is a '
        + 'decision rather than an oversight.' },
@@ -463,7 +463,7 @@ export const RESTORATION = [
     { p: 'Which means the discipline has to happen before export, not after. Settle which walls '
        + 'have had a tape on them, fix the ones that matter, and then export — because after '
        + 'that, the information is gone.' },
-    { p: 'Trueline is deliberately noisy about this on the way out: it will tell you which '
+    { p: 'ScanToBid is deliberately noisy about this on the way out: it will tell you which '
        + 'walls have never been measured at the point you ask for an export, so exporting '
        + 'anyway is a decision somebody made rather than something that happened.' },
   ],
@@ -523,7 +523,7 @@ export const RESTORATION = [
     { p: 'Switching scales partway through. A relative scale on Monday and %MC on Thursday '
        + 'cannot be compared, cannot be plotted, and cannot be shown to an adjuster as a '
        + 'drying curve — because a line drawn across a scale change is not measuring anything.' },
-    { note: 'Trueline keeps the scale with each reading and will not draw a curve across a '
+    { note: 'ScanToBid keeps the scale with each reading and will not draw a curve across a '
           + 'change of scale. It lists the readings instead and says why. That is deliberate: '
           + 'a curve that quietly spans two scales is worse than no curve, because it looks '
           + 'like evidence.' },
@@ -609,7 +609,7 @@ export const RESTORATION = [
        + 'feet when the water was fourteen inches?", and the answer — that a 4 ft cut is how a '
        + 'strip of board goes back properly — lands much better when the fourteen inches is '
        + 'documented right beside it.' },
-    { note: 'Trueline keeps these as separate fields on the same damage: what the water was '
+    { note: 'ScanToBid keeps these as separate fields on the same damage: what the water was '
           + 'seen to reach, and the height you have decided to cut to. The claim document '
           + 'prints both and says which figure the scope used.' },
 
@@ -719,7 +719,7 @@ export const RESTORATION = [
        + 'that way — but if the repair is one continuous strip, the scope is one strip. Record '
        + 'both observations, then state the scope as what you will actually do.' },
     { p: 'This is the kind of thing that is trivially easy on site and genuinely hard three '
-       + 'days later at a desk. Trueline marks each patch where it is on the wall, keeps them '
+       + 'days later at a desk. ScanToBid marks each patch where it is on the wall, keeps them '
        + 'separate as observations, and works out the areas from the wall it already measured.' },
 
     { h2: 'Why the wall length has to be right' },
@@ -798,7 +798,7 @@ export const RESTORATION = [
        + 'the loss narrative, the property and the dates, the room with its measurements, each '
        + 'damage with its area and its photographs, the moisture log, and the scope. In that '
        + 'order, because that is the order the questions come in.' },
-    { p: 'That is exactly what Trueline’s claim document is — assembled from the measurements '
+    { p: 'That is exactly what ScanToBid’s claim document is — assembled from the measurements '
        + 'and marks you took on site, with each figure showing where it came from and each '
        + 'photograph attached to the damage it belongs to rather than to an email.' },
     { shot: 'claim', caption:

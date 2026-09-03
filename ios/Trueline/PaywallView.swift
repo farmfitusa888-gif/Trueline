@@ -50,7 +50,7 @@ struct PaywallView: View {
                             .font(.title2.weight(.bold))
                     }
 
-                    // While Trueline is not on sale, this whole screen is a
+                    // While ScanToBid is not on sale, this whole screen is a
                     // description of what is coming rather than a gate, and it
                     // has to say so. A mode nobody can see on the screen is a
                     // mode that ships still switched on -- see
@@ -61,7 +61,7 @@ struct PaywallView: View {
                             Text("Everything is on, free, right now")
                                 .font(.subheadline.weight(.semibold))
                             Text(
-                                "Trueline is not on the App Store yet, so there is nothing to "
+                                "ScanToBid is not on the App Store yet, so there is nothing to "
                                 + "buy and nothing is being withheld. Every part of it below is "
                                 + "working on this phone today. When it does go on sale, "
                                 + "measuring, the drawing, the 3D view and your first room stay "
@@ -254,7 +254,7 @@ struct PaywallView: View {
                 }
                 .padding(20)
             }
-            .navigationTitle("Trueline")
+            .navigationTitle("ScanToBid")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

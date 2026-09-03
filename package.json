@@ -2,7 +2,7 @@
   "name": "trueline",
   "private": true,
   "version": "0.1.0",
-  "description": "Trueline \u2014 scan a building, correct it by hand, get a blueprint.",
+  "description": "ScanToBid \u2014 scan a room, price it, hand over the bid.",
   "workspaces": [
     "core",
     "web"

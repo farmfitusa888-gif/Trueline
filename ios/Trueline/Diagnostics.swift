@@ -244,7 +244,7 @@ final class Diagnostics: NSObject, ObservableObject, MXMetricManagerSubscriber {
         // the past payloads on every launch and Apple keeps them for a few days.
         // The name is derived from the payload's own end timestamp and kind, so
         // the second copy lands on the first and there is one file, not five.
-        let head = "\(summary)\n\nTrueline \(Self.version), \(Self.device), iOS \(UIDevice.current.systemVersion)\n\n"
+        let head = "\(summary)\n\nScanToBid \(Self.version), \(Self.device), iOS \(UIDevice.current.systemVersion)\n\n"
         var text = Data(head.utf8)
         text.append(body.prefix(Self.biggest))
         try? text.write(to: file, options: .atomic)
@@ -307,9 +307,9 @@ final class Diagnostics: NSObject, ObservableObject, MXMetricManagerSubscriber {
         guard !all.isEmpty else { return nil }
 
         var text = """
-        Trueline reports
+        ScanToBid reports
         \(all.count) report\(all.count == 1 ? "" : "s") from this phone.
-        Trueline \(Self.version), \(Self.device), iOS \(UIDevice.current.systemVersion).
+        ScanToBid \(Self.version), \(Self.device), iOS \(UIDevice.current.systemVersion).
 
         Nothing in this file was sent automatically. It is here because somebody
         tapped Send them.
@@ -324,7 +324,7 @@ final class Diagnostics: NSObject, ObservableObject, MXMetricManagerSubscriber {
         }
 
         let out = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Trueline-reports-\(Self.stamp.string(from: Date())).txt")
+            .appendingPathComponent("ScanToBid-reports-\(Self.stamp.string(from: Date())).txt")
         guard (try? Data(text.utf8).write(to: out, options: .atomic)) != nil else { return nil }
         return out
     }
@@ -419,7 +419,7 @@ struct MailReports: UIViewControllerRepresentable {
         let composer = MFMailComposeViewController()
         composer.mailComposeDelegate = context.coordinator
         composer.setToRecipients([Diagnostics.sendTo])
-        composer.setSubject("Trueline reports — \(Diagnostics.version), \(Diagnostics.device)")
+        composer.setSubject("ScanToBid reports — \(Diagnostics.version), \(Diagnostics.device)")
         composer.setMessageBody(
             """
             The reports are attached.

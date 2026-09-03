@@ -11,7 +11,7 @@ import Foundation
 ///
 /// It goes into the **user's own iCloud private database**, which is the whole
 /// reason it costs nothing to run. Apple's own words for it: *"Store private
-/// data securely in your users' iCloud accounts."* There is no Trueline server,
+/// data securely in your users' iCloud accounts."* There is no ScanToBid server,
 /// no account to create, no password to reset and no monthly bill — and the
 /// sentence on the screen stays honest: it is not "our cloud", it is theirs.
 ///
@@ -468,7 +468,7 @@ final class Backup: ObservableObject {
         case .zoneBusy, .serviceUnavailable, .requestRateLimited:
             return "iCloud is busy. Your work is on this phone; the copy will go up shortly."
         case .permissionFailure:
-            return "iCloud would not accept the copy — check that iCloud Drive is on for Trueline."
+            return "iCloud would not accept the copy — check that iCloud Drive is on for ScanToBid."
         case .invalidArguments:
             // Nearly always the missing Queryable index. Naming it beats
             // "invalid arguments", which tells nobody anything.

@@ -539,11 +539,11 @@ export const NOTICE_NOT_COMPLETED: readonly string[] = [
  * question it has not answered and sends him to find out.
  */
 export const WHAT_THIS_DOES_NOT_KNOW: readonly string[] = [
-  'This is not legal advice. Trueline works out a date from a federal rule; it does not ' +
+  'This is not legal advice. ScanToBid works out a date from a federal rule; it does not ' +
     'advise anybody on a contract.',
   'This is the federal rule only — 16 CFR Part 429. Many states have their own ' +
     'home-solicitation or home-improvement contract laws, several give the buyer longer ' +
-    'than three days, and some require wording of their own. Trueline does not know which ' +
+    'than three days, and some require wording of their own. ScanToBid does not know which ' +
     'state this job is in or what that state requires, and it has not checked. Whichever ' +
     'period is longer is the one that protects the buyer, so check your state before you ' +
     'rely on three days.',

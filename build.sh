@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Trueline and puts it on the phone. One command, no Xcode window.
+# Builds ScanToBid and puts it on the phone. One command, no Xcode window.
 #
 #   trueline
 #
@@ -56,7 +56,7 @@ for arg in "$@"; do
 done
 
 if [ ! -d ios/Trueline.xcodeproj ]; then
-  bad "There is no ios/Trueline.xcodeproj here, so this is not the Trueline repo."
+  bad "There is no ios/Trueline.xcodeproj here, so this is not the ScanToBid repo."
   echo "     Find it with:  find ~ -maxdepth 5 -type d -name trueline 2>/dev/null"
   exit 1
 fi
@@ -128,7 +128,7 @@ if [ "$sim" = yes ]; then
   # is the other reason this path exists.
   if xcodebuild \
     -project ios/Trueline.xcodeproj \
-    -scheme Trueline \
+    -scheme ScanToBid \
     -configuration Debug \
     -destination "id=$udid" \
     -derivedDataPath "$derived" \
@@ -144,9 +144,9 @@ if [ "$sim" = yes ]; then
     exit 1
   fi
 
-  app="$(find "$derived/Build/Products" -maxdepth 2 -name 'Trueline.app' -print -quit)"
+  app="$(find "$derived/Build/Products" -maxdepth 2 -name 'ScanToBid.app' -print -quit)"
   if [ -z "$app" ]; then
-    bad "It compiled and I cannot find Trueline.app under $derived/Build/Products."
+    bad "It compiled and I cannot find ScanToBid.app under $derived/Build/Products."
     exit 1
   fi
 
@@ -246,7 +246,7 @@ mkdir -p "$derived"
 # log is kept in the file named below for the times it does.
 if xcodebuild \
   -project ios/Trueline.xcodeproj \
-  -scheme Trueline \
+  -scheme ScanToBid \
   -configuration Debug \
   -destination "id=$udid" \
   -derivedDataPath "$derived" \
@@ -265,7 +265,7 @@ else
   exit 1
 fi
 
-app="$derived/Build/Products/Debug-iphoneos/Trueline.app"
+app="$derived/Build/Products/Debug-iphoneos/ScanToBid.app"
 if [ ! -d "$app" ]; then
   bad "It compiled but produced no app at $app"
   exit 1

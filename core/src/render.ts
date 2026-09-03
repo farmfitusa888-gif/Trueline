@@ -6,7 +6,7 @@ import { type Trust, readiness } from './issue.ts';
 import { type Zone } from './zone.ts';
 
 /**
- * The one place Trueline's exact model becomes floating point, for drawing.
+ * The one place ScanToBid's exact model becomes floating point, for drawing.
  *
  * Nothing needs exact arithmetic to put a wall on a screen, and every renderer
  * worth using — Three.js included — is float throughout. So this is a boundary

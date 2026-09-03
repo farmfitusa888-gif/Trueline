@@ -2957,3 +2957,61 @@ The first of those sweeps was invalidated by me: `npm run verify` rebuilds
 `web/dist`, and it was run twice while the audit was serving pages out of that
 exact folder. That is the same mistake as editing files under a running sweep,
 which this file already records once. A sweep gets the tree to itself.
+
+---
+
+## Trueline is ScanToBid
+
+There is an actively shipped construction estimating app called **Trueline** —
+same audience, same business model, updated a week before we found it. Sam:
+*"Rename the product."* Ten rounds of candidates later, the one that survived
+was the one that names the outcome rather than the instrument.
+
+A contractor does not want a room read. He wants a bid out the door tonight.
+**ScanToBid** says the whole arc — scan the room, hand over the bid — where
+`RoomReader` named only the first thirty seconds and `Trueline` named nothing at
+all. Domain: `scantobid.app`.
+
+### What changed, and what deliberately did not
+
+**Changed:** everything a customer or a search engine sees. The site's name,
+origin and support address; all 41 pages; the wordmark, in the same two-tone
+treatment with `ToBid` carrying the amber that means "measured" everywhere else;
+`CFBundleDisplayName`; every user-facing string in Swift; the logo files; the
+docs; and the one-word command, which is `scantobid` now.
+
+**Not changed, on purpose:** the bundle id `com.sunnyacres.trueline`, the two
+StoreKit product ids, the Xcode project, the `ios/Trueline/` folder and every
+Swift type name. None of them is ever shown to anybody. Renaming them would
+rewrite `project.pbxproj` and orphan the scans already on Sam's phone, the day
+before his first archive. A legacy bundle id is normal; a broken build the night
+you ship is not.
+
+### Four things the checkers caught that a search-and-replace would have shipped
+
+Every one of these was a green-looking rename that was actually broken:
+
+- **`ios/ScanToBid.xcodeproj`.** The blanket replace renamed a path that still
+  exists on disk under its old name, so `install-command.sh` started looking for
+  a directory that is not there. Caught by running the installer in a throwaway
+  HOME rather than by reading it.
+- **`/made with Trueline/`.** The rename guarded `Trueline/` to protect file
+  paths — and a JavaScript regex literal also ends in a slash, so the assertion
+  inside `claim-file.test.ts` was skipped while the test's own name was renamed
+  around it. Caught by the test suite.
+- **`Design.swift`.** Edited directly. It is GENERATED from `core/src/design.ts`,
+  and `check-tokens` refused the drift. The fix was to rename the source and
+  regenerate, which is the difference between changing a thing and changing the
+  thing that makes it.
+- **Four titles over 60 characters.** "ScanToBid" is three characters longer than
+  "Trueline", so four pages tipped past the limit the moment the suffix changed.
+  Caught by the SEO gate written yesterday, on its first real day of work.
+
+And one that was not a break: `Backup.swift` is excused from the Swift grammar
+on the basis of having been read line by line, and that excuse is pinned to a
+content hash. Two prose lines moved the hash and the excuse lapsed, exactly as
+designed. The diff was read — one doc comment, one sentence shown to somebody
+whose iCloud refused a copy — and the hash was moved with that on the record.
+
+npm run verify green: 1303/1303, typecheck clean, every checker, 43 pages, 0 SEO
+findings. Site sweep green: 2073 checks, 42 pages at seven widths, 0px overflow.

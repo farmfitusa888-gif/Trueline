@@ -118,7 +118,7 @@ struct RootTabs: View {
         }
         // The same amber the web screens use for a control that acts, out of
         // the same generated token file. Before this the tab bar was iOS blue
-        // and the room inside it was Trueline amber, which is the seam this
+        // and the room inside it was ScanToBid amber, which is the seam this
         // whole pass exists to close.
         .tint(Ink.accent)
         .onAppear(perform: Self.dressTheBars)

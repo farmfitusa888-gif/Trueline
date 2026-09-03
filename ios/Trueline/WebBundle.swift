@@ -203,7 +203,7 @@ final class WebBundle: NSObject, WKURLSchemeHandler {
     private func fail(_ task: WKURLSchemeTask, _ reason: String) {
         task.didFailWithError(
             NSError(
-                domain: "Trueline.WebBundle",
+                domain: "ScanToBid.WebBundle",
                 code: 404,
                 userInfo: [NSLocalizedDescriptionKey: reason]
             )

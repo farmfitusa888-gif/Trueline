@@ -2,7 +2,7 @@
  * Guides for the people who buy this: remodelers and general contractors.
  *
  * Every one answers a question somebody types into Google before they have ever
- * heard of Trueline, and answers it well enough to be worth reading on its own
+ * heard of ScanToBid, and answers it well enough to be worth reading on its own
  * — which is the only kind of page that ranks and stays ranked. The product is
  * mentioned where it is genuinely the answer and nowhere else.
  *
@@ -91,7 +91,7 @@ export const CONTRACTOR = [
        + 'perimeter that is four inches out over four walls moves the wall face by more than '
        + 'ten square feet, and nobody notices, because the number looks exactly as '
        + 'authoritative as a correct one.' },
-    { p: 'This is the reason Trueline refuses to call a scanned length a measurement. The '
+    { p: 'This is the reason ScanToBid refuses to call a scanned length a measurement. The '
        + 'phone gives you the shape of the room in seconds; a tape on one wall running each '
        + 'way is what turns that shape into numbers you can defend. Until that has happened, '
        + 'every sheet the app prints says <strong>SCANNED</strong> across it, where the '
@@ -200,7 +200,7 @@ export const CONTRACTOR = [
        + 'measuring the room, and the honest problem with measuring is that the numbers you '
        + 'took standing up in a half-demolished kitchen become numbers on a legal document '
        + 'later, with nothing on the page saying which is which.' },
-    { p: 'That is the specific thing Trueline was built to fix: a length carries how it was '
+    { p: 'That is the specific thing ScanToBid was built to fix: a length carries how it was '
        + 'arrived at — scanned, drawn, or measured with a tape — right through onto the '
        + 'estimate, so the document tells the client what it is standing on.' },
     { shot: 'proposal', caption:
@@ -287,7 +287,7 @@ export const CONTRACTOR = [
        + 'the area comes off the outline rather than off two numbers multiplied together.' },
     { p: 'What it does not give you is a measurement. A tape on one wall running each way is '
        + 'what turns a scanned outline into a number worth ordering material against, and '
-       + 'Trueline says which one it is holding at every point until you do.' },
+       + 'ScanToBid says which one it is holding at every point until you do.' },
     { shot: 'plan', caption:
       'The outline as the phone found it, dimensioned, with the notch for the doorway. '
       + 'The line under it says these are the scanner’s numbers.' },
@@ -362,7 +362,7 @@ export const CONTRACTOR = [
        + 'floor, ceiling, wall face or perimeter, and put the unit beside it. A line that '
        + 'says <code>Wall face — 416 sq ft</code> cannot be misread. A line that says '
        + '<code>Area — 416</code> will be, eventually, by you.' },
-    { p: 'Trueline never prints a bare area for this reason. Every line on a takeoff names '
+    { p: 'ScanToBid never prints a bare area for this reason. Every line on a takeoff names '
        + 'which of the four it is, carries its unit, and shows the arithmetic that produced '
        + 'it, so a number can be checked rather than trusted.' },
     { h2: 'Working it out on a room that is not a rectangle' },
@@ -480,7 +480,7 @@ export const CONTRACTOR = [
     { h2: 'Where the perimeter comes from' },
     { p: 'Base is perimeter arithmetic, so it is only ever as good as the perimeter. That is '
        + 'the number a phone scan gives you quickly and a tape gives you properly — and '
-       + 'Trueline keeps the two apart, wall by wall, so a base figure standing on a scan '
+       + 'ScanToBid keeps the two apart, wall by wall, so a base figure standing on a scan '
        + 'says so.' },
     { h2: 'Working round a staircase' },
     { p: 'Where base meets a stair it usually becomes skirting, cut on the rake, and that is a '
@@ -537,7 +537,7 @@ export const CONTRACTOR = [
   slug: 'lidar-room-scanning',
   audience: 'contractor',
   title: 'LiDAR room scanning: what it is good at, and where it fails',
-  metaTitle: 'LiDAR Room Scanning for Contractors: Honest Guide',
+  metaTitle: 'LiDAR Room Scanning for Contractors, Honestly',
   description:
     'What an iPhone’s LiDAR scanner actually measures, the five situations where it '
     + 'gets a room wrong, and why a scan is a shape rather than a measurement.',
@@ -590,7 +590,7 @@ export const CONTRACTOR = [
        + 'look at the plan, and put a tape on the walls that matter — which on almost every '
        + 'room means one wall running each way, because that is what pins the whole outline.' },
 
-    { h2: 'Why Trueline prints the word SCANNED on the drawing' },
+    { h2: 'Why ScanToBid prints the word SCANNED on the drawing' },
     { p: 'Every length in this app carries how it was arrived at, and there are only three '
        + 'answers: scanned by the phone, drawn on a grid, or measured with a tape. That '
        + 'provenance follows the number onto the plan, the takeoff, the proposal and the '
@@ -685,7 +685,7 @@ export const CONTRACTOR = [
     { p: 'A record worth having says who signed, when, on what device, the exact wording they '
        + 'agreed to, that they consented to sign electronically, and a hash of the document as '
        + 'it stood at that moment. Anything less is a picture of a name.' },
-    { p: 'That is what Trueline records, and the signed scope then becomes the thing the job '
+    { p: 'That is what ScanToBid records, and the signed scope then becomes the thing the job '
        + 'is measured against — never edited, with anything that changes becoming a change '
        + 'order that is itself signed before work starts.' },
     { shot: 'proposal', caption:
@@ -766,7 +766,7 @@ export const CONTRACTOR = [
     { p: 'A change order only means something if there is a fixed thing it is changing. That '
        + 'means the signed scope has to be preserved exactly as signed — not edited, not '
        + 'updated in place, not "the latest version".' },
-    { p: 'Trueline treats the signed proposal as a baseline that is never edited. Every later '
+    { p: 'ScanToBid treats the signed proposal as a baseline that is never edited. Every later '
        + 'difference is a change order against it, so at any point you can show what was '
        + 'agreed, what changed, when, and who signed for each.' },
   ],
@@ -840,7 +840,7 @@ export const CONTRACTOR = [
       note: 'One job gives you a number. Five jobs give you a rate. Take the middle one '
           + 'rather than the average, so a single emergency job at triple money does not move '
           + 'your book.' },
-    { p: 'This is why Trueline can suggest rates without inventing any: it works them out '
+    { p: 'This is why ScanToBid can suggest rates without inventing any: it works them out '
        + 'from the jobs you marked won, takes the median rather than the mean, and never '
        + 'changes your book unless you tap the suggestion.' },
 
@@ -852,7 +852,7 @@ export const CONTRACTOR = [
         'Name it on the proposal as excluded, so the client knows it is not in the number.',
       ] },
     { p: 'A quote that adds up perfectly and is silently missing a floor is the worst document '
-       + 'in this trade. Trueline will not price an item at zero for this reason — an item '
+       + 'in this trade. ScanToBid will not price an item at zero for this reason — an item '
        + 'with no rate is listed by name instead, on the screen and on the proposal.' },
     { shot: 'price', caption:
       'Every line is a rate you set times a quantity the room measured, with the arithmetic '
