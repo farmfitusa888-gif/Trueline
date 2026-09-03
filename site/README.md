@@ -59,5 +59,5 @@ Add a new Netlify site from this repository with the base directory set to
 of the build — a deploy that would ship a dead link or broken structured data
 fails instead of going live.
 
-Then point `trueline.tools` at it, and set `SITE.origin` in `content/site.mjs`
+Then point `scantobid.app` at it, and set `SITE.origin` in `content/site.mjs`
 if the domain is ever anything else.

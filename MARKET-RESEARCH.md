@@ -274,7 +274,7 @@ Trueline actually competes with for a contractor's monthly payment are estimatin
 platforms, CRMs and proposal tools, and the features worth taking come from them.
 
 That survey, the four places a remodeler loses money, and a ranked build order are in
-**`docs/the-trueline-wedge.html`** (published as an artifact for Sam on the same date).
+**`docs/the-scantobid-wedge.html`** (published as an artifact for Sam on the same date).
 
 The two findings that change the product:
 

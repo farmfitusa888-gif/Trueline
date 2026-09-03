@@ -41,7 +41,7 @@ const BACK = `
   .back-to-app:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
   @media print { .back-to-app { display:none; } }
 </style>
-<div class="wrap"><a class="back-to-app" href="./index.html">&larr; Back to Trueline</a></div>
+<div class="wrap"><a class="back-to-app" href="./index.html">&larr; Back to ScanToBid</a></div>
 `;
 
 function main() {
@@ -55,7 +55,7 @@ function main() {
     throw new Error('handbook.html still reaches for a font off the device');
   }
 
-  const title = doc.match(/<title>(.*?)<\/title>/)?.[1] ?? 'The Trueline Handbook';
+  const title = doc.match(/<title>(.*?)<\/title>/)?.[1] ?? 'The ScanToBid Handbook';
 
   const page = `<!doctype html>
 <html lang="en">

@@ -67,7 +67,7 @@ final class Diagnostics: NSObject, ObservableObject, MXMetricManagerSubscriber {
     /// The domain rather than a personal inbox: an address inside a shipped app
     /// is permanent in a way a Gmail account is not, and the App Store listing
     /// needs a support URL on that domain anyway.
-    static let sendTo = "support@trueline.tools"
+    static let sendTo = "support@scantobid.app"
 
     /// One report on disk.
     struct Report: Identifiable, Equatable {

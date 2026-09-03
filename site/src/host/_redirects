@@ -1,5 +1,5 @@
 # One host, one address. Two hostnames serving the same pages is the duplicate
 # a search engine has to pick between, and a canonical tag is a hint rather
 # than an instruction -- a 301 is the instruction.
-https://www.trueline.tools/* https://trueline.tools/:splat 301
-http://www.trueline.tools/* https://trueline.tools/:splat 301
+https://www.scantobid.app/* https://scantobid.app/:splat 301
+http://www.scantobid.app/* https://scantobid.app/:splat 301

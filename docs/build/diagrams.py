@@ -164,7 +164,7 @@ OPENPLAN = f'''<svg viewBox="0 0 620 168" xmlns="http://www.w3.org/2000/svg" rol
 # distinct line weight and dash as well as a colour, so it still reads after a
 # black-and-white photocopy.
 PLANKEY = f'''<svg viewBox="0 0 620 150" xmlns="http://www.w3.org/2000/svg" role="img"
-  aria-label="What each kind of line on the Trueline plan means">{DEFS}
+  aria-label="What each kind of line on the ScanToBid plan means">{DEFS}
   <text x="0" y="10" font-size="11" font-weight="bold" fill="#14181B">THE PLAN ON SCREEN &#8212; WHAT EACH LINE MEANS</text>
 
   <!-- a small room, one edge of each kind -->

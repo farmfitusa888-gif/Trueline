@@ -557,14 +557,14 @@ export function App() {
             >
               <Mark className="h-7 w-auto text-slate-900" />
               <span>
-                True<span className="text-[#B8590A]">line</span>
+                Scan<span className="text-[#B8590A]">ToBid</span>
               </span>
             </button>
           ) : (
             <span className="flex items-center gap-2">
               <Mark className="h-7 w-auto text-slate-900" />
               <span>
-                True<span className="text-[#B8590A]">line</span>
+                Scan<span className="text-[#B8590A]">ToBid</span>
               </span>
             </span>
           )}

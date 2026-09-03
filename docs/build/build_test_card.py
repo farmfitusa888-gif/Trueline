@@ -73,10 +73,10 @@ def css(pt, lead):
 def html(pt, lead):
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Trueline — tests 2 and 20</title>
+<title>ScanToBid — tests 2 and 20</title>
 <style>{css(pt, lead)}</style></head><body>
 
-<header class="mast"><div class="brand">True<span>line</span></div>
+<header class="mast"><div class="brand">Scan<span>ToBid</span></div>
   <div class="sub">On the phone &mdash; tests 2 and 20<br>The two that decide whether this works</div></header>
 
 <h1><span class="n">02</span>Measure a room &mdash; the AR path</h1>

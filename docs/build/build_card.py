@@ -53,10 +53,10 @@ def css(body_pt, lead):
 '''
 
 def mast(right):
-    return f'''<header class="mast"><div class="brand">True<span>line</span></div>
+    return f'''<header class="mast"><div class="brand">Scan<span>ToBid</span></div>
   <div class="sub">{right}</div></header>'''
 
-FOOT1 = ("Figures are published manufacturer and industry values, not measurements taken by Trueline. "
+FOOT1 = ("Figures are published manufacturer and industry values, not measurements taken by ScanToBid. "
   "Range ~5 m / 16 ft; minimum working distance ~8&ndash;10 in; recommended max scan area ~9 &times; 9 m. "
   "Validate against your own device before quoting any of them to a customer.")
 FOOT3 = ("<b>What to send back:</b> one export file per room, scanned separately &mdash; not merged. Two rooms "
@@ -64,7 +64,7 @@ FOOT3 = ("<b>What to send back:</b> one export file per room, scanned separately
   "formats; DXF and PDF too if the app offers them. Plus this page, filled in.")
 
 def html(body_pt=9.2, lead=1.34, rows=7):
-    return f'''<!doctype html><html><head><meta charset="utf-8"><title>Trueline Field Card</title>
+    return f'''<!doctype html><html><head><meta charset="utf-8"><title>ScanToBid Field Card</title>
 <style>{css(body_pt, lead)}</style></head><body>
 
 {mast("Field card &mdash; how to measure a room<br>Rev 5 &middot; iPhone / iPad &mdash; with LiDAR or without")}
@@ -166,7 +166,7 @@ done properly beats twenty done badly.</footer>
   as you have patience for, longest first. <b>Measure one wall twice</b>, at the start and end of the
   scan &mdash; if the two differ, that is drift, a different problem from sensor error.</p>
   <div class="warn"><span class="lbl">The app will tell you which walls</span>
-  Open the scan in Trueline first and it ranks them: longest and most blocked at the top, because
+  Open the scan in ScanToBid first and it ranks them: longest and most blocked at the top, because
   that is the measurement that buys the most. Four of them is a two-minute job. Send the list to
   your phone before you go.</div>
   <table>
@@ -222,7 +222,7 @@ done properly beats twenty done badly.</footer>
   tolerance</em>, that wall is the next one to tape. It is the room telling you where it is wrong.</p>
   <div class="warn"><span class="lbl">It is saved, but it is not backed up</span>
   Corrections are kept inside the app and survive closing it &mdash; on that phone only. Deleting the
-  app deletes them. The captures themselves also sit in the <b>Files</b> app under Trueline, so a
+  app deletes them. The captures themselves also sit in the <b>Files</b> app under ScanToBid, so a
   room can be copied off; until accounts exist that is the only backup there is.</div>
 </section>
 
@@ -252,7 +252,7 @@ whole point of the tape log on the previous page &mdash; and of the amber lines 
     <tr><td class="k">6. Correct it</td><td>Same screen as a scan: plan, area, punch list, tape box.</td></tr>
   </table>
   <div class="warn"><span class="lbl">The closing tap is not a corner &mdash; it is the accuracy</span>
-  Nobody publishes how precisely a person places a point in AR by eye, and Trueline will not invent a
+  Nobody publishes how precisely a person places a point in AR by eye, and ScanToBid will not invent a
   figure. The gap between tap 1 and tap 5 <b>is</b> the tolerance. Skip it and the app has to ask you
   to type one in, because it has nothing else to go on.</div>
 </section>
