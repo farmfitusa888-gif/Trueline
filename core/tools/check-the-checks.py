@@ -73,6 +73,12 @@ class Bench:
         # one of these rather than one under `core/tools`.
         for path in sorted(ROOT.glob('*.sh')):
             shutil.copy2(path, where / path.name)
+        # The document generators. `check-wordmark.py` reads every text file in
+        # the tree, and one of the two places the bug it exists for actually
+        # lived is `docs/build/build_card.py` — the masthead on six printed
+        # pages — rather than anything under `web/src`.
+        shutil.copytree(ROOT / 'docs' / 'build', where / 'docs' / 'build',
+                        ignore=shutil.ignore_patterns('__pycache__'))
         for folder, suffixes in (('web/src', ('.tsx', '.ts')),
                                  ('web/audit', ('.mjs',))):
             for path in sorted((ROOT / folder).rglob('*')):
@@ -1381,6 +1387,58 @@ def bashThirtyTwo(bench: Bench) -> None:
     expect('quiet again once the files are put back', code, out, fires=False)
 
 
+def splitWordmark(bench: Bench) -> None:
+    print('check-wordmark.py — the old name, hiding where grep cannot see it')
+
+    code, out = bench.run('check-wordmark.py')
+    expect('says nothing about the repository as it stands', code, out, fires=False)
+
+    # 1. The exact line that shipped. On 2026-09-02 the product was renamed and
+    #    every file containing `Trueline` was fixed -- and the app went on
+    #    saying Trueline at the top of every screen, because the wordmark is
+    #    written across two elements and is not that string in any file.
+    rel = 'web/src/App.tsx'
+    was = bench.read(rel)
+    broken = was.replace('Scan<span className="text-[#B8590A]">ToBid</span>',
+                         'True<span className="text-[#B8590A]">line</span>')
+    assert broken != was, 'the wordmark check-wordmark was written for has moved'
+    bench.write(rel, broken)
+    code, out = bench.run('check-wordmark.py')
+    expect('the app header wordmark put back the way it shipped', code, out,
+           fires=True, saying='App.tsx')
+    bench.restore(rel)
+
+    # 2. Plain HTML rather than JSX, in a generator rather than a component --
+    #    the field card masthead, which hid the same name on six printed pages.
+    rel = 'docs/build/build_card.py'
+    was = bench.read(rel)
+    bench.write(rel, was.replace('<div class="brand">Scan<span>ToBid</span></div>',
+                                 '<div class="brand">True<span>line</span></div>'))
+    code, out = bench.run('check-wordmark.py')
+    expect('the field card masthead', code, out, fires=True, saying='build_card.py')
+    bench.restore(rel)
+
+    # 3. Spelled with an HTML entity, which neither grep nor a naive tag strip
+    #    would catch -- the checker unescapes before it looks.
+    rel = 'docs/probe.html'
+    bench.write(rel, '<p>True<b>&#108;ine</b></p>\n')
+    code, out = bench.run('check-wordmark.py')
+    expect('a half spelled as an HTML entity', code, out, fires=True, saying='probe.html')
+    (bench.where / rel).unlink()
+
+    # 4. The name split by a newline inside ONE element is prose, not a
+    #    wordmark: on screen it reads "True line", with a space. A checker that
+    #    called that a bug would fire on any paragraph ending in the word true.
+    rel = 'docs/probe.html'
+    bench.write(rel, '<p>The reading is true\nline by line.</p>\n')
+    code, out = bench.run('check-wordmark.py')
+    expect('prose that merely ends a line with the word true', code, out, fires=False)
+    (bench.where / rel).unlink()
+
+    code, out = bench.run('check-wordmark.py')
+    expect('quiet again once every one of them is put back', code, out, fires=False)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         bench = Bench(Path(tmp))
@@ -1413,6 +1471,8 @@ def main() -> int:
         scanLifecycle(bench)
         print()
         bashThirtyTwo(bench)
+        print()
+        splitWordmark(bench)
 
     print()
     if failures:

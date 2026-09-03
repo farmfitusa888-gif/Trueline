@@ -2,13 +2,19 @@
      role="img" aria-label="ScanToBid">
   <!-- The same mark for light ground: ink where the icon is paper-white. No
        background, so it can sit on anything. -->
-  <g transform="translate(512,512) scale(1.16) translate(-512,-512)">
-    <g stroke="#14181B" stroke-linecap="butt">
-      <line x1="224" y1="300" x2="800" y2="300" stroke-width="46"/>
-      <line x1="234" y1="234" x2="234" y2="366" stroke-width="24"/>
-      <line x1="790" y1="234" x2="790" y2="366" stroke-width="24"/>
-      <line x1="512" y1="300" x2="512" y2="596" stroke-width="46"/>
+  <g transform="translate(512,512) scale(0.9751) translate(-512,-512)">
+    <g fill="none" stroke="#14181B" stroke-width="50" stroke-linecap="butt">
+      <path d="M180 320 L180 180 L320 180"/>
+      <path d="M704 180 L844 180 L844 320"/>
+      <path d="M844 704 L844 844 L704 844"/>
+      <path d="M320 844 L180 844 L180 704"/>
     </g>
-    <polygon points="512,584 578,646 578,690 512,800 446,690 446,646" fill="#B8590A"/>
+    <path d="M336 448 L512 296 L688 448 L688 690 L336 690 Z"
+          fill="none" stroke="#14181B" stroke-width="36" stroke-linejoin="miter"/>
+    <g fill="#14181B">
+      <rect x="396" y="494" width="232" height="30"/>
+      <rect x="396" y="548" width="152" height="30"/>
+    </g>
+    <rect x="396" y="608" width="232" height="52" fill="#B8590A"/>
   </g>
 </svg>

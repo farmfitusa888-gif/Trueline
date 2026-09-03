@@ -22,7 +22,7 @@
     "check-collapse": "python3 core/tools/check-collapse.py",
     "check-shipped": "python3 core/tools/check-shipped.py",
     "catch-up": "bash setup-mac.sh --checks-only",
-    "verify": "npm test && npm run typecheck && npm run build && npm run check-guide && npm run what-is-left && npm run check-collapse && npm run check-shipped && npm run what-is-untouched && npm run check-tokens && npm run check-art && npm run check-portable && npm run check-bash32 && npm run check-testflight && npm run check-swift && npm run check-the-checks && npm run site",
+    "verify": "npm test && npm run typecheck && npm run build && npm run check-guide && npm run what-is-left && npm run check-collapse && npm run check-shipped && npm run what-is-untouched && npm run check-tokens && npm run check-art && npm run check-logo && npm run check-wordmark && npm run check-portable && npm run check-bash32 && npm run check-testflight && npm run check-swift && npm run check-the-checks && npm run site",
     "ship-web": "npm run build && rm -rf ios/Trueline/Web && mkdir -p ios/Trueline/Web && cp -R web/dist/. ios/Trueline/Web/",
     "site": "node site/build.mjs && node site/tools/check.mjs",
     "site-seo": "node site/tools/seo-report.mjs",
@@ -41,6 +41,9 @@
     "check-testflight": "python3 core/tools/check-testflight.py",
     "site-open": "npm run site && echo \"\" && echo \"The site is at  http://127.0.0.1:4180  \u2014 Ctrl-C to stop.\" && echo \"\" && cd site/dist && python3 -m http.server 4180 --bind 127.0.0.1",
     "phone": "bash build.sh",
-    "sim": "bash build.sh --sim"
+    "sim": "bash build.sh --sim",
+    "logo": "node core/tools/gen-logo.mjs",
+    "check-logo": "node core/tools/gen-logo.mjs --check",
+    "check-wordmark": "python3 core/tools/check-wordmark.py"
   }
 }

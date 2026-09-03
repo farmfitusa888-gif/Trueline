@@ -1,6 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The same mark the app ships, redrawn for 16 px: reticle, gable, total.
+       The line items inside the sheet are dropped because at this size they
+       close up into a grey block. -->
   <rect width="32" height="32" rx="5" fill="#14181B"/>
-  <path d="M4 24h24" stroke="#E9ECEE" stroke-width="2.2" stroke-linecap="square"/>
-  <path d="M8 24v-5M12.5 24v-8M17 24v-5M27 24v-5" stroke="#E9ECEE" stroke-width="1.6"/>
-  <path d="M22 24V11" stroke="#FFD400" stroke-width="2.6"/>
+  <g fill="none" stroke="#F4F6F7" stroke-width="2.5" stroke-linecap="butt">
+    <path d="M5.5 10 L5.5 5.5 L10 5.5"/>
+    <path d="M22 5.5 L26.5 5.5 L26.5 10"/>
+    <path d="M26.5 22 L26.5 26.5 L22 26.5"/>
+    <path d="M10 26.5 L5.5 26.5 L5.5 22"/>
+  </g>
+  <path d="M10.5 14 L16 9.5 L21.5 14 L21.5 21.5 L10.5 21.5 Z"
+        fill="none" stroke="#F4F6F7" stroke-width="2" stroke-linejoin="miter"/>
+  <rect x="12.4" y="16.8" width="7.2" height="2.8" fill="#B8590A"/>
 </svg>

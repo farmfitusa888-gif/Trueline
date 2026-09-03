@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"
      role="img" aria-label="ScanToBid">
   <!--
-    Two lines, which is the whole product.
+    Three things the product does, in one drawing.
 
-    Across the top: a dimension line with its end ticks — a true length, the
-    thing a tape gives you and a scanner only estimates. Down the middle: a
-    plumb line with the bob on the end — true vertical, the oldest measuring
-    instrument there is and the only one that cannot drift. Together they read
-    as a T.
+    The outer brackets are a scan reticle — what the phone frames before it
+    reads a room. Inside it, a sheet with a gable: the bid and the building it
+    is for are the same object here, because in this app they are produced in
+    one act. Two ink rules are line items; the amber rule under them is the
+    total, in the colour that means "measured" everywhere else in this product.
 
     No text. Apple's icons are read at 60 px on a home screen, and a word at
     that size is a smudge.
@@ -21,20 +21,21 @@
 
   <rect width="1024" height="1024" fill="url(#ground)"/>
 
-  <!-- Sized to fill the icon the way Apple's own do: the art carries its own
-       margin, and the system supplies the rounded mask. -->
-  <g transform="translate(512,512) scale(1.16) translate(-512,-512)">
-  <g stroke="#F4F6F7" stroke-linecap="butt">
-    <!-- the dimension line -->
-    <line x1="224" y1="300" x2="800" y2="300" stroke-width="46"/>
-    <!-- its end ticks -->
-    <line x1="234" y1="234" x2="234" y2="366" stroke-width="24"/>
-    <line x1="790" y1="234" x2="790" y2="366" stroke-width="24"/>
-    <!-- the plumb line -->
-    <line x1="512" y1="300" x2="512" y2="596" stroke-width="46"/>
-  </g>
-
-  <!-- the bob -->
-  <polygon points="512,584 578,646 578,690 512,800 446,690 446,646" fill="#B8590A"/>
+  <!-- 68% of the square, the same fraction core/tools/gen-art.mjs uses, so the
+       shipped icon and this file are the same picture at the same weight. -->
+  <g transform="translate(512,512) scale(0.9751) translate(-512,-512)">
+    <g fill="none" stroke="#F4F6F7" stroke-width="50" stroke-linecap="butt">
+      <path d="M180 320 L180 180 L320 180"/>
+      <path d="M704 180 L844 180 L844 320"/>
+      <path d="M844 704 L844 844 L704 844"/>
+      <path d="M320 844 L180 844 L180 704"/>
+    </g>
+    <path d="M336 448 L512 296 L688 448 L688 690 L336 690 Z"
+          fill="none" stroke="#F4F6F7" stroke-width="36" stroke-linejoin="miter"/>
+    <g fill="#F4F6F7">
+      <rect x="396" y="494" width="232" height="30"/>
+      <rect x="396" y="548" width="152" height="30"/>
+    </g>
+    <rect x="396" y="608" width="232" height="52" fill="#B8590A"/>
   </g>
 </svg>

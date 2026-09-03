@@ -1,21 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 874 300" width="874" height="300"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1064 300" width="1064" height="300"
      role="img" aria-label="ScanToBid">
   <!--
     The horizontal lockup: the mark, then the name, with `ToBid` in the amber
     that means "measured" everywhere else in this product — on the plan, on the
     field card, in the app.
+
+    The mark's ink box is 714 square (155..869 in its own coordinates), scaled
+    to 240 tall and set on the baseline of the type.
   -->
-  <g transform="translate(-11,0) scale(0.2896)">
-    <g transform="translate(512,512) scale(1.16) translate(-512,-512)">
-      <g stroke="#14181B" stroke-linecap="butt">
-        <line x1="224" y1="300" x2="800" y2="300" stroke-width="46"/>
-        <line x1="234" y1="234" x2="234" y2="366" stroke-width="24"/>
-        <line x1="790" y1="234" x2="790" y2="366" stroke-width="24"/>
-        <line x1="512" y1="300" x2="512" y2="596" stroke-width="46"/>
-      </g>
-      <polygon points="512,584 578,646 578,690 512,800 446,690 446,646" fill="#B8590A"/>
+  <g transform="translate(20,30) scale(0.33613) translate(-155,-155)">
+    <g fill="none" stroke="#14181B" stroke-width="50" stroke-linecap="butt">
+      <path d="M180 320 L180 180 L320 180"/>
+      <path d="M704 180 L844 180 L844 320"/>
+      <path d="M844 704 L844 844 L704 844"/>
+      <path d="M320 844 L180 844 L180 704"/>
     </g>
+    <path d="M336 448 L512 296 L688 448 L688 690 L336 690 Z"
+          fill="none" stroke="#14181B" stroke-width="36" stroke-linejoin="miter"/>
+    <g fill="#14181B">
+      <rect x="396" y="494" width="232" height="30"/>
+      <rect x="396" y="548" width="152" height="30"/>
+    </g>
+    <rect x="396" y="608" width="232" height="52" fill="#B8590A"/>
   </g>
-  <text x="285" y="205" font-family="Liberation Sans, Arial, Helvetica, sans-serif"
+  <text x="296" y="205" font-family="Liberation Sans, Arial, Helvetica, sans-serif"
         font-size="152" font-weight="bold" letter-spacing="-4" fill="#14181B">Scan<tspan fill="#B8590A">ToBid</tspan></text>
 </svg>

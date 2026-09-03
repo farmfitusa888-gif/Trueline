@@ -1,0 +1,22 @@
+{
+  "why": [
+    "Names the product used to go by. A name that is gone must be gone from",
+    "everything a person can read -- and the one place it hides is the wordmark,",
+    "which is written across two elements (True<span>line</span>) and so is not a",
+    "contiguous string in any file. check-wordmark.py strips the markup first and",
+    "then looks, which is the only way to see it."
+  ],
+  "gone": [
+    {
+      "name": "Trueline",
+      "since": "2026-09-02",
+      "why": "The App Store name was taken by another construction measuring app."
+    }
+  ],
+  "allowed": [
+    {
+      "text": "TruelineApp",
+      "why": "The SwiftUI App struct. Not a name anybody reads; renaming it is a source change with no user-visible effect."
+    }
+  ]
+}

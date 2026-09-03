@@ -160,9 +160,15 @@ ${head}${structured}
   <div class="wrap">
     <a class="mark" href="/">
       <svg viewBox="0 0 32 32" aria-hidden="true" fill="none">
-        <path d="M3 24h26" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/>
-        <path d="M7 24v-5M12 24v-8M17 24v-5M27 24v-5" stroke="currentColor" stroke-width="1.6"/>
-        <path d="M22 24V11" stroke="var(--yellow)" stroke-width="2.6"/>
+        <g stroke="currentColor" stroke-width="2.5" stroke-linecap="butt">
+          <path d="M5.5 10 L5.5 5.5 L10 5.5"/>
+          <path d="M22 5.5 L26.5 5.5 L26.5 10"/>
+          <path d="M26.5 22 L26.5 26.5 L22 26.5"/>
+          <path d="M10 26.5 L5.5 26.5 L5.5 22"/>
+        </g>
+        <path d="M10.5 14 L16 9.5 L21.5 14 L21.5 21.5 L10.5 21.5 Z"
+              stroke="currentColor" stroke-width="2" stroke-linejoin="miter"/>
+        <rect x="12.4" y="16.8" width="7.2" height="2.8" fill="#B8590A" stroke="none"/>
       </svg>
       <span>Scan<span class="b">ToBid</span></span>
     </a>
@@ -179,10 +185,12 @@ ${body}
   <div class="wrap">
     <div class="cols">
       <div>
-        <p class="foot-h" id="foot-trueline">ScanToBid</p>
-        <ul aria-labelledby="foot-trueline">
+        <p class="foot-h" id="foot-scantobid">ScanToBid</p>
+        <ul aria-labelledby="foot-scantobid">
           <li><a href="/">What it is</a></li>
           <li><a href="/about/">About</a></li>
+          <li><a href="/support/">Support</a></li>
+          <li><a href="/privacy/">Privacy</a></li>
           <li><a href="mailto:${SITE.email}">${SITE.email}</a></li>
         </ul>
       </div>
@@ -1279,6 +1287,147 @@ function aboutPage() {
   };
 }
 
+function supportPage() {
+  const body = `
+<div class="wrap narrow">
+  <div class="guide-head">
+    <p class="eyebrow">Support</p>
+    <h1>Something is wrong, or you want something it does not do</h1>
+  </div>
+
+  <p class="lede">Write to <a href="mailto:${SITE.email}">${SITE.email}</a>. One address, read by
+    the person who builds it.</p>
+
+  <h2 id="what-to-say">What to put in the email</h2>
+  <p>Four things make a problem fixable instead of guessable:</p>
+  <ul class="plain">
+    <li><strong>Which iPhone, and which version of iOS.</strong> Settings &rarr; General &rarr;
+      About has both.</li>
+    <li><strong>What you were doing</strong> — scanning, walking, drawing on the grid, pricing a
+      takeoff, sending a proposal.</li>
+    <li><strong>What you expected, and what happened instead.</strong></li>
+    <li><strong>A screenshot</strong>, if there is anything on screen worth seeing.</li>
+  </ul>
+
+  <h2 id="diagnostics">Sending a diagnostic report</h2>
+  <p>If the app crashed or froze, it will have written a report to itself. Open
+    <strong>Business &rarr; Diagnostics</strong>, read what it says, and tap <strong>Send
+    them</strong>. That opens your own mail app with the file attached and your finger on the
+    send button — nothing is transmitted unless you press it, and you can read the file first.</p>
+
+  <h2 id="data">Getting your work out, and getting rid of it</h2>
+  <p>Every scan is a folder on the phone, and those folders are visible in the
+    <strong>Files</strong> app under ${esc(SITE.name)}. You can copy them to a computer, put them
+    in your own cloud, or delete them there. Deleting the app deletes all of it, because there is
+    nowhere else it exists — see <a href="/privacy/">the privacy page</a> for why.</p>
+
+  <h2 id="subscription">The subscription</h2>
+  <p>Billing is Apple's, not ours: we never see a card number and cannot charge, refund or cancel
+    anything. Manage or cancel a subscription in <strong>Settings &rarr; your name &rarr;
+    Subscriptions</strong> on the iPhone. Refunds go through
+    <a href="https://reportaproblem.apple.com" rel="external">reportaproblem.apple.com</a>.</p>
+
+  <h2 id="corrections">Corrections to this site</h2>
+  <p>If a guide, a calculator or a figure on this site is wrong, say so at the same address.
+    <a href="/about/#true">Every claim here is listed with how to check it</a>, and one that
+    cannot be checked gets removed.</p>
+</div>`;
+
+  return {
+    path: '/support/',
+    html: shell({
+      title: `${SITE.name} Support`,
+      description:
+        `How to get help with ${SITE.name}: what to put in the email, sending a diagnostic `
+        + 'report, exporting or deleting your scans, and managing the subscription.',
+      path: '/support/', body,
+      jsonLd: [
+        { '@context': 'https://schema.org', '@type': 'ContactPage', url: url('/support/'),
+          publisher: ORGANISATION },
+        crumbs([{ name: SITE.name, path: '/' }, { name: 'Support', path: '/support/' }]),
+      ],
+    }),
+  };
+}
+
+function privacyPage() {
+  const body = `
+<div class="wrap narrow">
+  <div class="guide-head">
+    <p class="eyebrow">Privacy</p>
+    <h1>What leaves your phone</h1>
+  </div>
+
+  <p class="lede">Nothing, unless you send it yourself. There is no account, no server behind this
+    app and nowhere for your work to go.</p>
+
+  <h2 id="collected">What is collected</h2>
+  <p>Nothing. ${esc(SITE.name)} has no account system, no analytics, no advertising identifier and
+    no tracking of any kind. The app's own privacy manifest declares no collected data types and
+    no tracking domains, which is what Apple shows you on the App Store listing and what the app
+    is built against.</p>
+
+  <h2 id="stays">What stays on the device</h2>
+  <p>All of it. Scans, photographs, voice notes and their transcripts, the plan, the takeoff,
+    prices, proposals, signatures, invoices and the schedule are files in the app's own storage on
+    that iPhone. They are readable in the <strong>Files</strong> app, and deleting the app deletes
+    them.</p>
+
+  <h2 id="permissions">Why the app asks for what it asks for</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Permission</th><th>What it is for</th></tr></thead>
+      <tbody>
+        <tr><td>Camera</td><td>Measuring the room, and photographing it as you walk.</td></tr>
+        <tr><td>Microphone</td><td>Recording what you say about a wall instead of typing it.</td></tr>
+        <tr><td>Speech recognition</td><td>Turning that recording into words. It runs on the iPhone; the audio is not sent to Apple.</td></tr>
+        <tr><td>Calendar</td><td>Adding scheduled days to a calendar of its own. Write-only — it never reads what else is in there.</td></tr>
+        <tr><td>Location</td><td>The compass, so north is right on the drawing. The position itself is not used or stored.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="sent">The only things that ever leave, and you press send on all of them</h2>
+  <ul class="plain">
+    <li><strong>A proposal, invoice, claim or export you share.</strong> You choose the file and
+      where it goes, through the iPhone's own share sheet.</li>
+    <li><strong>A diagnostic report.</strong> Crash and hang reports are written to disk and shown
+      to you. Tapping <strong>Send them</strong> opens your mail app with the file attached; it
+      goes nowhere until you send it, and you can read it first.</li>
+  </ul>
+
+  <h2 id="payments">Payments</h2>
+  <p>Subscriptions are handled entirely by Apple. This app never sees, handles or stores a card
+    number, and it processes no payments of its own — not for the subscription, and not for the
+    invoices you write in it. An invoice records what was agreed; taking the money is between you
+    and your customer.</p>
+
+  <h2 id="children">Children</h2>
+  <p>This is a tool for tradespeople. It is not directed at children and collects nothing from
+    anybody, of any age.</p>
+
+  <h2 id="changes">Changes, and how to ask</h2>
+  <p>If this page ever stops being true it gets rewritten here, on the same address. Questions to
+    <a href="mailto:${SITE.email}">${SITE.email}</a>.</p>
+</div>`;
+
+  return {
+    path: '/privacy/',
+    html: shell({
+      title: `${SITE.name} Privacy Policy`,
+      description:
+        `${SITE.name} collects nothing and has no server. What each permission is for, what `
+        + 'stays on the iPhone, and the only two things that ever leave it.',
+      path: '/privacy/', body,
+      jsonLd: [
+        { '@context': 'https://schema.org', '@type': 'WebPage', url: url('/privacy/'),
+          publisher: ORGANISATION },
+        crumbs([{ name: SITE.name, path: '/' }, { name: 'Privacy', path: '/privacy/' }]),
+      ],
+    }),
+  };
+}
+
 function thanksPage() {
   const body = `
 <div class="wrap narrow" style="padding-top:5rem;min-height:50vh">
@@ -1340,6 +1489,8 @@ const pages = [
   calculatorsIndex(),
   templatesPage(),
   aboutPage(),
+  supportPage(),
+  privacyPage(),
   thanksPage(),
   notFound(),
   ...GUIDES.map(guidePage),

@@ -1,38 +1,38 @@
 {
   "AppIcon.appiconset/icon-1024.png": {
-    "source": "0d0643d265509c9c57186dd4a6d4c61e",
-    "png": "133fb3546755637d53b82d93078843aa"
+    "source": "a82bfecc368cee457229f131cd617d80",
+    "png": "42435178abdb879d38c5bcaa904becaa"
   },
   "AppIcon.appiconset/icon-1024-dark.png": {
-    "source": "681a5e6361aec6f4665d19a333f24e44",
-    "png": "85aef1d4810c093891f3e1e5673d8b29"
+    "source": "b3da5f87e6c3e5a71acea312993178df",
+    "png": "72905a51abc65fbe8d08cd5963bc013b"
   },
   "AppIcon.appiconset/icon-1024-tinted.png": {
-    "source": "402c3674981bddd718f9bb1eb51fa200",
-    "png": "97979c9dc1cd2bd6300e07d000697acd"
+    "source": "b54493c8883d5c2e0c197c4c1cc89812",
+    "png": "6ec273671d2ee6c0920f5ace22e16e68"
   },
   "LaunchMark.imageset/mark-1x.png": {
-    "source": "70b08130a0106ba21cfdff4b1f88351f",
-    "png": "98647c10bd460705aca8d147035d7c51"
+    "source": "edc440b7f0e354ab10e409eaadbf87f2",
+    "png": "a2e6ce133a3cdffe55f6e99558cc1d9c"
   },
   "LaunchMark.imageset/mark-dark-1x.png": {
-    "source": "adf667da3f87f431a53d73c7ceab6c5e",
-    "png": "1604a10b06fdaf5e6e137b8fd8760421"
+    "source": "9e31dce23876a6ae436e1a20a99a3749",
+    "png": "2a5a8e1f9a984467786516d121fc1aff"
   },
   "LaunchMark.imageset/mark-2x.png": {
-    "source": "26b80d5f214b2d0d7f19a87ac27d194f",
-    "png": "782c2471c29369e23c5fde6dfc171c2f"
+    "source": "9dc73181a63179d19b783b45d9cdacd7",
+    "png": "a2722ef26a3cfbe8824fa20c06ffc035"
   },
   "LaunchMark.imageset/mark-dark-2x.png": {
-    "source": "1bc0a4a1fcb6d1a120f8799772dbd783",
-    "png": "48efb89e334162bed5df13c7e245da68"
+    "source": "b15046022249b27627814c168a3c910c",
+    "png": "53409840914ebf931757f030fae5a9e8"
   },
   "LaunchMark.imageset/mark-3x.png": {
-    "source": "c6fb6b975bbecf03d6250cb50af4d7f8",
-    "png": "d2bea8777492b38436265909b184277f"
+    "source": "009162f88fdeafd993569bb3c46ae726",
+    "png": "150f30ffeda2fd866dbffa6214952914"
   },
   "LaunchMark.imageset/mark-dark-3x.png": {
-    "source": "6c81cf508625628ac0cb906ff8839723",
-    "png": "440e56839d86bb2b0bdc4bb5778b1535"
+    "source": "b45cac8eaf140abb4d1cab5fcd62d81f",
+    "png": "3c44e3ec2081c1028f9ca48e33e0f656"
   }
 }

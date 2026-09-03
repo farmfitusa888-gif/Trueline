@@ -1,12 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- The app mark, redrawn for 16 px: the dimension line keeps its end ticks
-       but at this size they are part of the bar, and the bob is heavier. -->
+  <!-- The app mark, redrawn for 16 px. The two line items inside the sheet are
+       dropped and the strokes are heavier: at favicon size they close up into a
+       grey block, and what has to survive is the reticle, the gable and the
+       total. -->
   <rect width="64" height="64" rx="13" fill="#14181B"/>
-  <g stroke="#F4F6F7" stroke-linecap="butt">
-    <line x1="13" y1="21" x2="51" y2="21" stroke-width="6"/>
-    <line x1="14.5" y1="16" x2="14.5" y2="27" stroke-width="4"/>
-    <line x1="49.5" y1="16" x2="49.5" y2="27" stroke-width="4"/>
-    <line x1="32" y1="21" x2="32" y2="40" stroke-width="6"/>
+  <g fill="none" stroke="#F4F6F7" stroke-width="5" stroke-linecap="butt">
+    <path d="M11 20 L11 11 L20 11"/>
+    <path d="M44 11 L53 11 L53 20"/>
+    <path d="M53 44 L53 53 L44 53"/>
+    <path d="M20 53 L11 53 L11 44"/>
   </g>
-  <polygon points="32,38 41,45 41,48 32,59 23,48 23,45" fill="#B8590A"/>
+  <path d="M21 28 L32 19 L43 28 L43 43 L21 43 Z"
+        fill="none" stroke="#F4F6F7" stroke-width="4" stroke-linejoin="miter"/>
+  <rect x="25" y="33.5" width="14" height="5.5" fill="#B8590A"/>
 </svg>

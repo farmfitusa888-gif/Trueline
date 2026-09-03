@@ -44,18 +44,23 @@ const { NEUTRAL, MEANING } = await import(join(root, 'core', 'src', 'design.ts')
  * The mark, at whatever size is asked for.
  *
  * The geometry is lifted from `web/src/Mark.tsx` and is checked against it
- * below, so the icon and the wordmark on every screen are the same drawing:
- * a dimension line with end ticks -- a true length, the thing a tape gives you
- * and a scanner only estimates -- over a plumb line with the bob on the end.
+ * below, so the icon and the wordmark on every screen are the same drawing: a
+ * scan reticle around a gabled sheet — the bid and the building it is for —
+ * with two line items and the total ruled under them in amber.
  */
-function mark(ink, bob) {
-  return `<g stroke="${ink}" stroke-linecap="butt">
-      <line x1="224" y1="300" x2="800" y2="300" stroke-width="46"/>
-      <line x1="234" y1="234" x2="234" y2="366" stroke-width="24"/>
-      <line x1="790" y1="234" x2="790" y2="366" stroke-width="24"/>
-      <line x1="512" y1="300" x2="512" y2="596" stroke-width="46"/>
+function mark(ink, total) {
+  return `<g fill="none" stroke="${ink}" stroke-width="50" stroke-linecap="butt">
+      <path d="M180 320 L180 180 L320 180"/>
+      <path d="M704 180 L844 180 L844 320"/>
+      <path d="M844 704 L844 844 L704 844"/>
+      <path d="M320 844 L180 844 L180 704"/>
     </g>
-    <polygon points="512,584 578,646 578,690 512,800 446,690 446,646" fill="${bob}"/>`;
+    <path d="M336 448 L512 296 L688 448 L688 690 L336 690 Z" fill="none" stroke="${ink}" stroke-width="36" stroke-linejoin="miter"/>
+    <g fill="${ink}">
+      <rect x="396" y="494" width="232" height="30"/>
+      <rect x="396" y="548" width="152" height="30"/>
+    </g>
+    <rect x="396" y="608" width="232" height="52" fill="${total}"/>`;
 }
 
 /**
@@ -71,13 +76,12 @@ function mark(ink, bob) {
  * background for comes back as a grey square.
  */
 function icon(ground, ink, bob) {
-  // The mark's own INK box, not its viewBox. The viewBox in `Mark.tsx` carries
-  // slack on every side, and scaling to it drew an icon with the mark small and
-  // sitting high in a field of graphite. What is actually drawn runs from the
-  // outside of the left tick to the outside of the right one, and from the top
-  // of the ticks to the point of the bob.
-  const LEFT = 234 - 12, RIGHT = 790 + 12;   // tick centres, less/plus half a stroke
-  const TOP = 234 - 12, BOTTOM = 800;        // tick top, to the bob's point
+  // The mark's own INK box, not its viewBox. What is actually drawn is the
+  // reticle, whose brackets are centred on 180 and 844 and carry a 50 stroke,
+  // so the ink runs half a stroke outside those on every side. The box is
+  // square, which is what lets the icon sit centred rather than high.
+  const LEFT = 180 - 25, RIGHT = 844 + 25;   // bracket centres, less/plus half a stroke
+  const TOP = 180 - 25, BOTTOM = 844 + 25;
   const w = RIGHT - LEFT;
   const h = BOTTOM - TOP;
 
@@ -100,7 +104,7 @@ function icon(ground, ink, bob) {
 function launchMark(ink, bob) {
   // Cropped to the ink, the same as the icon, so the launch screen and the home
   // screen show the mark at the same weight rather than one of them padded.
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="580" height="578" viewBox="222 222 580 578">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="714" height="714" viewBox="155 155 714 714">
   ${mark(ink, bob)}
 </svg>`;
 }
@@ -121,12 +125,12 @@ const ART = [
 for (const [scale, px] of [[1, 166], [2, 332], [3, 498]]) {
   ART.push({
     path: `LaunchMark.imageset/mark-${scale}x.png`,
-    w: px, h: Math.round((px * 578) / 580),
+    w: px, h: px,
     svg: launchMark(hex(NEUTRAL.ink, 'light'), hex(MEANING.accent, 'light')),
   });
   ART.push({
     path: `LaunchMark.imageset/mark-dark-${scale}x.png`,
-    w: px, h: Math.round((px * 578) / 580),
+    w: px, h: px,
     svg: launchMark(hex(NEUTRAL.ink, 'dark'), hex(MEANING.accent, 'dark')),
   });
 }
@@ -179,7 +183,8 @@ function colour(h) {
 // not, the app icon becomes a picture of a mark the app no longer uses -- so
 // the numbers are read back out of it and compared.
 const source = readFileSync(join(root, 'web', 'src', 'Mark.tsx'), 'utf8');
-const mine = mark('X', 'Y').replace(/\s+/g, ' ').match(/x1="[^"]*"|points="[^"]*"/g) ?? [];
+const mine = mark('X', 'Y').replace(/\s+/g, ' ')
+  .match(/d="[^"]*"|x="\d+" y="\d+" width="\d+" height="\d+"/g) ?? [];
 for (const bit of mine) {
   if (!source.includes(bit)) {
     console.error(`web/src/Mark.tsx no longer has ${bit}.`);
@@ -235,9 +240,28 @@ const fingerprint = (text) => createHash('sha256').update(text).digest('hex').sl
 
 /** The exact string handed to the renderer, so the hash is of what is drawn. */
 function pageFor(art) {
-  return `<style>html,body{margin:0;padding:0;background:transparent}svg{display:block}</style>`
-    + art.svg.replace('width="1024" height="1024"', `width="${art.w}" height="${art.h}"`)
-             .replace(/width="580" height="578"/, `width="${art.w}" height="${art.h}"`);
+  // The SVG carries its own intrinsic size and is shot into a viewport of the
+  // size actually wanted, so that size has to be written onto the tag or
+  // Chromium renders it at its own size and crops to the viewport.
+  //
+  // This used to name the two sizes it expected as literal strings. When the
+  // mark changed shape and the launch mark stopped being 580x578, neither
+  // literal matched, nothing was substituted, and the art came out silently
+  // cropped to the top-left corner -- with an exit code of 0 and nine cheerful
+  // "wrote" lines. So the substitution is now positional, and not making it is
+  // an error rather than a no-op.
+  let hit = false;
+  const sized = art.svg.replace(/width="\d+" height="\d+"/, () => {
+    hit = true;
+    return `width="${art.w}" height="${art.h}"`;
+  });
+  // Comparing the strings would not do: an SVG already at the wanted size comes
+  // back unchanged whether the substitution matched or not, which is the icon's
+  // case exactly. What has to be true is that it MATCHED.
+  if (!hit) {
+    throw new Error(`${art.path}: the SVG has no width/height to scale, so it would render cropped.`);
+  }
+  return `<style>html,body{margin:0;padding:0;background:transparent}svg{display:block}</style>${sized}`;
 }
 
 const check = process.argv.includes('--check');
