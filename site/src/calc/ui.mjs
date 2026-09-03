@@ -195,7 +195,7 @@ const CALCULATORS = {
       note:
         waste > 0n
           ? null
-          : 'No waste allowance is in these figures. Trueline has not seen this room, and how ' +
+          : 'No waste allowance is in these figures. ScanToBid has not seen this room, and how ' +
             'much a room wastes is a fact about the room — put your own figure in the box.',
     };
   },
@@ -219,7 +219,7 @@ const CALCULATORS = {
         working: [],
         note:
           'The room is measured. What is missing is the coverage rate — the square feet a '
-          + 'gallon covers, printed on the tin. Trueline does not know what you are painting '
+          + 'gallon covers, printed on the tin. ScanToBid does not know what you are painting '
           + 'with, it is different for a primer, and it is different again over bare board, so '
           + 'it will not pick one for you. Put it in the box and the gallons appear.',
       };

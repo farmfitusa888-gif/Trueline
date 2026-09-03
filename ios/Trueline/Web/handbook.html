@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>The Trueline Handbook</title>
+<title>The ScanToBid Handbook</title>
 </head>
 <body>
 
@@ -20,7 +20,7 @@
 </style>
 <div class="wrap"><a class="back-to-app" href="./index.html">&larr; Back to Trueline</a></div>
 
-<title>The Trueline Handbook</title>
+<title>The ScanToBid Handbook</title>
 <style>
 /*
    The faces, out of the app's own bundle rather than off the network.
@@ -237,8 +237,8 @@
 
 <div class="wrap">
 <header class="mast">
-  <p class="eyebrow">Trueline · how to use it · every feature</p>
-  <h1>The <em>Trueline</em> Handbook</h1>
+  <p class="eyebrow">ScanToBid · how to use it · every feature</p>
+  <h1>The <em>ScanToBid</em> Handbook</h1>
   <p class="standfirst">
     Every screen, every button, and what each one is actually for. Written for
     somebody who has never opened it. Search below, or read it straight through.
@@ -295,15 +295,15 @@ const GUIDE = [
     why: 'Five minutes, once. Everything after this is the job.',
     cards: [
       { t: 'Getting it on the phone', where: 'Terminal, on the Mac', tag: null,
-        what: 'Trueline is not on the App Store yet, so it goes on your phone from your own Mac.',
+        what: 'ScanToBid is not on the App Store yet, so it goes on your phone from your own Mac.',
         steps: ['Plug the iPhone in with a cable, unlock it, and tap Trust if it asks.',
                 'Open Terminal and type <kbd>cd ~/trueline &amp;&amp; git pull &amp;&amp; bash build.sh</kbd>',
                 'It pulls, checks everything, compiles, installs and launches. No Xcode window.',
                 'First time only: on the phone, Settings → General → VPN &amp; Device Management → your Apple ID → Trust. Then run it again.'],
-        done: 'Trueline opens on the phone and shows an empty list of rooms.' },
+        done: 'ScanToBid opens on the phone and shows an empty list of rooms.' },
       { t: 'What it costs, and what it never will', where: 'Free / paid', tag: null,
         what: 'Measuring is free forever. What turns a drawing into money is the subscription.',
-        steps: ['Right now nothing is withheld from anybody. Trueline is not on the App Store yet, so there is nothing to buy, and the paid screen says so in those words: <b>Everything is on, free, right now</b>.',
+        steps: ['Right now nothing is withheld from anybody. ScanToBid is not on the App Store yet, so there is nothing to buy, and the paid screen says so in those words: <b>Everything is on, free, right now</b>.',
                 'When it does go on sale — free, with no account and no card: scanning, walking a room, the drawing, the 3D view, correcting anything on it, and the room’s dimensions.',
                 'Free keeps one room at a time. One room with the whole app on it, not a cut-down room.',
                 'The subscription adds the quantities, pricing, proposals, signatures, change orders, scheduling, invoices, insurance mode, your supplier’s and your stores’ prices, and every export.'],
@@ -671,7 +671,7 @@ const GUIDE = [
                 'Read the lines underneath: whether it applies and why, what the deadline works out to, and what you have to hand over.',
                 'Send it. The notice and two completed cancellation forms are on the document — one for them to send back, one to keep.'],
         done: 'A proposal carrying the notice, both forms, your name and address on them, and a deadline the app worked out rather than asked you for.',
-        warn: 'Being invited to quote does not take a sale out of the rule — “following an invitation by the buyer” is inside the definition, not outside it. Business days are the rule’s, not yours: Saturday counts, Sunday and federal holidays do not. This is the federal rule only. Several states give a buyer longer and some require wording of their own; Trueline does not know which state your job is in, and says so on the notice rather than letting you assume three days is the answer. It is not legal advice. Until you answer the question the proposal goes out with no notice on it, and with no business address it prints a block saying the notice could not be completed rather than a form with a blank where the address goes.' },
+        warn: 'Being invited to quote does not take a sale out of the rule — “following an invitation by the buyer” is inside the definition, not outside it. Business days are the rule’s, not yours: Saturday counts, Sunday and federal holidays do not. This is the federal rule only. Several states give a buyer longer and some require wording of their own; ScanToBid does not know which state your job is in, and says so on the notice rather than letting you assume three days is the answer. It is not legal advice. Until you answer the question the proposal goes out with no notice on it, and with no business address it prints a block saying the notice could not be completed rather than a form with a blank where the address goes.' },
       { t: 'Get it signed', where: 'Agreement → Sign it', tag: PAID,
         what: 'Signed in the kitchen, with the record that makes it stand up.',
         steps: ['Tap <b>Take this one</b> on the option they chose.',
@@ -712,7 +712,7 @@ const GUIDE = [
                 'Tap <b>Put it in the calendar</b> to add it to the list.',
                 'Tap <b>Add to my calendar</b> to send them to the phone.'],
         done: 'A calendar named after your business, which you can switch off on a Sunday without switching off your life.',
-        warn: 'The first time, iOS asks permission. Trueline asks only to <i>add</i> events — it never reads what else is in your calendar.' },
+        warn: 'The first time, iOS asks permission. ScanToBid asks only to <i>add</i> events — it never reads what else is in your calendar.' },
       { t: 'Send the dates to somebody', where: 'Work → Send it to somebody', tag: PAID,
         what: 'A file every calendar reads — Apple, Google, Outlook.',
         steps: ['Add the days first.',
@@ -729,19 +729,19 @@ const GUIDE = [
                 'Tap <b>Write the change order</b>.'],
         done: 'A change order waiting to be signed, with the price, the days and the reason on it.',
         warn: 'Nothing on a change order is billable until it is signed. That is on purpose: a bill for work nobody agreed to is the one accusation you cannot answer.' },
-      { t: 'Trueline in a browser', where: 'app.trueline.tools', tag: FREE,
-        what: 'Everything but the scan runs on any computer, at app.trueline.tools.',
+      { t: 'ScanToBid in a browser', where: 'app.scantobid.app', tag: FREE,
+        what: 'Everything but the scan runs on any computer, at app.scantobid.app.',
         steps: ['Drawing a room by hand, correcting one, the 3D view and the dimensions are free there, with no account and no card.',
                 'The takeoff, prices, proposals, signatures, change orders, insurance mode and the exports are the subscription — the same line the phone draws.',
-                'A <code>room.json</code> from a scan opens there, and so does a Trueline job file somebody sent you.',
+                'A <code>room.json</code> from a scan opens there, and so does a ScanToBid job file somebody sent you.',
                 'There is no login, there and here. Nothing to sign into and nothing to forget.'],
         done: 'The same screens, on a computer, with the same line drawn through them.',
         warn: 'A browser is not a safe place to keep work. Safari deletes what a site has stored after seven days you have not been back, and any browser may clear it sooner when the machine is short of space. Write the job to a file.' },
-      { t: 'Open your browser with the code from this phone', where: 'Business → Trueline in a browser', tag: PAID,
+      { t: 'Open your browser with the code from this phone', where: 'Business → ScanToBid in a browser', tag: PAID,
         what: 'You already pay. You should not meet a paywall in your own browser.',
         steps: ['On this phone, go to <b>Your business</b> and scroll to the bottom.',
                 'There is a code that starts <code>TL-</code>. Tap <b>Copy the browser code</b>.',
-                'On the computer, open app.trueline.tools and paste it into the box on the front page.',
+                'On the computer, open app.scantobid.app and paste it into the box on the front page.',
                 'Once. From then on that browser does what this phone does.'],
         done: 'Every paid screen open in that browser, with no account anywhere.',
         warn: 'It is a courtesy lock, not security. A code you forward works in whoever’s browser you forward it to. It is there so you are not asked to pay twice, not to stop anybody.' },
@@ -786,7 +786,7 @@ const GUIDE = [
                 'Put a reference if you have one: a cheque number, a wire reference, or the last four digits.',
                 'Tap <b>Write it down</b>.'],
         done: 'The top of the invoice list says what is still out, worst first, with how many days past due.',
-        warn: 'Trueline takes no payments and holds no card details — you are writing down what arrived, the way a paper ledger does. Type a full card number in the reference and it refuses to store it. That refusal is the reason the app needs no security certification and cannot leak anybody’s card.' },
+        warn: 'ScanToBid takes no payments and holds no card details — you are writing down what arrived, the way a paper ledger does. Type a full card number in the reference and it refuses to store it. That refusal is the reason the app needs no security certification and cannot leak anybody’s card.' },
       { t: 'Send it to QuickBooks', where: 'Work → Send to QuickBooks', tag: PAID,
         what: 'A file, not an integration — nothing about it stops working on a Tuesday.',
         steps: ['Write at least one invoice.',
@@ -893,7 +893,7 @@ const GUIDE = [
     why: 'What it costs and how to manage it.',
     cards: [
       { t: 'Starting it', where: 'Any locked screen', tag: null,
-        what: 'One plan, monthly or yearly — and nothing to buy at all until Trueline is on the App Store.',
+        what: 'One plan, monthly or yearly — and nothing to buy at all until ScanToBid is on the App Store.',
         steps: ['Tap anything locked. It says what that feature does before it says it is paid.',
                 'Until launch the screen reads <b>Everything is on, free, right now</b>, and it means it: there is nothing to buy and nothing is being withheld.',
                 'After that, pick monthly or yearly. The price, and any free trial attached to it, are whatever the App Store is offering that day — the screen reads them from Apple rather than from a number typed into the app.',
@@ -916,7 +916,7 @@ const GUIDE = [
         warn: 'If you paid with a different Apple ID, sign in with that one in Settings first.' },
       { t: 'Stopping it', where: 'iPhone Settings', tag: null,
         what: 'In the App Store, not by asking anybody.',
-        steps: ['iPhone Settings → your name → Subscriptions → Trueline → Cancel.'],
+        steps: ['iPhone Settings → your name → Subscriptions → ScanToBid → Cancel.'],
         done: 'It stops renewing. Every room you have measured stays on the phone.' },
     ],
   },
@@ -928,7 +928,7 @@ const GUIDE = [
         what: 'If the app quits on its own, or a screen goes blank, there is a report on the phone.',
         steps: ['Bottom tab: <b>Business</b>. Scroll to the bottom.',
                 'Under <b>When something goes wrong</b>, each report says what it was and when.',
-                'Tap <b>Send them</b>. It opens a mail to support@trueline.tools with everything attached.',
+                'Tap <b>Send them</b>. It opens a mail to support@scantobid.app with everything attached.',
                 '<b>Delete them</b> throws them away, and asks twice because it cannot be undone.'],
         done: 'A mail is open with one file attached, waiting for you to press send.',
         warn: 'A crash from today usually appears tomorrow. iOS hands crash reports over on a later launch rather than at the moment of the crash. Anything a screen inside the app throws is written straight away.' },
@@ -936,7 +936,7 @@ const GUIDE = [
         what: 'Which build, which model of phone, and what failed. Nothing about the job.',
         steps: ['No room, no client, no address, no photograph and no measurement is in a report.',
                 'Nothing goes anywhere on its own — there is no server in this app and no network call that sends one.',
-                'The files are in the Files app under Trueline → Reports if you would rather look yourself.'],
+                'The files are in the Files app under ScanToBid → Reports if you would rather look yourself.'],
         done: 'You can read the whole file before you send it.' },
     ],
   },

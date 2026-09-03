@@ -430,7 +430,7 @@ export function paint(room, { coats, coverageSqFt, ceiling = false }) {
   if (coats <= 0n) throw new RangeError('A coat of paint is at least one coat.');
   if (coverageSqFt <= 0n) {
     throw new RangeError(
-      'Coverage is the square feet a gallon covers, off the can. Trueline does not know what ' +
+      'Coverage is the square feet a gallon covers, off the can. ScanToBid does not know what ' +
         'you are painting with, so it will not pick one for you.'
     );
   }
